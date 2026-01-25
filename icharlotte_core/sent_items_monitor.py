@@ -9,6 +9,8 @@ from PyQt6.QtCore import QThread, pyqtSignal
 
 from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.ui.logs_tab import LogManager
+from icharlotte_core.llm import LLMHandler
+from icharlotte_core.config import API_KEYS
 
 
 class SentItemsMonitorWorker(QThread):
@@ -226,13 +228,13 @@ class SentItemsMonitorWorker(QThread):
 
     def _extract_todo_text(self, body: str, body_prefix: str = "AS -") -> str:
         """
-        Extract and clean todo text from email body.
+        Extract and clean todo text from email body using LLM.
 
         Body format example:
-            AS - Please call plaintiff re: deposition scheduling, thnx
+            AS - Can you please work on finishing the FSR I started on this case?
 
         Returns:
-            Cleaned todo text: "Call plaintiff re: deposition scheduling"
+            Cleaned action-only todo text: "Finish the FSR"
         """
         # Remove the prefix (case insensitive)
         text = body.strip()
@@ -243,6 +245,56 @@ class SentItemsMonitorWorker(QThread):
         lines = text.split('\n')
         first_line = lines[0].strip() if lines else ""
 
+        if not first_line:
+            return ""
+
+        # Try LLM extraction first
+        extracted = self._extract_action_with_llm(first_line)
+        if extracted:
+            return extracted
+
+        # Fallback to rule-based extraction
+        return self._extract_todo_text_fallback(first_line)
+
+    def _extract_action_with_llm(self, text: str) -> str:
+        """Use LLM to extract just the action from email text."""
+        if not API_KEYS.get("Gemini"):
+            return ""
+
+        system_prompt = """You are a task extraction assistant. Extract ONLY the core action/task from the given text.
+
+Rules:
+- Remove all conversational language (can you, please, would you, etc.)
+- Remove references to "this case" or "the case"
+- Remove phrases like "I started", "I need you to", "work on"
+- Keep the essential action and its object (e.g., "finish the FSR", "call the plaintiff")
+- Use imperative form (start with a verb)
+- Capitalize the first letter
+- Be concise - just the action, nothing else
+- Output ONLY the extracted action, no explanation"""
+
+        user_prompt = f"Extract the action from: {text}"
+
+        try:
+            result = LLMHandler.generate(
+                provider="Gemini",
+                model="gemini-2.0-flash",
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                file_contents="",
+                settings={"temperature": 0.1, "max_tokens": 50, "stream": False}
+            )
+            # Clean up the result
+            result = result.strip().strip('"').strip("'")
+            if result:
+                return result
+        except Exception as e:
+            LogManager().add_log("Email Monitor", f"LLM extraction failed: {e}")
+
+        return ""
+
+    def _extract_todo_text_fallback(self, first_line: str) -> str:
+        """Fallback rule-based extraction when LLM is unavailable."""
         # Remove filler words
         words = first_line.split()
         cleaned_words = []

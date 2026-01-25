@@ -8,6 +8,12 @@ GEMINI_DATA_DIR = os.path.join(os.getcwd(), ".gemini", "case_data")
 TEMP_DIR = os.path.join(os.getcwd(), ".gemini", "tmp")
 NOTETAKER_DIR = os.path.join(os.getcwd(), "NoteTaker", "out", "renderer")
 
+# Templates & Resources
+TEMPLATES_DIR = os.path.join(os.getcwd(), "Templates")
+RESOURCES_DIR = os.path.join(os.getcwd(), "Resources")
+TEMPLATE_EXTENSIONS = ['.docx', '.txt', '.html', '.rtf']
+RESOURCE_EXTENSIONS = ['.pdf', '.docx', '.txt', '.html', '.png', '.jpg', '.jpeg']
+
 API_KEYS = {
     "Gemini": os.environ.get("GEMINI_API_KEY"),
     "OpenAI": os.environ.get("OPENAI_API_KEY"),

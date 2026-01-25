@@ -1297,9 +1297,13 @@ class MasterCaseTab(QWidget):
         self.restore_selection()
 
     def on_case_double_clicked(self, item):
+        # Only load case and switch to Case View when double-clicking the Tasks column (index 6)
+        if item.column() != 6:
+            return
+
         row = item.row()
         file_number = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
-        
+
         if self.main_window:
             # Trigger switch in MainWindow
             if hasattr(self.main_window, 'load_case_by_number'):

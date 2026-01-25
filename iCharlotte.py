@@ -1,5 +1,6 @@
 import sys
 import os
+import argparse
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
@@ -50,6 +51,7 @@ from icharlotte_core.ui.report_tab import ReportTab
 from icharlotte_core.ui.logs_tab import LogsTab
 from icharlotte_core.ui.liability_tab import LiabilityExposureTab
 from icharlotte_core.ui.master_case_tab import MasterCaseTab
+from icharlotte_core.ui.templates_resources_tab import TemplatesResourcesTab
 
 class DirectoryTreeWorker(QThread):
     data_ready = pyqtSignal(list) # Emits (root, dirs, files) tuples
@@ -95,23 +97,37 @@ class DirectoryTreeWorker(QThread):
         self.running = False
 
 class MainWindow(QMainWindow):
-    def __init__(self, file_number, case_path):
+    def __init__(self, file_number=None, case_path=None, initial_tab=None):
         super().__init__()
         self.file_number = file_number
         self.case_path = case_path
-        self.setWindowTitle(f"iCharlotte - {self.file_number} - {os.path.basename(self.case_path)}")
+        self._update_window_title()
         self.resize(1200, 800)
-        
+
         self.agent_runners = [] # Keep references to prevent GC
         self.cached_models = {} # Cache for models: {provider: [list]}
         self.fetcher = None
-        
+
         log_event(f"Initializing MainWindow for {file_number} at {case_path}")
         self.icon_provider = QFileIconProvider()
         self.setup_ui()
-        self.populate_tree()
-        self.load_status_history()
-        self.check_docket_expiry(file_number)
+
+        # Restore tab if specified
+        if initial_tab is not None and 0 <= initial_tab < self.tabs.count():
+            self.tabs.setCurrentIndex(initial_tab)
+
+        # Only populate tree and check docket if a case is loaded
+        if self.case_path:
+            self.populate_tree()
+            self.load_status_history()
+            self.check_docket_expiry(file_number)
+
+    def _update_window_title(self):
+        """Update window title based on current file_number and case_path."""
+        if self.file_number and self.case_path:
+            self.setWindowTitle(f"iCharlotte - {self.file_number} - {os.path.basename(self.case_path)}")
+        else:
+            self.setWindowTitle("iCharlotte")
 
     def setup_ui(self):
         self.tabs = QTabWidget()
@@ -325,6 +341,10 @@ class MainWindow(QMainWindow):
         self.liability_tab = LiabilityExposureTab()
         self.tabs.addTab(self.liability_tab, "Liability & Exposure")
 
+        # --- Tab: Templates / Resources ---
+        self.templates_tab = TemplatesResourcesTab(main_window=self)
+        self.tabs.addTab(self.templates_tab, "Templates / Resources")
+
         # --- Tab 8: Logs ---
         self.logs_tab = LogsTab(self)
         self.tabs.addTab(self.logs_tab, "Logs")
@@ -422,13 +442,31 @@ class MainWindow(QMainWindow):
                 runner.terminate()
             except:
                 pass
-        
-        # Get the current arguments
-        args = sys.argv[:]
-        
+
+        # Get the absolute path to this script
+        script_path = os.path.abspath(__file__)
+
+        # Build restart arguments with current state
+        args = [script_path]
+
+        # Add current file number if loaded
+        if self.file_number:
+            args.extend(['--file-number', str(self.file_number)])
+
+        # Add current case path if loaded
+        if self.case_path:
+            args.extend(['--case-path', str(self.case_path)])
+
+        # Add current tab index
+        current_tab = self.tabs.currentIndex()
+        args.extend(['--tab', str(current_tab)])
+
+        log_event(f"Restarting with: python={sys.executable}, args={args}")
+        log_event(f"Current state: file_number={self.file_number}, case_path={self.case_path}, tab={current_tab}")
+
         # Spawn new process
         subprocess.Popen([sys.executable] + args)
-        
+
         # Exit current process
         QApplication.quit()
 
@@ -619,12 +657,12 @@ class MainWindow(QMainWindow):
 
     def load_case_by_number(self, file_number):
         new_path = get_case_path(file_number)
-        
+
         if new_path:
             self.save_status_history()
             self.file_number = file_number
             self.case_path = new_path
-            self.setWindowTitle(f"iCharlotte - {self.file_number} - {os.path.basename(self.case_path)}")
+            self._update_window_title()
             self.populate_tree()
             self.clear_all_status()
             self.load_status_history()
@@ -841,6 +879,9 @@ class MainWindow(QMainWindow):
                 widget.deleteLater()
 
     def save_status_history(self):
+        if not self.file_number:
+            return
+
         history = []
         # Loop from 0 to count-1 (top to bottom)
         for i in range(self.status_list_layout.count()):
@@ -848,10 +889,10 @@ class MainWindow(QMainWindow):
             widget = item.widget()
             if isinstance(widget, StatusWidget):
                 history.append(widget.to_dict())
-        
+
         if not os.path.exists(GEMINI_DATA_DIR):
             os.makedirs(GEMINI_DATA_DIR, exist_ok=True)
-            
+
         save_path = os.path.join(GEMINI_DATA_DIR, f"{self.file_number}_status_history.json")
         try:
             with open(save_path, 'w') as f:
@@ -861,6 +902,9 @@ class MainWindow(QMainWindow):
             log_event(f"Error saving status history: {e}", "error")
 
     def load_status_history(self):
+        if not self.file_number:
+            return
+
         save_path = os.path.join(GEMINI_DATA_DIR, f"{self.file_number}_status_history.json")
         if not os.path.exists(save_path):
             return
@@ -1267,29 +1311,33 @@ sys.excepthook = exception_hook
 
 if __name__ == "__main__":
     try:
+        # Parse command-line arguments for restart state restoration
+        parser = argparse.ArgumentParser(description='iCharlotte Legal Document Management Suite')
+        parser.add_argument('--file-number', type=str, help='File number to load on startup')
+        parser.add_argument('--case-path', type=str, help='Case path to load on startup')
+        parser.add_argument('--tab', type=int, help='Tab index to open on startup')
+        args, remaining = parser.parse_known_args()
+
+        # Debug: Log received arguments
+        print(f"DEBUG: sys.argv = {sys.argv}")
+        print(f"DEBUG: Parsed args = file_number={args.file_number}, case_path={args.case_path}, tab={args.tab}")
+
         # Disable Chromium sandbox and security for local file editing
         os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--no-sandbox --disable-web-security"
 
         app = QApplication(sys.argv)
-        
-        # 1. Ask for File Number
-        dialog = FileNumberDialog()
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            file_num = dialog.get_file_number()
-            
-            # 2. Resolve Path
-            case_path = get_case_path(file_num)
-            
-            if case_path:
-                # 3. Launch Main Window
-                window = MainWindow(file_num, case_path)
-                window.show()
-                sys.exit(app.exec())
-            else:
-                QMessageBox.critical(None, "Error", f"Could not find case directory for {file_num}")
-                sys.exit(1)
-        else:
-            sys.exit(0)
+
+        # Log startup parameters
+        log_event(f"Starting with args: file_number={args.file_number}, case_path={args.case_path}, tab={args.tab}")
+
+        # Launch Main Window with restored state if provided
+        window = MainWindow(
+            file_number=args.file_number,
+            case_path=args.case_path,
+            initial_tab=args.tab
+        )
+        window.show()
+        sys.exit(app.exec())
     except Exception as e:
         print(f"CRITICAL MAIN ERROR: {e}")
         import traceback
