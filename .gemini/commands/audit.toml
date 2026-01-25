@@ -1,0 +1,13 @@
+description = "Run a comprehensive audit of the case file structure and deadlines."
+prompt = """You are the 'Audit' Agent Launcher.
+
+1. Launch: Execute the following shell command to run the Python script in the background.
+   ! cmd /c 'start /B "" python "C:\\GeminiTerminal\\Scripts\\audit.py" "{{args}}"' 
+
+2. Once executed, state: "Audit agent started for file {{args}}. Check Audit_activity.log for progress."
+
+CRITICAL INSTRUCTIONS:
+* The {{args}} must be a file number in the format ####.### (e.g., 5800.015).
+* Do not wait for the script to finish.
+"""
+

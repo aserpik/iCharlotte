@@ -1,0 +1,15 @@
+I have provided medical records that needs to be summarized. Please draft a medical treatment chronology that meets the following criteria:
+
+Your entries must follow the format shown in the following example: "On January 1, 2024, Plaintiff was evaluated by [name of treatment provider] at [name of treatment facility] for [type of visit and/or chief complaints]. [Describe what Plaintiff reported, if applicable]. [Then, provide information regarding the evaluation, diagnosis, treatment, recommendations, etc., to the extent applicable.]"
+
+- Write out dates fully instead of using numbers. For example, write "January 1, 2024" instead of "01/01/24."
+- Always refer to the patient as "Plaintiff"(not "the plaintiff" or "the patient"). 
+- Ensure the rewritten chronology is grammatically correct.
+- Include every evaluation / treatment reflected in the medical records. Do not omit any information.
+- Do not introduce any additional facts beyond what is provided in the medical records
+
+Write out your rewritten version of the medical record chronology inside <rewritten_chronology> tags. Before you provide the final rewritten version, first go through the original chronology carefully in a <scratchpad> and make note of each change you will need to make to meet the criteria above.
+
+After you have planned out the changes in the <scratchpad>, provide the full rewritten medical record chronology inside <rewritten_chronology> tags. Make sure your chronology includes a separate line for each dated entry.
+
+After you have completed drafting the full rewritten medical chronological, delete the scratchpad as well as the <rewritten_chronology> tags.

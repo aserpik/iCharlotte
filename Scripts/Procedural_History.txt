@@ -1,0 +1,124 @@
+Your task is to generate a "PROCEDURAL HISTORY" section for a legal status report based on the information and documents I will provide to you or that are available in our current conversation context.
+
+**CRITICAL REQUIREMENT:** The generated section *must strictly adhere to the style, tone, format, structure, and level of detail* demonstrated in the examples provided below. You are essentially mimicking the writing style and conventions used in those examples.
+
+Here are the specific requirements:
+
+1.  **Title:** Do NOT include the title "**PROCEDURAL HISTORY**" in your response. Start directly with the first sub-section.
+2.  **Structure:** The section should be divided into sub-sections using capital letters followed by a period (A., B., C., etc.). The sub-section titles should be concise and descriptive, similar to the examples (e.g., Pleadings, Venue, Representation, Future Hearings, Government Tort Claim, Responsive Pleading, etc.).
+3.  **Standard Sub-sections:** Based on the examples, the section should typically include, *if* the relevant information is available in the provided context, the following sub-sections in a logical order:
+    *   Pleadings (or Complaint, or Government Tort Claim if that's the initial step)
+    *   Venue
+    *   Representation (referring to Plaintiff's Counsel)
+    *   Future Hearings (or Upcoming Hearings)
+    *   Include other relevant procedural steps as demonstrated in the examples (e.g., Responsive Pleading, Cross-Complaints, Amended Complaints, Government Tort Claim details and rejection) if information is provided about them.
+4.  **Content per Sub-section:**
+    *   **Pleadings/Complaint:** State when the matter was initiated (filing of original complaint), by whom, against whom, and briefly list the causes of action. Include details and dates of subsequent relevant pleadings like Answers, Amended Complaints, or Cross-Complaints filed by any party mentioned in the source material, noting which parties filed them. Mention the filing of responsive pleadings on behalf of the client the report is for, including the date and mention of asserting applicable affirmative defenses.
+    *   **Government Tort Claim (if applicable):** If information about a pre-litigation tort claim is provided, include details like the submission date, a brief summary of the claims/allegations/injuries as stated in the claim, and the date it was accepted or rejected.
+    *   **Venue:** State the court, county, and possibly department/judge where the case is venued. State whether venue is proper and concisely explain why (e.g., location of incident). If information is provided about the jury pool characteristics (like "largely conservative"), include that detail.
+    *   **Representation:** Identify Plaintiff's counsel by name and firm. Include location of the firm and/or a brief description of their practice area or reputation if that information is provided. You can include any brief, factual commentary on counsel *if* it's in the source material (e.g., "cooperative," "experienced").
+    *   **Future/Upcoming Hearings:** List scheduled future court dates or deadlines (Case Management Conference, Settlement Conference, Trial Setting Conference, Trial, etc.). Include the type of hearing and the date. *Crucially*, include a sentence at the end of this sub-section confirming the date(s) are calendared and attendance is planned *to protect the client's interests* (you should be able to identify the client from the overall context or provided information). Use phrasing similar to the examples, e.g., "We confirm that we have calendared this date and will appear at the same to protect [Client's Name/Interest] interests."
+5.  **Tone and Style:**
+    *   Maintain a formal, factual, objective, concise, and legalistic tone, reporting only on procedural events.
+    *   Write from the perspective of representing the client for whom the report is being prepared.
+    *   Use clear, direct sentences.
+    *   Use standard legal terminology as seen in the examples (e.g., "filed their Complaint," "asserting three causes of action," "timely filed an Answer," "venue is proper").
+    *   Do not include analysis, arguments, or subjective opinions beyond what is demonstrated in the examples (e.g., commentary on jury pool or counsel's demeanor *if provided*).
+6.  **Information Usage:** Only include information that is explicitly present or clearly inferable from the documents/context you are given. Do not invent dates, facts, or procedural steps.
+7.  **Handling Missing Information:** If information for a typical sub-section (like Future Hearings) is not available in the provided context, omit that specific sub-section. Only include sub-sections for which you have relevant information to report, while prioritizing the standard ones listed above.
+
+**Examples to Follow:**
+
+```
+PROCEDURAL HISTORY
+
+A.	Pleadings
+
+Plaintiffs filed their Complaint on August 9, 2022. Defendants Invitation Homes, THR, and IH Borrower filed their Answer on September 14, 2022.
+
+B.	Venue
+
+This case has been filed in Riverside County, which has a largely conservative jury pool.
+
+C.	Representation
+
+Plaintiffs’ counsel is Ronald Appel, Esq. of Appel & Appel. He has thus far been cooperative.
+
+D.	Future Hearings
+
+Per the parties stipulation, the Court has continued the trial date in this matter to February 21, 2025. We confirm that we have calendared this date and will appear at the same to protect Defendants’ interests.
+```
+
+```
+PROCEDURAL HISTORY
+
+A.	Government Tort Claim
+
+On May 24, 2023, Plaintiffs submitted a Government Tort Claims to the City relating to the subject incident. Through their claims, Plaintiffs assert that the City knew or should reasonably have known that the Subject Intersection was a dangerous condition of public property because other collisions that resulted in injuries had occurred at the Subject Intersection several times prior to the Subject Incident. The claims specifies that Plaintiff Andrew Haire sustained a broken clavicle, broken scapula, 5 broken ribs, broken pelvic bone, brain bleed, traumatic brain injury, ischemic stroke, and medical complications including paralysis. Emily Haire sustained abrasions, a neck injury, and concussion. Samuel Haire sustained abrasions. Both Emily and Samuel also claim “emotional injury.” Finally, Mary Haire seeks damages for loss of love, companionship, comfort, care, assistance, protection, affection, society, moral support, and the enjoyment of sexual relations with her husband, Andrew Haire. The claims do not specify the amounts demanded.
+
+Plaintiffs’ claims were rejected by the City on June 16, 2023.
+
+B.	Pleadings
+
+On October 18, 2023, Plaintiffs filed their Complaint, asserting three causes of action for Negligence (against Barraza only), Dangerous Condition of Public Property, and Loss of Consortium.
+
+On November 30, 2023, we filed a timely Answer on behalf of the City, asserting all applicable affirmative defenses. We also filed a Roe Cross-Complaint for indemnity.
+
+On April 17, 2024, Defendant Miguel Angel Barraza served the City with a Cross-Complaint for indemnity, filed against the City and the County of Riverside. Our office timely filed an Answer to Defendant Barraza’s cross-complaint asserting all applicable affirmative defenses.
+
+C.	Venue
+
+This matter is assigned to the Hon. Raquel A. Marquez in Dept S303 of the Southwest Justice Center at the Riverside County Superior Court. Venue is proper, as the incident occurred in the City of Wildomar.
+
+D.	Plaintiff’s Counsel
+
+Plaintiffs are represented by John J. Hyland of the Rizio Lipinsky Law Firm, a small personal injury and employment law firm based in Santa Ana, California. Mr. Hyland has over 25 years of experience.
+
+E.	Case Management Conference
+
+A Case Management Conference is scheduled for October 8, 2024. We confirm that we have calendared this date and will attend the same to protect the City’s interests.
+```
+
+```
+PROCEDURAL HISTORY
+
+A.	Pleadings
+
+This matter was initiated on October 13, 2022, when Plaintiff filed his original complaint. However, this complaint contained an incorrect property address, prompting Plaintiff to file his First Amended Complaint (“FAC”) on October 24, 2022. The FAC named The Reserve at Cadillac Apartments, Dick James & Associates, and Does 1 through 10 as defendants, asserting a single cause of action for negligence. The Reserve and Dick James & Associates filed their Answer on February 22, 2023.
+
+On July 12, 2024, Plaintiff amended his FAC to name The Estate of Harry Torgovitsky, Torgovitsky Trust, and Charlotte Torgovitsky (collectively, “Owners”) as defendants. The Owner defendants filed their Answer on November 25, 2024.
+
+B.	Venue
+
+The case is venued in Sacramento, CA. Venue is proper because the accident occurred in Sacramento County.
+
+C.	Representation
+
+Plaintiff is represented by Kelsey Fischer of Dreyer Babich Buccola Wood Campora, LLP in Sacramento, CA. The firm advertises numerous catastrophic injury case results, primarily from motor vehicle accidents.
+
+D.	Future Hearings
+
+The Court has set a Mandatory Settlement Conference for March 13, 2025. Trial has been set for April 28, 2025.
+```
+
+```
+PROCEDURAL HISTORY
+
+A.	Complaint
+
+Eve Marie Barati Darmian, Paymon Darmian, Arshan Barati, Avaz Barati, Daryan Barati, Jahan Barati, Shams Barati, and Shayan Barati (“Plaintiffs”) filed their Complaint on January 21, 2021, against Dawn Charinne Bloom; Pacific Construction Burn; and DOES 1-50. The Complaint asserts three causes of action: (1) Negligence – Motor Vehicle; (2) Negligent Hiring Training, Supervision, Retention and Entrustment; and (3) Loss of Consortium. Plaintiffs allege that Pacific is vicariously liable under doctrine of Respondeat Superior for the negligent and/or wrongful conduct of its employee, Dawn Bloom.
+
+B.	Responsive Pleading
+
+We confirm that on December 3, 2021, prior counsel timely filed an Answer to Plaintiffs’ Complaint, which asserts all applicable affirmative defenses to Plaintiffs’ alleged cause of action.
+
+C.	Venue
+
+This case was filed in the Superior Court of California, County of Ventura. The incident occurred in Ojai which is a city in Ventura County. As such, the venue is proper.
+
+D.	Upcoming Hearings
+
+A Trial Setting Conference is scheduled for February 6, 2025, in Department 20-Hall of Justice. A jury trial is scheduled to begin on May 6, 2025. We confirm that we have calendared these dates and will appear at the same to protect Defendants’ interests.
+```
+
+---

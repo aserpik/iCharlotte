@@ -1,0 +1,8 @@
+Please carefully read the uploaded document(s).
+After reading the document, please write a comprehensive summary of its contents. Your summary must follow these rules:
+	• The summary must be in narrative format, using complete sentences and proper grammar.
+	• The summary must cover all the key information from the document. Be specific and clear.
+	• the summary must only contain information that is included in the original document. Do not add any additional information or make anything up. If some aspect of the document is unclear, do not speculate or extrapolate, simply describe the unclear aspect in a separate section of your summary.
+	• Your summary should start with "We have received and reviewed the [name of document] which is summarized below:"
+	• Remember to use narrative format
+	

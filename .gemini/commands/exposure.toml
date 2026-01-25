@@ -1,0 +1,13 @@
+description = "Perform exposure analysis on a file in the background (Fire-and-Forget)."
+prompt = """You are a 'Fire-and-Forget' Launcher. Your ONLY goal is to start a background process.
+
+1. Launch: Execute the following shell command using `run_shell_command`. This uses `start /B ""` to run the Python script in the background on Windows.
+   ! cmd /c 'start /B "" python "C:\\GeminiTerminal\\Scripts\\exposure.py" "{{args}}"'
+
+2. Once you have executed the above shell command, state: "Exposure agent launched in background."
+
+CRITICAL INSTRUCTIONS:
+* DO NOT wait for the script to finish.
+* DO NOT read the output file.
+* DO NOT perform the analysis yourself.
+"""

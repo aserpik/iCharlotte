@@ -1,0 +1,709 @@
+=== STATUS UPDATE EXAMPLES ===
+This file contains the text bodies of previous status updates.
+Use these as style references for the LLM.
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Discovery: We have recently received Plaintiff’s responses to discovery, which are summarized below: 
+
+
+Background. Plaintiff was born on May 26, 2006. At the time of the incident, Plaintiff did not have a driver's license. Plaintiff has not been convicted of a felony. 
+
+
+Insurance. Plaintiff states there was no policy of insurance in effect through which Plaintiff was or might be insured for damages, claims, or actions arising out of the incident.
+
+
+Contentions. The incident occurred on January 20, 2024, between approximately 8:00 a.m. and 9:00 a.m., at or near 5811 Tujunga Avenue, North Hollywood, California 91601. Plaintiff had just returned home from the gym and was walking toward the elevator to access his apartment, having entered the building through a side door located in the garage. Defendant’s vehicle, identified as a 2017 Ford Truck with license number 12863K2, backed into Plaintiff while Plaintiff was walking through the garage. The impact caused Plaintiff to fall and land on his right knee, resulting in immediate pain and emotional distress. Immediately preceding the incident, Plaintiff was looking straight ahead in the direction of the elevator. Following the incident, Plaintiff recalls Defendant asking if he was okay, and stating that he did not see Plaintiff and that Plaintiff "came out suddenly." Defendant repeated this several times and stated he was going to call his supervisor. Immediately after the incident, Plaintiff called his mother, informing her he had been hit. His mother and sister subsequently arrived at the scene where Plaintiff was still on the floor. Plaintiff also informed his other sisters, Lorena Garcias and Carolina Garcias, about being hit by a car and injured. Plaintiff alleges that Defendant was negligent in failing to operate the garbage truck in a safe and reasonable manner under the circumstances, specifically by failing to keep a proper lookout, failing to yield the right-of-way to a pedestrian, failing to control the vehicle’s speed and direction, and failing to ensure the path was clear before proceeding through the parking lot. Plaintiff contends that Defendant violated California Vehicle Code Section 21950
+
+
+Witnesses. Individuals claimed to have knowledge of the incident include Plaintiff and Juan Erasmo Melara Benavides. Plaintiff also identified his mother, Tereza Garcias, and sister, Rosa Garcias, as a general damages witnesses. 
+
+
+Cell Phone. Plaintiff’s cell phone number as of the day of the incident was (747) 389-3675, and his cell phone provider was T-Mobile.
+
+
+Injuries. Plaintiff attributes physical injuries to the incident, specifically affecting the right knee and lower back. Plaintiff continues to experience ongoing pain in these areas, reporting sharp lower back pain approximately three times per week and discomfort in the right knee three to four times per week. 
+
+
+Medical Treatment. Plaintiff identified the following treatment and associated costs, totaling $156,576.50:
+
+
+- Providence St. Joseph Medical Center: Emergency Care on January 20, 2024, at a cost of $2,211.75.
+
+
+- Jeffrey Chavis, D.C.: Chiropractic Care on various dates between February 20, 2024, and July 2, 2024, at a cost of $3,295.00.
+
+
+- Diagnostic Imaging Service Center of Encino: Diagnostic Imaging on February 1, 2024, at a cost of $3,900.00.
+
+
+- Parehjan & Vartzar Chiropractic, Inc.: Chiropractic Care on various dates between May 24, 2024, and June 19, 2024, at a cost of $1,674.75.
+
+
+- Yermian Physical Therapy: Physical Therapy on various dates between July 1, 2024, and August 21, 2024, at a cost of $4,575.00.
+
+
+- Fred Farshid Hekmat, M.D.: Orthopedic Consults on various dates between January 29, 2024, and November 18, 2024, at a cost of $55,800.00.
+
+
+- Beverly Hills Center for Arthroscopic and Outpatient Surgery: Surgery on April 25, 2024, at a cost of $85,120.00.
+
+
+Future Medical Care. Plaintiff anticipates a potential need for future medical treatment, but estimated costs are unknown at this time.
+
+
+Lost Income. Plaintiff is currently employed as a Team Member (Fast Food Employee) at Panda Express, located at 11313 Stockdale Hwy, Bakersfield, CA 93311. Plaintiff has held this position since July 2022. The last date Plaintiff worked for compensation prior to the incident was January 19, 2024. At the time of the incident, Plaintiff's monthly income was approximately $913.75. Plaintiff returned to work on July 23, 2024, after not working from April 24, 2024, through July 23, 2024. The total income lost to date as a result of the incident is approximately $2,741.25. 
+
+
+Lifestyle Impact. Prior to the incident, Plaintiff regularly went to the gym and was physically active. Since the incident, he has experienced a significant decline in his ability to engage in these activities. He goes to the gym less frequently as his back cannot tolerate the same level of physical stress, experiencing sharp back pain throughout the week, particularly after work. He also has ongoing knee discomfort, compounded by a prior knee surgery, especially when working or engaging in physical activity. These symptoms limit his mobility and overall physical function. Additionally, Plaintiff has struggled to maintain consistent work hours due to this ongoing pain and discomfort.
+
+
+Prior and Subsequent Accidents/Claims. Plaintiff had no complaints or injuries involving the same body parts prior to the incident, nor any physical, mental, or emotional disabilities immediately before the incident. Plaintiff sustained no subsequent injuries of the same kind after the incident. Plaintiff denies filing any prior actions or making written claims or demands for personal injuries within the last 10 years, other than the subject lawsuit, and also denies making any workers' compensation claims within the past 10 years. 
+
+
+Further Case Handling: Following receipt of Plaintiff’s responses to discovery, we propounded subpoenas to all identified medical providers as well as Plaintiff’s employers. We are still waiting to receive records from several of the providers. Once we have received a complete set of Plaintiff’s medical and billing records, we will move forward with scheduling Plaintiff’s deposition and an IME with Dr. Krietenberg. 
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Deposition of Lauren Katacha. We took the deposition of Defendant Lauren Katacha on August 8, 2025. Lauren came off as nervous and shy. She was emotionless throughout the deposition and had a flat affect. She will make an average witness. The following is a screenshot of Lauren taken at her deposition:
+
+
+Below are the most salient portions of Lauren’s testimony:
+
+
+Background
+
+
+*	Lauren confirmed her date of birth is November 2, 2005, making her 17 years old at the time of the incident in May 2023. She lives with her parents and two younger siblings in Hemet, California. She was a junior in high school at the time of the incident.
+
+*	Lauren obtained her learner's permit at fifteen and a half after completing an online course and her full driver's license at sixteen. Before her driving test, which she passed on her first attempt, she completed six hours of in-person, behind-the-wheel instruction. This means she had been a licensed driver for over a year at the time of the incident.
+
+
+*	Prior to the collision, Lauren had a clean driving record with no history of accidents, traffic tickets, or warnings. She stated that she drove almost every day and felt she was a comfortable and experienced driver. She has not been involved in any other accidents since this incident.
+
+*	Lauren confirmed she has no corrective lens restriction on her license and only wears glasses for reading or extended screen time. On the day of the incident, she felt alert and healthy. 
+
+
+Vehicle Information
+
+
+*	On the day of the incident, Lauren was driving a 2014 Buick owned by her father. The car had been passed down to her, and she was its primary and sole operator. She used it almost every day for transportation to school and other activities.
+
+*	Lauren testified that the vehicle had no known mechanical problems prior to the collision. The car's headlights were on an automatic setting. She could not recall if they were illuminated at the time of the accident, which occurred around dusk.
+
+*	As a result of the accident, the vehicle's windshield was shattered and its frame was damaged. The cost of repair was deemed too high, and the car was considered a total loss. Lauren confirmed her father no longer owns the vehicle and that she has not seen it since the day of the incident.
+
+
+Familiarity With The Accident Location
+
+
+*	Lauren testified she was familiar with the intersection of Whitewood Road and Hellebore Street, having driven through it approximately five to ten times before the incident. She was frequently in the area to drop off or pick up her friend and track teammate, Jeremiah, who lived in the adjacent neighborhood. On the day of the incident, she had just left his house.
+
+*	Lauren stated that she used two different routes to exit the neighborhood. About half the time, she would take Hellebore to turn onto Whitewood Road. The other half of the time, she would exit via Keller Road, which was the route she typically used to enter the neighborhood.
+
+*	Prior to the incident, Lauren had never heard anyone complain about the safety of the Whitewood and Hellebore intersection. Although she had seen roadside memorials on other parts of Whitewood Road, she was not aware of any specific accidents having occurred at or near this intersection. She testified she had no knowledge of a prior fatal motorcycle accident on that road.
+
+
+The Curve of Whitewood
+
+
+*	Lauren testified she was acutely aware of a significant curve in Whitewood Road to her left, which she knew created a visual obstruction for seeing oncoming traffic. She identified this hazard the first time she ever drove there which led her to always exercise extra caution at this specific intersection.
+
+*	Lauren confirmed that the curve was the only problem she was aware of involving the intersection. Lauren testified that she had not previously noticed the trees that are within the sight line north from the subject intersection and did not even recall if trees were present in that location at the time of the incident. Nor had Lauren noticed excessive speeding on Whitewood prior to the incident. 
+
+*	She estimated that once a car came into view from around the curve, it would reach the intersection in about three seconds. She understood this meant that if she saw any vehicle, it was already too late to proceed safely.
+
+*	To manage the risk, Lauren's standard practice was to wait at the stop sign for an extended period to ensure the road was completely clear. 
+
+*	Lauren’s cautionary procedure included inching her vehicle forward past the stop line to gain a slightly better view of oncoming traffic. She would then come to a second complete stop before entering the intersection. She confirmed this was a maneuver she had performed on prior occasions, as well as on the day of the incident. Lauren confirmed that the below image was an accurate representation of what her view looked like from the subject intersection prior to the accident and identified several points as follows:
+
+
+(2 circles on the bottom identify the two points Lauren testified she stopped her vehicle to check for oncoming traffic. Circle on the left indicates the point Lauren believes is 3 seconds driving distance from the intersection. Line towards middle of photo represents Lauren’s vehicle at the time of impact.)
+
+
+Events On The Day Of The Incident
+
+
+*	Lauren described her day as routine, including attending her high school classes and going to track practice. After practice, she drove her friend Jeremiah home and they spoke for a few minutes in her car. 
+
+*	At the time of the collision, Lauren was on her way to a 7:00 p.m. volleyball practice at a different high school. She stated she was not in a hurry and had sufficient time to get to her destination. Her intended route involved making a left turn from Hellebore onto Whitewood.
+
+*	The collision occurred at dusk as the sun was setting, but Lauren affirmed it was still light enough outside to see her surroundings clearly and without difficulty. 
+
+*	Lauren testified that she came to a complete stop at the white stop line on Hellebore Street, observing moderately busy traffic on Whitewood. After a few seconds, she moved her car forward to improve her view. 
+
+*	After inching forward, Lauren came to a second complete stop, where she remained for an estimated 5 to 10 seconds. During this time, she continued to look left and right for a safe gap in traffic. Her left turn signal had been activated before her initial stop.
+
+*	Lauren stated she waited until there was no traffic coming from either direction. After looking left and right a final time and seeing no approaching vehicles, she determined it was completely safe to proceed. She then began to pull into the intersection to make her left turn.
+
+
+The Collision And Immediate Impact
+
+
+*	Lauren was traveling slowly, between 10 and 20 miles per hour, as she started her turn. She testified that she had moved approximately 10 feet from her stopped position into the intersection when the impact occurred. She was intending to turn into the far-left northbound lane of Whitewood.
+
+*	Lauren first became aware of the motorcycle less than a second before the collision when she saw it in her peripheral vision as she was looking to her left to navigate the turn. She testified that it was so close that she knew a collision was unavoidable.
+
+*	Lauren’s immediate and instinctive reaction was to brake, and she believes her car came to a stop at the moment of impact. 
+
+*	The motorcycle struck the front driver's side of her car. The impact caused the motorcycle to flip onto her windshield, shattering it, before landing on the road.
+
+
+Causation
+
+
+*	Lauren testified that she did not know what caused or contributed to the accident. She does not believe she did anything to cause or contribute to the accident.
+
+*	Lauren disagreed with a witness statement in the police report suggesting she failed to make a complete stop, reiterating that she stopped twice.
+
+*	Lauren stated she was not aware of anything that would have obstructed the motorcyclist's view of her vehicle entering the intersection.
+
+*	The only potential explanation Lauren could offer for not seeing the motorcycle until the last moment was a belief that it might have been speeding. This would have allowed it to cover the visible distance in the brief time it took her to look away and begin her turn. 
+
+*	When asked what could have prevented the accident, Lauren suggested that a protected left-turn signal or a traffic light at that intersection could be a potential solution. 
+
+
+We were able to illicit favorable testimony from Lauren Kacha, to support our argument that Lauren was the sole substantial cause of the accident. She admitted to being thoroughly familiar with the intersection and was acutely aware of the curve on Whitewood Road, which she identified as a visual obstruction. This testimony single-handedly undermines the plaintiff's potential argument that the intersection constituted a "trap" for an unsuspecting driver. Furthermore, her own "standard practice" of stopping twice and inching forward to get a better view establishes that she knew a high degree of caution was required to navigate the turn safely. We will argue that her failure to see the decedent's motorcycle, despite her awareness and self-professed caution, was a clear act of driver inattention and a breach of her duty to yield the right-of-way, making her negligence the superseding cause of the incident. On the other hand, Plaintiff will argue that the very fact a familiar driver felt the need to employ a special, two-stop maneuver proves the intersection was inherently unsafe for a driver exercising due care. Plaintiff will likely attempt to use Lauren’s estimation that an oncoming vehicle is only visible for three seconds after clearing the curve as a quantifiable and dangerous sight-line limitation. However, the lay opinions of a relatively inexperienced driver will carry minimal weight as compared to the testimony of our traffic expert, who found no significant problems with the sight lines during his inspection of the subject intersection. 
+
+
+Further Case Handling: Moving forward, we will notice the depositions of Plaintiff’s sister and the officers that responded to the scene and investigated the incident. In the meantime, we will continue to work with the City to obtain additional information regarding the approved design of the subject intersection in order to further evaluate the viability of a design immunity defense. Finally, We will prepare a persuasive mediation brief on behalf of the City in advance of the scheduled mediation.
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Deposition of Lauren Katacha. We took the deposition of Defendant Lauren Katacha on August 8, 2025. Lauren came off as nervous and shy. She was emotionless throughout the deposition and had a flat affect. She will make an average witness. The following is a screenshot of Lauren taken at her deposition:
+
+
+Below are the most salient portions of Lauren’s testimony:
+
+
+Background
+
+
+*	Lauren confirmed her date of birth is November 2, 2005, making her 17 years old at the time of the incident in May 2023. She lives with her parents and two younger siblings in Hemet, California. She was a junior in high school at the time of the incident.
+
+*	Lauren obtained her learner's permit at fifteen and a half after completing an online course and her full driver's license at sixteen. Before her driving test, which she passed on her first attempt, she completed six hours of in-person, behind-the-wheel instruction. This means she had been a licensed driver for over a year at the time of the incident.
+
+
+*	Prior to the collision, Lauren had a clean driving record with no history of accidents, traffic tickets, or warnings. She stated that she drove almost every day and felt she was a comfortable and experienced driver. She has not been involved in any other accidents since this incident.
+
+*	Lauren confirmed she has no corrective lens restriction on her license and only wears glasses for reading or extended screen time. On the day of the incident, she felt alert and healthy. 
+
+
+Vehicle Information
+
+
+*	On the day of the incident, Lauren was driving a 2014 Buick owned by her father. The car had been passed down to her, and she was its primary and sole operator. She used it almost every day for transportation to school and other activities.
+
+*	Lauren testified that the vehicle had no known mechanical problems prior to the collision. The car's headlights were on an automatic setting. She could not recall if they were illuminated at the time of the accident, which occurred around dusk.
+
+*	As a result of the accident, the vehicle's windshield was shattered and its frame was damaged. The cost of repair was deemed too high, and the car was considered a total loss. Lauren confirmed her father no longer owns the vehicle and that she has not seen it since the day of the incident.
+
+
+Familiarity With The Accident Location
+
+
+*	Lauren testified she was familiar with the intersection of Whitewood Road and Hellebore Street, having driven through it approximately five to ten times before the incident. She was frequently in the area to drop off or pick up her friend and track teammate, Jeremiah, who lived in the adjacent neighborhood. On the day of the incident, she had just left his house.
+
+*	Lauren stated that she used two different routes to exit the neighborhood. About half the time, she would take Hellebore to turn onto Whitewood Road. The other half of the time, she would exit via Keller Road, which was the route she typically used to enter the neighborhood.
+
+*	Prior to the incident, Lauren had never heard anyone complain about the safety of the Whitewood and Hellebore intersection. Although she had seen roadside memorials on other parts of Whitewood Road, she was not aware of any specific accidents having occurred at or near this intersection. She testified she had no knowledge of a prior fatal motorcycle accident on that road.
+
+
+The Curve of Whitewood
+
+
+*	Lauren testified she was acutely aware of a significant curve in Whitewood Road to her left, which she knew created a visual obstruction for seeing oncoming traffic. She identified this hazard the first time she ever drove there which led her to always exercise extra caution at this specific intersection.
+
+*	Lauren confirmed that the curve was the only problem she was aware of involving the intersection. Lauren testified that she had not previously noticed the trees that are within the sight line north from the subject intersection and did not even recall if trees were present in that location at the time of the incident. Nor had Lauren noticed excessive speeding on Whitewood prior to the incident. 
+
+*	She estimated that once a car came into view from around the curve, it would reach the intersection in about three seconds. She understood this meant that if she saw any vehicle, it was already too late to proceed safely.
+
+*	To manage the risk, Lauren's standard practice was to wait at the stop sign for an extended period to ensure the road was completely clear. 
+
+*	Lauren’s cautionary procedure included inching her vehicle forward past the stop line to gain a slightly better view of oncoming traffic. She would then come to a second complete stop before entering the intersection. She confirmed this was a maneuver she had performed on prior occasions, as well as on the day of the incident. Lauren confirmed that the below image was an accurate representation of what her view looked like from the subject intersection prior to the accident and identified several points as follows:
+
+
+(2 circles on the bottom identify the two points Lauren testified she stopped her vehicle to check for oncoming traffic. Circle on the left indicates the point Lauren believes is 3 seconds driving distance from the intersection. Line towards middle of photo represents Lauren’s vehicle at the time of impact.)
+
+
+Events On The Day Of The Incident
+
+
+*	Lauren described her day as routine, including attending her high school classes and going to track practice. After practice, she drove her friend Jeremiah home and they spoke for a few minutes in her car. 
+
+*	At the time of the collision, Lauren was on her way to a 7:00 p.m. volleyball practice at a different high school. She stated she was not in a hurry and had sufficient time to get to her destination. Her intended route involved making a left turn from Hellebore onto Whitewood.
+
+*	The collision occurred at dusk as the sun was setting, but Lauren affirmed it was still light enough outside to see her surroundings clearly and without difficulty. 
+
+*	Lauren testified that she came to a complete stop at the white stop line on Hellebore Street, observing moderately busy traffic on Whitewood. After a few seconds, she moved her car forward to improve her view. 
+
+*	After inching forward, Lauren came to a second complete stop, where she remained for an estimated 5 to 10 seconds. During this time, she continued to look left and right for a safe gap in traffic. Her left turn signal had been activated before her initial stop.
+
+*	Lauren stated she waited until there was no traffic coming from either direction. After looking left and right a final time and seeing no approaching vehicles, she determined it was completely safe to proceed. She then began to pull into the intersection to make her left turn.
+
+
+The Collision And Immediate Impact
+
+
+*	Lauren was traveling slowly, between 10 and 20 miles per hour, as she started her turn. She testified that she had moved approximately 10 feet from her stopped position into the intersection when the impact occurred. She was intending to turn into the far-left northbound lane of Whitewood.
+
+*	Lauren first became aware of the motorcycle less than a second before the collision when she saw it in her peripheral vision as she was looking to her left to navigate the turn. She testified that it was so close that she knew a collision was unavoidable.
+
+*	Lauren’s immediate and instinctive reaction was to brake, and she believes her car came to a stop at the moment of impact. 
+
+*	The motorcycle struck the front driver's side of her car. The impact caused the motorcycle to flip onto her windshield, shattering it, before landing on the road.
+
+
+Causation
+
+
+*	Lauren testified that she did not know what caused or contributed to the accident. She does not believe she did anything to cause or contribute to the accident.
+
+*	Lauren disagreed with a witness statement in the police report suggesting she failed to make a complete stop, reiterating that she stopped twice.
+
+*	Lauren stated she was not aware of anything that would have obstructed the motorcyclist's view of her vehicle entering the intersection.
+
+*	The only potential explanation Lauren could offer for not seeing the motorcycle until the last moment was a belief that it might have been speeding. This would have allowed it to cover the visible distance in the brief time it took her to look away and begin her turn. 
+
+*	When asked what could have prevented the accident, Lauren suggested that a protected left-turn signal or a traffic light at that intersection could be a potential solution. 
+
+
+We were able to illicit favorable testimony from Lauren Kacha, to support our argument that Lauren was the sole substantial cause of the accident. She admitted to being thoroughly familiar with the intersection and was acutely aware of the curve on Whitewood Road, which she identified as a visual obstruction. This testimony single-handedly undermines the plaintiff's potential argument that the intersection constituted a "trap" for an unsuspecting driver. Furthermore, her own "standard practice" of stopping twice and inching forward to get a better view establishes that she knew a high degree of caution was required to navigate the turn safely. We will argue that her failure to see the decedent's motorcycle, despite her awareness and self-professed caution, was a clear act of driver inattention and a breach of her duty to yield the right-of-way, making her negligence the superseding cause of the incident. On the other hand, Plaintiff will argue that the very fact a familiar driver felt the need to employ a special, two-stop maneuver proves the intersection was inherently unsafe for a driver exercising due care. Plaintiff will likely attempt to use Lauren’s estimation that an oncoming vehicle is only visible for three seconds after clearing the curve as a quantifiable and dangerous sight-line limitation. However, the lay opinions of a relatively inexperienced driver will carry minimal weight as compared to the testimony of our traffic expert, who found no significant problems with the sight lines during his inspection of the subject intersection. 
+
+
+Further Case Handling: Moving forward, we will notice the depositions of Plaintiff’s sister and the officers that responded to the scene and investigated the incident. In the meantime, we will continue to work with the City to obtain additional information regarding the approved design of the subject intersection in order to further evaluate the viability of a design immunity defense. Finally, We will prepare a persuasive mediation brief on behalf of the City in advance of the scheduled mediation.
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Further Case Handling: Following receipt of the Court’s Order granting Plaintiff’s counsel’s motion to be relieved as counsel, we served Requests for Admission to Plaintiff requesting he admit that King & Fig and 7-Eleven are not liable for the claims alleged in Plaintiff’s complaint. Given that Plaintiff is now in pro per, we expect that he will not respond to these requests. If so, we intend to file a motion to have the Requests for Admissions deemed admitted. We will then use that order to file a Motion for Judgment on the Pleadings and request that the case be dismissed. We will provide you with a further update once these motions are filed. 
+
+
+In the meantime, please do not hesitate to call or write if you have any questions.
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Cross-Complaint against Carson Building: As you may recall, together with the Answer, we had also filed a cross-complaint against Carson Building, the owner/operator of the adjacent Tire Shop, for indemnity and contribution. Carson Building has taken the position that our cross-complaint was improper under C.C.P. 328.5 (b), which indicates that cross-complaints can be filed without leave of court before a trial date has been scheduled. While we do not believe that this statute invalidates our cross-complaint, in an abundance of caution, we included a request for leave to file the cross-complaint in our recent ex parte application. At today’s ex parte hearing, the Court expressed skepticism regarding Carson Building’s position but has allowed Carson Building the opportunity to formally oppose our request for leave and has scheduled a hearing on the matter for December 9, 2025. We will provide you with a further update following the Court’s ruling. 
+
+
+Further Case Handling: Moving forward, we will prepare a reply brief to Carson Building’s opposition to our request for leave to file the cross-complaint and will appear at the hearing to protect Sizzler’s interests. In the meantime, we are reviewing Plaintiff’s responses to written discovery as well as the prior pleadings in this matter and will provide you with a comprehensive status update upon our completion of the same.  
+
+
+­­­
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Settlement Status: Today, we received the attached settlement demand from Plaintiff’s counsel in the amount of $1.5 million. This demand will expire on September 29, 2025, at 12:00 p.m. As you may recall, Plaintiff’s last demand at mediation was $1.65 million. In support of the new demand, counsel provided an MRI report dated August 8, 2025, and appointment notes from an evaluation by Dr. Irene Ching, DO, dated September 4, 2025. Plaintiff’s counsel claims that the MRI demonstrates that Plaintiff’s injury is becoming worse over time and that based on this MRI, Plaintiff has been referred for a neurosurgery consult. Counsel notes that this would be a high-risk surgery given that Plaintiff suffers from Osteopenia. Plaintiff’s counsel also notes that Plaintiff had recently had a sixth epidural injection which did not provide any relief. According to the medical note provided by Plaintiff’s counsel, Plaintiff has been referred for a neurosurgery consult with Abshire, Friedlich, and Oh. It is not clear when Plaintiff will have this consult. 
+
+
+A comparison of the 2025 MRI provided by Plaintiff’s counsel with a more recent lumbar MRI, dated September 14, 2023, does show a progression of some of the degenerative changes seen in the 2023 imaging. While the fusion at L4-L5 (described as L5-Transitional S1 in this report) appears stable, changes are noted at other levels. Specifically, it appears that the protrusion at L2-L3 has grown from 2.4 mm to 3 mm. Likewise, a 2.8 mm bulge at L3-L4 has grown to 3mm. In addition, the 2025 imaging now identifies a 3-4 mm disc bulge at L4-L5, while no disc bulge at this level was identified in 2023. Finally, the degree of stenosis has worsened at the L3-L4 and L4-L5 levels. Notably, there is nothing to suggest that the progression has any relation to the subject incident vs simply a natural progression of Plaintiff’s underlying disc disease that she had long before the incident. Nevertheless, Plaintiff’s counsel will undoubtedly attempt to attribute the entirety of this recent decline and the potential need for surgery directly to the subject incident.
+
+
+We are happy to discuss Plaintiff’s new demand by way of phone call at your convenience.
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Expert Retention and Site Inspection. An expert inspection of the Facility has been scheduled to take place on September 22-26, 2025. To that end, we have reached out to Mike Koster of Reliant Investigations to act as Titan Electric’s Origin and Cause expert, who has confirmed he is available to attend the inspection. We would also like to retain expert electrical engineer Gerard Moulin to attend the inspection alongside Mike Koster. Please advise if we have authority to do so. CVs and rate sheets for both experts are attached for your review. 
+
+
+Further Case Handling: Absent your objection, we will proceed with retaining the above experts who will attend the site inspection, starting September 22, 2025. In the meantime, it is vital that prior to the site inspection, our experts are able to interview any individuals from Titan Electric who performed work at the Facility and/or were present at the time the fire started. We will work with Titan Electric to schedule these interviews to take place sometime next week. 
+
+
+­­­
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Status of Discovery and Counsel: Our office had previously propounded targeted discovery on Plaintiffs seeking information relating to theories of liability and alleged damages. In response, we were notified that Plaintiff’s counsel was ill and that Plaintiffs would be retaining new counsel. After Plaintiff’s counsel failed to provide responses to discovery, respond to our multiple follow ups, or retain new counsel, we proceeded with filing motions to compel Plaintiff’s responses. Several weeks before the motions were scheduled to be heard, we were contacted by attorney Elan Dunaev, who indicated he was substituting in as Plaintiffs’ counsel. Mr. Dunaev is a solo practitioner based out of Newport Beach who has been practicing since 2016. 
+
+
+We are happy to report that today, the Court heard and granted our Motions to Compel. The Court has ordered Plaintiffs to serve verified substantive responses within 15 days, and to pay sanctions in the amount of $1,080. We will provide you with a further update upon our receipt of Plaintiffs’ discovery responses. 
+
+
+Tenant Contact: We have continued to follow up with former/current tenants Loi and Gina to obtain Loi’s communications with Plaintiffs and information regarding the plumber hired by Gina to inspect the property. Unfortunately, we have received no response from either tenant. It may take the retention of an investigator to physically approach and interview these individuals to obtain this information. 
+
+
+Other Claims: We have obtained the following additional information regarding several prior lawsuits filed against the Plaintiffs:
+
+
+Cole Lawsuit: We have obtained case documents relating to the small claims case filed by Orville Cole and Joyce Matthews-Cole against Ron Dudash, doing business as Lotus Enterprise. The initial claim, filed on March 7, 2024, sought $2,350.00 from Dudash. Cole alleged that after the Dudash took possession of the premises, he failed to pay the remaining balance due on the security deposit. The first scheduled non-jury trial on April 26, 2024, was continued to July 25, 2024. Following the trial, the Court entered a judgment on August 13, 2024, in favor of Cole. The Court found that Cole had established a cause of action for negligence and breach of contract and awarded them $2,350.00 in damages plus $50.00 in costs, for a total judgment of $2,400.00. To enforce this judgment, a Writ of Execution was issued on September 18, 2024. Subsequently, on October 16, 2024, Cole obtained an "Order to Produce Statement of Assets and to Appear for Examination," compelling Dudash to attend a hearing on January 3, 2025, to answer questions about his income and assets. However, Dudash did not appear at this hearing and the Court took the matter off calendar after it determined that Cole had not properly served Dudash with Notice. Unfortunately, no information is available regarding the testimony that was given during the trial in this matter. 
+
+
+Athen’s Fashion Lawsuit: Case No. 12ST0530 was a small claims lawsuit filed by Mayo Athena DBA Athena’s Fashions against Ronald Duadash DBA Lotus Enterprises on March 15, 2012. While we are still working on obtaining the records from this lawsuit, it appears that on June 12, 2012, judgment was entered in favor of Mayo Athena and against Ron Dudash in the amount of $2,220. 
+
+
+Settlement Status: During our call with Plaintiff’s new counsel, counsel indicated that, despite substituting into the matter, he was having a child and would not be available during the following 2 months. As such, counsel requested that we stipulate to a continuance of the trial date. In response, we have taken the aggressive position that we will not agree to a trial continuance, and that it would be in Plaintiffs’ best interest to attempt to settle the case now, while they still have the chance. We have requested that Plaintiffs make a new settlement demand which reflects the realities of the case and does not include any demand that Ms. Mathews re-grade or otherwise alter her property. Counsel indicated that he would speak to his clients and attempt to obtain such a demand. We will provide you with a further update if and when we receive a new settlement demand from Plaintiffs. 
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Further Case Handling: Moving forward, we will receive Plaintiff’s responses to the written discovery we have already propounded on behalf of Kenwood. We will also work with Kenwood to obtain any additional available documentation regarding Plaintiff’s health prior to the incident and the services provided by Kenwood. As soon as we receive Plaintiff’s responses to discovery and medical file, we will notice Plaintiff’s deposition and the depositions of Plaintiff’s son and daughter. 
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Deposition of Henrik Nazari: We took the deposition of Plaintiff’s son, Henrik Nazari, on October 8, 2025. A summary of Henrik’s testimony is included in the attached report. Overall, while we were able to illicit favorable testimony regarding the lack of written complaints and Plaintiff’s pre-incident ability to ambulate without assistance, Plaintiff will use Henrik’s testimony to support her claims that Kenwood was put on notice of the family’s concerns that Plaintiff was a fall risk and consciously disregarded these warnings. Henrik consistently described the driver's conduct as rushed and careless, stating they treated participants like "animals" and would drop his mother off at the curb and quickly drive away—a fact that Plaintiff will argue further reinforces the claim that the standard of care was not met. Plaintiff will point out that on the day of the incident, the Kenwood bus dropped his mother off at the curb during a rainstorm—a condition that increased the risk of a slip and fall—and immediately drove away without ensuring she reached her door. In support, Plaintiff will point to Kenwood’s own witness statements form the driver and the bus full of participants, none of whom saw Plaintiff fall only feet away from where the bus dropped her off. Plaintiff will argue that the fall occurred in the exact location and under the exact circumstances that Henrik had warned Kenwood management about, strengthening the argument that the incident was a foreseeable result of their negligence. More importantly, Henrik painted a stark contrast between the Plaintiff's condition before and after the incident, establishing catastrophic damages. Henrik described her as previously being healthy, independent, and capable of caring for herself. He testified that as a direct result of the fall, his mother suffered life-altering injuries, which required months of hospitalization followed by more months of being confined to a bed.  As a result, Plaintiff has become non-communicative and cognitively disabled, suffering from paranoia, and requiring 24/7 care for all basic needs, transforming her from an independent woman into someone he described as a "breathing corpse." Henrik’s testimony that he has placed a bed for himself directly next to his mother's so he can be with her 24/7 within the same room to ensure her safety will be particularly compelling to a jury.
+
+
+Settlement Status. As you recall, Plaintiff had previously served a C.C.P. § 998 Offers to Kenwood and Armen Bagbashyan. This offer remains open and is set to expire on October 14, 2025.  While we continue to have strong arguments to challenge liability, including the lack of written notice of the need for door-to-door assistance and the lack of a written agreement confirming such assistance would be provided, Henrik’s testimony significantly increases the potential exposure in this case. Based on his testimony, it is clear that should a jury find liability, the potential for a catastrophic damages award is substantial. The medical bills from the initial multi-month hospitalization alone will be significant. This exposure will only multiply if a jury finds that the second fall in December 2024, which resulted in a broken pelvis and another multi-month hospitalization, was causally linked to the physical and cognitive decline from the subject incident—a connection Henrik’s testimony directly supports. In addition, the general damages that a jury could award to a sympathetic, elderly mother, supported by the compelling testimony of her loving son who has given up his life to become her 24/7 caregiver, could easily go well into the seven-figure range. Given this landscape, should the case not settle, the only way to beat Plaintiff’s § 998 offer will be to obtain a complete defense verdict at trial. While a defense verdict is certainly possible, given Plaintiff’s sympathetic presentation as a witness and the risk of a 7-figure verdict, we would recommend resolving this matter up to $250,000.  As always, we will seek to resolve for the lowest possible amount, and under authority.
+
+
+Further Case Handling. Moving forward, we will continue to receive and review Plaintiff’s voluminous medical records and will provide you with a further update upon our completion of the same.  In the meantime, we will work to take Plaintiff’s deposition as well as the depositions of several of Plaintiff’s treatment providers and will follow up with Dr. Kreitenberg after he has completed his IME, which is scheduled for October 15, 2025.
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Settlement Status: Recently, Plaintiff’s counsel has indicated a wiliness to mediate this case. To that end, the parties have tentatively agreed to use Matt Conant as a mediator. Matt currently has availability on April  15, 16, 22, 23, and 29, 2026. 
+
+
+Further Case Handling; Please advise if you are agreeable to mediate with Matt Conant and whether you have any preference as to the dates listed above. In the meantime, we will continue to work with WM to gather additional information regarding the scope of the grazing lease, any formal or informal agreements WM had with other ranchers, fence ownership and maintenance responsibilities along the freeway, and the full extent of WM's knowledge regarding employee-owned livestock on its property. We will also continue our investigation into other ranches near the area of the incident from which the cow may have originated.
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Doe Amendment. Plaintiff has recently amended his complaint to identify Javier Jimenez as Doe 4. As you may recall, Leonel Ayon had identified Javier as the WM employee who owned the cow that was involved in the subject incident. Our understanding is that Javier has not yet been served with the summons and complaint. 
+
+
+Further Case Handling: Please advise if you would like us to take any action on behalf of Javier Jimenez in response to the complaint. In the meantime, we are continuing to receive and review Plaintiff’s medical and employment records and are working with WM to gather additional information regarding the scope of the grazing lease, any formal or informal agreements WM had with other ranchers, fence ownership and maintenance responsibilities along the freeway, and the full extent of WM's knowledge regarding employee-owned livestock on its property.
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Procedural Posture: The Court has continued the Trial Setting Conference to October 30, 2025. No trial date has been set given the number of related cases and the fact that not all defendants have filed responsive pleadings yet.
+
+
+Discovery: No depositions have yet taken place due to the fact that the case is not yet at issue. Once all parties have filed responsive pleadings or have been defaulted, we will begin scheduling depositions. In the meantime, we have continued to receive and review Plaintiffs’ and co-defendants responses to written discovery as well as medical and employment records in response to our subpoenas. 
+
+
+Further Case Handling: Moving forward, we will finish our review and analysis of all evidence received thus far and expect to have a comprehensive report ready for you by early next week. We expect that all parties will have made an appearance within the next 30 days, at which time we will begin scheduling depositions. 
+
+
+Should you have any questions or concerns, please let me know.
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Procedural Posture: The court has consolidated all related cases. The Court has continued the Trial Setting Conference to October 30, 2025. No trial date has yet been set given the number of related cases and the fact that not all defendants have filed responsive pleadings yet.
+
+
+Discovery: No depositions have yet taken place due to the fact that the case is not yet at issue. Once all parties have filed responsive pleadings or have been defaulted, we will begin scheduling depositions. In the meantime, we have continued to receive and review Plaintiffs’ and co-defendants responses to written discovery as well as medical and employment records in response to our subpoenas. 
+
+
+Further Case Handling: Moving forward, we will finish our review and analysis of all evidence received thus far and expect to have a comprehensive report ready for you by early next week. We expect that all parties will have made an appearance within the next 30 days, at which time we will begin scheduling depositions. 
+
+
+Should you have any questions or concerns, please let me know.
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Motion to Consolidate: We recently appeared at the hearing on co-defendant Miguel Barraza’s Motion to Consolidate the cases filed by Baraza and the Haire plaintiffs.  The Court tentetatively granted Barraza’s motion however, given the addition of additional parties and the complexity of the matter, the Court set an Order to Show cause Re: why the cases should not be consolidated for January 21, 2026, to allow any parties to lodge objections. The Court also set a trial setting conference for the same date.  
+
+
+Further Case Handling: We will appear at the Trial Setting Conference and Notice to Show Cause Hearing on January 21, 2026. In the interim, we will receive and review additional discovery from Plaintiffs, including employment records and any outstanding or updated treatment records and will provide a further update upon our completion of that review. In addition, now that the Court has ordered the matters consolidated, we anticipate that the parties will soon begin scheduling depositions.  
+
+
+­­
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Status of Settlement: While the parties had previously discussed mediating this case on December 9, 2025, this date proved unworkable due to Plaintiff’s counsel’s schedule. Recently, the parties have tentatively agreed to use Steven Kuhn as a mediator. Steven Kuhn currently has the following available dates:
+
+
+December 23rd – 9am
+
+
+December 30th – 9am
+
+
+January 5th – 1:30pm
+
+
+January 15th – 9am
+
+
+January 29th – 9am
+
+
+Please advise whether you have any objection to mediating with Steven Kuhn and whether you have a preference as to any of the above dates. 
+
+
+Further Case Handling: Moving further, we will review and analyze Plaintiff’s medical and billing records and will provide you with a further update upon our completion of the same. In the meantime, we will further investigate the scope of DBS’s services at the subject property. We will also attempt to depose Plaintiff’s boyfriend, Ricardo Perez, who is currently incarcerated, as well as the paramedics that responded to the incident. 
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Motion to have RFAs Deemed Admitted: We are happy to report that today, the Court heard and granted our Motions to have Requests for Admission, Set Two, deemed admitted. Plaintiffs did not oppose the motions or appear at today’s hearing. 
+
+
+Settlement Status: Yesterday, we were contacted by Attorney Robert G. Johnson, who indicated he is Lawrance Hester’s personal counsel, but would not be acting as trial counsel in this matter. Counsel noted that unfortunately, Plaintiff Pine passed away last Thursday, and that Plaintiff Hester was now extending a new demand of $100,000 to resolve the case. Given today’s ruling on the Motion to Have RFAs deemed admitted, we would not recommend accepting Plaintiff’s demand. 
+
+
+Further Case Handling: Following today’s ruling, we will proceed with preparing and filing a Motion for Judgment on the Pleadings and will move ex parte to have the motion heard prior to the upcoming trial date. We will provide you with a further update once the motion has been filed. 
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Motion for Judgment on the Pleadings. As we have filed a Motion for Judgment on the Pleadings (“MJOP”) asking that the case be dismissed following the Court’s order deeming admitted our Requests for Admissions, Set Two. Today, we appeared ex parte requesting to advance the hearing date on the MJOP to be heard before the upcoming trial date. Plaintiff Hester appeared in pro per to oppose the request. The Court granted the ex parte motion and ordered that the MJOP be heard this Friday, October 17, 2025. The Court ordered the parties to participate in a further mediation discussion Friday morning and make a good-faith effort to settle the case before the Court rules on the MJOP. The Court further informed Plaintiff that it would not waste the resources of a jury trial on this case.
+
+
+Given the scope of the requests for admission that were previously deemed admitted, we expect that the Court will grant the MJOP. As such, we believe that an offer to settle for a waiver of costs or, alternatively, a nominal settlement offer in the range of $1,000, is appropriate to demonstrate to the Court that we engaged in good-faith settlement efforts as directed by the Court.
+
+
+Further Case Handling: Moving forward, we will appear on October 17, 2025, to engage in the Court ordered settlement discussions and ultimately argue in support of the Motion for Judgment on the Pleadings. 
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Settlement Status: The parties scheduled a mediation with Natasha Roit, to take place on October 22, 2025, at 9am. We will prepare a persuasive mediation brief on behalf of Bright Stay well in advance of this mediation. 
+
+
+Further Case Handling: Moving forward, we will take the depositions of Sandra Trentini, Leslie Johnson, Emily Horton, and Ronnie Mendoza, which are scheduled to take place on July 30, 2025 and July 31, 2025. We will provide you with a further update upon completion of the same. 
+
+
+================================================================================
+--------------------------------------------------------------------------------
+Ann-Marie,
+
+
+Discovery. Plaintiff has now provided responses to our interrogatories, which mirror Plaintiff’s responses to GR Grossmont’s discovery summarized in our prior report. A copy of the responses is attached for your records. We have also received additional medical records in response to our subpoenas which are summarized in the attached updated report. 
+
+
+Further Case Handling: We will propound additional discovery to Rainbow Investment Co. to establish Casa De Pico’s lack of control over the incident location. We will also continue to receive and review additional medical and billing records received in response to our subpoenas and, absent your objection, will proceed with preparing a motion for summary judgment on behalf Casa de Pico. 
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Cross-Complaint: As you recall, after significant meet and confer efforts, we were able to secure Plaintiff’s dismissal of Southwest Stucco in exchange for a waiver of costs. Today, we received the attached cross-complaint, filed by homeowner Jacob Greene, which seeks indemnity from Southwest Stucco and the other defendants. It appears that the cross-complaint has not been personally served on Southwest Stucco and given that Southwest Stucco had previously been dismissed from the action, service of the cross-complaint on our office is not proper. 
+
+
+Further Case Handling: Moving forward, we will reach out to Greene’s counsel to request that Greene dismisses Southwest Stucco given its lack of work at the incident location in the months preceding the subject incident. Should counsel refuse to do so, we will aggressively pursue discovery against Greene and ultimately seek to extricate Southwest Stucco from the action by way of a summary judgment motion. 
+
+
+================================================================================
+--------------------------------------------------------------------------------
+Status update:
+
+
+Further Case Handling: Moving forward, we will receive Plaintiff’s responses to the written discovery we have already propounded on behalf of Kenwood. We will also work with Kenwood to obtain any additional available documentation regarding Plaintiff’s health prior to the incident and the services provided by Kenwood. As soon as we receive Plaintiff’s responses to discovery and medical file, we will notice Plaintiff’s deposition and the depositions of Plaintiff’s son and daughter. 
+
+
+================================================================================
+--------------------------------------------------------------------------------
+Ann-Marie and Christine,
+
+
+Procedural History: A final status conference is scheduled for December 5, 2025, with Phase 1 of trial to follow on December 15, 2025
+
+
+Discussions with Bryan Cho. We recently spoke to our structural engineering expert, Bryan Cho, regarding Eric Wickstrom’s deposition testimony and his identification of dry rot in truss no. 8. In reviewing the ATI photographs identified by Eric, Bryan agrees that truss no. 8 does show evidence of degradation due to water intrusion, as seen in the area circled in red in the photograph below:
+
+
+Bryan also agrees that it would have taken many years of water intrusion to cause this type of degradation, and that the degradation would have effected the structural capacity of the truss. However, Bryan believes that the failure of this truss alone should not have caused the adjacent trusses to collapse, unless the truss caused torquing forces to pull down the adjacent trusses when it collapsed – which Bryan acknowledges is a possibility, although difficult to prove or disprove. Given these findings, Tanzey’s liability defense will be highly dependent on being able to establish that the amount of water actually landing on the roof was well above the failure load of the trusses, and that the roof would have collapsed even if Truss No. 8 was structurally sound. 
+
+
+Deposition of Rick Snyder. On November 24, 2025, the parties took the deposition of Eurostar’s property management expert, Rick Snyder. Rick came off as knowledgeable and confident in his opinions. Below are the most salient portions of Rick Snyder's testimony:
+
+
+*	Rick testified that the standard of care applicable to landlords and property managers is defined by what a reasonable and prudent professional would do in similar circumstances. He explained that this standard requires following applicable statutes and codes, though he noted that property managers are not expected to have the same technical knowledge as licensed contractors. Rick emphasized that the primary goal of a landlord is to ensure the premises are tenantable and suitable for their intended use, rather than guaranteeing absolute safety at all times.
+
+
+*	Rick stated that there is no requirement in the industry for a landlord to conduct periodic interior inspections of a commercial property while a tenant is in possession. Rick emphasized that landlords generally rely on tenants to report interior issues that arise during the lease term.
+
+*	Regarding roof inspections, Rick testified that while not a mandatory requirement, it is a beneficial best practice to conduct annual inspections of the roof's exterior. Rick noted that this annual process helps ensure drains and scuppers remain clear to allow for proper water evacuation.
+
+*	Rick admitted that based on Mr. Strong's testimony, Tanzey did not perform any routine inspections of the building, including the roof, from 2002 to 2019. Rick agreed that this failure to perform routine inspections for 17 years is below the standard of care.
+
+
+*	Rick reviewed the specific lease between Tanzey and Eurostar, identifying it as a standard AIR industrial commercial multi-tenant lease common in California. He testified that Section 7.2 of the lease clearly delineates that the maintenance and control of the roof are the responsibility of the landlord. Rick further opined that the space between the drop-ceiling tiles and the underside of the roof deck generally falls under the landlord's purview for repairs.
+
+
+*	Rick acknowledged that both Eurostar and Tanzey had actual notice of water leaks at the subject property based on email communications. He testified that this notice imputed a responsibility onto the landlord to respond in a reasonable and timely manner. 
+
+*	Rick agreed that repeated water leaks over a period of months provided constructive notice of a potentially substandard condition. He testified that a prudent landlord, upon receiving such notice, should dispatch a qualified contractor to inspect and repair the source of the leaks. Rick conceded that failing to address known recurrent leaks could increase the risk of property damage and potential injury.
+
+*	Rick testified that the notice provided by the tenant regarding leaks was general notice of water intrusion rather than specific notice of structural failure. Rick stated that once the landlord receives notice of a leak, the burden shifts to the landlord to investigate the cause.
+
+
+*	Rick testified that the expected lifespan of a commercial flat roof is generally between 15 and 25 years. Rick agreed that routine maintenance is essential to ensure a roof reaches or exceeds its intended lifespan. He agreed that older roofs generally require diligent maintenance to prevent failure.
+
+*	Rick testified that it is beneficial to keep drains and scuppers free of debris to prevent water ponding. He acknowledged that failure to maintain these drainage systems can lead to water accumulation that stresses the roof structure. Rick stated that a reasonable property manager ensures these components are inspected regularly, typically as part of an annual roof maintenance program.
+
+
+The most damaging testimony from Rick Snyder was his agreement that Tanzey's failure to perform routine roof inspections was below the standard of care. Furthermore, Snyder confirmed that the lease places the maintenance and control of the roof, as well as the critical and unseen space between the ceiling and the roof deck (where the newly discovered dry rot in Truss No. 8 exists), squarely on Tanzey's shoulders as the landlord. Plaintiffs will utilize this testimony, combined with the fact that Rick agreed both Eurostar and Tanzey had actual and constructive notice of repeated leaks, to establishes the essential elements of duty and breach against Tanzey. Indeed, given the lack of routine preventative maintenance of the roof, it will be difficult to argue that Tanzey met its standard of care. Instead, our defense will focus on the argument that routing inspections would not have uncovered any underlying structural issues with the trusses and that there is no evidence that Tanzey had notice of any conditions which would have prompted it to conduct a structural inspection of the roof prior to the incident. 
+
+
+Further Case Handling. Moving forward, we will prepare a comprehensive trial brief on the indemnity issues to be tried in Phase 1.  In the meantime, we will continue with expert discovery.
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Settlement Demand: Recently, Plaintiff’s counsel conveyed an opening settlement demand of $1,022,000.00 and has requested a counteroffer. As you may recall, counsel had previously declined WM’s offer of $22,000, indicating he would consider a number in the range of $222,000.
+
+
+At this stage, while liability appears adverse, we believe that Plaintiff’s new demand is grossly excessive. Significant questions remain regarding the extent and causation of Plaintiff’s claimed injuries. Based on our initial review of the medical records provided to date, it does not appear that Plaintiff’s subsequent fall and resulting treatment are related to the subject incident. Plaintiff’s counsel has acknowledged that Plaintiff had a  history of balance problems and prior falls predating the collision, and there are no contemporaneous records suggesting new or worsened balance issues following the incident. Indeed, Plaintiff’s immediate post-accident complaints were limited to shoulder and back pain, with no reports of head trauma or neurological symptoms that could reasonably link the later fall to the motor-vehicle impact. Plaintiff’s pre-fall treatment has been limited to conservative treatment resulting in Howell specials totaling approximately $6,000. 
+
+
+Plaintiff’s demand is also premature. We have not yet had an opportunity to conduct discovery, obtain complete medical records, take Plaintiff’s deposition, or arrange an IME. That being said, Plaintiff’s counsel does appear eager to resolve the case, despite his inflated opening demand. Please advise whether WM would like us to make a counteroffer in response to Plaintiff’s demand. 
+
+
+Further Case Handling: Moving forward, we will continue review the medical records received to date and will issue subpoenas to all identified treatment providers. We will also provide you with a further update upon our receipt and review of Plaintiff’s responses to our written discovery.
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Mediation: The parties have meet and conferred regarding mediation and have preliminary agreed to use Thomas G. Oesterreich, Esq. as a mediator. We have had many successful mediations with Tom in the past. Tom currently has the following availability for mediation:
+
+
+February: 13, 23, 25, 27
+
+
+March: 3, 5, 10, 12, 17, 24, 26, 31
+
+
+Further Case Handling. Please advise whether you are agreeable to mediate with Tom Oesterreich and whether you have any preference as to any of the above dates. In the meantime, we will also receive and review additional records related to Plaintiff’s pre-incident treatment, including a complete set of records from Plaintiff’s workers’ compensation claim. We are also in the process of interviewing a witness to the incident (Sergio) identified by Plaintiff and are working on scheduling the deposition of Plaintiff’s supervisor from Home Depot. 
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Mediation: Counsel has recently approached us seeking to mediate this case in advance of trial. We have tentatively agreed to use the Thomas Oesterreich as a mediator, who has an last minute opening on December 30, 2025, to mediate this case. Do you have any objection to mediating with Tom and if not, does December 30, 2025, work on your end?
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Settlement Status: We recently received the attached joint policy limit demand which expire on December 11, 2025, at 5:00 P.M. PST.  By way of the demand, Plaintiffs allege that Decedent was visiting his grandparents at their apartment when he gained access to the building’s roof, which is described as unsecured and improperly maintained. Plaintiffs allege that Decedent “tripped or fell” three stories from the roof onto the cement sidewalk below. The demand asserts liability on the part of the property owners and managers based on California premises liability laws, including Civil Code §1714(a). Plaintiffs argue that tenants, guests, and others frequently and openly accessed the rooftop, meaning the Defendants had actual or constructive notice of this dangerous pattern of use. Despite this knowledge, Defendants allegedly failed to take any remedial action, such as installing physical barriers, alarms, or surveillance. The hazard was compounded by parapet walls on the roof that were less than two feet high. This failure to act, Plaintiffs contend, was a direct and substantial cause of Decedent’s death. The demand details two categories of damages. First, it seeks Survival Damages for the pre-death pain and suffering Decedent allegedly endured between his injury and death, as permitted under C.C.P. §§ 377.30-377.34(b). Plaintiffs claim that while Decedent was found in cardiac arrest, he received extensive medical interventions during which he would have experienced profound physiological distress. Second, it outlines Wrongful Death Damages recoverable by the parents, Erendira Ruiz Barajas and Rodrigo Solis, for their own losses. These include the loss of love, companionship, and financial support. The letter specifies that Decedent lived with and financially supported his mother, and that his death has caused his father, Rodrigo Solis, to suffer from depression. The demand also includes a breakdown of past medical, funeral, and burial expenses totaling $35,790.85. 
+
+
+Further Case Handling: Going forward, we will take the depositions of Plaintiff Barajas which is currently scheduled to take place on November 25, 2025.  We are also in the process of scheduling the deposition of Decedent’s grandmother, who lives at the subject property as well as the remaining coroner technicians who were involved in the toxicology testing performed on Decedent following the incident.  Finally, we will continue our efforts to secure the deposition of Simon Vitela, who has been evading service.
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Discovery Status:  Following receipt of Plaintiff’s discovery responses, we issued subpoenas to all identified treatment providers. We also identified several additional claims made by Plaintiff including claims relating to a motor vehicle accident on July 14, 2023 (wherein Plaintiff alleges to have sustained a concussion and a neck injury) as well as a workers’ compensation claim relating to an injury that occurred on October 26, 2020, and issued subpoenas to the insurance carriers involved in those claims. In addition, through a medical canvass, we were able to identify several additional treatment providers which were not previously identified by Plaintiff and have issued subpoenas to these providers as well. We are still waiting for responsive records to a few of these subpoenas and are in the process of reviewing the voluminous records we have received to date. We had also previously identified the lawsuit Plaintiff filed against Chipotle stemming from an injury which allegedly took place on November 5, 2022, and had already subpoenaed records from Broadspire, however the only records received in response to our subpoena was an internal Broadspire "Claim Overview" which did not contain any new pertinent information. 
+
+
+Further Case Handling: We will issue a fresh subpoena to Broadspire to obtain their complete file relating to Plaintiff's Claim against Chipotle. We will also reach out to counsel on the Chipotle case to get any additional information regarding Plaintiff’s claimed injuries. In the meantime, we will continue to review the voluminous records we have received in response to our subpoenas and will provide you with a further update upon our completion of the same. In addition, following receipt of responsive records to the last few outstanding subpoenas, we will notice plaintiff's deposition.
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Procedural Status. Our Motion for Determination of Good Faith Settlement is scheduled to be heard on October 23, 2025. A Case Management Conference is scheduled for December 2, 2025. 
+
+
+Discovery: As you may recall, Hyundai has been aggressively attempting to conduct discovery into the personal finances of Michael Bransby in an effort to use the existence of significant personal assets to oppose a good faith settlement determination. After we objected to providing this information, Hyundai filed motions to compel, which the Court recently denied as untimely. In response, Hyundai’s counsel, who also represents PHA Co., Ltd., a newly added co-defendant manufacturer, propounded new written discovery and noticed a second session of Bransby’s deposition, arguing that PHA Co. had not been a party at the time of the first deposition and thus has a right to conduct duplicative discovery. We have objected to the requested wholesale disclosure of Bransby’s financial records and second deposition session. First, we believe a second deposition is improper given that PHA Co., Ltd., shares the same counsel and identical interests with Hyundai, who already had an opportunity to depose Bransby. Second, and more importantly, is the lack of relevance Bransby’s highly confidential financial records have to this case. While a party seeking to challenge a good faith settlement determination does in some cases have a right to discovery into a settling defendant’s financial condition (i.e. when the grounds for the determination is the inability to pay a greater amount) there is no basis to require Bransby to disclose his financial records under the facts of this case, where we are not arguing that Bransby has insufficient assets to pay a higher judgment. While we have met and conferred with Hyundai’s counsel on these issues, it appears that the Court will have to weigh in and exercise its discretion as to whether to require the disclosure of these records and information.
+
+
+Further Case handling. Moving forward, we will file a motion for a protective order seeking to prohibit additional discovery against Bransby. We expect that Hyundai’s counsel will likewise soon be filing motions to compel Bransby’s second deposition, which we will oppose. In the meantime, we will update you once we receive Hyundai’s opposition to our Motion for Determination of Good Faith Settlement. 
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Procedural Status. On the Court’s own motion, the Court has continued the hearing date on our Motion for Determination of Good Faith Settlement to November 13, 2025. A Case Management Conference is scheduled for December 2, 2025. 
+
+
+Discovery: As you may recall, Hyundai has been aggressively attempting to conduct discovery into the personal finances of Michael Bransby in an effort to use the existence of significant personal assets  to oppose a good faith settlement determination. After we objected to providing this information, Hyundai filed motions to compel, which the Court denied as untimely. In response, Hyundai’s counsel, who also represents PHA Co., Ltd., a newly added co-defendant manufacturer, attempted to again take Bransby’s deposition and propounded a fresh set of discovery regarding Bransby’s current financial condition, to which we served timely objections based on the argument that the new discovery is duplicative and because Bransby’s current financial condition is private and irrelevant under the facts of this case, where we are not arguing that Bransby has insufficient assets to pay a higher judgment. As expected, Pha Co. has now filed motions to compel Bransby’s deposition and responses to its duplicative discovery, which are scheduled be heard on December 31, 2025, well after the hearing date on our pending Motion for good faith settlement. While we expect that counsel will attempt to use these pending motions to argue for a continuance or outright denial of our pending good faith settlement motion, we will argue that Hyundai / Pha waited far too long to bring these motions (which were filed only recently) and that the discovery being sought is entirely irrelevant to the determination of the motion. Should the Court grant our motion for good faith settlement, the pending motions to compel will be rendered moot. 
+
+
+Further Case handling.  Moving forward, we will appear at the hearing on our Motion for Determination of Good Faith Settlement and will provide you with a further update once we receive the Court’s ruling.
+
+
+Best.
+
+
+================================================================================
+--------------------------------------------------------------------------------
+
+
+Deposition of Karissa Anne-Marie Hamblin: On December 23, 2025, we took the deposition of Plaintiff’s ex-wife, Karissa Anne-Marie Hamblin. Ms. Hamblin testified in a candid, straightforward, and generally credible manner. She appeared honest and cooperative, and while somewhat naïve at times, she presented as a likable and believable witness who is likely to be well received by a jury. Overall, she would make a very strong witness. Below is a screenshot of Ms. Hamblin taken at her deposition. 
+
+
+ Below are the most salient portions of Karissa's testimony: 
+
+
+*	Ms. Hamblin testified that Plaintiff had been drinking vodka all day on the day of the incident, beginning in the morning. This is in direct contradiction to Plaintiff’s testimony that he only consumed two beers that day. Ms. Hamblin testified that vodka was Plaintiff’s drink of choice and that he did not drink beer.
+
+*	In the afternoon of the incident, Plaintiff’s friend, James Taylor, came to the home, and the two continued drinking vodka together. They consumed a very large bottle of vodka, ran out, and then went to purchase an additional half-liter bottle, after which the drinking continued. In his own deposition, Plaintiff stated that on the date of the incident it was only him, his wife and his son at home. 
+
+*	Ms. Hamblin confirmed that on the day of the incident, there was no barbecue, again directly contradicting Plaintiff’s testimony about a pre-game barbecue tradition. Plaintiff told her to go make dinner and then left the house without telling her where he was going.
+
+*	Ms. Hamblin testified that Plaintiff had a long-standing drinking problem, drinking at least twice per week throughout the marriage, and that his alcohol consumption regularly led to aggressive behavior.
+
+*	She confirmed that Plaintiff had a quick temper and became angry and aggressive when drinking. Ms. Hamblin testified that Plaintiff was verbally abusive, frequently calling her degrading names during the marriage.
+
+*	In March 2020, Plaintiff physically struck her arm, prompting her to call the police. She confirmed another physical altercation involving Plaintiff at a liquor store/fishing bait shop, during which Plaintiff also sustained knee pain, confirming pre-existing knee problems. 
+
+*	Plaintiff’s drinking and aggression caused Ms. Hamblin to be afraid for her own safety and for the safety of their child. Plaintiff had threatened to kill her on at least one occasion. Ms. Hamblin testified that on one occasion Plaintiff threatened to drown their three-year-old autistic son after the child spilled a bottle of water.
+
+*	She testified that she was not surprised that Plaintiff approached teenage girls on the night of the incident, particularly given the approximately 23-year age difference between herself and Plaintiff.
+
+*	Following the incident, Ms. Hamblin filed for divorce and sought emergency domestic-violence protection. Although the divorce has not been finalized due to paperwork issues, she has no intention of reconciling with Plaintiff. There is no formal custody order, but the parties share custody informally. Ms. Hamblin still sees Plaintiff a few times per month when he visits their child. But her ultimate goal is to proceed with final divorce. 
+
+*	Ms. Hamblin confirmed Plaintiff had two prior DUI convictions before they met, which prevented him from driving.
+
+
+Overall, Ms. Hamblin’s testimony was highly favorable to the defense. Her testimony directly undermines Plaintiff’s credibility regarding his alcohol consumption on the day of the incident and supports the defense theory that Plaintiff was heavily intoxicated prior to the altercation. Her testimony regarding Plaintiff’s history of alcohol abuse, aggression, verbal and physical abuse, and prior altercations significantly bolsters the defense’s comparative fault and provocation arguments. While Plaintiff’s counsel attempted to suggest that Ms. Hamblin’s prior strokes may have affected her memory, her testimony was detailed, generally consistent, and internally coherent. Overall, her testimony undermines Plaintiff’s credibility and supports the conclusion that his intoxication, aggressive tendencies, and prior conduct were significant contributing factors to the incident, independent of any alleged premises condition.
+
+
+Further Case Handling: Within the next 30 days, we will notice the deposition of Plaintiff’s friend James Taylor, who was present with Plaintiff on the day of the incident. We will continue preparing a motion for summary judgment based on lack of duty and causation. We will also notice the depositions of Jamesie Goff and Christian Teasley.    
+
+

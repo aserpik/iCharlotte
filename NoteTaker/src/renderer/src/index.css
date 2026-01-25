@@ -1,0 +1,151 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+/* TipTap Editor Styles */
+.ProseMirror {
+  outline: none;
+  min-height: 100%;
+  padding: 1.5rem;
+  font-family: 'Times New Roman', Times, serif !important;
+  font-size: 12pt !important;
+  line-height: 1.0 !important; /* Strict single spacing */
+  color: #000000 !important; /* Pure black text */
+}
+
+.ProseMirror p {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important; /* Remove spacing between paragraphs */
+  color: #000000 !important;
+}
+
+.ProseMirror * {
+  font-family: 'Times New Roman', Times, serif !important;
+  color: #000000 !important;
+}
+
+.ProseMirror ul, .ProseMirror ol {
+  padding-left: 1.5rem;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  list-style-type: disc !important;
+}
+
+.ProseMirror ul ul, .ProseMirror ol ol, .ProseMirror ul ol, .ProseMirror ol ul {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  list-style-type: disc !important;
+}
+
+.ProseMirror li {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important; /* Remove spacing between list items */
+}
+
+.ProseMirror li p {
+    margin: 0 !important;
+}
+
+.ProseMirror h1 {
+    font-size: 14pt !important;
+    font-weight: bold;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+    color: #000000 !important;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: #adb5bd;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+ul[data-type="taskList"] {
+  list-style: none;
+  padding: 0;
+}
+
+ul[data-type="taskList"] li {
+  display: flex;
+}
+
+.pdf-viewer-container {
+    height: 100%;
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Animations */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes zoom-in {
+  from { transform: scale(0.95); }
+  to { transform: scale(1); }
+}
+
+.animate-in {
+  animation-duration: 200ms;
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: fade-in;
+}
+
+.zoom-in {
+  animation-name: zoom-in;
+}
+
+.PdfHighlighter img, 
+.PdfHighlighter canvas, 
+.PdfHighlighter .page,
+.pdf-viewer-container img,
+.pdf-viewer-container canvas {
+    max-width: none !important;
+}
+
+.PdfHighlighter .page {
+    margin: 10px auto !important;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+/* Ensure text layer sits on top of canvas */
+.textLayer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+    line-height: 1.0;
+    pointer-events: none; /* Let clicks pass through to canvas if needed, but text selection needs pointer-events auto on spans? No, textLayer usually captures selection. */
+}
+
+/* Text Layer spans must capture mouse for selection */
+.textLayer > span {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+    pointer-events: all !important; /* Critical for selection */
+}
+
+/* Dynamic Highlight Color Support */
+.Highlight__part {
+    background-color: var(--highlight-color, #ffeb3b) !important;
+}
+
+/* Remove the previous broad debug style */

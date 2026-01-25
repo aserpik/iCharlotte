@@ -1,0 +1,116 @@
+**Objective:** Generate an "Evaluation of Liability" section for a legal analysis report.
+
+**Input:** You will be provided with case-specific information, including alleged causes of action, relevant facts, key documents (like complaints, contracts, investigation reports, expert opinions, witness statements, relevant statutes/case law citations if available), and the parties involved. This information will be supplied in the context window or through uploaded documents.
+
+**Task:** Your task is to analyze the provided information and draft *only* the "Evaluation of Liability" section of a report.
+
+**Crucial Requirements - Style, Tone, and Structure (Mimic Examples):**
+You MUST adhere strictly to the following style, tone, structure, and level of detail:
+
+1. **Heading:** Start the section with the exact heading "EVALUATION OF LIABILITY" in all caps.
+2. **Introduction:** Briefly state the causes of action alleged by the Plaintiff(s) against the Defendant(s), as identified in the provided input information.
+3. **Structure by Cause of Action:**
+* Organize the analysis by each distinct cause of action alleged (e.g., Breach of Contract, Negligence, Dangerous Condition of Public Property, Strict Product Liability, Negligent Hiring/Training/Supervision, Premises Liability). Use clear headings or subheadings for each cause of action (e.g., "A. Breach of Contract", "B. Negligence").
+* For each cause of action, **first state the required legal elements** needed for the Plaintiff to prevail. If specific legal citations (like CACI numbers, Government Code sections, or landmark cases) are provided in the input or are commonly known for that cause of action (especially in California law, as seen in the examples), include them.
+* **Analyze each relevant element systematically.** Use subheadings for elements where appropriate (e.g., "Duty", "Breach", "Causation", "Damages", "Ownership", "Dangerous Condition", "Notice", "Harm", "Substantial Factor").
+* **Apply Specific Facts:** For each element, explicitly discuss how the specific facts from the provided input information apply. Refer to specific documents, evidence, or factual details (e.g., "under ¶ 13.1 of the lease...", "emails from the Sheriff's department...", "the TCR indicates...", "According to ALR...", "Plaintiff produced a photograph...").
+* **Present Both Sides:** Clearly articulate the Plaintiff's likely arguments and the Defendant's likely defenses or counterarguments for each relevant point or element, based on the provided facts. Use predictive phrasing like "Plaintiff will argue...", "We will argue...", "Claimant may contend...", "The City can argue...".
+* **Assess Likelihood/Viability:** Include assessments of the strength or weakness of claims and defenses using phrases similar to the examples (e.g., "Plaintiffs will likely be able to establish this element," "we believe the City has a strong defense," "viable pathway to establish," "Plaintiffs will have a difficult time establishing," "liability is adverse," "premature to conclusively evaluate liability, however...").
+* **Acknowledge Unknowns:** If information is missing or further investigation is needed, state that clearly (e.g., "While we are still in the process of investigating...", "Further discovery is necessary...", "We will provide you with a further update...").
+4. **Concluding Summary:** Include a concise "Summary" paragraph at the end of the analysis for each major cause of action, or one overall summary at the end of the entire "Evaluation of Liability" section. This summary should briefly reiterate the key strengths and weaknesses of the case regarding liability and the overall assessment.
+5. **Tone:** Maintain a formal, objective, analytical, and professional tone. The perspective should generally be that of an analyst evaluating the potential liability of the Defendant(s), similar to the examples. Avoid overly emotional or biased language (unless reflecting a potential argument, e.g., "The Insured's belief is that Plaintiffs fabricated the complaints...").
+6. **Language:** Use clear, precise legal terminology where appropriate (e.g., respondeat superior, vicarious liability, dangerous condition, design defect, comparative fault, contributory negligence, substantial factor, CACI, Gov. Code).
+7. **Formatting:** Use formatting (like bolding for subheadings, indentation, bullet points if logically fitting within the prose style) consistent with the provided examples to enhance readability.
+
+**Scope:**
+* Focus *exclusively* on evaluating liability. Do not delve into detailed damages valuation, settlement recommendations, or procedural history unless directly relevant to a liability argument (like notice).
+* Do not create information not present in the provided input. Base your analysis solely on the facts and documents given.
+* Ensure the output flows logically and reads like a cohesive analysis section from a legal report.
+
+**Analysis Parameters:**
+- **Case Category:** {case_category}
+- **Analysis Depth:** {analysis_depth}
+- **Focus Areas:** {focus_areas}
+- **Include Case Law:** {include_case_law}
+- **Evidence Strength:** {evidence_strength}
+- **Comparative Fault Detail:** {comparative_fault_detail}
+
+**Additional User Instructions:**
+{additional_instructions}
+
+**Professional Standards:**
+- Use formal legal writing style appropriate for court filings and client reports
+- Cite specific facts, documents, and legal authorities
+- Maintain objectivity while advocating for the client's position
+- Provide actionable insights for case strategy
+- Consider California law and comparative fault principles throughout
+
+<EXAMPLE>
+EVALUATION OF LIABILITY
+Plaintiff's complaint specifically alleges two duplicative causes of action for
+General Negligence and Premises liability. In order to succeed, Plaintiff must
+demonstrate: (1) that ALR owned, leased, occupied or controlled the property; (2) that
+ALR was negligent in the use or maintenance of the property; (3) that Plaintiff was
+harmed; and (4) that ALR's negligence was a substantial factor in causing Plaintiff's
+harm. Below is our analysis of these elements:
+A. Ownership or Control
+First, a Plaintiff must establish that the defendant owned, leased, occupied, or
+controlled the property. Here, it is undisputed that ALR owned and operated the property
+where the incident took place. As such, Plaintiff will be able to establish this element.
+B. Negligent Use or Maintenance
+Second, a plaintiff must establish that the defendant's use or maintenance of the
+property was negligent. A defendant is negligent in the use or maintenance of the
+property if (1) a condition of the property created an unreasonable risk of harm; (2) the
+defendant knew or should have known about the condition; and (3) the defendant failed
+to repair the condition, protect against harm from the condition, or give adequate warning
+of the condition. (CACI No. 1003.)
+Here, Plaintiff will allege that the property was negligently maintained because an
+opening was left exposed on the scale platform. Plaintiff produced a photograph in
+discovery that appears to show the opening covered by a metal cover plate.
+Plaintiff will likely argue that the above photograph shows how the opening should have been covered at the time of the incident. Instead, the opening was left in an open position, creating a hazard for drivers exiting their vehicles:
+We are in the process of investigating Plaintiff's allegations to determine whether
+the opening is indeed typically covered as shown in the above photograph. According to
+ALR, the opening had not been covered for at least 2 years prior to the incident. As such,
+Plaintiff may have a viable argument that the condition as dangerous and ALR had notice
+of the same for at least 2 years. However, even if Plaintiff is able to establish that a
+dangerous condition existed, we will argue that Plaintiff was a regular user of the scale
+house (Plaintiff had been at the scalehouse 41 times since September 2022) and that the
+incident occurred during daylight hours. If an unsafe condition of the property is so
+obvious that a person could reasonably be expected to observe it, then the one who
+controls the property does not have to warn others about the dangerous condition. (CACI
+1004.) We will argue that given Plaintiff's experience using the scale house and the lack
+of visual obstructions, it should have been "obvious" to Plaintiff that there was an
+opening in the platform and thus ALR had no duty to provide Plaintiff any additional
+warnings. Even if these facts do not bar Plaintiff's claims, they will be useful to shift
+some liability away from ALR due to Plaintiff's contributory negligence.
+We will provide you with a further analysis of this element as more information is
+obtained.
+C. Harm
+Third, a plaintiff must prove that they suffered damages from this incident. While
+the extent of Plaintiff's injuries may be disputed, it does appear that Plaintiff was injured
+as a result of the incident. As such, Plaintiff will be able to establish this element.
+D. Substantial Factor
+Last, a plaintiff must establish that the dangerous condition was a "substantial
+factor" in the cause of the accident. CACI 430 defines substantial factors as follows:
+"A substantial factor in causing harm is a factor that a reasonable person would
+consider having contributed to the harm. It must be more than a remote or trivial
+factor. It does not have to be the only cause of the harm."
+Here, Plaintiff will argue that her injuries would not have occurred but for the
+opening in the platform. Given the low bar for causation, Plaintiff will be able to
+establish this element if he is able to show that a dangerous condition existed on the
+property.
+E. Summary
+While it is premature to conclusively analyze liability, Plaintiff does have a viable
+pathway to establish liability against ALR, as it appears that the joint was missing a metal
+cover and had been in this condition for at least 2 years before the incident. On the other
+hand, Plaintiff was an experienced user of the scalehouse and should have been aware of
+the opening from prior visits. Moreover, the incident occurred during daylight house, and
+there were no visual obstructions preventing Plaintiff from seeing the opening, such that
+the opening should have been obvious to Plaintiff. We will also investigate whether
+Plaintiff was wearing proper steel-toe shoes and corrective lenses at the time of the
+incident as well as whether Plaintiff had a valid driver's license. Even if these facts do
+not bar Plaintiff's claims, they will be useful to shift some liability away from ALR due
+to Plaintiff's contributory negligence.
+</EXAMPLE>
+
+Now, please process the provided case information and generate the "EVALUATION OF LIABILITY" section according to these instructions.

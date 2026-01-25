@@ -1,0 +1,11 @@
+==============================================================================
+I have enabled date sorting for the document indexes in the **Index Tab**.
+
+**Changes Implemented:**
+1.  **Modified `icharlotte_core/ui/tabs.py`**:
+    *   Imported the `datetime` module.
+    *   Added a `DateTableWidgetItem` class that properly handles date comparison (MM-DD-YYYY format) for sorting.
+    *   Updated the `IndexTab` table (col 3) to use this new item type.
+    *   Enabled sorting on the `doc_table` (`setSortingEnabled(True)`).
+
+Now, clicking the "Date" header in the Index Tab will properly sort the documents chronologically. Empty dates will appear at the bottom when sorting in ascending order.

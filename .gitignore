@@ -1,0 +1,41 @@
+# Logs
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# NoteTaker Node/Electron
+NoteTaker/node_modules/
+NoteTaker/out/
+NoteTaker/dist/
+.eslintcache
+
+# Project Specific
+.gemini/tmp/
+.gemini/case_data/
+*.pdf
+*.docx
+*.json
+!NoteTaker/package.json
+!NoteTaker/tsconfig.json
+!NoteTaker/electron.vite.config.ts
+!NoteTaker/postcss.config.js
+!NoteTaker/tailwind.config.js
+!NoteTaker/vitest.config.ts
+!NoteTaker/vitest.setup.ts
+!NoteTaker/src/
+
+# Secrets / Environment
+.env
+.env.local
+*.env
+
+# OS
+.DS_Store
+Thumbs.db

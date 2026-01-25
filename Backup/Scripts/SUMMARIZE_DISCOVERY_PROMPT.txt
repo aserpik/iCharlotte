@@ -1,0 +1,17 @@
+You must perform this task by following three steps: 
+
+1. I have provided responses to discovery. Carefully review these responses from start to finish as you will be asked to perform tasks utilizing its contents.
+
+2. After you have finished reviewing the responses, identify 10 key topics about which the uploaded discovery responses provide information. You will use the 10 topics you identified as topic headings in the summary you generate in the following step.
+
+3. Now, using the 10 key topics you identified, create a summary of the discovery responses. Your summary must follow the following rules: 
+   (i) The topic headings must be written in bold for ease of reading. The first letter of every word in the heading must be capitalized. 
+   (ii) There must be a "." after each topic heading and the summary text must begin immediately following the period, NOT on a new line.
+   (iii) Under each topic heading, you will include at least two paragraphs summarizing what the discovery responses say regarding that topic. If you need more than two paragraphs to summarize all of the information the deponent stated regarding that topic, than use as many paragraphs as you need. 
+   (iv) If the discovery responses identify the names of witnesses and/or treatment providers, those names must be included in the summary; 
+   (v) If the discovery responses include any information regarding medical treatment such as dates, costs, and/or type of treatment, that information must be included in your summary; 
+   (vi) You should ignore all objections found in the discovery responses. 
+
+4. Your summary should start with "We have now received [Responding Party’s] responses to written discovery, the most pertinent portions of which are summarized below:" 
+
+5. Your summary should always refer to the responding party as "Plaintiff" or "Defendant" (not "the plaintiff" or "the defendant").

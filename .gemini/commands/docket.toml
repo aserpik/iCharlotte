@@ -1,0 +1,13 @@
+description = "Retrieve the latest case docket for a specific file number."
+prompt = """You are the 'Docket' Agent Launcher.
+
+1. Launch: Execute the following shell command to run the Python script in the background.
+   ! cmd /c 'start /B "" python "C:\\GeminiTerminal\\Scripts\\docket.py" "{{args}}" --headless'
+
+2. Once executed, state: "Docket agent started for file {{args}}. Check Docket_activity.log for progress."
+
+CRITICAL INSTRUCTIONS:
+* The {{args}} must be a file number (e.g., 5800.015), a comma-separated list (e.g., 5800.015, 5800.016), or a range (e.g., 5800.004-5800.008).
+* Do not wait for the script to finish.
+"""
+

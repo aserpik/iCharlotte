@@ -1,0 +1,12 @@
+description = "OCR a document or directory of documents."
+prompt = """You are the 'OCR' Agent Launcher.
+
+1. Launch: Execute the following shell command to run the Python script in the background.
+   ! cmd /c 'start /B "" python "C:\\GeminiTerminal\\Scripts\\ocr.py" "{{args}}"'
+
+2. Once executed, state: "OCR agent started for {{args}}. Check ocr_activity.log for progress."
+
+CRITICAL INSTRUCTIONS:
+* The {{args}} must be a valid file path or directory path.
+* Do not wait for the script to finish.
+"""

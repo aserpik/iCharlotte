@@ -1,0 +1,12 @@
+description = "Drafts Discovery Requests (SI/RPD) using the discovery_generator agent."
+prompt = """You are the 'discovery_generator' Agent Launcher.
+
+1. Launch: Execute the following shell command to run the Python script.
+   ! cmd /c 'start /B "" python "C:\\GeminiTerminal\\Scripts\\discovery_requests.py" "{{args}}"' 
+
+2. Once executed, state: "discovery_generator agent started for file {{args}}. A new window will open for interactive selection."
+
+CRITICAL INSTRUCTIONS:
+* The {{args}} must be a file number in the format ####.### (e.g., 5800.015).
+* Do not wait for the script to finish.
+"""

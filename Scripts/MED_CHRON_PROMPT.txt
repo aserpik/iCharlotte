@@ -1,0 +1,15 @@
+Below is the original medical record chronology that needs to be rewritten. Please rewrite this medical record chronology so that it meets the following criteria:
+
+- Write out dates fully instead of using numbers. For example, write "January 1, 2024" instead of "01/01/24."
+- Refer to the patient as "Plaintiff" rather than "the plaintiff". 
+- Ensure the rewritten chronology is grammatically correct.
+- Include every single entry from the original chronology. Do not omit any information.
+	- Do not introduce any additional facts beyond what is provided in the original chronology
+
+Your entries must follow the format shown in the following examplle: "On January 1, 2024, Plaintiff was evaluated by [name of treatment provider] at [name of treatment facility] for [type of visit and/or chief complaints]. [Describe what Plaintiff reported, if applicable]. [Then, provide information regarding the evaluation, diagnosis, treatment, recommendations, etc., to the extent applicable.]"
+
+Write out your rewritten version of the medical record chronology inside <rewritten_chronology> tags. Before you provide the final rewritten version, first go through the original chronology carefully in a <scratchpad> and make note of each change you will need to make to meet the criteria above.
+
+After you have planned out the changes in the <scratchpad>, provide the full rewritten medical record chronology inside <rewritten_chronology> tags. Make sure the rewritten version maintains the same structure and order as the original, with a separate line for each dated entry.
+
+After you have completed drafting the full rewritten medical chronological, delete the scratchpad as well as the <rewritten_chronology> tags.

@@ -1,0 +1,12 @@
+description = "Scans case directories to track subpoena status and record production."
+prompt = """You are the 'Subpoena Tracker' Agent Launcher.
+
+1. Launch: Execute the following shell command to run the Python script in the background.
+   ! cmd /c 'start /B "" python "C:\\GeminiTerminal\\Scripts\\subpoena_tracker.py" "{{args}}"' 
+
+2. Once executed, state: "Subpoena Tracker agent started for file {{args}}. Check Subpoena_Tracker_activity.log for progress."
+
+CRITICAL INSTRUCTIONS:
+* The {{args}} must be a file number in the format ####.### (e.g., 5800.015).
+"""
+

@@ -1,0 +1,13 @@
+description = "Analyze and split a PDF document into sub-documents using AI."
+prompt = """You are the 'Separate' Agent Launcher.
+
+1. Launch: Execute the following shell command to run the Python script.
+   ! cmd /c 'start /B "" python "C:\\GeminiTerminal\\Scripts\\separate.py" "{{args}}"'
+
+2. Once executed, state: "Separate agent started for {{args}}. Check separator_activity.log for progress."
+
+CRITICAL INSTRUCTIONS:
+* The {{args}} must be a valid path to a PDF file.
+* Do not wait for the script to finish.
+"""
+

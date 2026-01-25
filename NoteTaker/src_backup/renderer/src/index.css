@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+/* TipTap Editor Styles */
+.ProseMirror {
+  outline: none;
+  min-height: 100%;
+  padding: 1rem;
+  font-family: 'Times New Roman', Times, serif;
+  font-size: 12pt;
+}
+
+.ProseMirror * {
+  font-family: 'Times New Roman', Times, serif !important;
+  font-size: 12pt !important;
+  line-height: 1.2 !important; /* Slightly more than 1.0 for better readability while still being 'single spaced' */
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+.ProseMirror li {
+  margin-bottom: 0 !important;
+}
+
+.ProseMirror ul, .ProseMirror ol {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+.ProseMirror h1 {
+    font-size: 14pt !important; /* Keep headers slightly larger? Or user said "all text... default to 12"? Assumed body text. */
+    font-weight: bold;
+}
+
+.ProseMirror p.is-editor-empty:first-child::before {
+  color: #adb5bd;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+ul[data-type="taskList"] {
+  list-style: none;
+  padding: 0;
+}
+
+ul[data-type="taskList"] li {
+  display: flex;
+}
+
+.pdf-viewer-container {
+    height: 100%;
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Animations */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes zoom-in {
+  from { transform: scale(0.95); }
+  to { transform: scale(1); }
+}
+
+.animate-in {
+  animation-duration: 200ms;
+  animation-fill-mode: both;
+}
+
+.fade-in {
+  animation-name: fade-in;
+}
+
+.zoom-in {
+  animation-name: zoom-in;
+}
+
+.PdfHighlighter img, 
+.PdfHighlighter canvas, 
+.PdfHighlighter .page,
+.pdf-viewer-container img,
+.pdf-viewer-container canvas {
+    max-width: none !important;
+    height: auto !important;
+}
+
+/* Ensure text layer sits on top of canvas */
+.textLayer {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+    line-height: 1.0;
+    pointer-events: none; /* Let clicks pass through to canvas if needed, but text selection needs pointer-events auto on spans? No, textLayer usually captures selection. */
+}
+
+/* Text Layer spans must capture mouse for selection */
+.textLayer > span {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+    pointer-events: all !important; /* Critical for selection */
+}
+
+/* Remove the previous broad debug style */
