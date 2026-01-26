@@ -19,6 +19,7 @@ from PySide6.QtWebEngineCore import QWebEnginePage
 from icharlotte_core.config import SCRIPTS_DIR, GEMINI_DATA_DIR, TEMP_DIR
 from icharlotte_core.ui.widgets import StatusWidget, AgentRunner
 from icharlotte_core.ui.logs_tab import LogManager
+from icharlotte_core.ui.word_tab import WordEmbedWidget
 
 PRESETS = {
     "main_heading": {
@@ -547,44 +548,48 @@ class RuleDialog(QDialog):
             QMessageBox.critical(self, "Error", f"Failed to call AI Builder: {e}")
 
     def get_from_word(self):
+        """Get formatting from selected text in embedded Word."""
         # Access the ReportTab instance (parent of this dialog)
-        if not self.parent() or not hasattr(self.parent(), 'web_view'):
-            QMessageBox.warning(self, "Error", "Cannot access document preview.")
+        if not self.parent() or not hasattr(self.parent(), 'word_widget'):
+            QMessageBox.warning(self, "Error", "Cannot access Word document.")
             return
 
-        js_script = """
-        (function() {
-            var sel = window.getSelection();
-            if (sel.rangeCount < 1) return JSON.stringify({error: "No selection found"});
-            
-            var node = sel.anchorNode;
-            if (!node) return JSON.stringify({error: "No element selected"});
-            if (node.nodeType === 3) node = node.parentElement; // Text node -> Element
-            
-            var computed = window.getComputedStyle(node);
-            
-            // Attempt to guess Word Style from class attribute
-            // Word HTML filtered often puts style name in class or nothing
-            var styleName = "";
-            if (node.className) {
-                // e.g. "MsoNormal", "Heading1"
-                styleName = node.className.replace(/^Mso/, "");
-            }
+        word_widget = self.parent().word_widget
+        if not word_widget.word_app or not word_widget.word_doc:
+            QMessageBox.warning(self, "Error", "No Word document is currently open.")
+            return
 
-            return JSON.stringify({
-                font_name: computed.fontFamily.split(",")[0].replace(/['"]/g, ""),
-                font_size: computed.fontSize,
-                font_weight: computed.fontWeight,
-                font_style: computed.fontStyle,
-                text_align: computed.textAlign,
-                margin_left: computed.marginLeft,
-                margin_bottom: computed.marginBottom,
-                style: styleName
-            });
-        })();
-        """
-        
-        self.parent().web_view.page().runJavaScript(js_script, self.handle_preview_selection)
+        try:
+            selection = word_widget.word_app.Selection
+            if not selection or not selection.Font:
+                QMessageBox.warning(self, "Error", "No selection found in Word.")
+                return
+
+            font = selection.Font
+            para_format = selection.ParagraphFormat
+
+            # Build result dict similar to JS version
+            result = json.dumps({
+                "font_name": font.Name or "Times New Roman",
+                "font_size": f"{font.Size}pt" if font.Size else "12pt",
+                "font_weight": "bold" if font.Bold else "normal",
+                "font_style": "italic" if font.Italic else "normal",
+                "text_align": self._get_alignment_name(para_format.Alignment),
+                "margin_left": f"{para_format.LeftIndent}pt" if para_format.LeftIndent else "0pt",
+                "margin_bottom": f"{para_format.SpaceAfter}pt" if para_format.SpaceAfter else "0pt",
+                "style": selection.Style.NameLocal if selection.Style else ""
+            })
+
+            self.handle_preview_selection(result)
+
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Failed to get formatting from Word: {e}")
+
+    def _get_alignment_name(self, alignment):
+        """Convert Word alignment constant to name."""
+        # Word alignment constants: 0=Left, 1=Center, 2=Right, 3=Justify
+        alignment_map = {0: "left", 1: "center", 2: "right", 3: "justify"}
+        return alignment_map.get(alignment, "left")
 
     def handle_preview_selection(self, result):
         if not result:
@@ -1212,9 +1217,13 @@ class ReportTab(QWidget):
 
         self.current_doc_path = None
         self.file_label.setText("No file loaded")
-        self.web_view.setHtml("<div style='text-align:center; padding-top:50px; color:#666;'>Drag & Drop a Word document here...</div>")
+        # Close Word if it's open
+        if hasattr(self, 'word_widget') and self.word_widget.word_hwnd:
+            self.word_widget.close_word(save=False)
         self.process_btn.setEnabled(False)
         self.save_doc_btn.setEnabled(False)
+        if hasattr(self, 'close_word_btn'):
+            self.close_word_btn.setEnabled(False)
         self.context_list.clear()
         self.ai_output_list.clear()
         
@@ -1273,24 +1282,32 @@ class ReportTab(QWidget):
         QTimer.singleShot(100, lambda: self._run_capture_js(tool, custom_prompt, sidebar_context))
 
     def _run_capture_js(self, tool, custom_prompt, sidebar_context):
-        # Capture selection AND full text for context
-        # We prepend sidebar context to the fullText
-        js = f"""
-        (function() {{
-            try {{
-                var sel = window.getSelection().toString();
-                var full = document.body.innerText || document.documentElement.innerText || "";
-                var sidebar = `{sidebar_context}`;
-                return JSON.stringify({{
-                    selection: sel,
-                    fullText: sidebar + "\\n\\n--- MAIN DOCUMENT ---\\n" + full
-                }});
-            }} catch (e) {{
-                return JSON.stringify({{error: e.toString()}});
-            }}
-        }})();
-        """
-        self.web_view.page().runJavaScript(js, lambda data: self.handle_ai_rewrite_selection(data, tool, custom_prompt))
+        """Capture selection and full text from Word for AI processing."""
+        try:
+            if not self.word_widget.word_app or not self.word_widget.word_doc:
+                QMessageBox.warning(self, "No Document", "No Word document is currently open.")
+                return
+
+            # Get selected text from Word
+            selection = ""
+            full_text = ""
+            try:
+                selection = self.word_widget.word_app.Selection.Text or ""
+                full_text = self.word_widget.word_doc.Content.Text or ""
+            except Exception as e:
+                print(f"Error getting Word text: {e}")
+
+            # Build the JSON data structure
+            import json
+            json_data = json.dumps({
+                "selection": selection.strip(),
+                "fullText": sidebar_context + "\n\n--- MAIN DOCUMENT ---\n" + full_text
+            })
+
+            self.handle_ai_rewrite_selection(json_data, tool, custom_prompt)
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to capture text from Word: {e}")
 
     def setup_ui(self):
         # ... (setup_ui code is above)
@@ -1603,176 +1620,61 @@ class ReportTab(QWidget):
         
         splitter.addWidget(left_panel)
         
-        # --- Right Panel (Preview) ---
+        # --- Right Panel (Word Editor) ---
         right_panel = QFrame()
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Create a Container for the Preview Area (Toolbar + WebView)
+
+        # Create a Container for the Word Editor Area
         preview_area = QWidget()
         preview_area_layout = QVBoxLayout(preview_area)
         preview_area_layout.setContentsMargins(0, 5, 0, 0)
 
-        # Header Row (Centered to match the 8.5in document)
+        # Header Row with document controls
         header_container = QHBoxLayout()
-        header_container.setContentsMargins(10, 0, 10, 0)
-        
-        # Inner layout to group Label and Toolbar and center them like the page
-        center_row = QHBoxLayout()
-        center_row.addStretch()
-        
-        # The actual content group (Matches document width roughly)
-        content_group = QWidget()
-        content_group.setFixedWidth(816) # 8.5 inches at 96 DPI
-        cg_layout = QHBoxLayout(content_group)
-        cg_layout.setContentsMargins(0, 0, 0, 0)
-        
-        preview_label = QLabel("<b>Document Preview</b>")
+        header_container.setContentsMargins(10, 5, 10, 5)
+
+        preview_label = QLabel("<b>Document Editor</b>")
         preview_label.setStyleSheet("font-size: 13px; color: #333;")
-        cg_layout.addWidget(preview_label)
-        cg_layout.addSpacing(15)
+        header_container.addWidget(preview_label)
 
-        # Formatting Toolbar
-        self.format_toolbar = QFrame()
-        self.format_toolbar.setObjectName("formatToolbar")
-        self.format_toolbar.setStyleSheet("""
-            #formatToolbar { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 4px; }
-            QPushButton { border: 1px solid transparent; border-radius: 3px; background: transparent; padding: 4px; font-weight: normal; }
-            QPushButton:hover { background: #e9ecef; border: 1px solid #adb5bd; }
-            QComboBox { background: white; border: 1px solid #ccc; border-radius: 3px; padding: 2px; }
-        """)
-        ft_layout = QVBoxLayout(self.format_toolbar)
-        ft_layout.setContentsMargins(4, 4, 4, 4)
-        ft_layout.setSpacing(6)
+        header_container.addSpacing(20)
 
-        # Row 1: Styles, Font, Size, and History
-        row1 = QHBoxLayout()
-        row1.setSpacing(4)
-        self.style_gallery = QComboBox()
-        self.style_gallery.addItems(["Normal", "Heading 1", "Heading 2", "Heading 3", "Title", "Subtitle"])
-        self.style_gallery.setFixedWidth(110)
-        self.style_gallery.currentTextChanged.connect(lambda s: self.exec_format_cmd("formatBlock", s))
-        row1.addWidget(self.style_gallery)
-        row1.addSpacing(5)
-        self.font_family_combo = QComboBox()
-        self.font_family_combo.addItems(["Times New Roman", "Arial", "Calibri", "Courier New", "Georgia"])
-        self.font_family_combo.setCurrentText("Times New Roman")
-        self.font_family_combo.setFixedWidth(130)
-        self.font_family_combo.currentTextChanged.connect(lambda f: self.exec_format_cmd("fontName", f))
-        row1.addWidget(self.font_family_combo)
-        self.font_size_combo = QComboBox()
-        self.font_size_combo.addItems(["8", "9", "10", "11", "12", "14", "16", "18", "20", "24", "26", "28", "36", "48", "72"])
-        self.font_size_combo.setCurrentText("12")
-        self.font_size_combo.setFixedWidth(55)
-        self.font_size_combo.currentTextChanged.connect(lambda sz: self.exec_format_cmd("fontSize", sz))
-        row1.addWidget(self.font_size_combo)
-        row1.addSpacing(10)
-        
-        def create_format_btn(text, tooltip, cmd, value=None):
-            btn = QPushButton(text)
-            btn.setToolTip(tooltip)
-            btn.setFixedWidth(28); btn.setFixedHeight(28)
-            btn.setStyleSheet("font-weight: bold; font-family: 'Segoe UI', sans-serif; font-size: 13px;")
-            btn.clicked.connect(lambda: self.exec_format_cmd(cmd, value))
-            return btn
+        # New Document button
+        new_doc_btn = QPushButton("New Document")
+        new_doc_btn.setStyleSheet("padding: 5px 12px;")
+        new_doc_btn.clicked.connect(self.new_word_document)
+        header_container.addWidget(new_doc_btn)
 
-        row1.addWidget(create_format_btn("↶", "Undo", "undo"))
-        row1.addWidget(create_format_btn("↷", "Redo", "redo"))
-        row1.addStretch()
-        ft_layout.addLayout(row1)
+        # Open Document button
+        open_doc_btn = QPushButton("Open Document")
+        open_doc_btn.setStyleSheet("padding: 5px 12px;")
+        open_doc_btn.clicked.connect(self.load_document)
+        header_container.addWidget(open_doc_btn)
 
-        # Row 2: Basic & Extended Formatting
-        row2 = QHBoxLayout()
-        row2.setSpacing(2)
-        row2.addWidget(create_format_btn("B", "Bold", "bold"))
-        row2.addWidget(create_format_btn("I", "Italic", "italic"))
-        row2.addWidget(create_format_btn("U", "Underline", "underline"))
-        row2.addWidget(create_format_btn("S", "Strikethrough", "strikeThrough"))
-        sub_btn = create_format_btn("x₂", "Subscript", "subscript"); sub_btn.setStyleSheet("font-size: 10px;")
-        row2.addWidget(sub_btn)
-        sup_btn = create_format_btn("x²", "Superscript", "superscript"); sup_btn.setStyleSheet("font-size: 10px;")
-        row2.addWidget(sup_btn)
-        row2.addSpacing(8)
-        highlight_btn = create_format_btn("H", "Highlight", "hiliteColor")
-        highlight_btn.setStyleSheet("background-color: yellow; border: 1px solid #ccc;")
-        row2.addWidget(highlight_btn)
-        row2.addSpacing(10)
-        row2.addWidget(create_format_btn("⫷", "Left", "justifyLeft"))
-        row2.addWidget(create_format_btn("⫸", "Center", "justifyCenter"))
-        row2.addWidget(create_format_btn("⫶", "Right", "justifyRight"))
-        row2.addSpacing(10)
-        row2.addWidget(create_format_btn("•", "Bullets", "insertUnorderedList"))
-        row2.addWidget(create_format_btn("1.", "Numbered List", "insertOrderedList"))
-        
-        row2.addSpacing(10)
-        
-        # Spacing & Table Menus
-        self.spacing_menu_btn = QPushButton("↕ Spacing")
-        self.spacing_menu_btn.setToolTip("Line & Paragraph Spacing")
-        self.spacing_menu_btn.setStyleSheet("padding: 2px 8px; border: 1px solid #ccc;")
-        self.spacing_menu_btn.clicked.connect(self.show_spacing_menu)
-        row2.addWidget(self.spacing_menu_btn)
-        
-        self.table_menu_btn = QPushButton("⊞ Table")
-        self.table_menu_btn.setToolTip("Insert or Modify Tables")
-        self.table_menu_btn.setStyleSheet("padding: 2px 8px; border: 1px solid #ccc;")
-        self.table_menu_btn.clicked.connect(self.show_table_menu)
-        row2.addWidget(self.table_menu_btn)
-        
-        row2.addStretch()
-        ft_layout.addLayout(row2)
-        
-        cg_layout.addWidget(self.format_toolbar)
-        cg_layout.addStretch()
-        
-        center_row.addWidget(content_group)
-        center_row.addStretch()
-        
-        self.save_doc_btn = QPushButton("💾 Save Changes")
+        header_container.addStretch()
+
+        self.save_doc_btn = QPushButton("💾 Save")
         self.save_doc_btn.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold; padding: 5px 12px;")
         self.save_doc_btn.clicked.connect(self.save_document)
         self.save_doc_btn.setEnabled(False)
-        
-        header_container.addLayout(center_row)
         header_container.addWidget(self.save_doc_btn)
+
+        self.close_word_btn = QPushButton("Close Word")
+        self.close_word_btn.setStyleSheet("background-color: #f44336; color: white; padding: 5px 12px;")
+        self.close_word_btn.clicked.connect(self.close_word_editor)
+        self.close_word_btn.setEnabled(False)
+        header_container.addWidget(self.close_word_btn)
+
         preview_area_layout.addLayout(header_container)
 
-        # --- Find Bar ---
-        self.find_bar = QFrame()
-        self.find_bar.setStyleSheet("background: #f1f3f4; border-bottom: 1px solid #ccc;")
-        fb_layout = QHBoxLayout(self.find_bar)
-        fb_layout.setContentsMargins(10, 5, 10, 5)
-        
-        self.find_input = QLineEdit()
-        self.find_input.setPlaceholderText("Find...")
-        self.find_input.textChanged.connect(self.run_find)
-        
-        self.replace_input = QLineEdit()
-        self.replace_input.setPlaceholderText("Replace with...")
-        
-        replace_btn = QPushButton("Replace")
-        replace_btn.clicked.connect(self.run_replace)
-        
-        replace_all_btn = QPushButton("Replace All")
-        replace_all_btn.clicked.connect(lambda: self.run_replace(all=True))
-        
-        close_find_btn = QPushButton("×")
-        close_find_btn.setFixedWidth(20)
-        close_find_btn.clicked.connect(lambda: self.find_bar.hide())
-        
-        fb_layout.addWidget(QLabel("🔍"))
-        fb_layout.addWidget(self.find_input)
-        fb_layout.addWidget(QLabel("➔"))
-        fb_layout.addWidget(self.replace_input)
-        fb_layout.addWidget(replace_btn)
-        fb_layout.addWidget(replace_all_btn)
-        fb_layout.addWidget(close_find_btn)
-        self.find_bar.hide()
-        preview_area_layout.addWidget(self.find_bar)
-        
-        self.web_view = DroppableWebView(self, on_drop_callback=self.load_document_path)
-        self.web_view.setHtml("<div style='text-align:center; padding-top:50px; color:#666;'>Drag & Drop a Word document here...</div>")
-        preview_area_layout.addWidget(self.web_view, 1)
+        # Embedded Word Widget (replaces web_view)
+        self.word_widget = WordEmbedWidget()
+        self.word_widget.setAcceptDrops(True)
+        self.word_widget.document_opened.connect(self._on_word_document_opened)
+        self.word_widget.document_saved.connect(self._on_word_document_saved)
+        self.word_widget.word_closed.connect(self._on_word_closed)
+        preview_area_layout.addWidget(self.word_widget, 1)
 
         # --- Preview & Sidebar Splitter ---
         preview_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -1806,200 +1708,35 @@ class ReportTab(QWidget):
         layout.addWidget(splitter)
         
     def run_find(self):
-        query = self.find_input.text()
-        # Use browser's built-in find functionality (case-insensitive by default)
-        # Note: True = forward, False = caseSensitive, False = backwards
-        self.web_view.findText(query)
+        """Find functionality - use Word's built-in Find (Ctrl+F)."""
+        # With embedded Word, users should use Word's Find feature
+        pass
 
     def run_replace(self, all=False):
-        find_text = self.find_input.text()
-        replace_text = self.replace_input.text()
-        if not find_text: return
-        
-        # JS logic for replace / replace all
-        # We use a custom search/replace to avoid breaking the DOM too much
-        js = f"""
-        (function() {{
-            var find = "{find_text}";
-            var repl = "{replace_text}";
-            var all = {str(all).lower()};
-            
-            // Simple approach: search for text nodes
-            function walk(node) {{
-                var child, next;
-                switch (node.nodeType) {{
-                    case 1:  // Element
-                    case 9:  // Document
-                    case 11: // Document fragment
-                        child = node.firstChild;
-                        while (child) {{
-                            next = child.nextSibling;
-                            walk(child);
-                            child = next;
-                        }}
-                        break;
-                    case 3: // Text node
-                        var val = node.nodeValue;
-                        if (val.toLowerCase().includes(find.toLowerCase())) {{
-                            var regex = new RegExp(find, all ? "gi" : "i");
-                            node.nodeValue = val.replace(regex, repl);
-                            if (!all) return true; // Stop after first match
-                        }}
-                        break;
-                }}
-                return false;
-            }}
-            walk(document.body);
-        }})();
-        """
-        self.web_view.page().runJavaScript(js)
+        """Replace functionality - use Word's built-in Replace (Ctrl+H)."""
+        # With embedded Word, users should use Word's Replace feature
+        pass
 
     def show_spacing_menu(self):
-        menu = QMenu(self)
-        menu.setStyleSheet("QMenu { background: white; border: 1px solid #ccc; } QMenu::item:selected { background: #e3f2fd; color: black; }")
-        
-        spacing_options = [("1.0", "1.0"), ("1.15", "1.15"), ("1.5", "1.5"), ("2.0", "2.0"), ("2.5", "2.5"), ("3.0", "3.0")]
-        for label, val in spacing_options:
-            act = QAction(label, self)
-            act.triggered.connect(lambda checked, v=val: self.exec_format_cmd("lineSpacing", v))
-            menu.addAction(act)
-        
-        menu.addSeparator()
-        
-        add_before = QAction("Add Space Before Paragraph", self)
-        add_before.triggered.connect(lambda: self.exec_format_cmd("paraSpacing", "before"))
-        menu.addAction(add_before)
-        
-        add_after = QAction("Add Space After Paragraph", self)
-        add_after.triggered.connect(lambda: self.exec_format_cmd("paraSpacing", "after"))
-        menu.addAction(add_after)
-        
-        rem_all = QAction("Remove All Spacing", self)
-        rem_all.triggered.connect(lambda: self.exec_format_cmd("paraSpacing", "remove"))
-        menu.addAction(rem_all)
-        
-        menu.exec(self.spacing_menu_btn.mapToGlobal(self.spacing_menu_btn.rect().bottomLeft()))
+        """Spacing menu - use Word's built-in paragraph formatting."""
+        # With embedded Word, users should use Word's paragraph formatting
+        pass
 
     def show_table_menu(self):
-        menu = QMenu(self)
-        menu.setStyleSheet("QMenu { background: white; border: 1px solid #ccc; } QMenu::item:selected { background: #e3f2fd; color: black; }")
-        
-        # Grid insert logic simplified for menu
-        insert_group = QMenu("Insert Table", self)
-        for r in range(1, 6):
-            for c in range(1, 6):
-                act = QAction(f"{r}x{c}", self)
-                act.triggered.connect(lambda checked, rows=r, cols=c: self.exec_format_cmd("insertTable", {"rows": rows, "cols": cols}))
-                insert_group.addAction(act)
-        menu.addMenu(insert_group)
-        
-        menu.addSeparator()
-        
-        menu.addAction("Insert Row Above", lambda: self.exec_format_cmd("tableRow", "above"))
-        menu.addAction("Insert Row Below", lambda: self.exec_format_cmd("tableRow", "below"))
-        menu.addSeparator()
-        menu.addAction("Insert Column Left", lambda: self.exec_format_cmd("tableCol", "left"))
-        menu.addAction("Insert Column Right", lambda: self.exec_format_cmd("tableCol", "right"))
-        menu.addSeparator()
-        menu.addAction("Delete Table", lambda: self.exec_format_cmd("tableDelete", None))
-        
-        menu.exec(self.table_menu_btn.mapToGlobal(self.table_menu_btn.rect().bottomLeft()))
+        """Table menu - use Word's built-in table features."""
+        # With embedded Word, users should use Word's Insert Table feature
+        pass
 
     def exec_format_cmd(self, cmd, value=None):
-        if not self.current_doc_path: return
-        
-        js = ""
-        if cmd == "fontSize":
-            # Map pts to 1-7 for execCommand fallback or use CSS in JS
-            size_map = {"8": "1", "10": "2", "12": "3", "14": "4", "18": "5", "24": "6", "36": "7"}
-            js = f"document.execCommand('fontSize', false, '{size_map.get(value, '3')}');"
-        elif cmd == "fontName":
-            js = f"document.execCommand('fontName', false, '{value}');"
-        elif cmd == "formatBlock":
-            block_map = {
-                "Normal": "P",
-                "Heading 1": "H1",
-                "Heading 2": "H2",
-                "Heading 3": "H3",
-                "Title": "H1",
-                "Subtitle": "H2"
-            }
-            tag = block_map.get(value, "P")
-            js = f"document.execCommand('formatBlock', false, '<{tag}>');"
-        elif cmd == "hiliteColor":
-            js = "document.execCommand('hiliteColor', false, (window.getComputedStyle(window.getSelection().anchorNode.parentElement).backgroundColor === 'rgb(255, 255, 0)') ? 'transparent' : 'yellow');"
-        elif cmd == "lineSpacing":
-            js = f"""
-            (function() {{
-                var sel = window.getSelection();
-                if (sel.rangeCount > 0) {{
-                    var node = sel.anchorNode;
-                    if (node.nodeType === 3) node = node.parentElement;
-                    var para = node.closest('p, div, li, h1, h2, h3') || document.body;
-                    para.style.lineHeight = '{value}';
-                }}
-            }})();
-            """
-        elif cmd == "paraSpacing":
-            js = f"""
-            (function() {{
-                var sel = window.getSelection();
-                if (sel.rangeCount > 0) {{
-                    var node = sel.anchorNode;
-                    if (node.nodeType === 3) node = node.parentElement;
-                    var para = node.closest('p, div, li, h1, h2, h3') || document.body;
-                    if ('{value}' === 'before') para.style.marginTop = '12pt';
-                    else if ('{value}' === 'after') para.style.marginBottom = '12pt';
-                    else {{ para.style.marginTop = '0'; para.style.marginBottom = '0'; }}
-                }}
-            }})();
-            """
-        elif cmd == "insertTable":
-            rows = value['rows']
-            cols = value['cols']
-            table_html = "<table border='1' style='border-collapse: collapse; width: 100%;'>"
-            for _ in range(rows):
-                table_html += "<tr>"
-                for _ in range(cols):
-                    table_html += "<td style='padding: 5px; min-width: 50px; border: 1px solid #ccc;'>&nbsp;</td>"
-                table_html += "</tr>"
-            table_html += "</table><p>&nbsp;</p>"
-            js = f"document.execCommand('insertHTML', false, `{table_html}`);"
-        elif cmd.startswith("table"):
-            # Simple table manipulation
-            sub = cmd.replace("table", "").lower()
-            js = f"""
-            (function() {{
-                var sel = window.getSelection();
-                var td = sel.anchorNode.parentElement.closest('td');
-                if (!td) return;
-                var tr = td.parentElement;
-                var table = tr.closest('table');
-                if ('{sub}' === 'delete') {{ table.remove(); return; }}
-                
-                if ('{value}' === 'above' || '{value}' === 'below') {{
-                    var newRow = table.insertRow('{value}' === 'above' ? tr.rowIndex : tr.rowIndex + 1);
-                    for (var i = 0; i < tr.cells.length; i++) {{
-                        var newCell = newRow.insertCell(i);
-                        newCell.style.padding = '5px'; newCell.style.border = '1px solid #ccc'; newCell.innerHTML = '&nbsp;';
-                    }}
-                }} else if ('{value}' === 'left' || '{value}' === 'right') {{
-                    var idx = td.cellIndex + ('{value}' === 'right' ? 1 : 0);
-                    Array.from(table.rows).forEach(row => {{
-                        var newCell = row.insertCell(idx);
-                        newCell.style.padding = '5px'; newCell.style.border = '1px solid #ccc'; newCell.innerHTML = '&nbsp;';
-                    }});
-                }}
-            }})();
-            """
-        else:
-            js = f"document.execCommand('{cmd}', false, null);"
-            
-        self.web_view.page().runJavaScript(js)
+        """Format command - use Word's built-in formatting (Ribbon/shortcuts)."""
+        # With embedded Word, users should use Word's formatting tools
+        pass
 
     def save_document(self, callback=None, silent=False):
-        if not self.current_doc_path: return
-        
+        """Save the document using embedded Word."""
+        if not self.word_widget.word_doc:
+            return
+
         # Safety: If called via signal (clicked), callback might be a boolean.
         if callback is not None and not callable(callback):
             callback = None
@@ -2007,64 +1744,14 @@ class ReportTab(QWidget):
         self._post_save_callback = callback
         self._silent_save = silent
 
-        # 1. Get edited HTML from WebView
-        # We want the full document to preserve Word's structure as much as possible
-        self.web_view.page().runJavaScript("document.documentElement.outerHTML", self.perform_save_to_word)
+        # Save using Word's save functionality
+        success = self.word_widget.save_document()
 
-    def perform_save_to_word(self, html_content):
-        if not html_content:
-            QMessageBox.critical(self, "Error", "Failed to retrieve edited content from preview.")
-            self._post_save_callback = None
-            self._silent_save = False
-            return
-
-        # 2. Save edited MHTML to a temp file
-        temp_html_path = os.path.join(TEMP_DIR, "edited_preview.mhtml")
-        try:
-            with open(temp_html_path, 'w', encoding='utf-8') as f:
-                f.write(html_content)
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to save temporary preview: {e}")
-            self._post_save_callback = None
-            self._silent_save = False
-            return
-
-        # 3. Run rule_engine.py --save-preview
-        script_path = os.path.join(SCRIPTS_DIR, "rule_engine.py")
-        
-        self.save_doc_btn.setEnabled(False)
-        self.save_doc_btn.setText("Saving...")
-        
-        if self.main_window:
-            self.save_runner = self.main_window.add_status_task(
-                "Syncing Edits", 
-                f"Saving changes to {os.path.basename(self.current_doc_path)}",
-                sys.executable,
-                [script_path, "--save-preview", temp_html_path, self.current_doc_path]
-            )
-            
-            logger = LogManager()
-            if not self._silent_save:
-                logger.add_log("Report Tab", f"Saving edited preview back to {self.current_doc_path}")
-            
-            self.save_runner.log_update.connect(
-                lambda msg: logger.add_log("Report Tab", f"[Save] {msg.strip()}")
-            )
-            self.save_runner.finished.connect(self.on_save_finished)
-        else:
-            # Fallback
-            self.save_runner = AgentRunner(sys.executable, [script_path, "--save-html", temp_html_path, self.current_doc_path], None)
-            self.save_runner.finished.connect(self.on_save_finished)
-            self.save_runner.start()
-
-    def on_save_finished(self, success):
-        self.save_doc_btn.setEnabled(True)
-        self.save_doc_btn.setText("💾 Save Changes")
-        
         if success:
             if not self._silent_save:
-                QMessageBox.information(self, "Success", "Changes saved to the Word document successfully.")
-            
+                logger = LogManager()
+                logger.add_log("Report Tab", f"Saved: {os.path.basename(self.current_doc_path)}")
+
             # Execute callback if one exists
             if self._post_save_callback:
                 cb = self._post_save_callback
@@ -2073,12 +1760,7 @@ class ReportTab(QWidget):
                 cb()
             else:
                 self._silent_save = False
-                
-            # We don't necessarily need to refresh preview since the user just edited it,
-            # but it ensures the HTML on disk matches the Word doc exactly.
-            # self.update_preview() 
         else:
-            QMessageBox.critical(self, "Error", "Failed to save changes to the Word document. Check logs.")
             self._post_save_callback = None
             self._silent_save = False
 
@@ -2219,336 +1901,84 @@ class ReportTab(QWidget):
             self.save_ai_tools()
             self.refresh_ai_tool_list()
 
+    def new_word_document(self):
+        """Create a new Word document in the embedded editor."""
+        if self.word_widget.new_document():
+            self.current_doc_path = None
+            self.file_label.setText("New document (unsaved)")
+            self.save_doc_btn.setEnabled(True)
+            self.close_word_btn.setEnabled(True)
+            self.process_btn.setEnabled(False)  # Can't process unsaved doc
+
     def load_document(self):
         path, _ = QFileDialog.getOpenFileName(self, "Select Document", "", "Word Documents (*.docx *.doc)")
         if path:
             self.load_document_path(path)
 
     def update_preview(self):
-        if not self.current_doc_path: return
-        
-        # Temp HTML path
-        html_path = os.path.join(TEMP_DIR, "preview.html")
-        script_path = os.path.join(SCRIPTS_DIR, "rule_engine.py")
-        
-        self.web_view.setHtml("<div style='text-align:center; padding-top:50px; font-family:sans-serif;'><h3>Generating High-Fidelity Preview...</h3><p>Please wait, capturing images and formatting.</p></div>")
-        self.process_btn.setEnabled(False)
-        
-        # Use AgentRunner with output capture for errors
-        logger = LogManager()
-        logger.add_log("Report Tab", f"Generating Preview for {os.path.basename(self.current_doc_path)}...")
-        
-        self.preview_runner = AgentRunner(sys.executable, [script_path, "--preview", self.current_doc_path, html_path], None)
-        self.preview_runner.log_update.connect(lambda msg: logger.add_log("Report Tab", f"[Preview] {msg.strip()}"))
-        self.preview_runner.finished.connect(lambda s: self.on_preview_ready(s, html_path))
-        self.preview_runner.start()
+        """Open the current document in embedded Word."""
+        if not self.current_doc_path:
+            return
 
-    def on_preview_ready(self, success, html_path):
-        if success and os.path.exists(html_path):
-            import time
-            url = QUrl.fromLocalFile(html_path)
-            # Append timestamp to query to force reload
-            url.setQuery(f"t={int(time.time())}")
-            
-            # Ensure we don't have multiple connections
-            try: self.web_view.loadFinished.disconnect(self.make_editable)
-            except: pass
-            
-            self.web_view.loadFinished.connect(self.make_editable)
-            self.web_view.setUrl(url)
+        logger = LogManager()
+        logger.add_log("Report Tab", f"Opening {os.path.basename(self.current_doc_path)} in Word...")
+
+        # Open document in embedded Word
+        if self.word_widget.open_document(self.current_doc_path):
             self.save_doc_btn.setEnabled(True)
+            self.close_word_btn.setEnabled(True)
             self.process_btn.setEnabled(True)
         else:
-            self.web_view.setHtml("<div style='color:red; text-align:center;'>Preview Generation Failed. Check logs.</div>")
             self.save_doc_btn.setEnabled(False)
+            self.close_word_btn.setEnabled(False)
             self.process_btn.setEnabled(False)
 
+    def _on_word_document_opened(self, file_path):
+        """Handle Word document opened signal."""
+        self.save_doc_btn.setEnabled(True)
+        self.close_word_btn.setEnabled(True)
+        self.process_btn.setEnabled(True)
+        logger = LogManager()
+        logger.add_log("Report Tab", f"Opened: {os.path.basename(file_path)}")
+
+    def _on_word_document_saved(self, file_path):
+        """Handle Word document saved signal."""
+        logger = LogManager()
+        logger.add_log("Report Tab", f"Saved: {os.path.basename(file_path)}")
+
+    def _on_word_closed(self):
+        """Handle Word being closed."""
+        self.save_doc_btn.setEnabled(False)
+        self.close_word_btn.setEnabled(False)
+
+    def close_word_editor(self):
+        """Close the embedded Word instance."""
+        if self.word_widget.word_doc:
+            reply = QMessageBox.question(
+                self, "Close Word",
+                "Do you want to save changes before closing?",
+                QMessageBox.StandardButton.Save |
+                QMessageBox.StandardButton.Discard |
+                QMessageBox.StandardButton.Cancel
+            )
+            if reply == QMessageBox.StandardButton.Save:
+                self.word_widget.save_document()
+                self.word_widget.close_word(save=False)
+            elif reply == QMessageBox.StandardButton.Discard:
+                self.word_widget.close_word(save=False)
+            # Cancel does nothing
+        else:
+            self.word_widget.close_word(save=False)
+
     def make_editable(self, ok):
-        if ok:
-            # Inject CSS/JS to make body editable, add Ruler, and improve appearance
-            js = """
-            (function() {
-                document.body.contentEditable = 'true';
-                
-                // 1. Basic Document Styling
-                document.body.style.fontFamily = "'Times New Roman', serif";
-                document.body.style.fontSize = "12pt";
-                document.body.style.lineHeight = "1.15";
-                document.body.style.backgroundColor = "white";
-                document.body.style.padding = "1in";
-                document.body.style.maxWidth = "8.5in";
-                document.body.style.margin = "60px auto 40px auto"; // Increased top margin for better ruler
-                document.body.style.boxShadow = "0 0 15px rgba(0,0,0,0.2)";
-                document.body.style.minHeight = "10.5in";
-                document.body.style.position = "relative";
-                document.body.style.tabSize = "4";
-                
-                document.documentElement.style.backgroundColor = "#e9ecef";
-                
-                var style = document.createElement('style');
-                style.innerHTML = `
-                    * { outline: none !important; }
-                    
-                    /* Headings Mapping */
-                    h1 { font-size: 16pt; font-weight: bold; margin-top: 12pt; margin-bottom: 6pt; }
-                    h2 { font-size: 14pt; font-weight: bold; margin-top: 10pt; margin-bottom: 4pt; }
-                    h3 { font-size: 12pt; font-weight: bold; margin-top: 8pt; margin-bottom: 4pt; }
-                    
-                    /* Tables */
-                    table { border-collapse: collapse; width: 100%; margin: 10pt 0; }
-                    /* Fix: Don't force borders on cells, as it reveals invisible layout tables (dashes on blank lines) */
-                    td, th { padding: 4pt; min-width: 20pt; }
-
-                    #word-ruler {
-                        position: fixed; top: 0; left: 50%; transform: translateX(-50%);
-                        width: 8.5in; height: 35px; background: white;
-                        border-bottom: 1px solid #adb5bd; z-index: 10000;
-                        display: flex; align-items: flex-end; user-select: none;
-                        font-family: 'Segoe UI', Arial, sans-serif; font-size: 9px; color: #495057;
-                        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-                    }
-                    .ruler-bg-margin {
-                        position: absolute; top: 0; bottom: 0; background: #e9ecef; width: 1in; z-index: 1;
-                    }
-                    .ruler-tick { position: absolute; bottom: 0; width: 1px; height: 6px; background: #adb5bd; z-index: 5; }
-                    .ruler-num { position: absolute; bottom: 8px; width: 20px; text-align: center; transform: translateX(-50%); z-index: 5; font-weight: 600; }
-                    
-                    .marker {
-                        position: absolute; width: 0; height: 0; 
-                        cursor: ew-resize; z-index: 10001;
-                    }
-                    #first-line-indent {
-                        border-left: 5px solid transparent; border-right: 5px solid transparent;
-                        border-top: 8px solid #212529; top: 5px;
-                    }
-                    #hanging-indent {
-                        border-left: 5px solid transparent; border-right: 5px solid transparent;
-                        border-bottom: 8px solid #212529; bottom: 12px;
-                    }
-                    #left-base { 
-                        position: absolute; width: 10px; height: 8px; 
-                        background: #212529; bottom: 3px; cursor: ew-resize; 
-                        z-index: 10001; transform: translateX(-50%);
-                    }
-                    #right-indent {
-                        border-left: 5px solid transparent; border-right: 5px solid transparent;
-                        border-bottom: 8px solid #212529; bottom: 3px; transform: translateX(50%);
-                    }
-                    
-                    /* Visual page guide */
-                    .margin-guide {
-                        position: absolute; top: 0; bottom: 0; width: 1px;
-                        border-left: 1px dashed rgba(33, 150, 243, 0.4);
-                        pointer-events: none; z-index: 9999;
-                    }
-
-                    /* List Indentation Styling */
-                    ul, ol { margin-left: 0.5in; padding-left: 0; }
-                    li { margin-bottom: 4pt; }
-                `;
-                document.head.appendChild(style);
-
-                // 2. Create Ruler Elements
-                if (!document.getElementById('word-ruler')) {
-                    var ruler = document.createElement('div');
-                    ruler.id = 'word-ruler';
-                    
-                    // Left and Right Margin Backgrounds
-                    var leftMg = document.createElement('div');
-                    leftMg.className = 'ruler-bg-margin'; leftMg.style.left = '0';
-                    var rightMg = document.createElement('div');
-                    rightMg.className = 'ruler-bg-margin'; rightMg.style.right = '0';
-                    ruler.appendChild(leftMg);
-                    ruler.appendChild(rightMg);
-
-                    // Add Ticks (Quarter-Inch)
-                    for (var i = 0; i <= 34; i++) {
-                        var posInches = i * 0.25;
-                        var leftPos = posInches + 'in';
-                        
-                        if (i % 4 === 0) {
-                            var inchNum = i;
-                            if (i > 0 && i < 8) {
-                                var num = document.createElement('div');
-                                num.className = 'ruler-num';
-                                num.innerText = inchNum;
-                                num.style.left = leftPos;
-                                ruler.appendChild(num);
-                            }
-                            var tick = document.createElement('div');
-                            tick.className = 'ruler-tick';
-                            tick.style.height = '10px';
-                            tick.style.left = leftPos;
-                            ruler.appendChild(tick);
-                        } else {
-                            var tick = document.createElement('div');
-                            tick.className = 'ruler-tick';
-                            tick.style.height = (i % 2 === 0) ? '6px' : '4px';
-                            tick.style.left = leftPos;
-                            ruler.appendChild(tick);
-                        }
-                    }
-
-                    var firstLine = document.createElement('div');
-                    firstLine.id = 'first-line-indent'; firstLine.className = 'marker';
-                    
-                    var hangingIndent = document.createElement('div');
-                    hangingIndent.id = 'hanging-indent'; hangingIndent.className = 'marker';
-                    
-                    var leftBase = document.createElement('div');
-                    leftBase.id = 'left-base';
-                    
-                    var rightIndent = document.createElement('div');
-                    rightIndent.id = 'right-indent'; rightIndent.className = 'marker';
-                    
-                    ruler.appendChild(firstLine);
-                    ruler.appendChild(hangingIndent);
-                    ruler.appendChild(leftBase);
-                    ruler.appendChild(rightIndent);
-                    document.body.parentElement.appendChild(ruler);
-                }
-
-                // 3. Ruler Logic
-                var ppi = 96; // Pixels per inch
-                var snap = 12; // 0.125in snap
-
-                function updateMarkersFromPara() {
-                    var sel = window.getSelection();
-                    if (sel.rangeCount > 0) {
-                        var node = sel.anchorNode;
-                        if (node.nodeType === 3) node = node.parentElement;
-                        var activePara = node.closest('p, div, h1, h2, h3, li, td') || document.body;
-                        
-                        var bodyRect = document.body.getBoundingClientRect();
-                        var paraRect = activePara.getBoundingClientRect();
-                        
-                        var style = window.getComputedStyle(activePara);
-                        var textIndent = parseFloat(style.textIndent || 0);
-                        
-                        // Relative to the left edge of the 8.5in page (the body)
-                        var leftPos = paraRect.left - bodyRect.left;
-                        var rightPos = paraRect.right - bodyRect.left;
-                        
-                        document.getElementById('first-line-indent').style.left = (leftPos + textIndent) + 'px';
-                        document.getElementById('hanging-indent').style.left = leftPos + 'px';
-                        document.getElementById('left-base').style.left = leftPos + 'px';
-                        document.getElementById('right-indent').style.left = rightPos + 'px';
-                    }
-                }
-
-                document.addEventListener('selectionchange', updateMarkersFromPara);
-
-                // Dragging logic
-                var dragging = null;
-                document.addEventListener('mousedown', function(e) {
-                    if (e.target.classList.contains('marker') || e.target.id === 'left-base') {
-                        dragging = e.target.id;
-                        e.preventDefault();
-                    }
-                });
-
-                document.addEventListener('mousemove', function(e) {
-                    if (!dragging) return;
-                    
-                    var sel = window.getSelection();
-                    var node = sel.anchorNode;
-                    if (node.nodeType === 3) node = node.parentElement;
-                    var activePara = node.closest('p, div, h1, h2, h3, li') || document.body;
-                    
-                    var rulerRect = document.getElementById('word-ruler').getBoundingClientRect();
-                    var pageMargin = 1 * ppi;
-                    var xRel = e.clientX - rulerRect.left - pageMargin;
-                    var snappedX = Math.round(xRel / snap) * snap;
-                    
-                    var style = window.getComputedStyle(activePara);
-                    var marginLeft = parseFloat(style.marginLeft || 0);
-                    var textIndent = parseFloat(style.textIndent || 0);
-                    
-                    if (dragging === 'first-line-indent') {
-                        activePara.style.textIndent = (snappedX - marginLeft) + 'px';
-                    } else if (dragging === 'hanging-indent') {
-                        // Hanging indent moves margin but keeps first line in place
-                        var firstLinePos = marginLeft + textIndent;
-                        activePara.style.marginLeft = snappedX + 'px';
-                        activePara.style.textIndent = (firstLinePos - snappedX) + 'px';
-                    } else if (dragging === 'left-base') {
-                        // Square moves both
-                        activePara.style.marginLeft = snappedX + 'px';
-                    } else if (dragging === 'right-indent') {
-                        var rightEdge = 7.5 * ppi;
-                        var snappedRight = Math.round((rightEdge - (e.clientX - rulerRect.left)) / snap) * snap;
-                        activePara.style.marginRight = snappedRight + 'px';
-                    }
-                    
-                    updateMarkersFromPara();
-                });
-
-                document.addEventListener('mouseup', function() { dragging = null; });
-
-                // 4. Keyboard Improvements
-                document.body.addEventListener('keydown', function(e) {
-                    if (e.key === 'Tab') {
-                        e.preventDefault();
-                        // Insert a visual tab (atomic span) that is deleted in one go
-                        // Using contenteditable=false makes it behave like a single object
-                        document.execCommand('insertHTML', false, '<span contenteditable="false" style="display:inline-block; width: 36px;">&nbsp;</span><span>&nbsp;</span>');
-                    }
-                });
-
-                // 5. Hide bullets on empty lines and Normalize Spacing
-                function enforceLayout() {
-                    var paras = document.querySelectorAll('p');
-                    
-                    paras.forEach(function(p) {
-                        // Detect Content
-                        // Remove zero-width, normal space, and NBSP (\u00A0)
-                        var rawText = p.innerText.replace(/[\u200B-\u200D\uFEFF\u00A0\s]/g, ''); 
-                        var isEmpty = (rawText === "");
-                        
-                        // Detect Word Bullet (Dash)
-                        var bullet = p.querySelector('span[style*="mso-list:Ignore"], span[style*="mso-list: Ignore"]');
-                        if (bullet) {
-                            var bulletText = bullet.innerText.replace(/[\u200B-\u200D\uFEFF\u00A0\s]/g, '');
-                            // If paragraph text is same as bullet text, it's just a bullet
-                            if (rawText === bulletText) {
-                                isEmpty = true;
-                            }
-                        }
-                        
-                        // Fix Empty/Dash-Only Lines
-                        if (isEmpty) {
-                            // 1. Remove artifacts (dash, underline)
-                            p.innerHTML = '&nbsp;'; 
-                            
-                            // 2. Force standard single-line height
-                            p.style.minHeight = '14pt';
-                            p.style.lineHeight = '14pt';
-                            
-                            // 3. Reset margins for the spacer itself so it doesn't double-up
-                            p.style.margin = '0';
-                            p.style.padding = '0';
-                            p.style.textDecoration = 'none';
-                            p.style.border = 'none';
-                        }
-                        // Note: We DO NOT touch non-empty paragraphs. 
-                        // They keep their CSS/Word styles.
-                    });
-                }
-                
-                enforceLayout();
-                // Re-run on changes
-                document.addEventListener('input', enforceLayout);
-
-                console.log("Improved Word-style Ruler and Formatting initialized.");
-            })();
-            """
-            self.web_view.page().runJavaScript(js)
+        """Legacy method - no longer used with embedded Word."""
+        # With embedded Word, the document is already editable in Word
+        pass
 
     def on_custom_url(self, url):
         if url.toString() == "icharlotte://show-find":
-            self.find_bar.show()
-            self.find_input.setFocus()
-            self.find_input.selectAll()
+            # With embedded Word, users should use Word's Find (Ctrl+F)
+            pass
 
     def process_document(self):
         if not self.current_doc_path: return
@@ -2565,9 +1995,9 @@ class ReportTab(QWidget):
         # 2. Run rule_engine.py --apply
         script_path = os.path.join(SCRIPTS_DIR, "rule_engine.py")
         
-        # Clear preview to release any file locks? 
-        # WebEngineView shouldn't lock the .docx (it locks the .html preview), but let's be safe.
-        self.web_view.setHtml("<div style='text-align:center; padding-top:50px; color:blue;'>Processing Rules... Please Wait.</div>")
+        # Close Word temporarily to release file locks before processing
+        if self.word_widget.word_hwnd:
+            self.word_widget.close_word(save=True)
         self.process_btn.setEnabled(False)
         
         if self.main_window:
@@ -2621,7 +2051,6 @@ class ReportTab(QWidget):
         self.process_btn.setEnabled(True)
         if success:
             QMessageBox.information(self, "Success", "Rules applied successfully!")
-            self.update_preview() # Refresh the view
+            self.update_preview()  # Reopen in Word
         else:
             QMessageBox.critical(self, "Error", "Failed to apply rules.")
-            self.web_view.setHtml("<div style='color:red; text-align:center;'>Processing Failed</div>")
