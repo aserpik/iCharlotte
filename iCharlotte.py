@@ -42,12 +42,11 @@ from icharlotte_core.utils import (
 from icharlotte_core.ui.widgets import (
     StatusWidget, AgentRunner, FileTreeWidget
 )
-from icharlotte_core.ui.dialogs import FileNumberDialog, VariablesDialog, PromptsDialog
+from icharlotte_core.ui.dialogs import FileNumberDialog, VariablesDialog, PromptsDialog, LLMSettingsDialog
 from icharlotte_core.ui.tabs import ChatTab, IndexTab
 from icharlotte_core.ui.email_tab import EmailTab
 from icharlotte_core.ui.email_update_tab import EmailUpdateTab
 from icharlotte_core.ui.report_tab import ReportTab
-from icharlotte_core.ui.word_tab import WordTab
 from icharlotte_core.ui.logs_tab import LogsTab
 from icharlotte_core.ui.liability_tab import LiabilityExposureTab
 from icharlotte_core.ui.master_case_tab import MasterCaseTab
@@ -248,6 +247,8 @@ class MainWindow(QMainWindow):
             {"id": "med_chron", "name": "Med Chron", "script": "med_chron.py", "color": "#00bcd4", "short": "CHRON"},
             {"id": "ocr", "name": "OCR", "script": "ocr.py", "color": "#795548", "short": "OCR"},
             {"id": "organize", "name": "Organize", "script": "organizer.py", "color": "#607d8b", "short": "ORG"},
+            {"id": "timeline", "name": "Timeline", "script": "extract_timeline.py", "color": "#3f51b5", "short": "TIME"},
+            {"id": "contradict", "name": "Conflicts", "script": "detect_contradictions.py", "color": "#f44336", "short": "CONF"},
         ]
 
         self.tree = FileTreeWidget()
@@ -333,10 +334,6 @@ class MainWindow(QMainWindow):
         self.report_tab = ReportTab(main_window=self)
         self.tabs.addTab(self.report_tab, "Report")
 
-        # --- Tab: Word ---
-        self.word_tab = WordTab(main_window=self)
-        self.tabs.addTab(self.word_tab, "Word")
-
         # --- Tab: Liability & Exposure ---
         self.liability_tab = LiabilityExposureTab()
         self.tabs.addTab(self.liability_tab, "Liability & Exposure")
@@ -365,6 +362,10 @@ class MainWindow(QMainWindow):
 
         self.setup_view_menu()
         self.corner_layout.addWidget(self.view_btn)
+
+        self.settings_btn = QPushButton("Settings")
+        self.settings_btn.clicked.connect(self.open_settings_dialog)
+        self.corner_layout.addWidget(self.settings_btn)
 
         self.restart_btn = QPushButton("Restart")
         self.restart_btn.setStyleSheet("background-color: #f44336; color: white; font-weight: bold;")
@@ -433,6 +434,11 @@ class MainWindow(QMainWindow):
                 json.dump(settings, f)
         except Exception as e:
             log_event(f"Error saving view settings: {e}", "error")
+
+    def open_settings_dialog(self):
+        """Open the LLM settings dialog."""
+        dialog = LLMSettingsDialog(self)
+        dialog.exec()
 
     def restart_app(self):
         log_event("User requested manual restart. Spawning new process...")

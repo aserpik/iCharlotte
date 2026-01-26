@@ -39,3 +39,13 @@ NoteTaker/dist/
 # OS
 .DS_Store
 Thumbs.db
+
+# Windows reserved names (cannot be valid filenames)
+nul
+NUL
+con
+CON
+aux
+AUX
+prn
+PRN

@@ -1,13 +1,16 @@
 import os
 import json
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QFormLayout, QComboBox, QDialogButtonBox, 
-    QTableWidget, QHeaderView, QPushButton, QHBoxLayout, QMessageBox, 
-    QTableWidgetItem, QDoubleSpinBox, QSpinBox, QTextEdit
+    QDialog, QVBoxLayout, QFormLayout, QComboBox, QDialogButtonBox,
+    QTableWidget, QHeaderView, QPushButton, QHBoxLayout, QMessageBox,
+    QTableWidgetItem, QDoubleSpinBox, QSpinBox, QTextEdit, QLabel,
+    QGroupBox, QTabWidget, QWidget, QListWidget, QListWidgetItem,
+    QGridLayout, QCheckBox, QFrame, QScrollArea
 )
 from PySide6.QtCore import Qt, QByteArray
 from ..config import GEMINI_DATA_DIR
 from ..utils import log_event
+from ..llm_config import LLMConfig, ModelSpec, TaskConfig
 
 class FileNumberDialog(QDialog):
     def __init__(self, parent=None):
@@ -358,14 +361,536 @@ class PromptsDialog(QDialog):
         filename = self.file_combo.currentText()
         if not filename:
             return
-            
+
         path = os.path.join(self.scripts_dir, filename)
         content = self.editor.toPlainText()
-        
+
         try:
             with open(path, 'w', encoding='utf-8') as f:
                 f.write(content)
             QMessageBox.information(self, "Success", f"Saved {filename}")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save {filename}: {e}")
+
+
+# =============================================================================
+# LLM Settings Dialog
+# =============================================================================
+
+# Available models per provider
+AVAILABLE_MODELS = {
+    "Gemini": [
+        ("gemini-2.5-pro", "Gemini 2.5 Pro"),
+        ("gemini-2.5-flash", "Gemini 2.5 Flash"),
+        ("gemini-2.0-flash", "Gemini 2.0 Flash"),
+        ("gemini-1.5-pro", "Gemini 1.5 Pro"),
+        ("gemini-1.5-flash", "Gemini 1.5 Flash"),
+    ],
+    "Claude": [
+        ("claude-opus-4-20250514", "Claude Opus 4"),
+        ("claude-sonnet-4-20250514", "Claude Sonnet 4"),
+        ("claude-haiku-4-20250514", "Claude Haiku 4"),
+        ("claude-3-5-sonnet-20241022", "Claude 3.5 Sonnet"),
+        ("claude-3-opus-20240229", "Claude 3 Opus"),
+    ],
+    "OpenAI": [
+        ("gpt-4o", "GPT-4o"),
+        ("gpt-4o-mini", "GPT-4o Mini"),
+        ("gpt-4-turbo", "GPT-4 Turbo"),
+        ("o1", "O1"),
+        ("o1-mini", "O1 Mini"),
+    ],
+}
+
+TASK_TYPE_DESCRIPTIONS = {
+    "general": "Default for general-purpose LLM calls",
+    "extraction": "Document data extraction (entities, dates, facts)",
+    "summary": "Document summarization and condensing",
+    "cross_check": "Verification and consistency checking",
+    "classification": "Quick categorization and labeling",
+    "quick": "Fast, simple operations (low complexity)",
+}
+
+# Agent categories for organization
+AGENT_CATEGORIES = [
+    ("Document Processing Agents", [
+        "agent_separate", "agent_summarize", "agent_sum_disc", "agent_sum_depo",
+        "agent_med_rec", "agent_med_chron", "agent_organize", "agent_timeline",
+        "agent_contradict"
+    ]),
+    ("Case Agents", [
+        "agent_docket", "agent_complaint", "agent_discovery_gen",
+        "agent_subpoena", "agent_liability", "agent_exposure"
+    ]),
+    ("UI Functions", [
+        "func_chat", "func_email_intelligence", "func_email_compose",
+        "func_liability_tab", "func_sent_monitor", "func_attachment_classifier"
+    ]),
+]
+
+
+class LLMSettingsDialog(QDialog):
+    """Dialog for configuring LLM model preferences per agent/function."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("LLM Settings")
+        self.resize(800, 650)
+        self.config = LLMConfig()
+
+        # Track widgets for agents and task types
+        self.agent_widgets = {}
+        self.task_widgets = {}
+
+        self._setup_ui()
+        self._load_current_settings()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+
+        # Provider status header
+        status_frame = QFrame()
+        status_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        status_layout = QHBoxLayout(status_frame)
+        status_layout.setContentsMargins(10, 5, 10, 5)
+
+        status_label = QLabel("API Keys:")
+        status_label.setStyleSheet("font-weight: bold;")
+        status_layout.addWidget(status_label)
+
+        for provider in ["Gemini", "Claude", "OpenAI"]:
+            available = self.config.is_provider_available(provider)
+            indicator = QLabel(f"{provider}: {'OK' if available else 'Missing'}")
+            indicator.setStyleSheet(
+                f"color: {'#4CAF50' if available else '#f44336'}; font-weight: bold;"
+            )
+            status_layout.addWidget(indicator)
+
+        status_layout.addStretch()
+        layout.addWidget(status_frame)
+
+        # Main tabs: Agents & Functions | Default Profiles
+        self.main_tabs = QTabWidget()
+
+        # Tab 1: Agents & Functions
+        agents_tab = self._create_agents_tab()
+        self.main_tabs.addTab(agents_tab, "Agents && Functions")
+
+        # Tab 2: Default Profiles (task types)
+        defaults_tab = self._create_defaults_tab()
+        self.main_tabs.addTab(defaults_tab, "Default Profiles")
+
+        layout.addWidget(self.main_tabs)
+
+        # Buttons
+        btn_layout = QHBoxLayout()
+
+        reset_btn = QPushButton("Reset All to Defaults")
+        reset_btn.clicked.connect(self._reset_to_defaults)
+        btn_layout.addWidget(reset_btn)
+
+        btn_layout.addStretch()
+
+        save_btn = QPushButton("Save")
+        save_btn.setStyleSheet("font-weight: bold;")
+        save_btn.clicked.connect(self._save_settings)
+        btn_layout.addWidget(save_btn)
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        layout.addLayout(btn_layout)
+
+    def _create_agents_tab(self) -> QWidget:
+        """Create the agents/functions configuration tab."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # Instructions
+        info_label = QLabel(
+            "Configure the LLM model for each agent/function. "
+            "Use 'Default' to inherit from Default Profiles, or select a specific model."
+        )
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: #666; margin-bottom: 10px;")
+        layout.addWidget(info_label)
+
+        # Scroll area for agents
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setSpacing(15)
+
+        # Create sections for each category
+        for category_name, agent_ids in AGENT_CATEGORIES:
+            group = QGroupBox(category_name)
+            group_layout = QVBoxLayout(group)
+            group_layout.setSpacing(8)
+
+            for agent_id in agent_ids:
+                row = self._create_agent_row(agent_id)
+                group_layout.addLayout(row)
+
+            scroll_layout.addWidget(group)
+
+        scroll_layout.addStretch()
+        scroll.setWidget(scroll_content)
+        layout.addWidget(scroll)
+
+        return tab
+
+    def _create_agent_row(self, agent_id: str) -> QHBoxLayout:
+        """Create a configuration row for a single agent."""
+        row = QHBoxLayout()
+        row.setSpacing(10)
+
+        info = self.config.get_agent_info(agent_id)
+
+        # Agent name label
+        name_label = QLabel(info["name"])
+        name_label.setFixedWidth(150)
+        name_label.setStyleSheet("font-weight: bold;")
+        name_label.setToolTip(info["description"])
+        row.addWidget(name_label)
+
+        # Use default checkbox
+        use_default_cb = QCheckBox("Use Default")
+        use_default_cb.setChecked(True)
+        use_default_cb.setFixedWidth(100)
+        row.addWidget(use_default_cb)
+
+        # Provider combo
+        provider_combo = QComboBox()
+        provider_combo.addItems(["Gemini", "Claude", "OpenAI"])
+        provider_combo.setFixedWidth(90)
+        provider_combo.setEnabled(False)
+        row.addWidget(provider_combo)
+
+        # Model combo
+        model_combo = QComboBox()
+        model_combo.setFixedWidth(180)
+        model_combo.setEnabled(False)
+        row.addWidget(model_combo)
+
+        # Current setting indicator
+        current_label = QLabel("")
+        current_label.setStyleSheet("color: #888; font-style: italic;")
+        current_label.setFixedWidth(150)
+        row.addWidget(current_label)
+
+        row.addStretch()
+
+        # Connect signals
+        use_default_cb.toggled.connect(
+            lambda checked, pc=provider_combo, mc=model_combo:
+            self._toggle_agent_custom(checked, pc, mc)
+        )
+        provider_combo.currentTextChanged.connect(
+            lambda text, mc=model_combo: self._update_model_list(text, mc)
+        )
+
+        # Store widgets
+        self.agent_widgets[agent_id] = {
+            "use_default": use_default_cb,
+            "provider": provider_combo,
+            "model": model_combo,
+            "current_label": current_label,
+            "default_task": info["default_task"]
+        }
+
+        return row
+
+    def _toggle_agent_custom(self, use_default: bool, provider_combo: QComboBox,
+                             model_combo: QComboBox):
+        """Toggle between default and custom model selection."""
+        provider_combo.setEnabled(not use_default)
+        model_combo.setEnabled(not use_default)
+
+        if not use_default and model_combo.count() == 0:
+            self._update_model_list(provider_combo.currentText(), model_combo)
+
+    def _create_defaults_tab(self) -> QWidget:
+        """Create the default profiles (task types) configuration tab."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # Instructions
+        info_label = QLabel(
+            "Configure default model sequences for each task type. "
+            "Agents set to 'Use Default' will inherit these settings based on their task type."
+        )
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("color: #666; margin-bottom: 10px;")
+        layout.addWidget(info_label)
+
+        # Tabs for each task type
+        self.task_tabs = QTabWidget()
+
+        for task_type in self.config.get_all_task_types():
+            task_tab = self._create_task_tab(task_type)
+            display_name = task_type.replace("_", " ").title()
+            self.task_tabs.addTab(task_tab, display_name)
+
+        layout.addWidget(self.task_tabs)
+
+        return tab
+
+    def _create_task_tab(self, task_type: str) -> QWidget:
+        """Create a tab widget for a specific task type."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+
+        # Description
+        desc = TASK_TYPE_DESCRIPTIONS.get(task_type, "")
+        if desc:
+            desc_label = QLabel(desc)
+            desc_label.setStyleSheet("color: #666; font-style: italic; margin-bottom: 10px;")
+            layout.addWidget(desc_label)
+
+        # Model sequence group
+        group = QGroupBox("Model Sequence (in order of preference)")
+        group_layout = QVBoxLayout(group)
+
+        # Store widgets for this task type
+        self.task_widgets[task_type] = {
+            "model_rows": [],
+            "max_retries": None,
+            "timeout": None
+        }
+
+        # Create 4 model selection rows
+        for i in range(4):
+            row_layout = QHBoxLayout()
+
+            priority_label = QLabel(f"{i + 1}.")
+            priority_label.setFixedWidth(20)
+            row_layout.addWidget(priority_label)
+
+            provider_combo = QComboBox()
+            provider_combo.addItem("(None)", None)
+            provider_combo.addItems(["Gemini", "Claude", "OpenAI"])
+            provider_combo.setFixedWidth(100)
+            row_layout.addWidget(provider_combo)
+
+            model_combo = QComboBox()
+            model_combo.setFixedWidth(200)
+            row_layout.addWidget(model_combo)
+
+            max_tokens_spin = QSpinBox()
+            max_tokens_spin.setRange(1024, 128000)
+            max_tokens_spin.setSingleStep(1024)
+            max_tokens_spin.setValue(8192)
+            max_tokens_spin.setPrefix("Tokens: ")
+            max_tokens_spin.setFixedWidth(130)
+            row_layout.addWidget(max_tokens_spin)
+
+            row_layout.addStretch()
+
+            # Connect provider change to update model list
+            provider_combo.currentTextChanged.connect(
+                lambda text, mc=model_combo: self._update_model_list(text, mc)
+            )
+
+            self.task_widgets[task_type]["model_rows"].append({
+                "provider": provider_combo,
+                "model": model_combo,
+                "max_tokens": max_tokens_spin
+            })
+
+            group_layout.addLayout(row_layout)
+
+        layout.addWidget(group)
+
+        # Additional settings
+        settings_layout = QHBoxLayout()
+
+        retries_label = QLabel("Max Retries:")
+        retries_spin = QSpinBox()
+        retries_spin.setRange(1, 10)
+        retries_spin.setValue(3)
+        self.task_widgets[task_type]["max_retries"] = retries_spin
+        settings_layout.addWidget(retries_label)
+        settings_layout.addWidget(retries_spin)
+
+        settings_layout.addSpacing(20)
+
+        timeout_label = QLabel("Timeout (seconds):")
+        timeout_spin = QSpinBox()
+        timeout_spin.setRange(30, 600)
+        timeout_spin.setValue(120)
+        self.task_widgets[task_type]["timeout"] = timeout_spin
+        settings_layout.addWidget(timeout_label)
+        settings_layout.addWidget(timeout_spin)
+
+        settings_layout.addStretch()
+
+        layout.addLayout(settings_layout)
+        layout.addStretch()
+
+        return tab
+
+    def _update_model_list(self, provider: str, model_combo: QComboBox):
+        """Update model combo based on selected provider."""
+        model_combo.clear()
+
+        if provider in AVAILABLE_MODELS:
+            for model_id, description in AVAILABLE_MODELS[provider]:
+                model_combo.addItem(description, model_id)
+
+    def _load_current_settings(self):
+        """Load current settings from LLMConfig into the UI."""
+        # Load agent settings
+        for agent_id, widgets in self.agent_widgets.items():
+            agent_config = self.config.get_agent_config(agent_id)
+
+            widgets["use_default"].setChecked(agent_config.use_default)
+
+            if not agent_config.use_default and agent_config.model_sequence:
+                # Set custom model
+                first_model = agent_config.model_sequence[0]
+                idx = widgets["provider"].findText(first_model.provider)
+                if idx >= 0:
+                    widgets["provider"].setCurrentIndex(idx)
+
+                self._update_model_list(first_model.provider, widgets["model"])
+                for j in range(widgets["model"].count()):
+                    if widgets["model"].itemData(j) == first_model.model:
+                        widgets["model"].setCurrentIndex(j)
+                        break
+
+            # Update current label to show what's being used
+            self._update_agent_current_label(agent_id)
+
+        # Load task type settings
+        for task_type, widgets in self.task_widgets.items():
+            task_config = self.config.get_task_config(task_type)
+
+            # Load model sequence
+            for i, row in enumerate(widgets["model_rows"]):
+                if i < len(task_config.model_sequence):
+                    model_spec = task_config.model_sequence[i]
+
+                    # Set provider
+                    idx = row["provider"].findText(model_spec.provider)
+                    if idx >= 0:
+                        row["provider"].setCurrentIndex(idx)
+
+                    # Update model list and select current
+                    self._update_model_list(model_spec.provider, row["model"])
+                    for j in range(row["model"].count()):
+                        if row["model"].itemData(j) == model_spec.model:
+                            row["model"].setCurrentIndex(j)
+                            break
+
+                    row["max_tokens"].setValue(model_spec.max_tokens)
+                else:
+                    row["provider"].setCurrentIndex(0)  # (None)
+
+            # Load other settings
+            widgets["max_retries"].setValue(task_config.max_retries)
+            widgets["timeout"].setValue(task_config.timeout_seconds)
+
+    def _update_agent_current_label(self, agent_id: str):
+        """Update the label showing current model for an agent."""
+        widgets = self.agent_widgets[agent_id]
+        agent_config = self.config.get_agent_config(agent_id)
+
+        if agent_config.use_default:
+            # Show what default profile will be used
+            default_task = widgets["default_task"]
+            task_config = self.config.get_task_config(default_task)
+            if task_config.model_sequence:
+                first = task_config.model_sequence[0]
+                widgets["current_label"].setText(f"-> {first.model}")
+            else:
+                widgets["current_label"].setText(f"-> {default_task}")
+        else:
+            widgets["current_label"].setText("")
+
+    def _save_settings(self):
+        """Save settings to LLMConfig."""
+        try:
+            # Save agent settings
+            for agent_id, widgets in self.agent_widgets.items():
+                use_default = widgets["use_default"].isChecked()
+
+                if use_default:
+                    self.config.update_agent_config(agent_id, use_default=True)
+                else:
+                    provider = widgets["provider"].currentText()
+                    model_id = widgets["model"].currentData()
+
+                    if provider and model_id:
+                        model_sequence = [ModelSpec(
+                            provider=provider,
+                            model=model_id,
+                            max_tokens=8192
+                        )]
+                        self.config.update_agent_config(
+                            agent_id,
+                            model_sequence=model_sequence,
+                            use_default=False
+                        )
+
+            # Save task type settings
+            for task_type, widgets in self.task_widgets.items():
+                model_sequence = []
+
+                for row in widgets["model_rows"]:
+                    provider = row["provider"].currentText()
+                    if provider == "(None)" or not provider:
+                        continue
+
+                    model_id = row["model"].currentData()
+                    if not model_id:
+                        continue
+
+                    model_sequence.append(ModelSpec(
+                        provider=provider,
+                        model=model_id,
+                        max_tokens=row["max_tokens"].value()
+                    ))
+
+                if model_sequence:
+                    self.config.update_task_config(
+                        task_type,
+                        model_sequence,
+                        max_retries=widgets["max_retries"].value(),
+                        timeout_seconds=widgets["timeout"].value()
+                    )
+
+            QMessageBox.information(self, "Success", "LLM settings saved successfully.")
+            self.accept()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to save settings: {e}")
+
+    def _reset_to_defaults(self):
+        """Reset all settings to defaults."""
+        reply = QMessageBox.question(
+            self, "Reset to Defaults",
+            "Are you sure you want to reset all LLM settings to defaults?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            # Remove config file and reload
+            from ..llm_config import CONFIG_FILE
+            if os.path.exists(CONFIG_FILE):
+                try:
+                    os.remove(CONFIG_FILE)
+                except:
+                    pass
+
+            # Reset singleton
+            LLMConfig._instance = None
+            self.config = LLMConfig()
+
+            # Reload UI
+            self._load_current_settings()
+            QMessageBox.information(self, "Reset", "Settings reset to defaults.")
 

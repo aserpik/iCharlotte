@@ -77,6 +77,11 @@ class WordEmbedWidget(QWidget):
         self.embed_timer.setSingleShot(True)
         self.embed_timer.timeout.connect(self._do_embed)
 
+        # Timer for delayed resize after embedding
+        self.resize_timer = QTimer(self)
+        self.resize_timer.setSingleShot(True)
+        self.resize_timer.timeout.connect(self._resize_word_window)
+
     def _init_com(self):
         """Initialize COM for this thread."""
         if not self._com_initialized:
@@ -178,6 +183,8 @@ class WordEmbedWidget(QWidget):
                 self._embed_window(self.word_hwnd)
                 self.placeholder.hide()
                 self.check_timer.start(1000)  # Check every second if Word is still alive
+                # Schedule a delayed resize to ensure proper sizing after layout settles
+                self.resize_timer.start(150)
                 print(f"Word embedded successfully, hwnd={self.word_hwnd}, pid={self.word_pid}")
             else:
                 self.placeholder.setText("Word started but window not found.\nTry clicking 'New Document' again.")
@@ -278,14 +285,20 @@ class WordEmbedWidget(QWidget):
     def _resize_word_window(self):
         """Resize the embedded Word window to fill this widget."""
         if self.word_hwnd and win32gui.IsWindow(self.word_hwnd):
-            rect = self.rect()
             try:
-                win32gui.MoveWindow(
-                    self.word_hwnd,
-                    0, 0,
-                    rect.width(), rect.height(),
-                    True
-                )
+                # Get our widget's native handle and its client rect in physical pixels
+                self_hwnd = int(self.winId())
+                left, top, right, bottom = win32gui.GetClientRect(self_hwnd)
+                width = right - left
+                height = bottom - top
+
+                if width > 0 and height > 0:
+                    win32gui.MoveWindow(
+                        self.word_hwnd,
+                        0, 0,
+                        width, height,
+                        True
+                    )
             except Exception as e:
                 print(f"Error resizing Word window: {e}")
 
@@ -361,6 +374,7 @@ class WordEmbedWidget(QWidget):
         """Close Word and restore the window."""
         self.check_timer.stop()
         self.embed_timer.stop()
+        self.resize_timer.stop()
 
         # Don't try to use COM to close - it's unreliable after embedding
         # Just force close the window and kill the process
