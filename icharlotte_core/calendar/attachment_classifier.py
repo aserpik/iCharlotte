@@ -48,14 +48,18 @@ class AttachmentClassifier:
 
     # Document type patterns for fallback detection
     DOC_TYPE_PATTERNS = {
+        'deposition_notice': [
+            r'deposition\s+notice',
+            r'notice\s+of\s+(?:taking\s+)?deposition',
+            r'notice\s+of\s+(?:video(?:taped)?|remote)?\s*deposition',
+            r'notice\s+to\s+take\s+deposition',
+        ],
         'discovery_request': [
             r'form\s+interrogator',
             r'special\s+interrogator',
             r'request\s+for\s+production',
             r'request\s+for\s+admission',
             r'demand\s+for\s+inspection',
-            r'deposition\s+notice',
-            r'notice\s+of\s+deposition',
             r'set\s+(?:one|two|three|four|five|\d+)',
         ],
         'discovery_response': [
@@ -143,6 +147,9 @@ class AttachmentClassifier:
             'doc_type': 'correspondence',
             'motion_type': None,
             'hearing_date': None,
+            'deposition_date': None,
+            'deposition_time': None,
+            'deponent_name': None,
             'dates_found': [],
             'summary': '',
             'confidence': 0.0,
@@ -263,20 +270,31 @@ class AttachmentClassifier:
 
 Return a JSON object with these fields:
 {
-    "doc_type": "correspondence" | "discovery_request" | "discovery_response" | "motion" | "opposition" | "reply",
+    "doc_type": "correspondence" | "deposition_notice" | "discovery_request" | "discovery_response" | "motion" | "opposition" | "reply",
     "motion_type": null | "msj" | "msa" | "demurrer" | "motion_to_strike" | "motion_to_compel" | "anti_slapp" | "standard",
     "hearing_date": null | "YYYY-MM-DD",
+    "deposition_date": null | "YYYY-MM-DD",
+    "deposition_time": null | "HH:MM" (24-hour format, e.g., "09:00", "14:30"),
+    "deponent_name": null | "Name of person being deposed",
     "summary": "Brief 1-2 sentence summary of the document",
     "confidence": 0.0-1.0
 }
 
 Classification rules:
 - correspondence: Letters, emails, cover letters, transmittals
-- discovery_request: Interrogatories, Requests for Production (RFPs), Requests for Admission (RFAs), Deposition Notices
+- deposition_notice: Notice of Deposition, Notice of Taking Deposition (NOT other discovery requests)
+- discovery_request: Interrogatories, Requests for Production (RFPs), Requests for Admission (RFAs) (NOT deposition notices)
 - discovery_response: Responses to any discovery request
 - motion: Any motion filed with the court (includes Notice of Motion, Memorandum of Points and Authorities)
 - opposition: Opposition papers to a motion
 - reply: Reply brief in support of a motion
+
+IMPORTANT: Deposition notices are NOT discovery_request. They must be classified as "deposition_notice".
+
+For deposition_notice documents:
+- Extract deponent_name: The name of the person being deposed (e.g., "John Smith", "Jane Doe, PMK")
+- Extract deposition_date: The date the deposition is scheduled for
+- Extract deposition_time: The time the deposition is scheduled for in 24-hour format (e.g., "09:00", "10:30", "14:00")
 
 For motion_type, only set if doc_type is motion, opposition, or reply:
 - msj: Motion for Summary Judgment
@@ -322,6 +340,13 @@ Return ONLY the JSON object, no other text."""
                     parsed['hearing_date'] = datetime.strptime(parsed['hearing_date'], '%Y-%m-%d')
                 except:
                     parsed['hearing_date'] = None
+
+            # Convert deposition_date string to datetime if present
+            if parsed.get('deposition_date'):
+                try:
+                    parsed['deposition_date'] = datetime.strptime(parsed['deposition_date'], '%Y-%m-%d')
+                except:
+                    parsed['deposition_date'] = None
 
             # Extract all dates from text
             parsed['dates_found'] = self._extract_dates(text)
@@ -463,6 +488,9 @@ Return ONLY the JSON object, no other text."""
                 'doc_type': 'correspondence',
                 'motion_type': None,
                 'hearing_date': None,
+                'deposition_date': None,
+                'deposition_time': None,
+                'deponent_name': None,
                 'dates_found': [],
                 'summary': '',
                 'confidence': 0.0,

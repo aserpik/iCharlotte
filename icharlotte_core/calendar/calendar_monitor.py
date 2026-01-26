@@ -198,6 +198,10 @@ class CalendarMonitorWorker(QThread):
             if has_attachment:
                 deadlines = self._process_attachments(item, file_number, email_link)
 
+            # Check if we processed deposition notices - if so, skip body date extraction
+            # Deposition notices are self-contained and we don't want extra dates from the email body
+            has_deposition = any('Deposition of' in d.get('title', '') for d in deadlines)
+
             # If no document-based deadlines were created, use dates from body
             if not deadlines and body_dates:
                 # Use LLM to extract descriptive title from email
@@ -210,7 +214,8 @@ class CalendarMonitorWorker(QThread):
                     })
 
             # Also add body dates if they're different from document deadlines
-            if deadlines and body_dates:
+            # BUT skip this if we have deposition notices (they're self-contained)
+            if deadlines and body_dates and not has_deposition:
                 existing_dates = {d['date'].date() for d in deadlines if d.get('date')}
                 for date in body_dates:
                     if date.date() not in existing_dates:
@@ -229,7 +234,8 @@ class CalendarMonitorWorker(QThread):
                     date=deadline['date'],
                     description=deadline.get('description', ''),
                     file_number=file_number,
-                    email_link=email_link
+                    email_link=email_link,
+                    all_day=deadline.get('all_day', True)  # Default to all-day unless specified
                 )
                 if event_id:
                     events_created += 1
@@ -531,6 +537,40 @@ Return ONLY the short event title, nothing else. If no clear action is mentioned
                                     'date': date,
                                     'description': f'Date from: {filename}\n{summary}',
                                 })
+
+                    elif doc_type == 'deposition_notice':
+                        # Deposition notice - calendar the deposition date/time with deponent name
+                        deposition_date = classification.get('deposition_date')
+                        deposition_time = classification.get('deposition_time')  # e.g., "09:00", "14:30"
+                        deponent_name = classification.get('deponent_name', 'Unknown')
+
+                        if deposition_date:
+                            # Combine date and time if time is available
+                            if deposition_time:
+                                try:
+                                    hour, minute = map(int, deposition_time.split(':'))
+                                    deposition_datetime = deposition_date.replace(hour=hour, minute=minute)
+                                    time_str = deposition_datetime.strftime('%I:%M %p')
+                                except:
+                                    deposition_datetime = deposition_date
+                                    time_str = "Time TBD"
+                            else:
+                                deposition_datetime = deposition_date
+                                time_str = "Time TBD"
+
+                            deadlines.append({
+                                'title': f"Deposition of {deponent_name}",
+                                'date': deposition_datetime,
+                                'all_day': deposition_time is None,  # Timed event if we have a time
+                                'description': f"Deposition Notice\nDeponent: {deponent_name}\nTime: {time_str}\n\nDocument: {filename}\n{summary}",
+                            })
+                            self.log.add_log("Calendar", f"Deposition: {deponent_name} on {deposition_date.strftime('%Y-%m-%d')} at {time_str}")
+                        else:
+                            self.log.add_log("Calendar", f"No deposition date found in: {filename}")
+
+                        # Skip processing dates_found for deposition notices - only use the extracted deposition date
+                        # Clear dates_found to prevent extra calendar entries
+                        classification['dates_found'] = []
 
                     elif doc_type == 'discovery_request':
                         # Discovery response due: 30 days + service extension

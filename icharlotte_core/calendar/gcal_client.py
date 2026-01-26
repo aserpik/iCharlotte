@@ -169,9 +169,12 @@ class GoogleCalendarClient:
                     },
                 }
             else:
-                # Timed event (9 AM - 10 AM)
-                start_time = date.replace(hour=9, minute=0, second=0)
-                end_time = date.replace(hour=10, minute=0, second=0)
+                # Timed event - use time from date, default duration 2 hours (for depositions, etc.)
+                start_time = date.replace(second=0, microsecond=0)
+                # If no time was set (midnight), default to 9 AM
+                if start_time.hour == 0 and start_time.minute == 0:
+                    start_time = start_time.replace(hour=9, minute=0)
+                end_time = start_time + timedelta(hours=2)  # Default 2-hour duration
                 event = {
                     'summary': event_title,
                     'description': full_description,
