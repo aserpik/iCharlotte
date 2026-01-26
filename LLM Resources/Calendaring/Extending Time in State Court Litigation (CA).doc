@@ -1,0 +1,3640 @@
+{\rtf1 \ansi 
+{\colortbl;
+\red0\green0\blue0;
+\red255\green255\blue255;
+\red255\green0\blue0;
+\red0\green255\blue0;
+\red0\green0\blue255;
+\red0\green255\blue255;
+\red255\green0\blue255;
+\red255\green255\blue0;
+\red0\green0\blue128;
+\red0\green128\blue128;
+\red0\green128\blue0;
+\red128\green0\blue128;
+\red128\green0\blue0;
+\red128\green128\blue0;
+\red128\green128\blue128;
+\red192\green192\blue192;
+\red170\green170\blue170;
+\red85\green85\blue85;
+\red31\green31\blue31;
+\red33\green33\blue33;
+\red0\green111\blue196;
+\red37\green37\blue37;
+\red214\green214\blue214;
+\red218\green218\blue218;
+\red119\green119\blue119;
+\red80\green80\blue80;
+\red61\green61\blue61;
+\red255\green255\blue102;
+\red204\green204\blue204;
+\red112\green112\blue112;
+\red106\green144\blue39;
+\red242\green242\blue242;
+\red214\green9\blue9;
+\red56\green124\blue43;
+\red181\green79\blue104;
+\red107\green107\blue106;
+\red238\green238\blue238;
+\red21\green137\blue21;
+\red247\green247\blue247;
+\red151\green151\blue151;
+\red255\green255\blue174;
+\red86\green86\blue86;
+\red232\green233\blue232;
+\red20\green93\blue164;
+\red246\green246\blue246;
+\red233\green233\blue233;
+\red249\green249\blue249;
+\red236\green236\blue236;
+\red187\green187\blue187;
+\red223\green223\blue223;
+\red239\green239\blue239;
+\red255\green255\blue198;
+\red203\green203\blue203;
+\red127\green127\blue127;
+\red71\green120\blue194;
+\red245\green245\blue245;
+\red255\green210\blue183;
+\red240\green240\blue240;
+\red105\green105\blue105;
+\red227\green227\blue227;
+\red255\green248\blue96;
+\red240\green191\blue187;
+\red190\green237\blue228;
+\red153\green153\blue153;
+\red240\green248\blue255;
+\red229\green243\blue255;
+\red179\green218\blue255;
+\red255\green255\blue204;
+\red255\green204\blue0;
+\red239\green122\blue2;
+\red143\green34\blue26;
+\red68\green68\blue68;
+\red255\green194\blue211;
+\red183\green242\blue206;
+\red249\green250\blue251;
+\red228\green231\blue232;
+\red0\green114\blue54;
+}
+{\fonttbl {
+\f0 Arial;}{
+\f1 Symbol;}{
+\f2 Times New Roman;}{
+\f3 Georgia;}{
+\f4 sans-serif;}{
+\f5 serif;}{
+\f6 Source Sans Pro;}
+}
+{\*\generator Apache XML Graphics RTF Library;}
+\fet0 \ftnbj 
+{\*\listtable
+{\list\listtemplateid-151296832\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid181549056}
+{\list\listtemplateid2123499287\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1327018495}
+{\list\listtemplateid-1428801466\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1987125508}
+{\list\listtemplateid846836672\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1624742453}
+{\list\listtemplateid-975658674\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1104032997}
+{\list\listtemplateid399523362\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1121373095}
+{\list\listtemplateid2050058109\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1001482466}
+{\list\listtemplateid-1898871928\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-791126}
+{\list\listtemplateid2065614468\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-584785534}
+{\list\listtemplateid-2045749878\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1314713942}
+{\list\listtemplateid-934535827\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-42621729}
+{\list\listtemplateid1547479934\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-173813147}
+{\list\listtemplateid562741048\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1175625472}
+{\list\listtemplateid-694749395\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-23778875}
+{\list\listtemplateid-252790618\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-307139969}
+{\list\listtemplateid-2047373111\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1923408100}
+{\list\listtemplateid277978963\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-2073788565}
+{\list\listtemplateid927755806\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-732146387}
+{\list\listtemplateid449494538\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-945099665}
+{\list\listtemplateid-1143039736\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1955114961}
+{\list\listtemplateid1087189588\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid459275827}
+{\list\listtemplateid1154750756\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid2123396554}
+{\list\listtemplateid428986194\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1041008382}
+{\list\listtemplateid-2089138998\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid658740252}
+{\list\listtemplateid-1292117556\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1715910484}
+{\list\listtemplateid-1204835014\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1259770787}
+{\list\listtemplateid-159059575\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid2024393389}
+{\list\listtemplateid1132730900\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1048271496}
+{\list\listtemplateid1252899808\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid433723022}
+{\list\listtemplateid1268271117\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-914570067}
+{\list\listtemplateid943072143\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1921378443}
+{\list\listtemplateid-1305583904\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1118186789}
+{\list\listtemplateid-956743222\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1778707851}
+{\list\listtemplateid964121217\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1430163969}
+{\list\listtemplateid-1619639145\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1705994535}
+{\list\listtemplateid230204312\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-2070804734}
+{\list\listtemplateid-1261377960\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid567399010}
+{\list\listtemplateid1806250797\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-602842201}
+{\list\listtemplateid346639017\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-660056197}
+{\list\listtemplateid773528991\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1687117034}
+{\list\listtemplateid1339315308\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-774545352}
+{\list\listtemplateid1282658522\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-2059986575}
+{\list\listtemplateid-302331615\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-734659978}
+{\list\listtemplateid-841821752\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1585748904}
+{\list\listtemplateid1203164538\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1448825408}
+{\list\listtemplateid769320199\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid221593651}
+{\list\listtemplateid-1943222482\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1062027660}
+{\list\listtemplateid1595444957\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-854624686}
+{\list\listtemplateid1234505741\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid386888613}
+{\list\listtemplateid1731993192\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-427958714}
+{\list\listtemplateid-1996822956\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid258081091}
+{\list\listtemplateid1645000729\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid425925028}
+{\list\listtemplateid-36432318\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-376963847}
+{\list\listtemplateid-1671621789\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid376424456}
+{\list\listtemplateid1464588522\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-975142826}
+{\list\listtemplateid2007097262\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1014134621}
+{\list\listtemplateid-463223734\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1408785582}
+{\list\listtemplateid475333777\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1132473254}
+{\list\listtemplateid1118513309\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid980101442}
+{\list\listtemplateid1548759361\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1655775409}
+{\list\listtemplateid444493549\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1421570146}
+{\list\listtemplateid-369332413\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1503471905}
+{\list\listtemplateid818236651\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-151029182}
+{\list\listtemplateid-1931760535\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-265593710}
+{\list\listtemplateid-1639980542\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1106708868}
+{\list\listtemplateid-892571653\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-568158267}
+{\list\listtemplateid1692406185\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1896385868}
+{\list\listtemplateid-1766379725\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid448223745}
+{\list\listtemplateid363704056\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1272655233}
+{\list\listtemplateid-1403521810\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1021774260}
+{\list\listtemplateid-896971394\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1157829530}
+}
+{\*\listoverridetable
+{\*\listoverride{\listid181549056\listoverridecount0\ls1}}
+{\*\listoverride{\listid-1327018495\listoverridecount0\ls2}}
+{\*\listoverride{\listid-1987125508\listoverridecount0\ls3}}
+{\*\listoverride{\listid-1624742453\listoverridecount0\ls4}}
+{\*\listoverride{\listid1104032997\listoverridecount0\ls5}}
+{\*\listoverride{\listid1121373095\listoverridecount0\ls6}}
+{\*\listoverride{\listid1001482466\listoverridecount0\ls7}}
+{\*\listoverride{\listid-791126\listoverridecount0\ls8}}
+{\*\listoverride{\listid-584785534\listoverridecount0\ls9}}
+{\*\listoverride{\listid1314713942\listoverridecount0\ls10}}
+{\*\listoverride{\listid-42621729\listoverridecount0\ls11}}
+{\*\listoverride{\listid-173813147\listoverridecount0\ls12}}
+{\*\listoverride{\listid1175625472\listoverridecount0\ls13}}
+{\*\listoverride{\listid-23778875\listoverridecount0\ls14}}
+{\*\listoverride{\listid-307139969\listoverridecount0\ls15}}
+{\*\listoverride{\listid1923408100\listoverridecount0\ls16}}
+{\*\listoverride{\listid-2073788565\listoverridecount0\ls17}}
+{\*\listoverride{\listid-732146387\listoverridecount0\ls18}}
+{\*\listoverride{\listid-945099665\listoverridecount0\ls19}}
+{\*\listoverride{\listid1955114961\listoverridecount0\ls20}}
+{\*\listoverride{\listid459275827\listoverridecount0\ls21}}
+{\*\listoverride{\listid2123396554\listoverridecount0\ls22}}
+{\*\listoverride{\listid-1041008382\listoverridecount0\ls23}}
+{\*\listoverride{\listid658740252\listoverridecount0\ls24}}
+{\*\listoverride{\listid-1715910484\listoverridecount0\ls25}}
+{\*\listoverride{\listid-1259770787\listoverridecount0\ls26}}
+{\*\listoverride{\listid2024393389\listoverridecount0\ls27}}
+{\*\listoverride{\listid-1048271496\listoverridecount0\ls28}}
+{\*\listoverride{\listid433723022\listoverridecount0\ls29}}
+{\*\listoverride{\listid-914570067\listoverridecount0\ls30}}
+{\*\listoverride{\listid1921378443\listoverridecount0\ls31}}
+{\*\listoverride{\listid-1118186789\listoverridecount0\ls32}}
+{\*\listoverride{\listid-1778707851\listoverridecount0\ls33}}
+{\*\listoverride{\listid1430163969\listoverridecount0\ls34}}
+{\*\listoverride{\listid-1705994535\listoverridecount0\ls35}}
+{\*\listoverride{\listid-2070804734\listoverridecount0\ls36}}
+{\*\listoverride{\listid567399010\listoverridecount0\ls37}}
+{\*\listoverride{\listid-602842201\listoverridecount0\ls38}}
+{\*\listoverride{\listid-660056197\listoverridecount0\ls39}}
+{\*\listoverride{\listid1687117034\listoverridecount0\ls40}}
+{\*\listoverride{\listid-774545352\listoverridecount0\ls41}}
+{\*\listoverride{\listid-2059986575\listoverridecount0\ls42}}
+{\*\listoverride{\listid-734659978\listoverridecount0\ls43}}
+{\*\listoverride{\listid-1585748904\listoverridecount0\ls44}}
+{\*\listoverride{\listid1448825408\listoverridecount0\ls45}}
+{\*\listoverride{\listid221593651\listoverridecount0\ls46}}
+{\*\listoverride{\listid-1062027660\listoverridecount0\ls47}}
+{\*\listoverride{\listid-854624686\listoverridecount0\ls48}}
+{\*\listoverride{\listid386888613\listoverridecount0\ls49}}
+{\*\listoverride{\listid-427958714\listoverridecount0\ls50}}
+{\*\listoverride{\listid258081091\listoverridecount0\ls51}}
+{\*\listoverride{\listid425925028\listoverridecount0\ls52}}
+{\*\listoverride{\listid-376963847\listoverridecount0\ls53}}
+{\*\listoverride{\listid376424456\listoverridecount0\ls54}}
+{\*\listoverride{\listid-975142826\listoverridecount0\ls55}}
+{\*\listoverride{\listid1014134621\listoverridecount0\ls56}}
+{\*\listoverride{\listid1408785582\listoverridecount0\ls57}}
+{\*\listoverride{\listid-1132473254\listoverridecount0\ls58}}
+{\*\listoverride{\listid980101442\listoverridecount0\ls59}}
+{\*\listoverride{\listid-1655775409\listoverridecount0\ls60}}
+{\*\listoverride{\listid-1421570146\listoverridecount0\ls61}}
+{\*\listoverride{\listid1503471905\listoverridecount0\ls62}}
+{\*\listoverride{\listid-151029182\listoverridecount0\ls63}}
+{\*\listoverride{\listid-265593710\listoverridecount0\ls64}}
+{\*\listoverride{\listid1106708868\listoverridecount0\ls65}}
+{\*\listoverride{\listid-568158267\listoverridecount0\ls66}}
+{\*\listoverride{\listid-1896385868\listoverridecount0\ls67}}
+{\*\listoverride{\listid448223745\listoverridecount0\ls68}}
+{\*\listoverride{\listid1272655233\listoverridecount0\ls69}}
+{\*\listoverride{\listid1021774260\listoverridecount0\ls70}}
+{\*\listoverride{\listid1157829530\listoverridecount0\ls71}}
+}
+\paperw12240 \paperh15840 \margt1800 \margb1080 \margl1080 \margr1080 \headery720 \footery720 \itap0 \cols1 
+\sectd {\header {
+{\trowd \ltrrow \trleft0 
+\clpadb60 \clpadfb3 \clpadl400 \clpadfl3 \clbrdrt \clbrdrl \clbrdrr \trql \clvertalb \clwWidth9380 \cellx9380 
+\intbl 
+{\b0 \qc \cf1 \f0 \ri0 \i0 \fs18 \li0 
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+}
+{\b1 \cf1 \f0 \i0 \fs18 
+{\b1 \cf1 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+O\\ \rquote Shea, Dillon
+}
+}
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ 
+}
+{\b1 \cf1 \f0 \i0 \fs18 
+{\b1 \cf1 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+1/25/2026
+}
+}
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+\par 
+}
+}
+{\b0 \qc \cf1 \f0 \ri0 \i0 \fs18 \li0 
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+}
+{\b1 \cf1 \f0 \i0 \fs18 
+{\b1 \cf1 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+For Educational Use Only
+}
+}
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+}
+}\b0 \qc \cf1 \f0 \ri0 \ul0 \strike0 \i0 \fs18 \li0 \sa0 \sb0 \intbl \cell \row }
+{\trowd \ltrrow \trleft0 
+\clpadb60 \clpadfb3 \clpadl400 \clpadfl3 \clbrdrb \brdrcf17 \brdrw20 \brdrs \clbrdrl \trql \clvertalb \clwWidth9380 \cellx9380 
+\clpadb60 \clpadfb3 \clpadl400 \clpadfl3 \clbrdrb \brdrcf17 \brdrw20 \brdrs \clbrdrr \trql \clwWidth700 \cellx10080 
+\intbl 
+{\b0 \cf1 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+}
+{\b1 \cf18 \f0 \i0 \fs18 
+{\b1 \cf18 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Extending Time in State Court Litigation (CA), Practical Law Practice Note w-000-6456
+}
+}
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+}
+}\b0 \cf1 \f0 \ri0 \ul0 \strike0 \i0 \ql \fs18 \li0 \sa0 \sb0 \intbl \cell \intbl 
+{\qr \b0 \cf1 \f0 \ri0 \i0 \fs18 \li0 
+}\qr \b0 \cf1 \f0 \ri0 \i0 \fs18 \li0 \intbl \cell \row }
+{\trowd \lastrow \trleft0 
+\clbrdrb \clbrdrl \trql \clwWidth10080 \cellx10080 
+\intbl 
+{\b0 \cf1 \f0 \ri0 \i0 \ql \fs18 \li0 
+}\b0 \cf1 \f0 \ri0 \i0 \ql \fs18 \li0 \intbl \cell \row }}\par }{\footer {
+{\trowd \lastrow \trleft0 
+\clpadl60 \clpadfl3 \clbrdrt \brdrcf17 \brdrw20 \brdrs \clbrdrb \clbrdrl \trql \clvertalb \clwWidth9300 \cellx9300 
+\clpadl60 \clpadfl3 \clbrdrt \brdrcf17 \brdrw20 \brdrs \clbrdrb \clbrdrr \trql \clwWidth700 \cellx10000 
+\intbl 
+{\b0 \cf17 \f0 \ri0 \i0 \ql \fs20 \li0 
+{\b0 \cf17 \f0 \ul0 \strike0 \i0 \fs20 
+}
+{\*\shppict {\pict \pngblip \picw78 \pich10 \picwgoal1170 \pichgoal150 89504e470d0a1a0a0000000d494844520000004e0000000a08030000002dbd985500000300504c5445f8a969f6913ff68931fff9f5f69241f5852af68d38fcddc4f58326fac294f8a868fac193fcdabefab985fcdfc7fef5eef58022f8a35efef6effde5d2fac092fffaf6f9ac6ffffcfafde8d7fef7f1f9b279f6862cf8aa6af79e56f79c53f58327fef1e7fde3cefeeee2f9b076f79a4efef8f4f58123f58224f9ae72feefe4f58021f9ae71fac295fffaf7fcdabffef7f2f9af73f9b177f8ac6ef9b47cf8a15bf6872ef79648fef5edf9b278fcd9bdf9b782f9b57efbc89ffde3cffffefdf6872df8aa6bfcd6b8fac59af9b781fabc8bfffbf8fac091fac396fbceaaf8a461f68e39f6882ffabe8dfabf8ff9b884f79c52fdeadbfeede0f68c36f89f58fcdcc3fde0c9fef0e5fef3eaf68f3cfbcaa2f8a867f9b37afaba87f68b35fde7d6fabf90fffcfbfaba86fde7d5f6903efffdfcfef4ecf68f3bfde1cafcdfc6fbd1affbcea9fcd6b7f68a33f79444fbcba5f58429fcdec6f9af74f8a25df58428f7a461fef4edfdede0fde6d4fde7d4f9b680fbc69cfbc8a0f9b37bfac9a1f69240f79d54fcd4b4f9b883f68e3afef8f3fdebddfde2cbf7984cf8a35ff6882efef3ebf9bd8cfcd4b5feecdef8a562fde6d3fef9f4fcdbc1f9bc8afcd8bcf8ab6dfef8f2fcd7b9fffbf7feefe3f79546f8aa69f79f57fde1cbfcd3b3fcd2b1f8a25cfcd3b2fde2ccfac599fac397f9b379fcd8bbfbd2b0fef2e9fcd5b6fac79ef8a664f8a460f68a32fac090fffbf9fef2e8f8ab6cfde4d0f7994df6903df79749fffefcf79e55f8a766f8a059f68830f7974afde2cdfbcca6fabd8cf57f20ffffff000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c5baaa8e000000bf74524e53ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00456e8439000002804944415478da63dcc70001fef2931866b0be0cd2085114e5ff7ef72a0357d0a3a31cc2129ebb9f492a3e4b6eb8cb20913bb5c808a2f849bf610c438bf99a9917cf2a18092c7bf1a30a6a0a13946658f6af92e15352e52386af5d677ee5ff61618c5ca7c6b58921d6ecc47383e56a52b3181955bf2e3e01513b49bae7260383be8b048376a2e34786a3853761a6b0c018892b57313c48fa38834195c1cf94c16a3a03c3edad7c5f163030a8672bcc3afcf4251343639ef3ae2cb05afe384e9390352a0c320cbdf71f19b43d6690c7302e84e11383d28bff67bcba9a6e2831acd9c6e0d990fe70b74ae7d2a90c0cbbc36fbaef6660b80f55ba68e9d2d5a9ae0cdd2f341878be8b9c64f8cb701d660a733c9451af78704effa1c6b3536708cf2c9ffde7c78fcb9b16497b8acf3e3721061812bfde8433302c8d5a190152ca93f7d26df6796bff83310dbfe504de7f7ff9ec621c7ad8ade964d5f0f8162da4257e9da18c39434955602283a37fdaefde9cb30c686005c3a4c9a6d792186c6b665d8e54f97ae7c5badd189e65307c22395565fbc43fcc010cad5b3ba781c5363184af0bfa8530481844b84e65b87efde6bcb50c67d9dc36d4f6bf7aa6e4015700771dc3fd57751f183c97ecfe7f04c8b17e9f9fdfceb0e334c3ca37c16940feb644b09ad7e1aee90cdaaa9f1ca31ef6bd6478e2b43ba29f615fc7cf550c1861c720c2699619c930d362d55a060ff68e592f7d4eacd82df9eb3bd7bd387986ff73182d18183686ba2ff9f76ec59f909c2e83a8499dbbaaa404ecf8199cb8051e79627ad6fa4799360383602cd0bdcbdeb2fc6158debec577daf1a9076ba51818e679bf05aaf85cfdeb0f8383c1ec0973801cee342386c537cdf218fecf4b70801b0200f61ff095f54de6170000000049454e44ae426082}}
+{\b0 \cf17 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb0 
+ \u169\'3f 2026 Thomson Reuters. No claim to original U.S. Government Works.
+}
+}\b0 \cf17 \f0 \ri0 \ul0 \strike0 \i0 \ql \fs20 \li0 \sa0 \sb0 \intbl \cell \intbl 
+{\qr \b0 \cf17 \f0 \ri0 \i0 \fs20 \li0 
+{\b0 \i0 \ul0 \fs20 \f0 \chpgn }
+}\qr \b0 \cf17 \f0 \ri0 \ul0 \strike0 \i0 \fs20 \li0 \intbl \cell \row }}\par }
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 \par}\sect\sbknone\pgncont\cols1{\ids0 
+{\*\bkmkstart co_document_1}{\*\bkmkend co_document_1}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart Iba840d956d0811e598dc8b09b4f043e0_Target}{\*\bkmkend Iba840d956d0811e598dc8b09b4f043e0_Target}
+\par 
+}
+{\b0 \cf26 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\*\bkmkstart co_docContentHeader_1}{\*\bkmkend co_docContentHeader_1}
+\par 
+{\b0 \cf26 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\*\bkmkstart co_docHeaderContainer_1}{\*\bkmkend co_docHeaderContainer_1}
+\par 
+{\b1 \cf20 \f0 \ri0 \i0 \ql \fs36 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs36 \sa0 \sb0 
+Extending Time in State Court Litigation (CA)
+\par 
+}
+}
+{\b1 \cf26 \f0 \ri0 \i0 \ql \fs22 \li0 
+{\b1 \cf26 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+by\u160\'3fPractical Law 
+}
+{\b1 \cf22 \f0 \i0 \fs22 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs22 \sa120 \sb120 
+Litigation
+}
+}
+{\b1 \cf26 \f0 \i0 \fs22 \chcbpat2 
+\par 
+}
+}
+{\b0 \cf26 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf26 \f0 \ri0 \i0 \qj \fs18 \li0 {
+{\trowd \lastrow \trleft0 
+\clpadt33 \clpadft3 \clpadr33 \clpadfr3 \clbrdrt \clbrdrb \clbrdrl \clbrdrr \trql \clvertalt \clwWidth10080 \cellx10080 
+\intbl 
+{\ri33 \li33 
+{\b1 \cf26 \f0 \ri33 \i0 \ql \fs22 \li33 
+{\b1 \cf38 \f0 \i0 \fs22 
+{\b1 \cf38 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+Maintained
+}
+}
+{\b1 \cf25 \f0 \i0 \fs17 
+{\b1 \cf25 \f0 \ul0 \strike0 \i0 \fs17 \sa0 \sb0 
+ \u8226\'3f 
+}
+}
+{\b1 \cf26 \f0 \i0 \fs22 
+{\b1 \cf26 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+California
+\par 
+}
+}
+}
+}\b1 \cf26 \f0 \ri33 \ul0 \strike0 \i0 \ql \li33 \fs22 \sa0 \sb0 \intbl \cell \row }}\par 
+}
+}
+}
+}
+{\b0 \cf19 \f0 \i0 \brdrt \brdrcf29 \brdrw20 \brdrs \fs18 \brdrr \brdrcf29 \brdrw0 \brdrs \brdrl \brdrcf29 \brdrw0 \brdrs \ri0 \qj \li0 \brdrb \brdrcf29 \brdrw0 \brdrs 
+{\*\bkmkstart co_docContentBody_1}{\*\bkmkend co_docContentBody_1}
+\par 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \chbrdr \brdrcf29 \brdrw20 \brdrs \f0 \ri0 \i0 \qj \fs22 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs22 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs22 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+A Practice Note outlining the key issues for counsel to consider when seeking to extend a 
+}
+{\b1 \cf22 \f0 \i0 \fs22 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs22 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+ in an unlimited 
+}
+{\b1 \cf22 \f0 \i0 \fs22 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+civil
+}
+}
+{\b0 \cf19 \f0 \i0 \fs22 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+ action in California state court. This Practice Note examines the standards and procedures for obtaining both prospective extensions before a 
+}
+{\b1 \cf22 \f0 \i0 \fs22 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs22 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+ expires and retroactive relief after a 
+}
+{\b1 \cf22 \f0 \i0 \fs22 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs22 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+ has passed. It details the different avenues for securing more time, including by stipulation with opposing counsel. This Practice Note also explains the distinct legal grounds for each type of request, from showing \ldblquote good cause\rdblquote  for a prospective extension to demonstrating \ldblquote mistake, inadvertence, surprise, or excusable neglect\rdblquote  for relief under 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS473&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C0DFE7B98E9836962CFF9A878968D8330C8172CC605F8F100631BF42AB4087CA&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+California Code of 
+}
+{\b1 \cf22 \f0 \i0 \fs22 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+Civil
+}
+}
+{\b0 \cf21 \f0 \i0 \fs22 \chcbpat2 
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+ Procedure Section 473
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+. Additionally, it addresses the court\rquote s authority and its limits, identifying certain 
+}
+{\b1 \cf22 \f0 \i0 \fs22 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+deadlines
+}
+}
+{\b0 \cf19 \f0 \i0 \fs22 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+ that cannot be extended and explaining the procedural requirements for mandatory and discretionary relief.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa400 \sb0 
+\u160\'3f\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\*\bkmkstart kh_toc-wrapper_1}{\*\bkmkend kh_toc-wrapper_1}
+\par 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\*\bkmkstart kh_tocContainer_1}{\*\bkmkend kh_tocContainer_1}
+\par 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf26 \f0 \ri0 \i0 \qj \fs18 \li-120 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000001_1" }{\fldrslt 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+\u160\'3fBasic Principles
+}}}
+\sa120 
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000018_1" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fKey Rules
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000019_1" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fDeadlines That May Be Extended
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000020_1" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fLimits on Court\rquote s Power
+}}}
+\sa120 
+\par 
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000021_1" }{\fldrslt 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+\u160\'3fProspective Deadline Extensions
+}}}
+\sa120 
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000022_1" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fGrounds for Obtaining an Extension
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000023_1" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fMoving for an Extension
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000026_1" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fStipulating to an Extension
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000027_1" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fBest Practices for Seeking a Prospective Deadline Extension
+}}}
+\sa120 
+\par 
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000028_1" }{\fldrslt 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+\u160\'3fRetroactive Deadline Extensions
+}}}
+\sa120 
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000029_1" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fGrounds for Obtaining a Retroactive Extension
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000032_1" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fApplication for a Retroactive Extension
+}}}
+\sa120 
+\par 
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_Id478f2a8d13211f0a5f6fa0d299e9}{\*\bkmkend co_anchor_Id478f2a8d13211f0a5f6fa0d299e9}
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+If a party needs more time to file a document or take other action in a lawsuit, generally the superior court may, in its discretion, grant 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ extensions before the original time period expires. In certain circumstances, counsel may stipulate to prospective 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb1440 
+ extensions without requesting the court\rquote s permission. In other circumstances, counsel may be able to obtain relief from the court after the time to act has expired if counsel can show that there was mistake, inadvertence, surprise, or neglect.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+This Note outlines the key issues to consider when requesting common 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ extensions from the court or opposing counsel. For a discussion on the computation of time periods in California 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+litigation
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/Ibcc942d336cd11e598dc8b09b4f043e0/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Practice Note, Computing Time in State Court 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Litigation
+}
+}
+{\b0 \cf21 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (CA)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000001_1}{\*\bkmkend co_anchor_a000001_1}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs28 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs28 \sa0 \sb0 
+Basic Principles
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+If a party needs a 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ extension, California courts have discretion to extend certain timeframes set by the California Rules of Court and the California Code of 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Civil
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ Procedure (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085224&cite=CASTALLCTR1.10&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=6D67B838426F19802D8A7FD75FF34AE817C6AA5EB1806188C448B3E3F873E1B8&contextData=(sc.Search)#co_pp_4b24000003ba5" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 1.10(c)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ and 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085225&cite=CATRCRTR2.20&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=2200315A98A2D507B70CF866A4FB54A3FEC43B766356ACF38254F7AA17F37C03&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+2.20
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1054&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=BD03D9F9992B75642AC4FF570077E34E4A81E48EC445B0F418B93083257BCA10&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1054(a)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+). California courts may grant both prospective and retroactive requests for extensions of time.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+However, the procedure for seeking an extension of time and the standard under which the courts analyze the request differ depending on whether a party makes the request before or after the deadline has expired. Prospective relief is much easier to obtain, and counsel should request a deadline extension as soon as they determine that they need one.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000018_1}{\*\bkmkend co_anchor_a000018_1}
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Key Rules
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Before requesting an extension, counsel should review the applicable statutes and rules, including:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls1 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls1 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1054&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=BD03D9F9992B75642AC4FF570077E34E4A81E48EC445B0F418B93083257BCA10&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1054
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ (extension of time).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls2 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls2 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS473&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C0DFE7B98E9836962CFF9A878968D8330C8172CC605F8F100631BF42AB4087CA&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 473(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ (enlargement of time to answer or demurrer).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls3 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls3 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS473&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C0DFE7B98E9836962CFF9A878968D8330C8172CC605F8F100631BF42AB4087CA&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 473(b)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ (relief from judgment, dismissal, or order taken against the party based on mistake, inadvertence, surprise, or excusable neglect).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls4 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls4 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085224&cite=CASTALLCTR1.10&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=6D67B838426F19802D8A7FD75FF34AE817C6AA5EB1806188C448B3E3F873E1B8&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 1.10
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ (extension of time by the court and computation of time).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls5 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls5 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085225&cite=CATRCRTR2.20&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=2200315A98A2D507B70CF866A4FB54A3FEC43B766356ACF38254F7AA17F37C03&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 2.20
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ (application for order extending time).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls6 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls6 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.110&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=693E60E7E7C6EB4A20208C3DB2D9FC7FC56F3B8758222AEE372130BA97631422&contextData=(sc.Search)#co_pp_5ba1000067d06" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.110(d)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ (parties may stipulate to one 15-day extension to respond to the initial complaint).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls7 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls7 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.110&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=693E60E7E7C6EB4A20208C3DB2D9FC7FC56F3B8758222AEE372130BA97631422&contextData=(sc.Search)#co_pp_7fdd00001ca15" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.110(e)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ (modification of deadline for service of complaint or cross-complaint and response to initial complaint).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls8 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls8 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000211&cite=CAGTS68115&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=275EFC0CFD8BBB957A6907CF88A1B383C3E52C983253D4187E98BEA23CBD5F72&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Gov\rquote t Code \u167\'3f 68115
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ (court\u8217\'3fs ability to extend deadlines and take other actions due to public emergencies).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls9 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls9 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000211&cite=CAGTS68616&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=7E5AAA7147C4AE86B9B99426BA0B95B436ABEC37C5AC6A00B9827E696B267906&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Gov\rquote t Code \u167\'3f 68616
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ (minimum time periods for certain actions, extension of time for service of pleadings, responsive pleadings, and provisions for certain stipulations extending time).
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Statutes specific to a particular procedure may have requirements in addition to or different from the generally applicable rules. For example, the Discovery Act authorizes relief from some discovery deadlines (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2024.060&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=764999078FCB4A8E25314E3E1C81CF04507C0C363B26E306778F8BFC5832C905&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 2024.060
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Counsel should also consult the superior court\rquote s local rules as well as the judge\rquote s individual rules before seeking an extension of time in a specific matter. For example:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls10 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls10 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+In Los Angeles Superior Court, the rules encourage counsel to grant deadline extensions to alleviate the burden of asking the court\rquote s permission (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1013803&cite=CARLASUPCTR3.26&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=GA&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=635C09C798243C7F8FEF1689E793665A24C81B1CADEA4ECE10D2EAB85E8AD6E9&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+CA R LOS ANGELES SUPER CT Rule 3.26
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ and 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1092572&cite=CARLASUPCTAPP3.A&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=GA&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=CA3F6403EBC48CA4E35284ECEC1EC1E9B9DFEE051492B7306E46C2350D1D82E0&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+CA R LOS ANGELES SUPER CT Appendix 3.A(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls11 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls11 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+In San Francisco Superior Court, there are special requirements for seeking extensions of deadlines to serve the summons and complaint and respond to the complaint (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1013937&cite=CRSFSCR3.1&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=GA&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=0B1FD07D6176E27749AD65DFED8888C1C01CA5E95F2348B9566BC1CE77869C02&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+CA R SAN FRANCISCO SUPER CT Rule 3.1
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000019_1}{\*\bkmkend co_anchor_a000019_1}
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Deadlines That May Be Extended
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+California courts have the discretion to extend deadlines in certain situations (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1054&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=BD03D9F9992B75642AC4FF570077E34E4A81E48EC445B0F418B93083257BCA10&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1054(a)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085224&cite=CASTALLCTR1.10&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=6D67B838426F19802D8A7FD75FF34AE817C6AA5EB1806188C448B3E3F873E1B8&contextData=(sc.Search)#co_pp_4b24000003ba5" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 1.10(c)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ and 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085225&cite=CATRCRTR2.20&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=2200315A98A2D507B70CF866A4FB54A3FEC43B766356ACF38254F7AA17F37C03&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+2.20
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+). Unless provided otherwise by orders in a specific case, a party may obtain an extension of time for any of the following:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls12 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls12 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Responding to or serving pleadings (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.110&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=693E60E7E7C6EB4A20208C3DB2D9FC7FC56F3B8758222AEE372130BA97631422&contextData=(sc.Search)#co_pp_7fdd00001ca15" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.110(e)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1054&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=BD03D9F9992B75642AC4FF570077E34E4A81E48EC445B0F418B93083257BCA10&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1054(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls13 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls13 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I51144d24e4c611e598dc8b09b4f043e0/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Law and motion
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ matters (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1103&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=2D2D672EBC8375C448957526CD388C1BBF2B7CE25593F08D1C9545F379D8AEFC&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.1103(b)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1054&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=BD03D9F9992B75642AC4FF570077E34E4A81E48EC445B0F418B93083257BCA10&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1054(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ (any act related to a service of notice)).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls14 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls14 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Any act to be performed by a party under the California Rules of Court (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085224&cite=CASTALLCTR1.10&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=6D67B838426F19802D8A7FD75FF34AE817C6AA5EB1806188C448B3E3F873E1B8&contextData=(sc.Search)#co_pp_4b24000003ba5" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 1.10(c)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085225&cite=CATRCRTR2.20&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=2200315A98A2D507B70CF866A4FB54A3FEC43B766356ACF38254F7AA17F37C03&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 2.20
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ (any act that \ldblquote is required by law\rdblquote )).
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000020_1}{\*\bkmkend co_anchor_a000020_1}
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Limits on Court\rquote s Power
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+A court\rquote s discretion to extend deadlines has limits. There are several key litigation acts for which extensions are unavailable even if a party requests the extension before the time to act expires.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+A party may not obtain an extension of time for any of the following:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls15 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls15 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Serving a 
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I0f9fe904ef0811e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+notice of appeal
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+. The time within which a party may file a notice of appeal is fixed by law. It cannot be enlarged by stipulation of the parties or by court order. (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1054&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=BD03D9F9992B75642AC4FF570077E34E4A81E48EC445B0F418B93083257BCA10&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1054(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+;
+}
+{\b0 \cf19 \f0 \i1 \fs18 
+{\b0 \cf19 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+ 
+}
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=2006927684&pubNum=0004040&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=RP&fi=co_pp_sp_4040_372&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=A6F98E11861D5CA1E2110118C014B2699507CCEA86EB915ACAD54F2360A1AD40&contextData=(sc.Search)#co_pp_sp_4040_372" }{\fldrslt 
+{\b0 \cf21 \f0 \i1 \fs18 
+{\b0 \cf21 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Maynard v. Brandon
+}
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 36 Cal. 4th 364, 372 (2005)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+;
+}
+{\b0 \cf19 \f0 \i1 \fs18 
+{\b0 \cf19 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+ 
+}
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=1909005852&pubNum=0000220&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=RP&fi=co_pp_sp_220_255&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=3A088D912789AAFB7142E45FEA60A8D495201B42F3DCD3C786071B1584F20876&contextData=(sc.Search)#co_pp_sp_220_255" }{\fldrslt 
+{\b0 \cf21 \f0 \i1 \fs18 
+{\b0 \cf21 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Land v. Johnston
+}
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 156 Cal. 253, 255 (1909)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \i1 \fs18 
+{\b0 \cf19 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+.
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+)
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls16 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls16 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Serving a notice of motion for a new trial (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS659&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=41C8299194397FA6D7E8FC1EDD2157A013D88729586A2FABC13D2AEC397C21EC&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f\u167\'3f 659(b)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ and 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1054&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=BD03D9F9992B75642AC4FF570077E34E4A81E48EC445B0F418B93083257BCA10&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+1054(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; see also 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=2006927684&pubNum=0004040&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=RP&fi=co_pp_sp_4040_372&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=A6F98E11861D5CA1E2110118C014B2699507CCEA86EB915ACAD54F2360A1AD40&contextData=(sc.Search)#co_pp_sp_4040_372" }{\fldrslt 
+{\b0 \cf21 \f0 \i1 \fs18 
+{\b0 \cf21 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Maynard
+}
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 36 Cal. 4th at 372
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls17 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls17 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Other acts for which specific statutory provisions prohibit certain extensions (for example, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1054&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=BD03D9F9992B75642AC4FF570077E34E4A81E48EC445B0F418B93083257BCA10&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1054(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ (extensions allowed \ldblquote unless otherwise expressly provided\rdblquote )).
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Even where a court can grant an extension, the duration of the extension may be limited. For example, for matters related to pleadings, preparation of bills of exceptions, and certain notices, a court may not grant an extension beyond 30 days without the consent of opposing counsel (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1054&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=BD03D9F9992B75642AC4FF570077E34E4A81E48EC445B0F418B93083257BCA10&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1054(a)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000021_1}{\*\bkmkend co_anchor_a000021_1}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs28 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs28 \sa0 \sb0 
+Prospective Deadline Extensions
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Seeking a deadline extension before the original time period has expired is the easiest way to obtain an extension. A party may secure a prospective deadline extension from the court or, in some cases, by stipulation with opposing counsel.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000022_1}{\*\bkmkend co_anchor_a000022_1}
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Grounds for Obtaining an Extension
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+When a party makes a request to extend certain deadlines before the original time period expires, the court may grant the extension:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls18 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls18 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+For good cause.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls19 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls19 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+With or without notice and consent.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+(
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1054&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=BD03D9F9992B75642AC4FF570077E34E4A81E48EC445B0F418B93083257BCA10&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1054(a)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085225&cite=CATRCRTR2.20&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=2200315A98A2D507B70CF866A4FB54A3FEC43B766356ACF38254F7AA17F37C03&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 2.20
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ and 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.110&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=693E60E7E7C6EB4A20208C3DB2D9FC7FC56F3B8758222AEE372130BA97631422&contextData=(sc.Search)#co_pp_7fdd00001ca15" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+3.110(e)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+.)
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Although extensions commonly require a showing of good cause, courts liberally apply the standard for good cause (see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=0431582872&pubNum=0103977&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=TS&docFamilyGuid=Ic77bddf3297e11e5a977f69f36ef3c17&fi=co_pp_sp_103977_9%3a361&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=121748BA247A24D8E00867B9FB48DA58874C1B38B4C6427396BF5ADC2FB3227C&contextData=(sc.Search)#co_pp_sp_103977_9:361" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Prac. Guide Civ. Pro. Before Trial Ch. 9(I)-F, 9:361
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (\rdblquote good cause\rdblquote  liberally construed for 
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I0f9fe5e5ef0811e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ex parte
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ extension request)).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000023_1}{\*\bkmkend co_anchor_a000023_1}
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Moving for an Extension
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Parties usually request deadline extensions by ex parte application, but, on occasion, need to make a noticed motion to obtain an extension.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000024_1}{\*\bkmkend co_anchor_a000024_1}
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs20 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb160 
+Ex Parte Application
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Before a deadline expires, a party may apply ex parte to extend a deadline by 30 days on a showing of good cause. This includes deadlines related to pleadings, bills of exceptions, or certain notices. The extension of time is not limited to pleading matters and can include law and motion matters. (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1103&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=2D2D672EBC8375C448957526CD388C1BBF2B7CE25593F08D1C9545F379D8AEFC&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.1103(b)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1054&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=BD03D9F9992B75642AC4FF570077E34E4A81E48EC445B0F418B93083257BCA10&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1054(a)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (any act related to a service of notice).)
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+California\rquote s definition of ex parte is more expansive than in federal court and some other state jurisdictions. In California, ex parte proceedings usually require that the adverse party be given minimal notice and an opportunity to respond. The moving party typically needs to give notice to all parties in the action by 10:00 a.m. on the court day before the moving party goes to court (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1203&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=4D39FC1870A60FD8BC4EAA9BED4C804A7AEDE5EE9B9B6E74F91607CC0851F029&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.1203(a)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+). Attorneys commonly give notice by calling or emailing opposing counsel. The moving party also must serve the ex parte application at the first reasonable opportunity (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1206&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=DB513ECB2C5F90BC6E02FB613592EAE3D2134EF8E71CDAB44560CC89B2A6354F&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.1206
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+). In exceptional circumstances, ex parte proceedings may be conducted without notice to and outside the presence of others impacted by the proceedings (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1203&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=4D39FC1870A60FD8BC4EAA9BED4C804A7AEDE5EE9B9B6E74F91607CC0851F029&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.1203(a)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+An ex parte application for an extension of time must:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls20 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls20 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Be heard and determined by the judge before whom the matter is pending unless that judge has died or is otherwise unavailable (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085225&cite=CATRCRTR2.20&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=2200315A98A2D507B70CF866A4FB54A3FEC43B766356ACF38254F7AA17F37C03&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 2.20(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls21 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls21 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Disclose in writing the nature of the case and what extensions, if any, the parties have obtained by court order or stipulation of counsel (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085225&cite=CATRCRTR2.20&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=2200315A98A2D507B70CF866A4FB54A3FEC43B766356ACF38254F7AA17F37C03&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 2.20(b)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls22 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls22 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Comply with the requirements of ex parte applications specified in 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1200&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=D989515E407F2C518D5B36FC0F4A13ACF22D33EE91FD9779B5EAB642457476B7&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+California Rules of Court, rule 3.1200
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ to 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1207&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=CD348865AFB078EC1A845585B20453B59258257E292DF7EC98191D60EA160B34&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+3.1207
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ and any individual rules of the superior court or judge pertaining to ex parte applications. Specifically, an ex parte application requires submission of:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls23 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls23 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+an application stating the relief requested;
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls24 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls24 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+a 
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I03f4d949eee311e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+declaration
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+ stating the factual showing required;
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls25 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls25 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+a declaration based on personal knowledge stating the notice given;
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls26 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls26 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+a memorandum of points and authorities; and
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls27 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls27 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+a proposed order.
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+(
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1201&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=394108C51E0EDCDD9B09C1DCB140B777C332965AB963970525AC0A8036ECFC30&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.1201
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb340 
+.)
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Counsel must serve any order extending time within 
+}
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+24 hours
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ after the making of the order or within any time the court orders (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085225&cite=CATRCRTR2.20&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=2200315A98A2D507B70CF866A4FB54A3FEC43B766356ACF38254F7AA17F37C03&contextData=(sc.Search)#co_pp_4b24000003ba5" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 2.20(c)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+For more information on ex parte applications, see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I70e303dbde5911e698dc8b09b4f043e0/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Practice Note, Motion Practice: Ex Parte Applications (CA)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+. For a sample ex parte application, see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/Ia374c35c96d011e698dc8b09b4f043e0/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Standard Document, Ex Parte Application (CA)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000025_1}{\*\bkmkend co_anchor_a000025_1}
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs20 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb160 
+On Notice
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+If time permits (or the rules require it), a party may also request a deadline extension by a noticed motion.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+In some cases, a noticed motion 
+}
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+is required
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ to extend a deadline. For example, a party must make a noticed motion to extend the time to respond to any of the following:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls28 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls28 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I42995f2c136111e498db8b09b4f043e0/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Interrogatories
+}}}
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2030.260&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=D04F8E12D524A6F45CF7ADCB5321AC57B15226C9359EE3D95CD1341A3C93FF9E&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 2030.260(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls29 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls29 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I4299843e136111e498db8b09b4f043e0/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Requests for production
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ of documents and other tangible objects (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2031.260&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=99F2BE3AEF0BF599A0A7986A61CA0542627E4357D8D3609B991D49F440713770&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 2031.260(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls30 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls30 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I42998500136111e498db8b09b4f043e0/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Requests for admission
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2033.250&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=D084C1907A76F89A8B8F28AB8A5E71466413790D12C8A1B425C1BF6D0D5217D7&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 2033.250(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The court 
+}
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+does not
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ grant this relief on an ex parte basis. The rules provide that the court may grant ex parte relief to a party seeking to limit the number of parties to be served with interrogatories (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2030.260&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=D04F8E12D524A6F45CF7ADCB5321AC57B15226C9359EE3D95CD1341A3C93FF9E&contextData=(sc.Search)#co_pp_4b24000003ba5" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 2030.260(c)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+). However, the discovery statutes do not explicitly provide for ex parte relief with the extension of other deadlines, so the assumption is that the motion must be noticed.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The noticed motion for a deadline extension should:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls31 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls31 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Be heard and determined by the judge before whom the matter is pending unless that judge has died or is otherwise unavailable (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085225&cite=CATRCRTR2.20&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=2200315A98A2D507B70CF866A4FB54A3FEC43B766356ACF38254F7AA17F37C03&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 2.20(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls32 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls32 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Disclose in writing the nature of the case and what extensions, if any, the parties have obtained by court order or stipulation of counsel (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085225&cite=CATRCRTR2.20&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=2200315A98A2D507B70CF866A4FB54A3FEC43B766356ACF38254F7AA17F37C03&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 2.20(b)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls33 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls33 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Follow the requirements of a noticed motion under 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1005&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=134771FEC4BA4DCD3421EEC3A7EE9BEB0C9E3E2F9EC30BB18543B4473A824F61&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+California Code of Civil Procedure Section 1005
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1110&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=DE53D79BCB8DD36D0005FE38552AEE977FC4816DB4A56392B31E99D44D8DFED2&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.1110
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ to 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1116&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=1658858ACA6289C9B8992355B6F14B6664ECE62F4B45BDEC2DADD34ACA50FA90&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+3.1116
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ and 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1300&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=BDDD1CEB353B79F5EDFBD9CED0B057D5C437998DCF6A97C69CAA6B18F1E9805B&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.1300
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ to 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1312&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=7296391D19F43FC31A7A36556B3B9147844A74C2EA584CFB61E4321F9135AF3F&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+3.1312
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ (general motion requirements, explanation of motion, and required documents for motion)). Specifically, a noticed motion requires:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls34 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls34 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+the motion itself;
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls35 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls35 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+a notice of hearing on the motion; and
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls36 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls36 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+a memorandum in support of the motion.
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+(
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1112&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=30FC233B1B684AB2BE4B7655C6A96BA53F452507ECA4EE8AB4208C96168993EC&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.1112(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb340 
+.)
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Depending on the type of motion and the court\rquote s and judge\rquote s rules, counsel may need to file certain additional documents with the court. These additional documents may include, for example, declarations, affidavits, exhibits, requests for judicial notice, and proposed orders. For more information on how to draft motion papers, see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/Iee7d305f6c3711e598dc8b09b4f043e0/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Practice Note, Motion Practice: Drafting the Motion Papers (CA)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+If there is not enough time to hear a noticed motion, counsel may file an ex parte application to hear the motion on an expedited basis (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1200&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=D989515E407F2C518D5B36FC0F4A13ACF22D33EE91FD9779B5EAB642457476B7&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.1200
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ to 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1207&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=CD348865AFB078EC1A845585B20453B59258257E292DF7EC98191D60EA160B34&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+3.1207
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Counsel must serve any order extending time within 24 hours after the making of the order or within any time the court orders (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085225&cite=CATRCRTR2.20&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=2200315A98A2D507B70CF866A4FB54A3FEC43B766356ACF38254F7AA17F37C03&contextData=(sc.Search)#co_pp_4b24000003ba5" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 2.20(c)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000026_1}{\*\bkmkend co_anchor_a000026_1}
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Stipulating to an Extension
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Parties may stipulate to extend certain deadlines, although some stipulations require filing or court approval (for example, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1054&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=BD03D9F9992B75642AC4FF570077E34E4A81E48EC445B0F418B93083257BCA10&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1054(b)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.110&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=693E60E7E7C6EB4A20208C3DB2D9FC7FC56F3B8758222AEE372130BA97631422&contextData=(sc.Search)#co_pp_5ba1000067d06" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.110(d)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+In some cases, the courts encourage parties to stipulate to alleviate the burden of asking permission of the court (for example, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1013803&cite=CARLASUPCTR3.26&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=GA&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=635C09C798243C7F8FEF1689E793665A24C81B1CADEA4ECE10D2EAB85E8AD6E9&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+CA R LOS ANGELES SUPER CT Rule 3.26
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ and 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1092572&cite=CARLASUPCTAPP3.A&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=GA&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=CA3F6403EBC48CA4E35284ECEC1EC1E9B9DFEE051492B7306E46C2350D1D82E0&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+CA R LOS ANGELES SUPER CT Appendix 3.A(a)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+). In Los Angeles Superior Court, the court rules recommend that counsel grant as a matter of courtesy the first request for a reasonable extension of time to respond to litigation deadlines \ldblquote relating to pleadings, discovery or motions,\rdblquote  unless time is of the essence (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1092572&cite=CARLASUPCTAPP3.A&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=GA&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=CA3F6403EBC48CA4E35284ECEC1EC1E9B9DFEE051492B7306E46C2350D1D82E0&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+CA R LOS ANGELES SUPER CT Appendix 3.A(a)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Attorneys who think they cannot meet a deadline should ask opposing counsel to voluntarily agree to extend the deadline before the expiration of the original time period (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1054&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=BD03D9F9992B75642AC4FF570077E34E4A81E48EC445B0F418B93083257BCA10&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1054(b)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.110&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=693E60E7E7C6EB4A20208C3DB2D9FC7FC56F3B8758222AEE372130BA97631422&contextData=(sc.Search)#co_pp_5ba1000067d06" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.110(d)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Counsel should check the statutory and case law and the court rules regarding the particular case to ensure that counsel meet all the requirements when seeking a deadline extension by stipulation.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000033_1}{\*\bkmkend co_anchor_a000033_1}
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs20 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb160 
+Stipulations Between the Parties
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The parties may stipulate to extend the deadlines without court involvement for any of the following: 
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls37 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls37 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Acts related to the pleadings, preparation of bills of exception, or to the service of certain notices (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1054&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=BD03D9F9992B75642AC4FF570077E34E4A81E48EC445B0F418B93083257BCA10&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1054
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls38 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls38 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+A responsive pleading, provided that the extension is for no more than 15 days beyond the 30-day time period after the plaintiff serves the complaint (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.110&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=693E60E7E7C6EB4A20208C3DB2D9FC7FC56F3B8758222AEE372130BA97631422&contextData=(sc.Search)#co_pp_5ba1000067d06" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.110(d)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000211&cite=CAGTS68616&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=7E5AAA7147C4AE86B9B99426BA0B95B436ABEC37C5AC6A00B9827E696B267906&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Gov\rquote t Code \u167\'3f 68616(b)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls39 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls39 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Responding to:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls40 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls40 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+interrogatories (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2030.270&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=8AEDA1AC46CF7500C56246587F874A98E4C97E929229BFDFF4C00C8BF9804974&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 2030.270
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+);
+\par {\pntext }
+}
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls41 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls41 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+requests for documents or tangible items (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2031.270&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=65589EDBDD7445FED156D02142F43F2B739DCEA2FB589ACD92D00000BC8847AD&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 2031.270
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+); or
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls42 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls42 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+requests for admission (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2033.260&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=677F62C2F3094C8BEA06E4E281454EAD4629DF8C7602093F52D65F9766FB255E&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 2033.260
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+).
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls43 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls43 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Filing a motion to compel further discovery responses (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2030.300&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=D6D8CD2019EF71DA1B336C638206B82594A2B070A6B97A3952034FA30D71FA63&contextData=(sc.Search)#co_pp_4b24000003ba5" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f\u167\'3f 2030.300(c)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2031.310&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=8DB64F6B82263F2E675A94AF4EF67D5DA1AD059E69AE2AF0405BE56BFC618660&contextData=(sc.Search)#co_pp_4b24000003ba5" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+2031.310(c)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, and 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2033.290&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=B08CC39993C7A91DE902FB8677C10E5BF35D560957866BD9E7D4048FBCF3EF07&contextData=(sc.Search)#co_pp_4b24000003ba5" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+2033.290(c)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+). Counsel should be careful to obtain an agreement to extend time because a court likely cannot grant similar relief (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2030.300&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=D6D8CD2019EF71DA1B336C638206B82594A2B070A6B97A3952034FA30D71FA63&contextData=(sc.Search)#co_pp_4b24000003ba5" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f\u167\'3f 2030.300(c)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2031.310&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=8DB64F6B82263F2E675A94AF4EF67D5DA1AD059E69AE2AF0405BE56BFC618660&contextData=(sc.Search)#co_pp_4b24000003ba5" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+2031.310(c)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, and 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2033.290&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=B08CC39993C7A91DE902FB8677C10E5BF35D560957866BD9E7D4048FBCF3EF07&contextData=(sc.Search)#co_pp_4b24000003ba5" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+2033.290(c)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ (noting that a right to a motion to compel is waived unless agreement is reached with the opposing party)).
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Although a stipulation to extend a deadline must be in writing, attorneys commonly memorialize the agreement in a letter or email to opposing counsel when they do not need to file the stipulation. This is especially true for stipulations related to discovery (for example, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2030.270&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=8AEDA1AC46CF7500C56246587F874A98E4C97E929229BFDFF4C00C8BF9804974&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 2030.270(b)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+ (agreement may be informal, but in writing)).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000034_1}{\*\bkmkend co_anchor_a000034_1}
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs20 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb160 
+Filed Stipulations
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+When agreeing to certain extensions, the parties must file their stipulation. In some situations, stipulations must be approved by the court. This typically occurs when a local rule or judge\rquote s rule requires filing or approval or when the parties seek to alter a court-ordered deadline.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+For example, the parties must file the stipulation (but need not obtain court approval) if, within 30 days of service of the responsive pleadings, the parties stipulate to a single continuance of a proceeding for no more than 30 days (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000211&cite=CAGTS68616&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=7E5AAA7147C4AE86B9B99426BA0B95B436ABEC37C5AC6A00B9827E696B267906&contextData=(sc.Search)#co_pp_5ba1000067d06" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Gov\rquote t Code \u167\'3f 68616(d)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+If there is any doubt about whether a given situation requires filing, counsel should contact the court.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000027_1}{\*\bkmkend co_anchor_a000027_1}
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Best Practices for Seeking a Prospective Deadline Extension
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Counsel should do the following to maximize the client\rquote s chances of receiving a deadline extension:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls44 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls44 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Request an extension 
+}
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+before
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ the time period expires, if possible.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls45 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls45 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Show diligence by seeking the extension as soon as they recognize the need for it.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls46 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls46 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Consult the court\rquote s local rules where the action is pending and the presiding judge\rquote s rules, if any.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls47 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls47 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Consider whether the parties may stipulate to extend time periods without an order from the court.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls48 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls48 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Seek a stipulation to extend time with court approval or an agreement not to oppose a request to extend time.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls49 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls49 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Be aware of limits on the court\rquote s power to extend a time period.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000028_1}{\*\bkmkend co_anchor_a000028_1}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs28 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs28 \sa0 \sb0 
+Retroactive Deadline Extensions
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Counsel should try to avoid requesting an extension of time after the original time period has expired because the options for counsel are much more limited after expiration of a deadline.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+In general, the court may not grant an extension after expiration of a statutory deadline (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1054&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=BD03D9F9992B75642AC4FF570077E34E4A81E48EC445B0F418B93083257BCA10&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1054
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (statute does not specify that an extension may be sought after the time has expired unlike the similar federal rule, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000600&cite=USFRCPR6&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=D90CC8D0A0A338BDD785F62B04F378591489090DF68ABABC693230EEC621B9BB&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Fed. R. Civ. P. 6(b)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+); 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=1931130078&pubNum=0000221&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=RP&fi=co_pp_sp_221_127&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C4D3B846E0C4156757EAEBE0DFB6C62B5627C8AE59FF294D180A3F6E57978E94&contextData=(sc.Search)#co_pp_sp_221_127" }{\fldrslt 
+{\b0 \cf21 \f0 \i1 \fs18 
+{\b0 \cf21 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Coast Elec. Serv. v. Jensen
+}
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 111 Cal. App. 124, 127 (1931)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (\rdblquote the court loses jurisdiction to extend time upon the expiration of the statutory period within which the act may have been done\rdblquote ); 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=1901005327&pubNum=0000220&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=RP&fi=co_pp_sp_220_50&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=50209996BD57D5F98C5E865718E378B85AF1ADAFCF0277A8C5346045D6305172&contextData=(sc.Search)#co_pp_sp_220_50" }{\fldrslt 
+{\b0 \cf21 \f0 \i1 \fs18 
+{\b0 \cf21 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Freese v. Freese
+}
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 134 Cal. 48, 50 (1901)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (time to act had expired and thus judge had no authority to extend time)).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+In limited circumstances, counsel may apply under 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS473&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C0DFE7B98E9836962CFF9A878968D8330C8172CC605F8F100631BF42AB4087CA&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+California Code of 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Civil
+}
+}
+{\b0 \cf21 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ Procedure Section 473
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ to extend a 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ after time has expired (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS473&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C0DFE7B98E9836962CFF9A878968D8330C8172CC605F8F100631BF42AB4087CA&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 473(a)(1)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\b0 \cf19 \f0 \i1 \fs18 
+{\b0 \cf19 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Cornell Univ. Med. Coll. v. Super. Ct.
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 38 Cal. App. 3d 311, 315-16 (1974)).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000029_1}{\*\bkmkend co_anchor_a000029_1}
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Grounds for Obtaining a Retroactive Extension
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Even if a party makes the required showing, the court generally has discretion whether to grant a retroactive extension. In limited circumstances, however, the court must grant an extension retroactively.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000030_1}{\*\bkmkend co_anchor_a000030_1}
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs20 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb160 
+Mandatory Retroactive Extensions
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The court must grant a retroactive extension when an attorney:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls50 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls50 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Attempts to set aside a default or a dismissal that has the effect of a default.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls51 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls51 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Shows by affidavit or declaration that the default or dismissal was the attorney\rquote s fault. Specifically, the affidavit or declaration must show the attorney\rquote s:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls52 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls52 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+mistake;
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls53 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls53 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+inadvertence;
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls54 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls54 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+surprise; or
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls55 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls55 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+neglect (any neglect, it does not have to be \ldblquote excusable\rdblquote ).
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+(
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS473&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C0DFE7B98E9836962CFF9A878968D8330C8172CC605F8F100631BF42AB4087CA&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 473(b)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I79639a4394de11e8a5b3e3d9e23d7429/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)#co_anchor_a349130" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Practice Note, Default Judgment: Vacating the Judgment (CA): Mandatory Motion to Vacate for Attorney Mistake
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+.)
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+In addition to all the usual motion requirements (see 
+}
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000032_1" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Application For A Retroactive Extension
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+) this type of motion must state that the attorney seeks mandatory relief under 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS473&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C0DFE7B98E9836962CFF9A878968D8330C8172CC605F8F100631BF42AB4087CA&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Section 473(b)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=2003287491&pubNum=0004041&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=RP&fi=co_pp_sp_4041_1125&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=D0EEB1A7C1C475B4AE1570CF2A626F300C7D5BC1D5BA392C8FFA982856FB672D&contextData=(sc.Search)#co_pp_sp_4041_1125" }{\fldrslt 
+{\b0 \cf21 \f0 \i1 \fs18 
+{\b0 \cf21 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Luri v. Greenwald
+}
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 107 Cal. App. 4th 1119, 1125 (2003)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Mandatory relief under 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS473&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C0DFE7B98E9836962CFF9A878968D8330C8172CC605F8F100631BF42AB4087CA&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Section 473(b) of the Code of Civil Procedure
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ includes defaults entered by the trial court, even though the statute specifies defaults entered by the clerk (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=1995236887&pubNum=0004041&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=RP&fi=co_pp_sp_4041_998&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=5A5BA465BEC86852E4C87F39F03AE80714C0C74A3B364853BBE7C685A76AFFD4&contextData=(sc.Search)#co_pp_sp_4041_998" }{\fldrslt 
+{\b0 \cf21 \f0 \i1 \fs18 
+{\b0 \cf21 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Lorenz v. Commercial Acceptance Ins. Co.
+}
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 40 Cal. App. 4th 981, 998-99 (1995)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (mandatory relief granted but noting many cases where mandatory relief denied); 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=2041451351&pubNum=0007053&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=RP&fi=co_pp_sp_7053_998&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=5CA7DC0D14C544324786C535D2A4BE8C6351B2F254020BCB027D07F1C8140D93&contextData=(sc.Search)#co_pp_sp_7053_998" }{\fldrslt 
+{\b0 \cf21 \f0 \i1 \fs18 
+{\b0 \cf21 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Urban Wildlands Group, Inc. v. City of Los Angeles
+}
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 10 Cal. App. 5th 993, 998-1001 (2017)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (mandatory relief under 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS473&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C0DFE7B98E9836962CFF9A878968D8330C8172CC605F8F100631BF42AB4087CA&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Section 473(b)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ based on an attorney\rquote s affidavit of fault does not apply unless there has been an actual default, 
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I3a9a0bcfef1211e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+default judgment
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, or dismissal)).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000031_1}{\*\bkmkend co_anchor_a000031_1}
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs20 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb160 
+Discretionary Extensions
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The court may grant a retroactive extension in situations that are neither eligible for mandatory relief nor covered by a subject-specific statute. A court has discretion to grant a party relief from a \ldblquote judgment, dismissal, order or other proceeding\rdblquote  taken against the party if the court determines:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls56 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls56 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+That it would be just to provide relief.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls57 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls57 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+One of the following circumstances exist:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls58 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls58 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+mistake;
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls59 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls59 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+inadvertence,
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls60 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls60 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+surprise; or
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls61 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls61 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+excusable neglect.
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+(
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS473&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C0DFE7B98E9836962CFF9A878968D8330C8172CC605F8F100631BF42AB4087CA&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 473(b)
+}}}
+}
+{\b0 \cf19 \f0 \i1 \fs18 
+{\b0 \cf19 \f0 \i1 \fs18 
+{\b0 \cf19 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+.
+}
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+)
+\par 
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Unlike a mandatory extension, a discretionary extension is not limited to a default or dismissal. A \ldblquote proceeding,\rdblquote  as used in 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS473&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C0DFE7B98E9836962CFF9A878968D8330C8172CC605F8F100631BF42AB4087CA&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Section 473(b)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, incorporates \ldblquote [a]ll the steps or measures adopted in the prosecution or defense of an action.\rdblquote  (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=2006927684&pubNum=0004040&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=RP&fi=co_pp_sp_4040_372&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=A6F98E11861D5CA1E2110118C014B2699507CCEA86EB915ACAD54F2360A1AD40&contextData=(sc.Search)#co_pp_sp_4040_372" }{\fldrslt 
+{\b0 \cf21 \f0 \i1 \fs18 
+{\b0 \cf21 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Maynard
+}
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 36 Cal. 4th at 372
+}}}
+{\b0 \cf19 \f0 \i1 \fs18 
+{\b0 \cf19 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+.
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+)
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Counsel need not be at fault for a discretionary extension. The error may be anyone\rquote s. However, any neglect must be excusable. Ordinary neglect is insufficient.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+For example, courts awarded discretionary retroactive extensions in the following types of cases:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls62 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls62 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Untimely filing of cost bills (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=1933120260&pubNum=0000221&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=RP&fi=co_pp_sp_221_592&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=616170E868EFB218E3A868D4DD9918776A3683FD006ABEB6B7B8CE874D914580&contextData=(sc.Search)#co_pp_sp_221_592" }{\fldrslt 
+{\b0 \cf21 \f0 \i1 \fs18 
+{\b0 \cf21 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Soda v. Marriott
+}
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 130 Cal. App. 589, 592-94 (1933)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ (mistake and inadvertence excused when attorney wholly unfamiliar with case filed cost bills 24 days late after lead attorney was appointed to the bench)).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls63 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls63 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Filing petition for writ of mandate after time for filing lapsed (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=1974103802&pubNum=0000226&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=RP&fi=co_pp_sp_226_314&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=39A686BFE69A031E919B1EEBD766367C09E2F68536F0E61F16E8232D41C1A00F&contextData=(sc.Search)#co_pp_sp_226_314" }{\fldrslt 
+{\b0 \cf21 \f0 \i1 \fs18 
+{\b0 \cf21 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Cornell Univ. Med. Coll.
+}
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 38 Cal. App. 3d at 314-15
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ (permitting extension of time where statutory deadline was not jurisdictional and messenger inadvertently delivered writ to federal appellate court)).
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Even if a party makes the required showing, the court lacks discretion to grant relief if another statute specifically governs a particular proceeding. For example, where the Discovery Act expressly authorizes relief for some types of discovery-related proceedings, a court lacks the authority to grant relief under 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS473&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C0DFE7B98E9836962CFF9A878968D8330C8172CC605F8F100631BF42AB4087CA&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Section 473(b)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=1991179087&pubNum=0000226&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=RP&fi=co_pp_sp_226_1104&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=FA5DEB485EC6B17D5F651E3831DDE4079CFDEC881F94F53FB54FA1B7BC6C189E&contextData=(sc.Search)#co_pp_sp_226_1104" }{\fldrslt 
+{\b0 \cf21 \f0 \i1 \fs18 
+{\b0 \cf21 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Zellerino v. Brown
+}
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 235 Cal. App. 3d 1097
+}
+{\b0 \cf21 \f0 \i1 \fs18 
+{\b0 \cf21 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+, 
+}
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+1104-07, 1109 (1991)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+ (granting discretionary relief from issuance of untimely early demand for expert witness disclosure but noting that other discovery related proceedings are governed by the Discovery Act)).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000032_1}{\*\bkmkend co_anchor_a000032_1}
+\par 
+}
+{\b1 \cf20 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Application for a Retroactive Extension
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Counsel seeking a 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ extension under 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS473&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C0DFE7B98E9836962CFF9A878968D8330C8172CC605F8F100631BF42AB4087CA&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Section 473(b) of the California Code of 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Civil
+}
+}
+{\b0 \cf21 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ Procedure
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ after the time has expired must:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls64 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls64 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Follow the requirements of a noticed motion under 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1005&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=134771FEC4BA4DCD3421EEC3A7EE9BEB0C9E3E2F9EC30BB18543B4473A824F61&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+California Code of 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat28 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Civil
+}
+}
+{\b0 \cf21 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ Procedure Section 1005
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1110&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=DE53D79BCB8DD36D0005FE38552AEE977FC4816DB4A56392B31E99D44D8DFED2&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.1110
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ to 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1116&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=1658858ACA6289C9B8992355B6F14B6664ECE62F4B45BDEC2DADD34ACA50FA90&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+3.1116
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1300&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=BDDD1CEB353B79F5EDFBD9CED0B057D5C437998DCF6A97C69CAA6B18F1E9805B&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.1300
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ to 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.1312&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=7296391D19F43FC31A7A36556B3B9147844A74C2EA584CFB61E4321F9135AF3F&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+3.1312
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; see also 
+}
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000025_1" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+On Notice
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+). At least one court has held that a party must apply for relief under 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS473&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C0DFE7B98E9836962CFF9A878968D8330C8172CC605F8F100631BF42AB4087CA&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+California Code of Civil Procedure Section 473(b)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ by noticed motion (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=2006436441&pubNum=0004041&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=RP&fi=co_pp_sp_4041_341&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=FFFADF6B3A5EAF32E6F9FE88A670DCAEB6E8ECE753C3CCD890D55EEB7B337AD6&contextData=(sc.Search)#co_pp_sp_4041_341" }{\fldrslt 
+{\b0 \cf21 \f0 \i1 \fs18 
+{\b0 \cf21 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Arambula v. Union Carbide Corp.
+}
+}
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 128 Cal. App. 4th 333, 341-42, 345-46 (2005)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls65 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls65 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Include evidence of one of the following:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls66 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls66 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+mistake, inadvertence, surprise, or neglect in the form of an \ldblquote attorney affidavit of fault\rdblquote  (when seeking mandatory relief); or
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls67 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls67 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+mistake, inadvertence, surprise, or 
+}
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+excusable
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+ neglect in the form of a declaration (when seeking discretionary relief).
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls68 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls68 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Include a copy of the proposed answer, additional pleading, or other papers.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls69 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls69 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Seek the relief:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls70 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls70 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+within a reasonable time, but in no case later than 
+}
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+six months,
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+ after the judgment, dismissal, order, or proceeding at issue occurs, if applying for discretionary relief; or
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls71 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls71 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+no more than 
+}
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+six months
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+ after entry of judgment, if applying for a mandatory extension. Entry of judgment may occur after the default or dismissal giving rise to the motion.
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+(
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS473&originatingDoc=Iba840d956d0811e598dc8b09b4f043e0&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C0DFE7B98E9836962CFF9A878968D8330C8172CC605F8F100631BF42AB4087CA&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf21 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 473(b)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+.)
+\par 
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+}
+}
+}
+}\sect }

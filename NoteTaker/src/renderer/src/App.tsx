@@ -8,7 +8,7 @@ import { useNoteStore } from './store/useNoteStore'
 import clsx from 'clsx'
 
 function App(): JSX.Element {
-  const { setPdf, loadFromState, openFiles, fileStates, currentFilePath, hasLoaded, setOcrStatus, isSaving, setIsSaving } = useNoteStore()
+  const { setPdf, loadFromState, openFiles, fileStates, currentFilePath, hasLoaded, setOcrStatus, isSaving, setIsSaving, zoom, setZoom } = useNoteStore()
   const [bridgeStatus, setBridgeStatus] = useState<'waiting' | 'ready' | 'missing'>(
     (window as any).api ? 'ready' : 'waiting'
   )
@@ -77,9 +77,19 @@ function App(): JSX.Element {
       const fileName = (parts && parts.length > 0) ? (parts.pop() || 'document.pdf') : 'document.pdf';
       setPdf(path, fileName, path);
     }
-    
+
     // @ts-ignore
     window.loadPdfExternal = window.setPdfExternal;
+
+    // Handle PDF zoom from PyQt (Ctrl+Wheel intercepted at browser level)
+    // @ts-ignore
+    window.handlePdfZoom = (direction: number) => {
+      const currentZoom = useNoteStore.getState().zoom;
+      const delta = direction > 0 ? 0.1 : -0.1;
+      const newZoom = Math.min(Math.max(currentZoom + delta, 0.5), 3.0);
+      const finalZoom = parseFloat(newZoom.toFixed(2));
+      setZoom(finalZoom);
+    };
 
     const handleBridgeReady = () => {
       console.log("App: bridge-ready event received");

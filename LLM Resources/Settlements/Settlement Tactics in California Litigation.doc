@@ -1,0 +1,4104 @@
+{\rtf1 \ansi 
+{\colortbl;
+\red0\green0\blue0;
+\red255\green255\blue255;
+\red255\green0\blue0;
+\red0\green255\blue0;
+\red0\green0\blue255;
+\red0\green255\blue255;
+\red255\green0\blue255;
+\red255\green255\blue0;
+\red0\green0\blue128;
+\red0\green128\blue128;
+\red0\green128\blue0;
+\red128\green0\blue128;
+\red128\green0\blue0;
+\red128\green128\blue0;
+\red128\green128\blue128;
+\red192\green192\blue192;
+\red170\green170\blue170;
+\red85\green85\blue85;
+\red31\green31\blue31;
+\red0\green111\blue196;
+\red33\green33\blue33;
+\red37\green37\blue37;
+\red214\green214\blue214;
+\red119\green119\blue119;
+\red80\green80\blue80;
+\red21\green137\blue21;
+\red204\green204\blue204;
+\red247\green247\blue247;
+\red151\green151\blue151;
+\red218\green218\blue218;
+\red107\green107\blue106;
+\red232\green233\blue232;
+\red255\green255\blue174;
+\red86\green86\blue86;
+\red183\green242\blue206;
+\red255\green210\blue183;
+\red182\green231\blue243;
+\red221\green195\blue236;
+\red246\green246\blue246;
+\red255\green255\blue102;
+\red249\green249\blue249;
+\red61\green61\blue61;
+\red0\green114\blue54;
+\red106\green144\blue39;
+\red56\green124\blue43;
+\red255\green248\blue96;
+\red112\green112\blue112;
+\red240\green240\blue240;
+\red20\green93\blue164;
+\red105\green105\blue105;
+\red255\green204\blue153;
+\red14\green86\blue140;
+\red187\green187\blue187;
+\red228\green231\blue232;
+\red153\green255\blue102;
+\red181\green79\blue104;
+\red229\green244\blue255;
+\red0\green93\blue162;
+\red250\green250\blue250;
+\red70\green70\blue70;
+\red250\green222\blue100;
+\red61\green61\blue60;
+\red188\green41\blue30;
+\red23\green94\blue146;
+\red227\green232\blue250;
+\red70\green70\blue68;
+\red190\green237\blue228;
+\red29\green115\blue102;
+\red223\green223\blue223;
+\red239\green239\blue239;
+\red255\green255\blue198;
+\red236\green236\blue236;
+\red71\green120\blue194;
+\red255\green255\blue204;
+\red255\green204\blue0;
+\red153\green153\blue153;
+\red203\green203\blue203;
+\red240\green248\blue255;
+\red127\green127\blue127;
+\red229\green243\blue255;
+\red179\green218\blue255;
+\red185\green185\blue185;
+\red245\green245\blue245;
+\red68\green68\blue68;
+\red255\green194\blue211;
+\red238\green238\blue238;
+\red190\green190\blue252;
+\red233\green233\blue233;
+\red220\green220\blue220;
+\red186\green186\blue186;
+\red227\green227\blue227;
+\red249\green250\blue251;
+\red239\green122\blue2;
+}
+{\fonttbl {
+\f0 Arial;}{
+\f1 Symbol;}{
+\f2 Times New Roman;}{
+\f3 Georgia;}{
+\f4 sans-serif;}{
+\f5 Source Sans Pro;}{
+\f6 serif;}
+}
+{\*\generator Apache XML Graphics RTF Library;}
+\fet0 \ftnbj 
+{\*\listtable
+{\list\listtemplateid-1223465519\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-448677515}
+{\list\listtemplateid-860215830\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-2001806831}
+{\list\listtemplateid485525163\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid845639053}
+{\list\listtemplateid-1791652377\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1543111846}
+{\list\listtemplateid1465090214\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1729757577}
+{\list\listtemplateid-1954463044\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid823376641}
+{\list\listtemplateid173681183\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid200461472}
+{\list\listtemplateid2133939038\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1739952480}
+{\list\listtemplateid-1495811665\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-107976208}
+{\list\listtemplateid1945676899\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1975807331}
+{\list\listtemplateid1202226372\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1658723098}
+{\list\listtemplateid905185969\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid462761234}
+{\list\listtemplateid90870637\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1213056994}
+{\list\listtemplateid1705305463\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid731949902}
+{\list\listtemplateid-116712076\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-30871271}
+{\list\listtemplateid39617377\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1923720986}
+{\list\listtemplateid-1274657615\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1003180477}
+{\list\listtemplateid690401031\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-95719779}
+{\list\listtemplateid-180903779\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid323943260}
+{\list\listtemplateid-884556123\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1738294565}
+{\list\listtemplateid-672174299\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1709711237}
+{\list\listtemplateid827384593\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-327047825}
+{\list\listtemplateid-1041662272\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-745871952}
+{\list\listtemplateid303362537\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1836063707}
+{\list\listtemplateid1493181891\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-293717153}
+{\list\listtemplateid640622347\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid2078471847}
+{\list\listtemplateid-867771661\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1517747584}
+{\list\listtemplateid1969641802\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-386506226}
+{\list\listtemplateid-1830993061\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1973861867}
+{\list\listtemplateid424099421\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1369532819}
+{\list\listtemplateid1451542880\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1637563670}
+{\list\listtemplateid65395226\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid447101529}
+{\list\listtemplateid1309675794\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid825267093}
+{\list\listtemplateid564110564\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1347016021}
+{\list\listtemplateid-1520116284\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid357945891}
+{\list\listtemplateid1012561250\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid475476611}
+{\list\listtemplateid1530805470\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid2038895474}
+{\list\listtemplateid-1521198735\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1841872784}
+{\list\listtemplateid-244971023\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1143302085}
+{\list\listtemplateid1399032411\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-547875185}
+{\list\listtemplateid2012880907\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1148028575}
+{\list\listtemplateid-976949176\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid580373521}
+{\list\listtemplateid-2134717364\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1139484586}
+{\list\listtemplateid982182132\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1634761344}
+{\list\listtemplateid-639281735\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1586246078}
+{\list\listtemplateid983909794\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1664632419}
+{\list\listtemplateid412528207\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid610776657}
+{\list\listtemplateid-275336112\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1494863328}
+{\list\listtemplateid-635461285\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-32649723}
+{\list\listtemplateid1736116267\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1059178626}
+{\list\listtemplateid-1530588408\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1234250091}
+{\list\listtemplateid-834333371\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid185981501}
+{\list\listtemplateid-1069800135\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1734018392}
+{\list\listtemplateid-1638788220\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid932037806}
+{\list\listtemplateid-1887742568\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1530690360}
+{\list\listtemplateid-103039779\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-177001050}
+{\list\listtemplateid-1724454673\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-927251200}
+{\list\listtemplateid1370593986\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1524156905}
+{\list\listtemplateid-1033357386\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1959292942}
+{\list\listtemplateid1999976152\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-841813966}
+{\list\listtemplateid1545908204\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-817573660}
+{\list\listtemplateid1864114925\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1676158854}
+{\list\listtemplateid-1258119126\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1615253678}
+{\list\listtemplateid993397801\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-3273863}
+{\list\listtemplateid1536630772\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-642026477}
+{\list\listtemplateid983846274\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1823226260}
+{\list\listtemplateid1014606162\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1393517381}
+{\list\listtemplateid1154725237\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1093818137}
+{\list\listtemplateid669988767\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-647708351}
+{\list\listtemplateid-882871566\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid790410256}
+{\list\listtemplateid187170720\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-311808032}
+{\list\listtemplateid-719889001\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1693919950}
+{\list\listtemplateid-1810361129\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-202120383}
+{\list\listtemplateid-1211691743\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-2073587594}
+{\list\listtemplateid-291205095\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1533102375}
+{\list\listtemplateid-87657441\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1317601558}
+{\list\listtemplateid-2090595490\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid2079260048}
+{\list\listtemplateid-1740770841\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-706236936}
+{\list\listtemplateid-456489257\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1384013475}
+{\list\listtemplateid-224718898\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-2066931477}
+{\list\listtemplateid-2071590074\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1596988618}
+}
+{\*\listoverridetable
+{\*\listoverride{\listid-448677515\listoverridecount0\ls1}}
+{\*\listoverride{\listid-2001806831\listoverridecount0\ls2}}
+{\*\listoverride{\listid845639053\listoverridecount0\ls3}}
+{\*\listoverride{\listid-1543111846\listoverridecount0\ls4}}
+{\*\listoverride{\listid1729757577\listoverridecount0\ls5}}
+{\*\listoverride{\listid823376641\listoverridecount0\ls6}}
+{\*\listoverride{\listid200461472\listoverridecount0\ls7}}
+{\*\listoverride{\listid-1739952480\listoverridecount0\ls8}}
+{\*\listoverride{\listid-107976208\listoverridecount0\ls9}}
+{\*\listoverride{\listid1975807331\listoverridecount0\ls10}}
+{\*\listoverride{\listid-1658723098\listoverridecount0\ls11}}
+{\*\listoverride{\listid462761234\listoverridecount0\ls12}}
+{\*\listoverride{\listid1213056994\listoverridecount0\ls13}}
+{\*\listoverride{\listid731949902\listoverridecount0\ls14}}
+{\*\listoverride{\listid-30871271\listoverridecount0\ls15}}
+{\*\listoverride{\listid1923720986\listoverridecount0\ls16}}
+{\*\listoverride{\listid1003180477\listoverridecount0\ls17}}
+{\*\listoverride{\listid-95719779\listoverridecount0\ls18}}
+{\*\listoverride{\listid323943260\listoverridecount0\ls19}}
+{\*\listoverride{\listid1738294565\listoverridecount0\ls20}}
+{\*\listoverride{\listid1709711237\listoverridecount0\ls21}}
+{\*\listoverride{\listid-327047825\listoverridecount0\ls22}}
+{\*\listoverride{\listid-745871952\listoverridecount0\ls23}}
+{\*\listoverride{\listid-1836063707\listoverridecount0\ls24}}
+{\*\listoverride{\listid-293717153\listoverridecount0\ls25}}
+{\*\listoverride{\listid2078471847\listoverridecount0\ls26}}
+{\*\listoverride{\listid-1517747584\listoverridecount0\ls27}}
+{\*\listoverride{\listid-386506226\listoverridecount0\ls28}}
+{\*\listoverride{\listid-1973861867\listoverridecount0\ls29}}
+{\*\listoverride{\listid-1369532819\listoverridecount0\ls30}}
+{\*\listoverride{\listid1637563670\listoverridecount0\ls31}}
+{\*\listoverride{\listid447101529\listoverridecount0\ls32}}
+{\*\listoverride{\listid825267093\listoverridecount0\ls33}}
+{\*\listoverride{\listid-1347016021\listoverridecount0\ls34}}
+{\*\listoverride{\listid357945891\listoverridecount0\ls35}}
+{\*\listoverride{\listid475476611\listoverridecount0\ls36}}
+{\*\listoverride{\listid2038895474\listoverridecount0\ls37}}
+{\*\listoverride{\listid1841872784\listoverridecount0\ls38}}
+{\*\listoverride{\listid-1143302085\listoverridecount0\ls39}}
+{\*\listoverride{\listid-547875185\listoverridecount0\ls40}}
+{\*\listoverride{\listid-1148028575\listoverridecount0\ls41}}
+{\*\listoverride{\listid580373521\listoverridecount0\ls42}}
+{\*\listoverride{\listid-1139484586\listoverridecount0\ls43}}
+{\*\listoverride{\listid-1634761344\listoverridecount0\ls44}}
+{\*\listoverride{\listid1586246078\listoverridecount0\ls45}}
+{\*\listoverride{\listid1664632419\listoverridecount0\ls46}}
+{\*\listoverride{\listid610776657\listoverridecount0\ls47}}
+{\*\listoverride{\listid1494863328\listoverridecount0\ls48}}
+{\*\listoverride{\listid-32649723\listoverridecount0\ls49}}
+{\*\listoverride{\listid1059178626\listoverridecount0\ls50}}
+{\*\listoverride{\listid1234250091\listoverridecount0\ls51}}
+{\*\listoverride{\listid185981501\listoverridecount0\ls52}}
+{\*\listoverride{\listid1734018392\listoverridecount0\ls53}}
+{\*\listoverride{\listid932037806\listoverridecount0\ls54}}
+{\*\listoverride{\listid-1530690360\listoverridecount0\ls55}}
+{\*\listoverride{\listid-177001050\listoverridecount0\ls56}}
+{\*\listoverride{\listid-927251200\listoverridecount0\ls57}}
+{\*\listoverride{\listid1524156905\listoverridecount0\ls58}}
+{\*\listoverride{\listid-1959292942\listoverridecount0\ls59}}
+{\*\listoverride{\listid-841813966\listoverridecount0\ls60}}
+{\*\listoverride{\listid-817573660\listoverridecount0\ls61}}
+{\*\listoverride{\listid-1676158854\listoverridecount0\ls62}}
+{\*\listoverride{\listid-1615253678\listoverridecount0\ls63}}
+{\*\listoverride{\listid-3273863\listoverridecount0\ls64}}
+{\*\listoverride{\listid-642026477\listoverridecount0\ls65}}
+{\*\listoverride{\listid-1823226260\listoverridecount0\ls66}}
+{\*\listoverride{\listid-1393517381\listoverridecount0\ls67}}
+{\*\listoverride{\listid1093818137\listoverridecount0\ls68}}
+{\*\listoverride{\listid-647708351\listoverridecount0\ls69}}
+{\*\listoverride{\listid790410256\listoverridecount0\ls70}}
+{\*\listoverride{\listid-311808032\listoverridecount0\ls71}}
+{\*\listoverride{\listid-1693919950\listoverridecount0\ls72}}
+{\*\listoverride{\listid-202120383\listoverridecount0\ls73}}
+{\*\listoverride{\listid-2073587594\listoverridecount0\ls74}}
+{\*\listoverride{\listid-1533102375\listoverridecount0\ls75}}
+{\*\listoverride{\listid-1317601558\listoverridecount0\ls76}}
+{\*\listoverride{\listid2079260048\listoverridecount0\ls77}}
+{\*\listoverride{\listid-706236936\listoverridecount0\ls78}}
+{\*\listoverride{\listid1384013475\listoverridecount0\ls79}}
+{\*\listoverride{\listid-2066931477\listoverridecount0\ls80}}
+{\*\listoverride{\listid1596988618\listoverridecount0\ls81}}
+}
+\paperw12240 \paperh15840 \margt1800 \margb1080 \margl1080 \margr1080 \headery720 \footery720 \itap0 \cols1 
+\sectd {\header {
+{\trowd \ltrrow \trleft0 
+\clpadb60 \clpadfb3 \clpadl400 \clpadfl3 \clbrdrt \clbrdrl \clbrdrr \trql \clvertalb \clwWidth9380 \cellx9380 
+\intbl 
+{\b0 \qc \cf1 \f0 \ri0 \i0 \fs18 \li0 
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+}
+{\b1 \cf1 \f0 \i0 \fs18 
+{\b1 \cf1 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+O\\ \rquote Shea, Dillon
+}
+}
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ 
+}
+{\b1 \cf1 \f0 \i0 \fs18 
+{\b1 \cf1 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+1/25/2026
+}
+}
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+\par 
+}
+}
+{\b0 \qc \cf1 \f0 \ri0 \i0 \fs18 \li0 
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+}
+{\b1 \cf1 \f0 \i0 \fs18 
+{\b1 \cf1 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+For Educational Use Only
+}
+}
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+}
+}\b0 \qc \cf1 \f0 \ri0 \ul0 \strike0 \i0 \fs18 \li0 \sa0 \sb0 \intbl \cell \row }
+{\trowd \ltrrow \trleft0 
+\clpadb60 \clpadfb3 \clpadl400 \clpadfl3 \clbrdrb \brdrcf17 \brdrw20 \brdrs \clbrdrl \trql \clvertalb \clwWidth9380 \cellx9380 
+\clpadb60 \clpadfb3 \clpadl400 \clpadfl3 \clbrdrb \brdrcf17 \brdrw20 \brdrs \clbrdrr \trql \clwWidth700 \cellx10080 
+\intbl 
+{\b0 \cf1 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+}
+{\b1 \cf18 \f0 \i0 \fs18 
+{\b1 \cf18 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Settlement Tactics in California Litigation, Practical Law Practice Note w-042-3352
+}
+}
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+}
+}\b0 \cf1 \f0 \ri0 \ul0 \strike0 \i0 \ql \fs18 \li0 \sa0 \sb0 \intbl \cell \intbl 
+{\qr \b0 \cf1 \f0 \ri0 \i0 \fs18 \li0 
+}\qr \b0 \cf1 \f0 \ri0 \i0 \fs18 \li0 \intbl \cell \row }
+{\trowd \lastrow \trleft0 
+\clbrdrb \clbrdrl \trql \clwWidth10080 \cellx10080 
+\intbl 
+{\b0 \cf1 \f0 \ri0 \i0 \ql \fs18 \li0 
+}\b0 \cf1 \f0 \ri0 \i0 \ql \fs18 \li0 \intbl \cell \row }}\par }{\footer {
+{\trowd \lastrow \trleft0 
+\clpadl60 \clpadfl3 \clbrdrt \brdrcf17 \brdrw20 \brdrs \clbrdrb \clbrdrl \trql \clvertalb \clwWidth9300 \cellx9300 
+\clpadl60 \clpadfl3 \clbrdrt \brdrcf17 \brdrw20 \brdrs \clbrdrb \clbrdrr \trql \clwWidth700 \cellx10000 
+\intbl 
+{\b0 \cf17 \f0 \ri0 \i0 \ql \fs20 \li0 
+{\b0 \cf17 \f0 \ul0 \strike0 \i0 \fs20 
+}
+{\*\shppict {\pict \pngblip \picw78 \pich10 \picwgoal1170 \pichgoal150 89504e470d0a1a0a0000000d494844520000004e0000000a08030000002dbd985500000300504c5445f8a969f6913ff68931fff9f5f69241f5852af68d38fcddc4f58326fac294f8a868fac193fcdabefab985fcdfc7fef5eef58022f8a35efef6effde5d2fac092fffaf6f9ac6ffffcfafde8d7fef7f1f9b279f6862cf8aa6af79e56f79c53f58327fef1e7fde3cefeeee2f9b076f79a4efef8f4f58123f58224f9ae72feefe4f58021f9ae71fac295fffaf7fcdabffef7f2f9af73f9b177f8ac6ef9b47cf8a15bf6872ef79648fef5edf9b278fcd9bdf9b782f9b57efbc89ffde3cffffefdf6872df8aa6bfcd6b8fac59af9b781fabc8bfffbf8fac091fac396fbceaaf8a461f68e39f6882ffabe8dfabf8ff9b884f79c52fdeadbfeede0f68c36f89f58fcdcc3fde0c9fef0e5fef3eaf68f3cfbcaa2f8a867f9b37afaba87f68b35fde7d6fabf90fffcfbfaba86fde7d5f6903efffdfcfef4ecf68f3bfde1cafcdfc6fbd1affbcea9fcd6b7f68a33f79444fbcba5f58429fcdec6f9af74f8a25df58428f7a461fef4edfdede0fde6d4fde7d4f9b680fbc69cfbc8a0f9b37bfac9a1f69240f79d54fcd4b4f9b883f68e3afef8f3fdebddfde2cbf7984cf8a35ff6882efef3ebf9bd8cfcd4b5feecdef8a562fde6d3fef9f4fcdbc1f9bc8afcd8bcf8ab6dfef8f2fcd7b9fffbf7feefe3f79546f8aa69f79f57fde1cbfcd3b3fcd2b1f8a25cfcd3b2fde2ccfac599fac397f9b379fcd8bbfbd2b0fef2e9fcd5b6fac79ef8a664f8a460f68a32fac090fffbf9fef2e8f8ab6cfde4d0f7994df6903df79749fffefcf79e55f8a766f8a059f68830f7974afde2cdfbcca6fabd8cf57f20ffffff000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c5baaa8e000000bf74524e53ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00456e8439000002804944415478da63dcc70001fef2931866b0be0cd2085114e5ff7ef72a0357d0a3a31cc2129ebb9f492a3e4b6eb8cb20913bb5c808a2f849bf610c438bf99a9917cf2a18092c7bf1a30a6a0a13946658f6af92e15352e52386af5d677ee5ff61618c5ca7c6b58921d6ecc47383e56a52b3181955bf2e3e01513b49bae7260383be8b048376a2e34786a3853761a6b0c018892b57313c48fa38834195c1cf94c16a3a03c3edad7c5f163030a8672bcc3afcf4251343639ef3ae2cb05afe384e9390352a0c320cbdf71f19b43d6690c7302e84e11383d28bff67bcba9a6e2831acd9c6e0d990fe70b74ae7d2a90c0cbbc36fbaef6660b80f55ba68e9d2d5a9ae0cdd2f341878be8b9c64f8cb701d660a733c9451af78704effa1c6b3536708cf2c9ffde7c78fcb9b16497b8acf3e3721061812bfde8433302c8d5a190152ca93f7d26df6796bff83310dbfe504de7f7ff9ec621c7ad8ade964d5f0f8162da4257e9da18c39434955602283a37fdaefde9cb30c686005c3a4c9a6d792186c6b665d8e54f97ae7c5badd189e65307c22395565fbc43fcc010cad5b3ba781c5363184af0bfa8530481844b84e65b87efde6bcb50c67d9dc36d4f6bf7aa6e4015700771dc3fd57751f183c97ecfe7f04c8b17e9f9fdfceb0e334c3ca37c16940feb644b09ad7e1aee90cdaaa9f1ca31ef6bd6478e2b43ba29f615fc7cf550c1861c720c2699619c930d362d55a060ff68e592f7d4eacd82df9eb3bd7bd387986ff73182d18183686ba2ff9f76ec59f909c2e83a8499dbbaaa404ecf8199cb8051e79627ad6fa4799360383602cd0bdcbdeb2fc6158debec577daf1a9076ba51818e679bf05aaf85cfdeb0f8383c1ec0973801cee342386c537cdf218fecf4b70801b0200f61ff095f54de6170000000049454e44ae426082}}
+{\b0 \cf17 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb0 
+ \u169\'3f 2026 Thomson Reuters. No claim to original U.S. Government Works.
+}
+}\b0 \cf17 \f0 \ri0 \ul0 \strike0 \i0 \ql \fs20 \li0 \sa0 \sb0 \intbl \cell \intbl 
+{\qr \b0 \cf17 \f0 \ri0 \i0 \fs20 \li0 
+{\b0 \i0 \ul0 \fs20 \f0 \chpgn }
+}\qr \b0 \cf17 \f0 \ri0 \ul0 \strike0 \i0 \fs20 \li0 \intbl \cell \row }}\par }
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 \par}\sect\sbknone\pgncont\cols1{\ids0 
+{\*\bkmkstart co_document_1}{\*\bkmkend co_document_1}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart Icfa7196cca9011ee8921fbef1a541940_Target}{\*\bkmkend Icfa7196cca9011ee8921fbef1a541940_Target}
+\par 
+}
+{\b0 \cf25 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\*\bkmkstart co_docContentHeader_1}{\*\bkmkend co_docContentHeader_1}
+\par 
+{\b0 \cf25 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\*\bkmkstart co_docHeaderContainer_1}{\*\bkmkend co_docHeaderContainer_1}
+\par 
+{\b1 \cf21 \f0 \ri0 \i0 \ql \fs36 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs36 \sa0 \sb0 
+Settlement Tactics in California Litigation
+\par 
+}
+}
+{\b1 \cf25 \f0 \ri0 \i0 \ql \fs22 \li0 
+{\b1 \cf25 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+by\u160\'3fPractical Law 
+}
+{\b1 \cf22 \f0 \i0 \fs22 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs22 \sa120 \sb120 
+Litigation
+}
+}
+{\b1 \cf25 \f0 \i0 \fs22 \chcbpat2 
+\par 
+}
+}
+{\b0 \cf25 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf25 \f0 \ri0 \i0 \qj \fs18 \li0 {
+{\trowd \lastrow \trleft0 
+\clpadt33 \clpadft3 \clpadr33 \clpadfr3 \clbrdrt \clbrdrb \clbrdrl \clbrdrr \trql \clvertalt \clwWidth10080 \cellx10080 
+\intbl 
+{\ri33 \li33 
+{\b1 \cf25 \f0 \ri33 \i0 \ql \fs22 \li33 
+{\b1 \cf26 \f0 \i0 \fs22 
+{\b1 \cf26 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+Maintained
+}
+}
+{\b1 \cf24 \f0 \i0 \fs17 
+{\b1 \cf24 \f0 \ul0 \strike0 \i0 \fs17 \sa0 \sb0 
+ \u8226\'3f 
+}
+}
+{\b1 \cf25 \f0 \i0 \fs22 
+{\b1 \cf25 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+California
+\par 
+}
+}
+}
+}\b1 \cf25 \f0 \ri33 \ul0 \strike0 \i0 \ql \li33 \fs22 \sa0 \sb0 \intbl \cell \row }}\par 
+}
+}
+}
+}
+{\b0 \cf19 \f0 \i0 \brdrt \brdrcf27 \brdrw20 \brdrs \fs18 \brdrr \brdrcf27 \brdrw0 \brdrs \brdrl \brdrcf27 \brdrw0 \brdrs \ri0 \qj \li0 \brdrb \brdrcf27 \brdrw0 \brdrs 
+{\*\bkmkstart co_docContentBody_1}{\*\bkmkend co_docContentBody_1}
+\par 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \chbrdr \brdrcf27 \brdrw20 \brdrs \f0 \ri0 \i0 \qj \fs22 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs22 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs22 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+A Practice Note providing a comprehensive analysis of factors influencing settlement decisions, including the benefits and costs of settling versus proceeding to trial. This Note emphasizes the importance of advising clients on settlement options, highlighting the exclusive right of clients to decide whether to settle. It examines the impact of parties\rquote  resources, litigation expenses, and the merits of the case on settlement strategies. Additionally, it discusses the timing of settlement offers and explores various payment methods, including installment payments and non-cash alternatives. This Note also discusses offers to compromise under 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS998&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=264910C8E8A5600B2F861EB1B8F754DE127633B115E5A02CE0BC1670CC3FF490&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+California Code of 
+}
+{\b1 \cf22 \f0 \i0 \fs22 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+Civil
+}
+}
+{\b0 \cf20 \f0 \i0 \fs22 \chcbpat2 
+}
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+ Procedure Section 998
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+ and addresses the role of insurance coverage, tax implications, and legal costs in settlement negotiations. This resource provides a framework for achieving favorable settlements and is essential for legal professionals navigating settlement discussions in California 
+}
+{\b1 \cf22 \f0 \i0 \fs22 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+civil
+}
+}
+{\b0 \cf19 \f0 \i0 \fs22 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+ 
+}
+{\b1 \cf22 \f0 \i0 \fs22 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+litigation
+}
+}
+{\b0 \cf19 \f0 \i0 \fs22 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa400 \sb0 
+\u160\'3f\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\*\bkmkstart kh_toc-wrapper_1}{\*\bkmkend kh_toc-wrapper_1}
+\par 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\*\bkmkstart kh_tocContainer_1}{\*\bkmkend kh_tocContainer_1}
+\par 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf25 \f0 \ri0 \i0 \qj \fs18 \li-120 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000001_1" }{\fldrslt 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+\u160\'3fAdvising the Client Whether to Settle
+}}}
+\sa120 
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000004_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fAmount at Stake
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000002_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fParties\rquote  Resources
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000005_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fLitigation Expenses
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a409357_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fControlling the Outcome
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000007_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fMerits of the Case
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000008_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fEvidentiary Problems
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000009_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fDiscovery Concerns
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000012_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fCommercial Considerations
+}}}
+\sa120 
+\par 
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000013_1" }{\fldrslt 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+\u160\'3fSettlement Timing
+}}}
+\sa120 
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000014_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fBefore Proceedings Begin
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000015_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fAfter Proceedings Begin
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000016_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fDuring Discovery
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a194321_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fDuring Summary Judgment Proceedings
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000018_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fOn the Eve of Trial
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000019_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fOn the Courthouse Steps
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000020_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fDuring Trial
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000021_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fAfter Trial and Before Judgment
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000022_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fPost-Judgment and Before Appeal
+}}}
+\sa120 
+\par 
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000023_1" }{\fldrslt 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+\u160\'3fAchieving a Favorable Settlement
+}}}
+\sa120 
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000024_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fPeople and Personalities
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000025_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fInstallment Payments
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000026_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fMaximize Collateral Benefits
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000027_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fConsider Non-cash Alternatives
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000028_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fRelevant Insurance
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000029_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fTaxes
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000030_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fLegal Costs
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000031_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fDrafting the Settlement Agreement
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a936511_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fSettlements Requiring Court Approval
+}}}
+\sa120 
+\par 
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000032_1" }{\fldrslt 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+\u160\'3fForm of the Offer
+}}}
+\sa120 
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000033_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fOffer to Compromise
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a546067_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fOpen Offer Before the Court
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a999720_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fSettlement-Related Communications
+}}}
+\sa120 
+\par 
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000036_1" }{\fldrslt 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+\u160\'3fMultiple Parties
+}}}
+\sa120 
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000037_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fRelated Parties
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000038_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fDivisions of Liability
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000039_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3fSimilar Claims Against Additional Parties
+}}}
+\sa120 
+\par 
+}
+}
+}
+}
+}
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_Ie2a9306f261211f0a7dab2b58dadd}{\*\bkmkend co_anchor_Ie2a9306f261211f0a7dab2b58dadd}
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb4440 
+Parties typically settle cases rather than proceeding to a trial and judgment. However, obtaining a favorable settlement is a complex process involving many factors. This Note discusses some of the factors that influence whether, when, and how to settle litigation pending in California state court. Specifically, it details the factors counsel should consider when contemplating and advising clients on the benefits and disadvantages of settling a dispute. It also offers ways to successfully present and correctly time a settlement offer.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000001_1}{\*\bkmkend co_anchor_a000001_1}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs28 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs28 \sa0 \sb0 
+Advising the Client Whether to Settle
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The right to settle a claim belongs exclusively to the client. Counsel can only advise the client to settle. They cannot settle an action over the client\rquote s objections, even if the client agreed to that arrangement in the retainer agreement. A retainer agreement that authorizes the attorney to settle a case over the client\rquote s objection violates 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1003711&cite=CASTRPCR1.2&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=0C2E423BB5F4BB3B7C628BDD393FA3B676479A04E2690F3CBABAAFA607C279EB&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+California Rule of Professional Conduct 1.2
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ and is void. (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1003711&cite=CASTRPCR1.2&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=0C2E423BB5F4BB3B7C628BDD393FA3B676479A04E2690F3CBABAAFA607C279EB&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+CA ST RPC RULE 1.2
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=2054398023&pubNum=0007053&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=RP&fi=co_pp_sp_7053_389&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=862779B184A544C6C1D1B3AD0F053A2489197C9D16E942E92E1E9994C427D0DF&contextData=(sc.Search)#co_pp_sp_7053_389" }{\fldrslt 
+{\b0 \cf20 \f0 \i1 \fs18 
+{\b0 \cf20 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Amjadi v. Brown
+}
+}
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 68 Cal. App. 5th 383, 389 (2021)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+.)
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000004_1}{\*\bkmkend co_anchor_a000004_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Amount at Stake
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+As soon as an attorney is aware of the dispute, the attorney should conduct a cost/benefit analysis of pursuing the case that considers:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls1 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls1 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+The potential litigation results.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls2 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls2 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+The potential settlement outcome.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls3 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls3 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+The near-term and long-term costs.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+Counsel should review and update this analysis periodically and when any relevant changes emerge concerning the client\rquote s or the opponent\rquote s negotiating position. It may be worth settling a case if the cost of litigation exceeds the sum at stake.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000002_1}{\*\bkmkend co_anchor_a000002_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Parties\rquote  Resources
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The parties\rquote  resources impact settlement possibilities in several ways.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a320724_1}{\*\bkmkend co_anchor_a320724_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs20 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb160 
+Opponent\rquote s Resources
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+If an attorney represents the plaintiff and the defendant has:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls4 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls4 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Limited financial resources, it may be better to settle soon after the dispute arises. This is especially true if counsel anticipate incurring significant costs litigating the dispute (for example, with discovery expenses). If an attorney pursues the lawsuit, the client may win, but a long, drawn-out litigation may result in the adversary\rquote s inability to pay any money judgment the court awards.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls5 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls5 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Extensive resources, counsel may want to create an incentive for speedy resolution by offering to settle early in the case for a reasonable amount that is less than the claim\rquote s full value.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+Conversely, if an attorney represents the defendant and the plaintiff has:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls6 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls6 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Limited financial resources, the client may want to litigate and not settle. Assuming the client has sufficient resources to defend itself, counsel may want to make litigation too costly for the plaintiff to pursue.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls7 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls7 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Extensive resources, counsel must consider the client\rquote s resources and the merits of the case and weigh the cost of settlement against the cost of mounting a vigorous defense.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a691705_1}{\*\bkmkend co_anchor_a691705_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs20 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb160 
+Client\rquote s Resources
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Counsel should consider their client\rquote s financial resources and examine whether it may be better to:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls8 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls8 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Settle early in the dispute without incurring significant litigation expenses. For a client with limited resources, attempting to settle early in the case can minimize litigation expenses.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls9 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls9 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Wait to settle until the attorney places the client in a more favorable negotiating position with the opposing side.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls10 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls10 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Pursue or defend the client\rquote s rights with the goal of achieving a more favorable result on the merits rather than through a settlement (see 
+}
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000007_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Merits of the Case
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+). This option can be costly but may make sense if the client has extensive resources and the desire to 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+litigate
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (whether on facts or principle). Clients with limited resources may explore third-party 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+litigation
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ financing to fund the 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+litigation
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ costs instead of settling (see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I210618dcef0811e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Practice Note, Third-Party 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Litigation
+}
+}
+{\b0 \cf20 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ Financing in the US
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000005_1}{\*\bkmkend co_anchor_a000005_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf22 \f0 \i0 \fs24 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Litigation
+}
+}
+{\b1 \cf21 \f0 \i0 \fs24 \chcbpat2 
+}
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+ Expenses
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+In advising the client on settlement, counsel should evaluate the current and anticipated 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+litigation
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ costs.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a135579_1}{\*\bkmkend co_anchor_a135579_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs20 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb0 
+Plaintiff\rquote s 
+}
+{\b1 \cf22 \f0 \i0 \fs20 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb0 
+Litigation
+}
+}
+{\b1 \cf21 \f0 \i0 \fs20 \chcbpat2 
+}
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb160 
+ Expenses
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Plaintiff\rquote s counsel should compare the cost and likelihood of a plaintiff\rquote s recovery by an early settlement against the potential of a favorable future settlement or judgment, considering both:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls11 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls11 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+litigation
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ expenses the client already incurred.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls12 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls12 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The expected additional costs if the plaintiff continues the 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+litigation
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+If counsel expect the plaintiff\rquote s 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+litigation
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ expenses to escalate as the case proceeds toward trial, the plaintiff may maximize its net recovery by settling for a discounted amount early rather than pursuing a potentially larger future recovery that is diminished by the 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+litigation
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+ costs incurred to obtain it.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a991918_1}{\*\bkmkend co_anchor_a991918_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs20 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb0 
+Defendant\rquote s 
+}
+{\b1 \cf22 \f0 \i0 \fs20 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb0 
+Litigation
+}
+}
+{\b1 \cf21 \f0 \i0 \fs20 \chcbpat2 
+}
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb160 
+ Expenses
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Defendant\rquote s counsel should weigh the risks and benefits of an early settlement against those of protracted 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+litigation
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, considering both:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls13 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls13 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The incurred and expected additional 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+litigation
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ costs.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls14 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls14 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+The possibility of a future adverse settlement or judgment.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+When counsel expect significant 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+litigation
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ expenses, early settlement may be less costly than continued 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+litigation
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+ even if the defendant expects to ultimately prevail.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Defendant\rquote s counsel also should consider whether early settlement or continued 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+litigation
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ in one case may encourage or deter the filing of future cases against that defendant.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a409357_1}{\*\bkmkend co_anchor_a409357_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Controlling the Outcome
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Counsel should consider the client\rquote s ability to control the outcome if the client settles versus the unpredictability of a judge\rquote s ruling or jury verdict. For example, a settlement may allow the client to:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls15 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls15 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Control when the case concludes. A settlement may offer the client finality that it would not otherwise achieve with a judgment, which may be appealed. Clients may have a fiscal or other reason to resolve a case within a certain time.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls16 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls16 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Determine how and when to handle the tax implications of the case. The client can better control the timing of a payout in a settlement than it would if the case goes to trial (see 
+}
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000029_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Taxes
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000007_1}{\*\bkmkend co_anchor_a000007_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Merits of the Case
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Counsel should consider the relative strength of the case when making settlement recommendations. For example, if an attorney represents:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls17 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls17 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+The plaintiff in a case where the evidence strongly suggests that the defendant is liable, counsel should consider and discuss with the client:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls18 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls18 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+counsel\rquote s assessment of the client\rquote s relatively strong legal position;
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls19 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls19 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+any need the client may have to obtain a monetary recovery sooner than later; and
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls20 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls20 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+the potential benefits of settling the case early based on good facts to avoid incurring legal fees and other litigation expenses that may cut into a later recovery.
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls21 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls21 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+The defendant in a case where the evidence strongly suggests it is liable to the plaintiff, counsel should consider and discuss with the client:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls22 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls22 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+counsel\rquote s assessment of the client\rquote s relatively weak legal position;
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls23 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls23 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+the possibility that an early settlement could mitigate the risk of a larger judgment against the defendant if the plaintiff strengthens its case during discovery or the case is pending in a jurisdiction where juries tend to return large verdicts;
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls24 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls24 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+counsel\rquote s assessment of the types of legal fees and expenses that the client may avoid by settling earlier in the litigation process;
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls25 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls25 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+the likelihood that settling earlier in the case will minimize the extent of any bad publicity about the client\rquote s role in the case; and
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls26 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls26 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+the fact that earlier settlement can lessen business disruptions that management and employees involved with the litigation may experience.
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+Counsel should periodically assess and report to the client the factual and legal strengths and weaknesses of the case to evaluate settlement options. Counsel\rquote s analysis typically evolves over the lawsuit\rquote s life and should include:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls27 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls27 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Findings made through discovery.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls28 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls28 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Projected expenses for additional factual investigations and document review.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls29 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls29 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I0f9fc0c1ef0811e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Deposition
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ results.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls30 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls30 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Witness credibility assessments.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls31 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls31 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Rulings on any pre-trial motions.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls32 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls32 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+New court decisions related to the case\rquote s subject matter.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+California\rquote s rules of professional conduct require attorneys to consult with the client on how to achieve the client\rquote s objectives in the representation and to keep the client informed on significant developments concerning the subject matter of the representation, including settlement offers (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1003711&cite=CASTRPCR1.4&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=26BBAC3EE17A68F8B6527E1089D1DF45733CEA160D453E05FD01E4D76E8E37B8&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+CA ST RPC Rules 1.4
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ and 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1003711&cite=CASTRPCR1.4.1&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=7D701ADDB0C5D40A04BDC4D2A805C3216F7C17B9C943649738B44299F17D221D&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+1.4.1
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000008_1}{\*\bkmkend co_anchor_a000008_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Evidentiary Problems
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Counsel should also determine whether the client\rquote s case has evidentiary problems, the extent to which the case suffers from them, and whether the client can overcome those issues. For example, counsel should consider:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls33 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls33 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Whether the client\rquote s case depends on information others possess and, if so, whether counsel can obtain it and the cost to do so. For example, counsel may need to obtain information from third parties located out of state. For more on obtaining out of state discovery from third party witnesses, see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/Ie1e74923313c11e89bf099c0ee06c731/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Practice Note, Subpoenas: Obtaining Out-of-State Discovery (CA)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls34 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls34 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Any admissibility issues and whether and how to resolve them. The opponent may try to bog the client down with expensive and time-consuming motion practice over the ability to use certain evidence.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000009_1}{\*\bkmkend co_anchor_a000009_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb180 
+Discovery Concerns
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The scope of discovery is broad, covering all matters that are relevant to the litigation, whether admissible in evidence or likely to lead to the discovery of admissible evidence (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=2053820118&pubNum=0007053&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=RP&fi=co_pp_sp_7053_638&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=0C9B5F218D9FD15091498132267868A983C604867FF4021DD4301CCCDB963CE0&contextData=(sc.Search)#co_pp_sp_7053_638" }{\fldrslt 
+{\b0 \cf20 \f0 \i1 \fs18 
+{\b0 \cf20 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+County of Los Angeles v. Super. Ct.
+}
+}
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 65 Cal. App. 5th 621, 638-39 (2021)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+). The client, however, may not want to disclose certain potentially damaging documents or information that are discoverable in litigation. This factor alone may be reason enough to settle. Discovery may also implicate evidence that is proprietary or sensitive, resulting in additional cost of arguing over the necessity of a 
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I0f9fbe36ef0811e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+protective order
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ and obtaining one.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000012_1}{\*\bkmkend co_anchor_a000012_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Commercial Considerations
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Counsel representing corporate and other commercial entities should examine specific reasons the entity may have for settling the case. For example, the client may be highly motivated to settle because of its concerns about:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls35 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls35 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Negative publicity. 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The client may be concerned about the negative publicity of a public trial (see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I3a9a0befef1211e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Practice Note, Managing Litigation PR
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+). This publicity may have a negative impact on the client\rquote s business, including:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls36 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls36 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+a drop in stock price;
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls37 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls37 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+the disruption of ongoing business relationships;
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls38 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls38 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+an inability to secure funding or investors;
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls39 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls39 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+a negative impact on insurability; and
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls40 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls40 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+the loss of good will with the public.
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls41 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls41 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Possibility of additional claims. 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The client may face a substantial risk that an unfavorable decision will lead to additional claims from other parties. Clients concerned that a settlement may attract more litigation may be less inclined to settle unless a confidentiality clause accompanies the general release. However, courts will not enforce a confidentiality clause if doing so is contrary to public policy (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=2000480061&pubNum=0004041&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=RP&fi=co_pp_sp_4041_128&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=D9886E3C056FDC99A9CF6C80F3B9B9757C175709E06D9EC0AC5A0043AE17A9C3&contextData=(sc.Search)#co_pp_sp_4041_128" }{\fldrslt 
+{\b0 \cf20 \f0 \i1 \fs18 
+{\b0 \cf20 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Cariveau v. Halferty
+}
+}
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 83 Cal. App. 4th 126, 128, 133-37(2000)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls42 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls42 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Relationship of the parties. 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The parties may have an existing relationship that the client wants to preserve going forward. While it may require creativity and considerable client consultation, counsel should identify any commercial benefits to an amicable settlement and try to develop a strategic settlement that maintains and advances any existing business relationship that the client wants to preserve (see 
+}
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000026_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Maximize Collateral Benefits
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls43 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls43 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Reduction in productivity. 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+It may be difficult for the client to bear the burden, expense, and opportunity costs to the client\rquote s management and employees of supporting the litigation. For example, employees involved in litigation may lose a significant amount of work time to locating, collecting, reviewing, and producing records requested in discovery. There may also be additional time lost to prepare for depositions, trial, or both. All these effects of litigation can have a negative impact on the company\rquote s overall productivity.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+These concerns may impact the client\rquote s negotiating leverage. Conversely, if the adversary faces these issues, the client may have substantial negotiating leverage.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000013_1}{\*\bkmkend co_anchor_a000013_1}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs28 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs28 \sa0 \sb0 
+Settlement Timing
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+If the client intends to settle, it is generally better to finalize the terms quickly before the client incurs additional legal costs and the parties\rquote  positions become too entrenched. While the prospect of settlement should be evaluated throughout the life of a dispute, there are several factors to consider about a settlement\rquote s timing.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000014_1}{\*\bkmkend co_anchor_a000014_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Before Proceedings Begin
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Both sides may benefit from settling the dispute as soon as it arises, mostly because of the costs they save by avoiding discovery and attorney\rquote s fees. An early settlement is particularly appropriate where maintaining the relationship between commercial parties is a priority, in which case counsel should pursue settlement before the situation becomes irreversibly adversarial (see 
+}
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000012_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Commercial Considerations
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+). However, even parties that do not have a lengthy or ongoing relationship may benefit from the cost savings associated with early negotiations, since greater amounts spent litigating the dispute may diminish the funds available to settle a lawsuit or pay any resulting judgment.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+To begin settlement talks at this stage of a dispute, counsel should:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls44 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls44 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Address the parties\rquote  long-standing business relationship (if one exists) and the client\rquote s interest in continuing it.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls45 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls45 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Stress the ongoing alignment of the two parties\rquote  business interests and how settlement can preserve the benefits of that relationship by working together.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+In certain circumstances, plaintiff\rquote s counsel may wish to consider drafting (but not filing) a complaint and providing it to the proposed defendant. This can help to define the legal and factual issues and can also show the defendant that the plaintiff is serious about pursuing the matter.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000015_1}{\*\bkmkend co_anchor_a000015_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+After Proceedings Begin
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+When representing a plaintiff, counsel may provide the client with negotiation leverage by beginning formal court proceedings and demonstrating through the filing that the client is serious about pursuing its rights. Through the complaint, counsel should articulate the strength of the claims in clear terms.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+From a defendant\rquote s perspective, by waiting to engage in a settlement dialogue until after court proceedings begin, counsel:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls46 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls46 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Force the plaintiff to commit to the process and incur the expense of preparing, filing, and serving the complaint.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls47 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls47 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Learn whether the plaintiff was bluffing about its litigation intentions.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls48 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls48 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Obtain the opportunity to assess the scope, nature, and strength of the plaintiff\rquote s claims before engaging in a settlement dialogue.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+Once a client realizes these initial benefits, counsel should assess the probability that the client ultimately may settle. Depending on the strength of each party\rquote s claims and defenses and the extent of damages apparent at the pleading stage, the parties may benefit from quickly reaching a settlement and finalizing the terms before the parties incur additional legal costs and become further entrenched in their positions.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+However, waiting to start negotiating settlement until after litigation starts can negatively impact the potential for settlement, as either or both of the parties may not want to discuss settlement immediately after proceedings formally begin.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000016_1}{\*\bkmkend co_anchor_a000016_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+During Discovery
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Discovery is often the most expensive part of litigation. The costs increase with each phase of the discovery process, including the costs of bringing and defending against motions to compel discovery responses. Counsel should:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls49 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls49 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Compare and factor into the settlement analysis each party\rquote s relative discovery burdens. There may be no strategic or financial advantage to incurring the expense of discovery only to engage in a settlement dialogue immediately after completing this stage of the litigation.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls50 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls50 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Consider whether the discovery process may strengthen or weaken the parties\rquote  respective positions and whether it is likely to provide the client additional settlement leverage. In addition, counsel may consider proposing limited initial discovery designed to aid the settlement process.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a213219_1}{\*\bkmkend co_anchor_a213219_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs20 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb340 
+During Written Discovery
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+In California state court litigation, parties typically engage in written discovery, including the production of documents, before taking the depositions of fact and expert witnesses. The parties\rquote  production of documents usually is the most burdensome and expensive aspect of the discovery process. Clients settling before beginning the 
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I03f4dab7eee311e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+document production
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ stage of litigation can avoid the significant costs of document production.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+For more on written discovery, see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/Iaff9803e360a11ee8921fbef1a541940/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Written Discovery Toolkit (CA)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000017_1}{\*\bkmkend co_anchor_a000017_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs20 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb160 
+During Depositions
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Preparing for, taking, and defending depositions is time consuming for the deponents and for the legal team. This process can also drain human and financial resources. While engaging in initial written discovery and document exchanges may be necessary to develop the client\rquote s settlement strategy, counsel should consider whether it is beneficial to have a settlement dialogue before taking depositions. However, if depositions may strengthen the client\rquote s factual or legal positions, the cost of depositions may be justified.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+For more on depositions, see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/Ib8499fa7940211ec9f24ec7b211d8087/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Deposition Toolkit (CA)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a194321_1}{\*\bkmkend co_anchor_a194321_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+During Summary Judgment Proceedings
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+If either or both parties have filed or plan to file a motion for 
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I0f9fbfe7ef0811e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+summary judgment
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ or 
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/Id0eaf4f3997d11e79bef99c0ee06c731/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+summary adjudication
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, counsel should consider how the motion may impact settlement discussions.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+For more on summary judgments, see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/Ia29d07b9293311e798dc8b09b4f043e0/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Practice Note, Summary Judgment: Overview (CA)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a768644_1}{\*\bkmkend co_anchor_a768644_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs20 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb160 
+Before a Summary Judgment Hearing
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The days leading up to a hearing on a motion for summary judgment or summary adjudication may present a suitable time to raise settlement with the opposing party. Because the parties are uncertain of the outcome, they may conclude that it is better to settle rather than risk an unfavorable ruling on the 
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I4cf8474cef2a11e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+dispositive
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ motion. Where the amount at issue is relatively low, filing a dispositive motion may also motivate the responding party to settle to avoid the expense of responding to the motion.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a609639_1}{\*\bkmkend co_anchor_a609639_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs20 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb160 
+After a Summary Judgment Hearing
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Similarly, if the court denies summary judgment or summary adjudication the ruling may present the parties with an opportunity to discuss settlement. The court\rquote s ruling means that material facts underlying the plaintiff\rquote s claims are in dispute and so the plaintiff is entitled to present its case at trial. Both parties face some risk going forward, and the court\rquote s ruling may indicate which party\rquote s position is stronger.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000018_1}{\*\bkmkend co_anchor_a000018_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+On the Eve of Trial
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Costs escalate rapidly in the period leading up to trial. Counsel should therefore consider whether there is a strategic opportunity to advance settlement discussions before the parties incur these costs, when both sides may feel some amount of uncertainty (for example, before preparing dispositive motions or while those motions are pending before the court). Once the opposing party incurs the cost of trial preparation, the parties may lose the opportunity to engage in a productive settlement dialogue.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+For more on trial preparation, see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/If780d8e6d06a11ec9f24ec7b211d8087/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Practice Note, Trial Preparation (CA)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000019_1}{\*\bkmkend co_anchor_a000019_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+On the Courthouse Steps
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Occasionally, parties agree on a settlement immediately before the start of trial, when they have already incurred many trial-related costs. Last minute pretrial rulings (for example, on 
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I0f9fe679ef0811e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+motions in limine
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+) often affect a party\rquote s negotiating position significantly. Counsel should consider whether any pretrial rulings have strengthened or weakened the client\rquote s position and reevaluate its settlement position accordingly.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+By settling right before trial, the parties:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls51 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls51 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Avoid substantial trial expense.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls52 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls52 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Eliminate the uncertainty inherent in any trial.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls53 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls53 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+May remove the risks of negative publicity and precedent that accompany some trials. (see 
+}
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000012_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Commercial Considerations
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000020_1}{\*\bkmkend co_anchor_a000020_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+During Trial
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The prospect of settlement does not end once trial begins. Counsel should evaluate the strength of the client\rquote s position objectively once a judge or jury is involved. The strength of the client\rquote s case may be affected by:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls54 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls54 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+The jury instructions the court approves.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls55 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls55 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Counsel\rquote s assessment of potential jurors during 
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I6a7ad5b9639c11e498db8b09b4f043e0/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+voir dire
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls56 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls56 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+The effectiveness of opening statements.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls57 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls57 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Rulings on the admissibility of evidence.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls58 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls58 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+The judge\rquote s temperament.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls59 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls59 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Opposing counsel\rquote s effectiveness.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls60 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls60 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Any new information that becomes known during the trial.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls61 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls61 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+The reactions of the judge, jury, or both, to the witnesses\rquote  testimony and evidence.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+Counsel and the client also may consider logistical and financial considerations that warrant settlement discussions during trial. As trial proceeds, counsel should consider whether:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls62 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls62 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+The length of the trial may extend beyond what they anticipated, resulting in increased expenses to the client.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls63 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls63 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+All necessary witnesses are available to testify at the appropriate time during trial.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+For more on trials, see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I34fe42c0588f11ee8921fbef1a541940/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Trial Toolkit (CA)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000021_1}{\*\bkmkend co_anchor_a000021_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+After Trial and Before Judgment
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The parties may choose to reach settlement after the evidentiary portion of trial ends but before the judge or jury renders a decision. A settlement at this time may be desirable where both parties are concerned about the case\rquote s outcome. For example, a party may want to settle if it appears the judge may misapply the law, or the jury appears confused about the facts or how to apply the law. These circumstances may make an appeal (and the associated costs) inevitable and unattractive. A settlement at this point may be especially desirable if trial went poorly for one party who wants to avoid an unfavorable judgment and the publicity associated with it.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Alternatively, the parties may consider entering a high-low agreement, in which the plaintiff and defendant agree to a maximum and minimum amount of any judgment despite the jury verdict (see, for example, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=2029851478&pubNum=0004041&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=RP&fi=co_pp_sp_4041_1044&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=05D6D3B87881F5C2D061B2CC908F8E21835DF0434E4BD596ED9E7BFA61BBAC61&contextData=(sc.Search)#co_pp_sp_4041_1044" }{\fldrslt 
+{\b0 \cf20 \f0 \i1 \fs18 
+{\b0 \cf20 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Simmons v. Ware
+}
+}
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 213 Cal. App. 4th 1035, 1044-45 (2013)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+). This protects the parties by limiting their total exposure.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000022_1}{\*\bkmkend co_anchor_a000022_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Post-Judgment and Before Appeal
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Parties may also reach settlement after the trial concludes, but before an appeal or ruling by an appellate court. If the trial court judgment is vulnerable on appeal, a party may want to settle for a compromised amount. Often, the quality of the trial judge\rquote s opinion or consistency of the jury\rquote s findings on the evidence play a significant role in settlement discussions during this stage of litigation.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000023_1}{\*\bkmkend co_anchor_a000023_1}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs28 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs28 \sa0 \sb0 
+Achieving a Favorable Settlement
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Regardless of when parties have settlement talks, the primary objective is to end the dispute. To achieve this in the most favorable way for the client, counsel should assess the strengths and weaknesses of the parties\rquote  positions. In addition to counsel\rquote s analysis of the material facts and controlling law, there are many other factors to consider in achieving and structuring a settlement.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000024_1}{\*\bkmkend co_anchor_a000024_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+People and Personalities
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Counsel should identify and consider who drives the decision-making process. To determine whether those decision-makers are the right people to negotiate a settlement, the attorney needs to know what the decision-makers\rquote  primary objectives are and whether they have:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls64 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls64 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+The necessary authority to reach a settlement.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls65 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls65 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Sufficient knowledge of the facts and legal issues to make an informed decision.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+Counsel should find out whether any individuals are fact witnesses to the underlying dispute and, if so, whether they are too close to the issues to be effective in the settlement process. Counsel should also consider whether a principal of the client or the attorney should be the primary representative in the settlement process.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000025_1}{\*\bkmkend co_anchor_a000025_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Installment Payments
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+If the plaintiff requires a financial payment as a condition of settlement but the defendant is unwilling or cannot pay the entire settlement amount at once, both parties may benefit from an agreement that allows the defendant to pay the settlement amount in installments. Installment payments may achieve an overall greater recovery if the defendant cannot pay the entire amount at once.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+However, installment payments create a future risk, and the party receiving payment may wish to ask for collateral or another type of security on the future payments. For example, in cases where the plaintiff alleges that the defendant defaulted on a contract, the plaintiff may be reluctant to enter into an installment agreement without adequate assurances that the defendant will perform its obligations in the future.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000026_1}{\*\bkmkend co_anchor_a000026_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Maximize Collateral Benefits
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Occasionally, counsel may solidify new business relationships through a settlement so that the agreement results in a win-win situation. For example, the parties may agree to:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls66 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls66 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+One party distributing or supplying the disputed products to the other in the future.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls67 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls67 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+A licensing agreement between the parties concerning the 
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I03f4d7ffeee311e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+intellectual property
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ in dispute.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls68 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls68 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Create a 
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/Ibb0a107def0511e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+joint venture
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ between the parties about the matter in dispute.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls69 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls69 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Create a new employment arrangement for a former or prospective employee.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000027_1}{\*\bkmkend co_anchor_a000027_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Consider Non-cash Alternatives
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+If the parties cannot agree on a cash payment to settle the dispute, counsel should consider non-cash alternatives to provide value to the opposing party. Counsel can make this type of arrangement by:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls70 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls70 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Offering noncash assets (for example, free or discounted goods or services that the opposing party needs).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls71 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls71 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Agreeing to engage in or refrain from engaging in certain conduct.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls72 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls72 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+A combination of both.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000028_1}{\*\bkmkend co_anchor_a000028_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Relevant Insurance
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+The availability of insurance coverage may help or impede a settlement. Plaintiff\rquote s counsel should consider whether the defendant has available insurance that may cover a settlement or a judgment.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+In California, if any party demands the exchange of initial disclosures, all represented parties are entitled to information on, among other things, any insurance policy that may either:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls73 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls73 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Cover all or part of a possible judgment against the defendant in the case.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls74 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls74 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Indemnify or reimburse for payments made to satisfy a possible judgment.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+(
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2016.090&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=21BCD604B95DDAF552C164450EEDBD8665FBD1C724F0C14C7A0B8660D260A9ED&contextData=(sc.Search)#co_pp_87f500004e8e4" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 2016.090(a)(1)(C), (D)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (applicable in actions filed on or after Jan. 1, 2024).) For more on initial disclosure requirements, see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/If5180bf6b0a511ee8921fbef1a541940/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)#co_anchor_a723229" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Practice Note, Early Discovery Obligations and Considerations in California Litigation: Initial Disclosures
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Defense counsel should review the defendant\rquote s insurance coverage when faced with a claim or potential claim and take all necessary steps to comply with its obligations under the policy and applicable law. For example, an insured party typically must fully and promptly inform its insurance carrier about any claim or potential claim and how the case is developing. An insured party that fails to comply with these types of policy obligations risks that the insurer denies coverage. In some actions, a defendant may be represented by both an insurer-appointed defense counsel and 
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/Ibf6a55f7e88511e698dc8b09b4f043e0/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf20 \f0 \i1 \fs18 
+{\b1 \cf20 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Cumis counsel
+}
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+If the client has not already produced insurance information in the underlying litigation, counsel should consider whether it benefits the client\rquote s position to voluntarily disclose this information in the settlement discussions. Counsel should be careful about volunteering the existence or amount of insurance coverage for a claim, especially pre-litigation, to avoid implying that it is prepared to settle for a certain amount.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+If necessary, counsel should recommend that the party obtain guidance from a lawyer experienced in dealing with insurance coverage matters if counsel or the insured party has any questions about the coverage afforded by the policy, the insurer\rquote s position on the claim, or any settlement that the insured is considering and wants its insurers to cover. For more on insurance companies\rquote  coverage of litigation costs, see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I0fa00c7bef0811e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Article, Minimizing Litigation Costs by Maximizing the Value of Insurance Coverage
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000029_1}{\*\bkmkend co_anchor_a000029_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Taxes
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Counsel must advise the client that, regardless of whether the client is paying or receiving the settlement proceeds, the settlement will have potential local, state, and federal tax implications. For example, because the timing of a settlement payout may impact the way tax authorities treat it, the client may want to delay, accelerate, or split up the settlement payment to reduce or avoid any unwanted tax consequences.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Tax law is complex, and counsel should not advise the client about the specific tax implications of a settlement if those matters are beyond the scope of counsel\rquote s expertise. Instead, counsel may wish to retain or advise the client to consult a tax specialist to:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls75 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls75 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Discuss the tax implications of various settlement options.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls76 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls76 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Assist in drafting the settlement agreement to minimize tax liability.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000030_1}{\*\bkmkend co_anchor_a000030_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb180 
+Legal Costs
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+A rule, statute, or contract may provide the prevailing party with the right to recover its legal costs, including attorneys\rquote  fees. If the client must pay the opposing party\rquote s legal costs, counsel should request itemized bills so that the client can assess their reasonableness and negotiate a lower reimbursement amount. If paying the opposing party\rquote s legal costs becomes a sticking point for the client, counsel may restructure the settlement terms to reduce or eliminate the impact.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+To avoid potential claims of self-dealing or breach of fiduciary duty, counsel should consider requesting judicial review of a settlement agreement that provides for counsel\rquote s attorneys\rquote  fees (see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=1994026284&pubNum=0004041&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=RP&fi=co_pp_sp_4041_922&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=5337DC23023EF9C708E9AF848DEAA50EA5ECCD761B4AAD724482982164AB04E8&contextData=(sc.Search)#co_pp_sp_4041_922" }{\fldrslt 
+{\b0 \cf20 \f0 \i1 \fs18 
+{\b0 \cf20 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Ramirez v. Sturdevant
+}
+}
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 21 Cal. App. 4th 904, 922-26 (1994)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000031_1}{\*\bkmkend co_anchor_a000031_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Drafting the Settlement Agreement
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Counsel should consider who should have primary control of the structure and format of the settlement agreement. If it is important to the client, counsel should seize the opportunity to prepare the initial draft from which the parties further negotiate the terms.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+For a sample settlement agreement and release that may be used to settle a California dispute, see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/Ica85ce5e9efc11e38578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Standard Document, Settlement Agreement and Release (CA)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a936511_1}{\*\bkmkend co_anchor_a936511_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Settlements Requiring Court Approval
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+While settlement generally allows the parties, rather than the court, to determine the litigation\rquote s outcome, in certain circumstances the court must approve the parties\rquote  agreement. For example, settlements of 
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I03f4dac7eee311e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+class actions
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ require court approval (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085226&cite=CASTCIVLR3.769&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=5C4044E47F9F90B416B417D1D81F0891EC50AB493DD4AF90A856C554D1BCB234&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 3.769(a)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000032_1}{\*\bkmkend co_anchor_a000032_1}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs28 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs28 \sa0 \sb0 
+Form of the Offer
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+In addition to engaging in traditional settlement discussions, a party may present its settlement offer in other ways to exert more pressure on the opposing party.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000033_1}{\*\bkmkend co_anchor_a000033_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Offer to Compromise
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+In a California state court action, any party may serve an offer to compromise on any other party in the action (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS998&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=264910C8E8A5600B2F861EB1B8F754DE127633B115E5A02CE0BC1670CC3FF490&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 998(b)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+). This places additional pressure on the adverse party to accept a settlement because a party that rejects an offer to compromise (the offeree) may incur part of the litigation costs of the party making the settlement offer (the offeror), depending on the case\rquote s final resolution. Specifically, the offeree risks incurring reasonable litigation expenses, additional prejudgment interest, reasonable attorney\rquote s fees, and costs of suit if the offeree fails to obtain a more favorable judgment (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS998&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=264910C8E8A5600B2F861EB1B8F754DE127633B115E5A02CE0BC1670CC3FF490&contextData=(sc.Search)#co_pp_10c0000001331" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 998(c)(1)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS998&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=264910C8E8A5600B2F861EB1B8F754DE127633B115E5A02CE0BC1670CC3FF490&contextData=(sc.Search)#co_pp_5ba1000067d06" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+(d)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+An offer must meet several requirements to be a valid offer to compromise under 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS998&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=264910C8E8A5600B2F861EB1B8F754DE127633B115E5A02CE0BC1670CC3FF490&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+California Code of 
+}
+{\b1 \cf22 \f0 \i0 \fs18 \chcbpat40 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Civil
+}
+}
+{\b0 \cf20 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ Procedure Section 998
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+. For example, an offer to compromise must be in writing, although it does not have to be in a particular format (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS998&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=264910C8E8A5600B2F861EB1B8F754DE127633B115E5A02CE0BC1670CC3FF490&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 998(b)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=1998070364&pubNum=0004041&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=RP&fi=co_pp_sp_4041_153&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=D31CCA02802E418524D646B85C7EC0AC88381CAEAAD60D1C70D93D694CAB2AFB&contextData=(sc.Search)#co_pp_sp_4041_153" }{\fldrslt 
+{\b0 \cf20 \f0 \i1 \fs18 
+{\b0 \cf20 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Saba v. Crater
+}
+}
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 62 Cal. App. 4th 150, 153 (1998)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (holding that oral statement of offer to compromise on record at deposition did not satisfy requirement that offer be in writing)).
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+For more on offers to compromise, see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I553d02323f1011ebbea4f0dc9fb69570/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Practice Note, Offer to Compromise (CA)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+. For a sample offer to compromise, see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/Idd4429af8cb211ebbea4f0dc9fb69570/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Standard Document, Offer to Compromise (CA)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a546067_1}{\*\bkmkend co_anchor_a546067_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Open Offer Before the Court
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+To the extent the judge or other judicial officer oversees the settlement discussions, making a formal offer in a court setting can have a positive impact for a party in two ways, by:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls77 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls77 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Demonstrating to the court the reasonableness of its position.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls78 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls78 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Forcing the opposing party to engage in the dialogue or risk appearing unreasonable.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+However, the potential positives must be balanced against the risk of the court construing a party\rquote s offer as a sign of weakness.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a999720_1}{\*\bkmkend co_anchor_a999720_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Settlement-Related Communications
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Regardless of how a party makes a settlement offer, a party may not use the offer and settlement communications to prove the validity or amount of a claim. Settlement-related communications are protected by the litigation privilege. (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000200&cite=CACIS47&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=28FBE4597A47262C7AD3FEB9E72EE0A1306B7441ACEF52A471EB1D4F0329F7D3&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Code \u167\'3f47(b)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=2056957406&pubNum=0007053&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=RP&fi=co_pp_sp_7053_304&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=4DEA2AE7894EE17311E4F1B5320F7CB8BC021A4541E0745A3780BBE4EEB397D1&contextData=(sc.Search)#co_pp_sp_7053_304" }{\fldrslt 
+{\b0 \cf20 \f0 \i1 \fs18 
+{\b0 \cf20 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Bonni v. St. Joseph Health System
+}
+}
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 83 Cal. App. 5th 288, 304-05 (2022)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; see also 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=2043909723&pubNum=0007053&originatingDoc=Icfa7196cca9011ee8921fbef1a541940&refType=RP&fi=co_pp_sp_7053_1145&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=F5A392A33687A66FBC5180FDF7C144D193D856DEFD8B74B911DE958E9BD03D7D&contextData=(sc.Search)#co_pp_sp_7053_1145" }{\fldrslt 
+{\b0 \cf20 \f0 \i1 \fs18 
+{\b0 \cf20 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Herterich v. Peltner
+}
+}
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 20 Cal. App. 5th 1132, 1145 (2018)
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (discussing exceptions to the litigation privilege).) To help identify protected communication, many attorneys prefer to include a statement such as \ldblquote Privileged and Confidential Settlement Communications\rdblquote  at the beginning of any written communication that contains settlement discussions.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000036_1}{\*\bkmkend co_anchor_a000036_1}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs28 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs28 \sa0 \sb0 
+Multiple Parties
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+When a dispute involves three or more parties, counsel should weigh several additional considerations.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000037_1}{\*\bkmkend co_anchor_a000037_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Related Parties
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+In cases with multiple parties, counsel should:
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls79 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls79 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Evaluate each party\rquote s potential liability exposure.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls80 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls80 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Assess each party\rquote s financial resources.
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls81 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls81 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+Consider whether any of the other parties to the dispute are connected to each other in a way that is significant to the dispute.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Parties with a common relationship or whose interests are aligned are more likely to coordinate their strategies and pool their ideas, information, and resources. For example, the defendants can agree on a united defense strategy and avoid falling victim to the plaintiff\rquote s \ldblquote divide and conquer\rdblquote  tactics (see 
+}
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000038_1" }{\fldrslt 
+{\b0 \cf20 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Divisions of Liability
+}}}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb180 
+). If other defendants start settling, defense counsel should keep in mind that it is rarely good to be the last defendant remaining in a case. They should reassess the strength of the claims asserted against their client and adjust the client\rquote s strategy to account for how any settlements may affect the client\rquote s position in the case.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000038_1}{\*\bkmkend co_anchor_a000038_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Divisions of Liability
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+There is often a tension between focusing on the total amount the client may want to recover and negotiating with the opposing parties to establish their share of liability. Counsel may settle with willing individual defendants separately (commonly known as the \ldblquote divide and conquer\rdblquote  strategy) to put additional pressure on defendants who are unwilling to engage in a meaningful settlement dialogue. Occasionally, this strategy results in a more favorable outcome overall than trying to achieve a single net result by negotiating collectively with all the parties simultaneously.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000039_1}{\*\bkmkend co_anchor_a000039_1}
+\par 
+}
+{\b1 \cf21 \f0 \ri0 \i0 \qj \fs24 \li0 
+{\b1 \cf21 \f0 \ul0 \strike0 \i0 \fs24 \sa0 \sb0 
+Similar Claims Against Additional Parties
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+When representing a plaintiff who may have similar future claims against other parties, counsel should ensure that the settlement does not release other claims against those parties.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+}
+}
+}
+}\sect }

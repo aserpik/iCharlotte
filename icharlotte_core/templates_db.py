@@ -50,6 +50,16 @@ class TemplatesDatabase:
             )
         ''')
 
+        # Placeholder mappings (global custom placeholder -> case variable mappings)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS placeholder_mappings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                custom_name TEXT NOT NULL UNIQUE,
+                maps_to TEXT NOT NULL,
+                created_date TEXT
+            )
+        ''')
+
         conn.commit()
         conn.close()
 
@@ -297,6 +307,58 @@ class TemplatesDatabase:
         cursor = conn.cursor()
 
         cursor.execute('DELETE FROM resource_tags WHERE resource_path = ?', (resource_path,))
+
+        conn.commit()
+        conn.close()
+
+    # ===== Placeholder Mapping Methods =====
+
+    def add_placeholder_mapping(self, custom_name, maps_to):
+        """Create or update a placeholder mapping."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            INSERT INTO placeholder_mappings (custom_name, maps_to, created_date)
+            VALUES (?, ?, ?)
+            ON CONFLICT(custom_name) DO UPDATE SET
+                maps_to = excluded.maps_to
+        ''', (custom_name.upper(), maps_to, datetime.now().isoformat()))
+
+        conn.commit()
+        conn.close()
+
+    def get_placeholder_mapping(self, custom_name):
+        """Get what a custom placeholder maps to."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT maps_to FROM placeholder_mappings WHERE custom_name = ?',
+                      (custom_name.upper(),))
+        row = cursor.fetchone()
+        conn.close()
+
+        return row[0] if row else None
+
+    def get_all_placeholder_mappings(self):
+        """Get all placeholder mappings."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT custom_name, maps_to FROM placeholder_mappings ORDER BY custom_name')
+        rows = cursor.fetchall()
+        conn.close()
+
+        return {row['custom_name']: row['maps_to'] for row in rows}
+
+    def delete_placeholder_mapping(self, custom_name):
+        """Remove a placeholder mapping."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute('DELETE FROM placeholder_mappings WHERE custom_name = ?',
+                      (custom_name.upper(),))
 
         conn.commit()
         conn.close()

@@ -62,6 +62,7 @@ class LogsTab(QWidget):
         self.category_combo.addItem("Email Tab")
         self.category_combo.addItem("Chat Tab")
         self.category_combo.addItem("Email Monitor")
+        self.category_combo.addItem("Calendar")
         self.category_combo.currentTextChanged.connect(self.refresh_view)
         controls_layout.addWidget(self.category_combo)
         

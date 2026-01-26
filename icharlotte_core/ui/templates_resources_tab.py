@@ -22,10 +22,12 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QUrl, QFileInfo, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6.QtWebEngineWidgets import QWebEngineView
+from PyQt6.QtWebEngineCore import QWebEngineSettings
 
 from ..config import TEMPLATES_DIR, RESOURCES_DIR, TEMPLATE_EXTENSIONS, RESOURCE_EXTENSIONS, GEMINI_DATA_DIR
 from ..templates_db import TemplatesDatabase
 from ..utils import log_event
+from ..bridge import LocalFileSchemeHandler
 
 
 class TemplateTreeWidget(QTreeWidget):
@@ -226,6 +228,130 @@ class TagEditDialog(QDialog):
         self.load_tags()
 
 
+class PlaceholderMappingDialog(QDialog):
+    """Dialog for mapping a custom placeholder to a case variable."""
+
+    # Available case variables grouped by category
+    VARIABLE_GROUPS = [
+        ("Case Info", [
+            ("Case Name", "CASE_NAME"),
+            ("Case Number", "CASE_NUMBER"),
+            ("File Number", "FILE_NUMBER"),
+            ("Venue County", "VENUE_COUNTY"),
+        ]),
+        ("Parties", [
+            ("Plaintiff", "PLAINTIFF"),
+            ("Plaintiffs (all)", "PLAINTIFFS"),
+            ("Defendant", "DEFENDANT"),
+            ("Defendants (all)", "DEFENDANTS"),
+            ("Client Name", "CLIENT_NAME"),
+        ]),
+        ("Dates", [
+            ("Today's Date", "TODAY_DATE"),
+            ("Today (Long)", "TODAY_DATE_LONG"),
+            ("Trial Date", "TRIAL_DATE"),
+            ("Incident Date", "INCIDENT_DATE"),
+            ("Filing Date", "FILING_DATE"),
+        ]),
+        ("Insurance", [
+            ("Claim Number", "CLAIM_NUMBER"),
+            ("Adjuster Name", "ADJUSTER_NAME"),
+            ("Adjuster Email", "ADJUSTER_EMAIL"),
+        ]),
+        ("Other", [
+            ("Plaintiff Counsel", "PLAINTIFF_COUNSEL"),
+        ]),
+    ]
+
+    def __init__(self, parent, placeholder_name, db, existing_mapping=None):
+        super().__init__(parent)
+        self.placeholder_name = placeholder_name.upper()
+        self.db = db
+        self.existing_mapping = existing_mapping
+        self.selected_mapping = None
+        self.setWindowTitle("Map Placeholder")
+        self.setMinimumWidth(350)
+        self.setup_ui()
+
+    def setup_ui(self):
+        layout = QVBoxLayout(self)
+
+        # Placeholder name display
+        name_label = QLabel(f"Custom Placeholder: <b>{{{{{self.placeholder_name}}}}}</b>")
+        name_label.setTextFormat(Qt.TextFormat.RichText)
+        layout.addWidget(name_label)
+
+        layout.addSpacing(10)
+
+        # Mapping dropdown
+        layout.addWidget(QLabel("Map to case variable:"))
+
+        self.mapping_combo = QComboBox()
+        self.mapping_combo.setMinimumWidth(280)
+
+        # Add "None" option first
+        self.mapping_combo.addItem("(None - keep as custom placeholder)", None)
+
+        # Add grouped variables
+        for group_name, variables in self.VARIABLE_GROUPS:
+            # Add group header (disabled)
+            self.mapping_combo.addItem(f"-- {group_name} --")
+            idx = self.mapping_combo.count() - 1
+            self.mapping_combo.model().item(idx).setEnabled(False)
+
+            # Add variables in group
+            for label, value in variables:
+                self.mapping_combo.addItem(f"  {label} ({{{{{value}}}}})", value)
+
+        # Select existing mapping if present
+        if self.existing_mapping:
+            for i in range(self.mapping_combo.count()):
+                if self.mapping_combo.itemData(i) == self.existing_mapping:
+                    self.mapping_combo.setCurrentIndex(i)
+                    break
+
+        layout.addWidget(self.mapping_combo)
+
+        layout.addSpacing(10)
+
+        # Info text
+        info_label = QLabel(
+            "When you 'Copy Filled', this placeholder will be replaced\n"
+            "with the value of the selected case variable."
+        )
+        info_label.setStyleSheet("color: #666; font-size: 11px;")
+        layout.addWidget(info_label)
+
+        layout.addSpacing(10)
+
+        # Buttons
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+        # Add delete button if editing existing mapping
+        if self.existing_mapping:
+            delete_btn = buttons.addButton("Remove Mapping", QDialogButtonBox.ButtonRole.DestructiveRole)
+            delete_btn.clicked.connect(self.remove_mapping)
+
+        layout.addWidget(buttons)
+
+    def accept(self):
+        self.selected_mapping = self.mapping_combo.currentData()
+        super().accept()
+
+    def remove_mapping(self):
+        self.selected_mapping = None
+        self.db.delete_placeholder_mapping(self.placeholder_name)
+        super().accept()
+
+    def get_mapping(self):
+        """Return the selected mapping (None if no mapping selected)."""
+        return self.selected_mapping
+
+
 class TemplatesResourcesTab(QWidget):
     """Main tab widget for Templates and Resources management."""
 
@@ -411,6 +537,15 @@ class TemplatesResourcesTab(QWidget):
 
         # Page 1: PDF Preview
         self.pdf_preview = QWebEngineView()
+        # Configure PDF preview settings
+        settings = self.pdf_preview.settings()
+        settings.setAttribute(QWebEngineSettings.WebAttribute.PluginsEnabled, True)
+        settings.setAttribute(QWebEngineSettings.WebAttribute.PdfViewerEnabled, True)
+        settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True)
+        settings.setAttribute(QWebEngineSettings.WebAttribute.LocalContentCanAccessRemoteUrls, True)
+        # Install scheme handler for local-resource:// URLs
+        self.scheme_handler = LocalFileSchemeHandler(self)
+        self.pdf_preview.page().profile().installUrlSchemeHandler(b"local-resource", self.scheme_handler)
         self.content_stack.addWidget(self.pdf_preview)
 
         # Page 2: Rich Text Editor
@@ -532,6 +667,19 @@ class TemplatesResourcesTab(QWidget):
         create_btn.clicked.connect(self.insert_custom_placeholder)
         layout.addWidget(create_btn)
 
+        # Separator
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.Shape.VLine)
+        sep2.setStyleSheet("color: #a8c8a8;")
+        layout.addWidget(sep2)
+
+        # Manage mappings button
+        mappings_btn = QPushButton("Mappings")
+        mappings_btn.setFixedWidth(65)
+        mappings_btn.setToolTip("Manage custom placeholder mappings")
+        mappings_btn.clicked.connect(self.show_manage_mappings_dialog)
+        layout.addWidget(mappings_btn)
+
         layout.addStretch()
 
         # Help button
@@ -587,6 +735,19 @@ class TemplatesResourcesTab(QWidget):
                 if first_selectable_idx is None:
                     first_selectable_idx = self.placeholder_combo.count() - 1
 
+        # Add custom placeholders from database
+        custom_mappings = self.db.get_all_placeholder_mappings()
+        if custom_mappings:
+            # Add Custom header
+            self.placeholder_combo.addItem("-- Custom --")
+            idx = self.placeholder_combo.count() - 1
+            self.placeholder_combo.model().item(idx).setEnabled(False)
+
+            # Add each custom placeholder
+            for custom_name, maps_to in sorted(custom_mappings.items()):
+                display = f"{custom_name} \u2192 {maps_to} ({{{{{custom_name}}}}})"
+                self.placeholder_combo.addItem(display, custom_name)
+
         # Select first real placeholder by default
         if first_selectable_idx is not None:
             self.placeholder_combo.setCurrentIndex(first_selectable_idx)
@@ -619,13 +780,32 @@ class TemplatesResourcesTab(QWidget):
                 "Placeholder names must start with a letter and contain only letters, numbers, and underscores.")
             return
 
-        placeholder_text = f"{{{{{name}}}}}"
-        self.insert_text_at_cursor(placeholder_text)
-        self.custom_placeholder_input.clear()
+        # Check if mapping already exists
+        existing_mapping = self.db.get_placeholder_mapping(name)
+
+        # Show mapping dialog
+        dialog = PlaceholderMappingDialog(self, name, self.db, existing_mapping)
+        result = dialog.exec()
+
+        if result == QDialog.DialogCode.Accepted:
+            mapping = dialog.get_mapping()
+            if mapping:
+                # Save the mapping
+                self.db.add_placeholder_mapping(name, mapping)
+                # Refresh dropdown to show new custom placeholder
+                self.populate_placeholder_combo()
+                # Update JavaScript variables for Ctrl+C to work
+                self.update_editor_variables()
+
+            # Insert the placeholder
+            placeholder_text = f"{{{{{name}}}}}"
+            self.insert_text_at_cursor(placeholder_text)
+            self.custom_placeholder_input.clear()
 
     def insert_text_at_cursor(self, text):
         """Insert text at the current cursor position in the editor."""
-        # Escape for JavaScript
+        # Escape for JavaScript string only (backslashes and quotes)
+        # Note: Braces in the text don't need escaping - f-string substitution inserts them as-is
         escaped_text = text.replace('\\', '\\\\').replace("'", "\\'")
         js = f"""
         (function() {{
@@ -648,6 +828,15 @@ class TemplatesResourcesTab(QWidget):
         self.editor_modified = True
         self.save_btn.setEnabled(True)
 
+    def update_editor_variables(self):
+        """Update the JavaScript templateVariables with current case variables."""
+        if self.current_item_type != 'templates':
+            return
+        variables = self.get_case_variables()
+        vars_js = json.dumps(variables)
+        js = f"templateVariables = {vars_js};"
+        self.editor.page().runJavaScript(js)
+
     def show_editor_context_menu(self, position):
         """Show context menu with placeholder options when right-clicking in editor."""
         # Only show placeholder menu when editing templates
@@ -655,6 +844,18 @@ class TemplatesResourcesTab(QWidget):
             return
 
         menu = QMenu(self)
+
+        # Add "Edit Placeholder Mapping" option at top
+        edit_mapping_action = QAction("Edit Placeholder Mapping...", self)
+        edit_mapping_action.triggered.connect(self.edit_placeholder_mapping_from_selection)
+        menu.addAction(edit_mapping_action)
+
+        # Add "Manage All Mappings" option
+        manage_mappings_action = QAction("Manage All Mappings...", self)
+        manage_mappings_action.triggered.connect(self.show_manage_mappings_dialog)
+        menu.addAction(manage_mappings_action)
+
+        menu.addSeparator()
 
         # Add placeholder submenu
         placeholder_menu = menu.addMenu("Insert Placeholder")
@@ -725,8 +926,147 @@ class TemplatesResourcesTab(QWidget):
                 QMessageBox.warning(self, "Invalid Name",
                     "Placeholder names must start with a letter and contain only letters, numbers, and underscores.")
                 return
-            placeholder_text = f"{{{{{name}}}}}"
-            self.insert_text_at_cursor(placeholder_text)
+
+            # Show mapping dialog
+            existing_mapping = self.db.get_placeholder_mapping(name)
+            dialog = PlaceholderMappingDialog(self, name, self.db, existing_mapping)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                mapping = dialog.get_mapping()
+                if mapping:
+                    self.db.add_placeholder_mapping(name, mapping)
+                    self.populate_placeholder_combo()  # Refresh dropdown
+                    self.update_editor_variables()  # Update JS variables
+
+                placeholder_text = f"{{{{{name}}}}}"
+                self.insert_text_at_cursor(placeholder_text)
+
+    def edit_placeholder_mapping_from_selection(self):
+        """Edit mapping for a placeholder - prompts user for the placeholder name."""
+        name, ok = QInputDialog.getText(
+            self, "Edit Placeholder Mapping",
+            "Enter placeholder name to edit mapping for:"
+        )
+        if ok and name:
+            name = name.strip().upper()
+            if not re.match(r'^[A-Z][A-Z0-9_]*$', name):
+                QMessageBox.warning(self, "Invalid Name",
+                    "Placeholder names must start with a letter and contain only letters, numbers, and underscores.")
+                return
+
+            existing_mapping = self.db.get_placeholder_mapping(name)
+            dialog = PlaceholderMappingDialog(self, name, self.db, existing_mapping)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                mapping = dialog.get_mapping()
+                if mapping:
+                    self.db.add_placeholder_mapping(name, mapping)
+                    self.status_label.setText(f"Mapped {{{{{name}}}}} to {{{{{mapping}}}}}")
+                else:
+                    self.status_label.setText(f"Removed mapping for {{{{{name}}}}}")
+                # Refresh dropdown and JS variables to reflect changes
+                self.populate_placeholder_combo()
+                self.update_editor_variables()
+
+    def show_manage_mappings_dialog(self):
+        """Show dialog to view and manage all placeholder mappings."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Manage Placeholder Mappings")
+        dialog.setMinimumSize(450, 350)
+        # Refresh dropdown and JS variables when dialog closes
+        dialog.finished.connect(lambda: (self.populate_placeholder_combo(), self.update_editor_variables()))
+        layout = QVBoxLayout(dialog)
+
+        layout.addWidget(QLabel("All custom placeholder mappings:"))
+
+        # List widget showing all mappings
+        mapping_list = QListWidget()
+        mapping_list.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+
+        def refresh_list():
+            mapping_list.clear()
+            mappings = self.db.get_all_placeholder_mappings()
+            if not mappings:
+                item = QListWidgetItem("(No custom mappings defined)")
+                item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsSelectable)
+                mapping_list.addItem(item)
+            else:
+                for custom_name, maps_to in sorted(mappings.items()):
+                    item = QListWidgetItem(f"{{{{{custom_name}}}}}  \u2192  {{{{{maps_to}}}}}")
+                    item.setData(Qt.ItemDataRole.UserRole, custom_name)
+                    mapping_list.addItem(item)
+
+        refresh_list()
+        layout.addWidget(mapping_list)
+
+        # Buttons
+        btn_layout = QHBoxLayout()
+
+        add_btn = QPushButton("Add New...")
+        def on_add():
+            name, ok = QInputDialog.getText(dialog, "New Mapping", "Placeholder name:")
+            if ok and name:
+                name = name.strip().upper()
+                if not re.match(r'^[A-Z][A-Z0-9_]*$', name):
+                    QMessageBox.warning(dialog, "Invalid Name",
+                        "Names must start with a letter and contain only letters, numbers, underscores.")
+                    return
+                existing = self.db.get_placeholder_mapping(name)
+                map_dialog = PlaceholderMappingDialog(dialog, name, self.db, existing)
+                if map_dialog.exec() == QDialog.DialogCode.Accepted:
+                    mapping = map_dialog.get_mapping()
+                    if mapping:
+                        self.db.add_placeholder_mapping(name, mapping)
+                    refresh_list()
+
+        add_btn.clicked.connect(on_add)
+        btn_layout.addWidget(add_btn)
+
+        edit_btn = QPushButton("Edit...")
+        def on_edit():
+            item = mapping_list.currentItem()
+            if not item:
+                return
+            name = item.data(Qt.ItemDataRole.UserRole)
+            if not name:
+                return
+            existing = self.db.get_placeholder_mapping(name)
+            map_dialog = PlaceholderMappingDialog(dialog, name, self.db, existing)
+            if map_dialog.exec() == QDialog.DialogCode.Accepted:
+                mapping = map_dialog.get_mapping()
+                if mapping:
+                    self.db.add_placeholder_mapping(name, mapping)
+                refresh_list()
+
+        edit_btn.clicked.connect(on_edit)
+        btn_layout.addWidget(edit_btn)
+
+        delete_btn = QPushButton("Delete")
+        def on_delete():
+            item = mapping_list.currentItem()
+            if not item:
+                return
+            name = item.data(Qt.ItemDataRole.UserRole)
+            if not name:
+                return
+            reply = QMessageBox.question(
+                dialog, "Delete Mapping",
+                f"Delete mapping for {{{{{name}}}}}?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.db.delete_placeholder_mapping(name)
+                refresh_list()
+
+        delete_btn.clicked.connect(on_delete)
+        btn_layout.addWidget(delete_btn)
+
+        btn_layout.addStretch()
+
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(dialog.accept)
+        btn_layout.addWidget(close_btn)
+
+        layout.addLayout(btn_layout)
+        dialog.exec()
 
     def show_placeholder_help(self):
         """Show help dialog explaining placeholders."""
@@ -883,9 +1223,12 @@ class TemplatesResourcesTab(QWidget):
         self.current_mode = 'templates' if mode_text == "Templates" else 'resources'
         self.tree.set_mode(self.current_mode)
 
-        # Show/hide category filter
+        # Category filter is visible for both modes
+        self.category_filter.setVisible(True)
+
+        # Tags button only for templates
         is_templates = self.current_mode == 'templates'
-        self.category_filter.setVisible(is_templates)
+        self.tag_filter_btn.setVisible(is_templates)
         self.new_btn.setText("New Template" if is_templates else "Open Folder")
 
         # Show/hide placeholder toolbar
@@ -973,17 +1316,23 @@ class TemplatesResourcesTab(QWidget):
         self.tree.clear()
 
         # Update category filter (block signals to prevent recursion)
+        current_cat = self.category_filter.currentText()
+        self.category_filter.blockSignals(True)
+        self.category_filter.clear()
+        self.category_filter.addItem("All")
+
         if self.current_mode == 'templates':
-            current_cat = self.category_filter.currentText()
-            self.category_filter.blockSignals(True)
-            self.category_filter.clear()
-            self.category_filter.addItem("All")
             for cat in self.db.get_all_categories():
                 self.category_filter.addItem(cat)
-            idx = self.category_filter.findText(current_cat)
-            if idx >= 0:
-                self.category_filter.setCurrentIndex(idx)
-            self.category_filter.blockSignals(False)
+        else:
+            # For resources, categories are subfolders
+            for cat in self.get_resource_categories():
+                self.category_filter.addItem(cat)
+
+        idx = self.category_filter.findText(current_cat)
+        if idx >= 0:
+            self.category_filter.setCurrentIndex(idx)
+        self.category_filter.blockSignals(False)
 
         if self.current_mode == 'templates':
             self.populate_templates_tree()
@@ -992,6 +1341,16 @@ class TemplatesResourcesTab(QWidget):
 
         # Re-apply filter
         self.filter_tree(self.search_input.text())
+
+    def get_resource_categories(self):
+        """Get list of subfolder names in Resources directory as categories."""
+        categories = []
+        if os.path.exists(RESOURCES_DIR):
+            for item in sorted(os.listdir(RESOURCES_DIR)):
+                item_path = os.path.join(RESOURCES_DIR, item)
+                if os.path.isdir(item_path):
+                    categories.append(item)
+        return categories
 
     def populate_templates_tree(self):
         """Populate tree with templates."""
@@ -1072,23 +1431,28 @@ class TemplatesResourcesTab(QWidget):
         self.tree.expandAll()
 
     def populate_resources_tree(self):
-        """Populate tree with resources."""
+        """Populate tree with resources organized by category (subfolder)."""
         if not os.path.exists(RESOURCES_DIR):
             return
 
         icon_provider = QFileIconProvider()
 
-        # Get resources that match tag filter
-        if self.active_tags:
-            matching_paths = set()
-            for tag in self.active_tags:
-                paths = self.db.get_resources_by_tag(tag)
-                matching_paths.update(paths)
-        else:
-            matching_paths = None
+        # Get selected category filter
+        category_filter = self.category_filter.currentText()
+        if category_filter == "All":
+            category_filter = None
 
-        for root, dirs, files in os.walk(RESOURCES_DIR):
-            rel_root = os.path.relpath(root, RESOURCES_DIR)
+        # Determine the base directory to scan
+        if category_filter:
+            # Only scan the selected category subfolder
+            scan_dir = os.path.join(RESOURCES_DIR, category_filter)
+            if not os.path.exists(scan_dir):
+                return
+        else:
+            scan_dir = RESOURCES_DIR
+
+        for root, dirs, files in os.walk(scan_dir):
+            rel_root = os.path.relpath(root, scan_dir)
 
             if rel_root == '.':
                 parent_item = self.tree.invisibleRootItem()
@@ -1106,7 +1470,7 @@ class TemplatesResourcesTab(QWidget):
                         parent_item = found
                     else:
                         folder_item = QTreeWidgetItem([part])
-                        folder_path = os.path.join(RESOURCES_DIR, *parts[:parts.index(part)+1])
+                        folder_path = os.path.join(scan_dir, *parts[:parts.index(part)+1])
                         folder_item.setData(0, Qt.ItemDataRole.UserRole, folder_path)
                         folder_item.setData(0, Qt.ItemDataRole.UserRole + 1, 'folder')
                         folder_item.setIcon(0, icon_provider.icon(QFileIconProvider.IconType.Folder))
@@ -1119,10 +1483,6 @@ class TemplatesResourcesTab(QWidget):
                     continue
 
                 file_path = os.path.join(root, filename)
-
-                # Apply tag filter
-                if matching_paths is not None and file_path not in matching_paths:
-                    continue
 
                 file_item = QTreeWidgetItem([filename])
                 file_item.setData(0, Qt.ItemDataRole.UserRole, file_path)
@@ -1154,7 +1514,7 @@ class TemplatesResourcesTab(QWidget):
 
         if ext == '.pdf':
             self.show_pdf_preview(path)
-        elif item_type == 'templates' or ext in ['.txt', '.html', '.docx']:
+        elif item_type == 'templates' or ext in ['.txt', '.html', '.docx', '.doc']:
             self.show_template_editor(path)
         else:
             self.show_pdf_preview(path)  # Try to preview other files
@@ -1218,6 +1578,22 @@ class TemplatesResourcesTab(QWidget):
                     return '\n'.join(html_parts)
                 except ImportError:
                     return "<p>python-docx not installed. Run: pip install python-docx</p>"
+
+            elif ext == '.doc':
+                # Use win32com on Windows to read .doc files
+                try:
+                    import win32com.client
+                    word = win32com.client.Dispatch("Word.Application")
+                    word.Visible = False
+                    doc = word.Documents.Open(path)
+                    text = doc.Content.Text
+                    doc.Close(False)
+                    word.Quit()
+                    return html.escape(text).replace('\n', '<br>').replace('\r', '')
+                except ImportError:
+                    return "<p>pywin32 not installed. Run: pip install pywin32</p>"
+                except Exception as e:
+                    return f"<p>Error reading .doc file: {html.escape(str(e))}</p>"
 
         except Exception as e:
             log_event(f"Error loading template: {e}", "error")
@@ -1354,6 +1730,11 @@ class TemplatesResourcesTab(QWidget):
                 file_number = self.main_window.file_number
 
         if not file_number:
+            # Still apply custom mappings even without a case loaded
+            mappings = self.db.get_all_placeholder_mappings()
+            for custom_name, maps_to in mappings.items():
+                if maps_to in variables:
+                    variables[custom_name] = variables[maps_to]
             return variables
 
         variables['FILE_NUMBER'] = file_number
@@ -1416,6 +1797,12 @@ class TemplatesResourcesTab(QWidget):
             except Exception as e:
                 log_event(f"Error loading case data: {e}", "error")
 
+        # Apply custom placeholder mappings
+        mappings = self.db.get_all_placeholder_mappings()
+        for custom_name, maps_to in mappings.items():
+            if maps_to in variables:
+                variables[custom_name] = variables[maps_to]
+
         return variables
 
     def extract_placeholders(self, content):
@@ -1466,6 +1853,7 @@ class TemplatesResourcesTab(QWidget):
         def on_html_ready(html_content):
             if html_content is None:
                 return
+
             # Convert HTML to plain text
             text = re.sub(r'<br\s*/?>', '\n', html_content)
             text = re.sub(r'<[^>]+>', '', text)
@@ -1521,7 +1909,15 @@ class TemplatesResourcesTab(QWidget):
 
     def open_current_folder(self):
         """Open the current folder in Explorer."""
-        folder = TEMPLATES_DIR if self.current_mode == 'templates' else RESOURCES_DIR
+        if self.current_mode == 'templates':
+            folder = TEMPLATES_DIR
+        else:
+            # For resources, open the selected category subfolder if one is selected
+            category = self.category_filter.currentText()
+            if category and category != "All":
+                folder = os.path.join(RESOURCES_DIR, category)
+            else:
+                folder = RESOURCES_DIR
         try:
             os.startfile(folder)
         except Exception as e:

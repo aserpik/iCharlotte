@@ -10,9 +10,9 @@ NOTETAKER_DIR = os.path.join(os.getcwd(), "NoteTaker", "out", "renderer")
 
 # Templates & Resources
 TEMPLATES_DIR = os.path.join(os.getcwd(), "Templates")
-RESOURCES_DIR = os.path.join(os.getcwd(), "Resources")
+RESOURCES_DIR = r"C:\geminiterminal2\LLM Resources"
 TEMPLATE_EXTENSIONS = ['.docx', '.txt', '.html', '.rtf']
-RESOURCE_EXTENSIONS = ['.pdf', '.docx', '.txt', '.html', '.png', '.jpg', '.jpeg']
+RESOURCE_EXTENSIONS = ['.pdf', '.docx', '.doc', '.txt', '.html', '.png', '.jpg', '.jpeg']
 
 API_KEYS = {
     "Gemini": os.environ.get("GEMINI_API_KEY"),

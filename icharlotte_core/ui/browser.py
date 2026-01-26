@@ -1,8 +1,8 @@
 import os
 import json
 from PyQt6.QtWidgets import QWidget, QVBoxLayout
-from PyQt6.QtCore import pyqtSignal, QUrl, QObject
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent
+from PyQt6.QtCore import pyqtSignal, QUrl, QObject, Qt
+from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QWheelEvent
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineScript
 from PyQt6.QtWebChannel import QWebChannel
@@ -122,6 +122,9 @@ class NoteTakerBrowser(QWebEngineView):
                         selectDirectory: () => new Promise(r => {
                             window.bridge.selectDirectory(r);
                         }),
+                        selectPdf: () => new Promise(r => {
+                            window.bridge.selectPdf(r);
+                        }),
                         listDirectory: (p) => new Promise(r => {
                             window.bridge.listDirectory(p, r);
                         }),
@@ -207,6 +210,22 @@ class NoteTakerBrowser(QWebEngineView):
         self.script.setRunsOnSubFrames(True)
         self.page().scripts().insert(self.script)
 
+
+    def wheelEvent(self, event: QWheelEvent):
+        """Intercept Ctrl+Wheel to prevent browser zoom and forward to JS for PDF zoom."""
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            # Get scroll delta (positive = zoom in, negative = zoom out)
+            delta = event.angleDelta().y()
+            if delta != 0:
+                # Forward to JavaScript for PDF-specific zoom
+                direction = 1 if delta > 0 else -1
+                js = f"if (window.handlePdfZoom) {{ window.handlePdfZoom({direction}); }}"
+                self.page().runJavaScript(js)
+            # Accept the event to prevent QWebEngine's default zoom
+            event.accept()
+            return
+        # For non-Ctrl wheel events, use default behavior
+        super().wheelEvent(event)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():

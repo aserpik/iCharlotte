@@ -1,0 +1,1803 @@
+{\rtf1 \ansi 
+{\colortbl;
+\red0\green0\blue0;
+\red255\green255\blue255;
+\red255\green0\blue0;
+\red0\green255\blue0;
+\red0\green0\blue255;
+\red0\green255\blue255;
+\red255\green0\blue255;
+\red255\green255\blue0;
+\red0\green0\blue128;
+\red0\green128\blue128;
+\red0\green128\blue0;
+\red128\green0\blue128;
+\red128\green0\blue0;
+\red128\green128\blue0;
+\red128\green128\blue128;
+\red192\green192\blue192;
+\red170\green170\blue170;
+\red85\green85\blue85;
+\red31\green31\blue31;
+\red247\green247\blue247;
+\red214\green214\blue214;
+\red33\green33\blue33;
+\red119\green119\blue119;
+\red80\green80\blue80;
+\red21\green137\blue21;
+\red204\green204\blue204;
+\red0\green111\blue196;
+\red151\green151\blue151;
+\red61\green61\blue61;
+\red56\green124\blue43;
+\red246\green246\blue246;
+\red37\green37\blue37;
+\red255\green255\blue102;
+\red107\green107\blue106;
+\red232\green233\blue232;
+\red86\green86\blue86;
+\red218\green218\blue218;
+\red255\green248\blue96;
+\red14\green86\blue140;
+\red229\green244\blue255;
+\red0\green93\blue162;
+\red240\green240\blue240;
+\red250\green250\blue250;
+\red70\green70\blue70;
+\red214\green78\blue69;
+\red61\green61\blue60;
+\red186\green186\blue186;
+\red250\green222\blue100;
+\red255\green204\blue153;
+\red23\green94\blue146;
+\red227\green232\blue250;
+\red70\green70\blue68;
+\red187\green187\blue187;
+\red0\green114\blue54;
+\red106\green144\blue39;
+\red118\green118\blue118;
+\red112\green112\blue112;
+\red181\green79\blue104;
+\red233\green233\blue233;
+\red223\green223\blue223;
+\red239\green239\blue239;
+\red71\green120\blue194;
+\red255\green255\blue204;
+\red255\green204\blue0;
+\red153\green153\blue153;
+\red203\green203\blue203;
+\red240\green248\blue255;
+\red127\green127\blue127;
+\red229\green243\blue255;
+\red179\green218\blue255;
+\red20\green93\blue164;
+\red245\green245\blue245;
+\red255\green255\blue198;
+\red236\green236\blue236;
+\red183\green242\blue206;
+\red105\green105\blue105;
+\red227\green227\blue227;
+\red255\green255\blue174;
+\red249\green249\blue249;
+\red190\green190\blue252;
+\red228\green231\blue232;
+\red254\green254\blue0;
+\red255\green210\blue183;
+}
+{\fonttbl {
+\f0 Arial;}{
+\f1 Symbol;}{
+\f2 Times New Roman;}{
+\f3 Georgia;}{
+\f4 sans-serif;}{
+\f5 Source Sans Pro;}{
+\f6 serif;}
+}
+{\*\generator Apache XML Graphics RTF Library;}
+\fet0 \ftnbj 
+{\*\listtable
+{\list\listtemplateid-1074906204\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-660269577}
+{\list\listtemplateid1607150577\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1933102042}
+{\list\listtemplateid-862499051\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-424947354}
+{\list\listtemplateid-1957089808\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1871699358}
+{\list\listtemplateid637460809\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1030423977}
+{\list\listtemplateid1524302527\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1948188792}
+{\list\listtemplateid-973537341\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid2107513231}
+{\list\listtemplateid863818396\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1944750483}
+{\list\listtemplateid579606721\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid709789557}
+{\list\listtemplateid1377026834\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-974831886}
+{\list\listtemplateid233538481\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1114365397}
+{\list\listtemplateid766801549\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-373776521}
+{\list\listtemplateid-290611997\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-870497824}
+{\list\listtemplateid-1770426063\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1054370616}
+{\list\listtemplateid-23369602\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid2120927863}
+{\list\listtemplateid1082816230\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid939801711}
+{\list\listtemplateid-236785480\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1537833304}
+{\list\listtemplateid854800055\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1135846494}
+{\list\listtemplateid525652801\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-174004104}
+{\list\listtemplateid1273550684\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1790103037}
+{\list\listtemplateid1072214527\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1428330466}
+{\list\listtemplateid-838649579\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-171639271}
+{\list\listtemplateid1464564481\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-356388320}
+{\list\listtemplateid-588775240\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1069395614}
+{\list\listtemplateid-1141523540\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1923791144}
+{\list\listtemplateid1899151373\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1354696619}
+{\list\listtemplateid1651995450\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1328367751}
+{\list\listtemplateid-1404645543\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1260090898}
+{\list\listtemplateid411703397\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1757520874}
+{\list\listtemplateid2053942328\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid1202468106}
+{\list\listtemplateid-934230434\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-215706926}
+{\list\listtemplateid359002543\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-1451775471}
+{\list\listtemplateid-432421628\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid21060814}
+{\list\listtemplateid-2000667263\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid788994830}
+{\list\listtemplateid57925714\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-2137330368}
+{\list\listtemplateid-1260349759\listsimple{\listlevel\leveljc\levelfollow0\levelspace0\levelindent0{\leveltext\'01\u8226\'3f}{\levelnumbers}}{\listname ;}\listid-237034827}
+}
+{\*\listoverridetable
+{\*\listoverride{\listid-660269577\listoverridecount0\ls1}}
+{\*\listoverride{\listid1933102042\listoverridecount0\ls2}}
+{\*\listoverride{\listid-424947354\listoverridecount0\ls3}}
+{\*\listoverride{\listid1871699358\listoverridecount0\ls4}}
+{\*\listoverride{\listid-1030423977\listoverridecount0\ls5}}
+{\*\listoverride{\listid-1948188792\listoverridecount0\ls6}}
+{\*\listoverride{\listid2107513231\listoverridecount0\ls7}}
+{\*\listoverride{\listid1944750483\listoverridecount0\ls8}}
+{\*\listoverride{\listid709789557\listoverridecount0\ls9}}
+{\*\listoverride{\listid-974831886\listoverridecount0\ls10}}
+{\*\listoverride{\listid1114365397\listoverridecount0\ls11}}
+{\*\listoverride{\listid-373776521\listoverridecount0\ls12}}
+{\*\listoverride{\listid-870497824\listoverridecount0\ls13}}
+{\*\listoverride{\listid1054370616\listoverridecount0\ls14}}
+{\*\listoverride{\listid2120927863\listoverridecount0\ls15}}
+{\*\listoverride{\listid939801711\listoverridecount0\ls16}}
+{\*\listoverride{\listid-1537833304\listoverridecount0\ls17}}
+{\*\listoverride{\listid-1135846494\listoverridecount0\ls18}}
+{\*\listoverride{\listid-174004104\listoverridecount0\ls19}}
+{\*\listoverride{\listid-1790103037\listoverridecount0\ls20}}
+{\*\listoverride{\listid1428330466\listoverridecount0\ls21}}
+{\*\listoverride{\listid-171639271\listoverridecount0\ls22}}
+{\*\listoverride{\listid-356388320\listoverridecount0\ls23}}
+{\*\listoverride{\listid1069395614\listoverridecount0\ls24}}
+{\*\listoverride{\listid1923791144\listoverridecount0\ls25}}
+{\*\listoverride{\listid1354696619\listoverridecount0\ls26}}
+{\*\listoverride{\listid-1328367751\listoverridecount0\ls27}}
+{\*\listoverride{\listid1260090898\listoverridecount0\ls28}}
+{\*\listoverride{\listid-1757520874\listoverridecount0\ls29}}
+{\*\listoverride{\listid1202468106\listoverridecount0\ls30}}
+{\*\listoverride{\listid-215706926\listoverridecount0\ls31}}
+{\*\listoverride{\listid-1451775471\listoverridecount0\ls32}}
+{\*\listoverride{\listid21060814\listoverridecount0\ls33}}
+{\*\listoverride{\listid788994830\listoverridecount0\ls34}}
+{\*\listoverride{\listid-2137330368\listoverridecount0\ls35}}
+{\*\listoverride{\listid-237034827\listoverridecount0\ls36}}
+}
+\paperw12240 \paperh15840 \margt1800 \margb1080 \margl1080 \margr1080 \headery720 \footery720 \itap0 \cols1 
+\sectd {\header {
+{\trowd \ltrrow \trleft0 
+\clpadb60 \clpadfb3 \clpadl400 \clpadfl3 \clbrdrt \clbrdrl \clbrdrr \trql \clvertalb \clwWidth9380 \cellx9380 
+\intbl 
+{\b0 \qc \cf1 \f0 \ri0 \i0 \fs18 \li0 
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+}
+{\b1 \cf1 \f0 \i0 \fs18 
+{\b1 \cf1 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+O\\ \rquote Shea, Dillon
+}
+}
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ 
+}
+{\b1 \cf1 \f0 \i0 \fs18 
+{\b1 \cf1 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+1/25/2026
+}
+}
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+\par 
+}
+}
+{\b0 \qc \cf1 \f0 \ri0 \i0 \fs18 \li0 
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+}
+{\b1 \cf1 \f0 \i0 \fs18 
+{\b1 \cf1 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+For Educational Use Only
+}
+}
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+}
+}\b0 \qc \cf1 \f0 \ri0 \ul0 \strike0 \i0 \fs18 \li0 \sa0 \sb0 \intbl \cell \row }
+{\trowd \ltrrow \trleft0 
+\clpadb60 \clpadfb3 \clpadl400 \clpadfl3 \clbrdrb \brdrcf17 \brdrw20 \brdrs \clbrdrl \trql \clvertalb \clwWidth9380 \cellx9380 
+\clpadb60 \clpadfb3 \clpadl400 \clpadfl3 \clbrdrb \brdrcf17 \brdrw20 \brdrs \clbrdrr \trql \clwWidth700 \cellx10080 
+\intbl 
+{\b0 \cf1 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+}
+{\b1 \cf18 \f0 \i0 \fs18 
+{\b1 \cf18 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Computing Time in State Court Litigation Checklist (CA), Practical Law Checklist...
+}
+}
+{\b0 \cf1 \f0 \ul0 \strike0 \i0 \fs18 
+}
+}\b0 \cf1 \f0 \ri0 \ul0 \strike0 \i0 \ql \fs18 \li0 \sa0 \sb0 \intbl \cell \intbl 
+{\qr \b0 \cf1 \f0 \ri0 \i0 \fs18 \li0 
+}\qr \b0 \cf1 \f0 \ri0 \i0 \fs18 \li0 \intbl \cell \row }
+{\trowd \lastrow \trleft0 
+\clbrdrb \clbrdrl \trql \clwWidth10080 \cellx10080 
+\intbl 
+{\b0 \cf1 \f0 \ri0 \i0 \ql \fs18 \li0 
+}\b0 \cf1 \f0 \ri0 \i0 \ql \fs18 \li0 \intbl \cell \row }}\par }{\footer {
+{\trowd \lastrow \trleft0 
+\clpadl60 \clpadfl3 \clbrdrt \brdrcf17 \brdrw20 \brdrs \clbrdrb \clbrdrl \trql \clvertalb \clwWidth9300 \cellx9300 
+\clpadl60 \clpadfl3 \clbrdrt \brdrcf17 \brdrw20 \brdrs \clbrdrb \clbrdrr \trql \clwWidth700 \cellx10000 
+\intbl 
+{\b0 \cf17 \f0 \ri0 \i0 \ql \fs20 \li0 
+{\b0 \cf17 \f0 \ul0 \strike0 \i0 \fs20 
+}
+{\*\shppict {\pict \pngblip \picw78 \pich10 \picwgoal1170 \pichgoal150 89504e470d0a1a0a0000000d494844520000004e0000000a08030000002dbd985500000300504c5445f8a969f6913ff68931fff9f5f69241f5852af68d38fcddc4f58326fac294f8a868fac193fcdabefab985fcdfc7fef5eef58022f8a35efef6effde5d2fac092fffaf6f9ac6ffffcfafde8d7fef7f1f9b279f6862cf8aa6af79e56f79c53f58327fef1e7fde3cefeeee2f9b076f79a4efef8f4f58123f58224f9ae72feefe4f58021f9ae71fac295fffaf7fcdabffef7f2f9af73f9b177f8ac6ef9b47cf8a15bf6872ef79648fef5edf9b278fcd9bdf9b782f9b57efbc89ffde3cffffefdf6872df8aa6bfcd6b8fac59af9b781fabc8bfffbf8fac091fac396fbceaaf8a461f68e39f6882ffabe8dfabf8ff9b884f79c52fdeadbfeede0f68c36f89f58fcdcc3fde0c9fef0e5fef3eaf68f3cfbcaa2f8a867f9b37afaba87f68b35fde7d6fabf90fffcfbfaba86fde7d5f6903efffdfcfef4ecf68f3bfde1cafcdfc6fbd1affbcea9fcd6b7f68a33f79444fbcba5f58429fcdec6f9af74f8a25df58428f7a461fef4edfdede0fde6d4fde7d4f9b680fbc69cfbc8a0f9b37bfac9a1f69240f79d54fcd4b4f9b883f68e3afef8f3fdebddfde2cbf7984cf8a35ff6882efef3ebf9bd8cfcd4b5feecdef8a562fde6d3fef9f4fcdbc1f9bc8afcd8bcf8ab6dfef8f2fcd7b9fffbf7feefe3f79546f8aa69f79f57fde1cbfcd3b3fcd2b1f8a25cfcd3b2fde2ccfac599fac397f9b379fcd8bbfbd2b0fef2e9fcd5b6fac79ef8a664f8a460f68a32fac090fffbf9fef2e8f8ab6cfde4d0f7994df6903df79749fffefcf79e55f8a766f8a059f68830f7974afde2cdfbcca6fabd8cf57f20ffffff000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c5baaa8e000000bf74524e53ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff00456e8439000002804944415478da63dcc70001fef2931866b0be0cd2085114e5ff7ef72a0357d0a3a31cc2129ebb9f492a3e4b6eb8cb20913bb5c808a2f849bf610c438bf99a9917cf2a18092c7bf1a30a6a0a13946658f6af92e15352e52386af5d677ee5ff61618c5ca7c6b58921d6ecc47383e56a52b3181955bf2e3e01513b49bae7260383be8b048376a2e34786a3853761a6b0c018892b57313c48fa38834195c1cf94c16a3a03c3edad7c5f163030a8672bcc3afcf4251343639ef3ae2cb05afe384e9390352a0c320cbdf71f19b43d6690c7302e84e11383d28bff67bcba9a6e2831acd9c6e0d990fe70b74ae7d2a90c0cbbc36fbaef6660b80f55ba68e9d2d5a9ae0cdd2f341878be8b9c64f8cb701d660a733c9451af78704effa1c6b3536708cf2c9ffde7c78fcb9b16497b8acf3e3721061812bfde8433302c8d5a190152ca93f7d26df6796bff83310dbfe504de7f7ff9ec621c7ad8ade964d5f0f8162da4257e9da18c39434955602283a37fdaefde9cb30c686005c3a4c9a6d792186c6b665d8e54f97ae7c5badd189e65307c22395565fbc43fcc010cad5b3ba781c5363184af0bfa8530481844b84e65b87efde6bcb50c67d9dc36d4f6bf7aa6e4015700771dc3fd57751f183c97ecfe7f04c8b17e9f9fdfceb0e334c3ca37c16940feb644b09ad7e1aee90cdaaa9f1ca31ef6bd6478e2b43ba29f615fc7cf550c1861c720c2699619c930d362d55a060ff68e592f7d4eacd82df9eb3bd7bd387986ff73182d18183686ba2ff9f76ec59f909c2e83a8499dbbaaa404ecf8199cb8051e79627ad6fa4799360383602cd0bdcbdeb2fc6158debec577daf1a9076ba51818e679bf05aaf85cfdeb0f8383c1ec0973801cee342386c537cdf218fecf4b70801b0200f61ff095f54de6170000000049454e44ae426082}}
+{\b0 \cf17 \f0 \ul0 \strike0 \i0 \fs20 \sa0 \sb0 
+ \u169\'3f 2026 Thomson Reuters. No claim to original U.S. Government Works.
+}
+}\b0 \cf17 \f0 \ri0 \ul0 \strike0 \i0 \ql \fs20 \li0 \sa0 \sb0 \intbl \cell \intbl 
+{\qr \b0 \cf17 \f0 \ri0 \i0 \fs20 \li0 
+{\b0 \i0 \ul0 \fs20 \f0 \chpgn }
+}\qr \b0 \cf17 \f0 \ri0 \ul0 \strike0 \i0 \fs20 \li0 \intbl \cell \row }}\par }
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 \par}\sect\sbknone\pgncont\cols1{\ids0 
+{\*\bkmkstart co_document_1}{\*\bkmkend co_document_1}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart Ibd965f1d8e9011e38578f7ccc38dcbee_Target}{\*\bkmkend Ibd965f1d8e9011e38578f7ccc38dcbee_Target}
+\par 
+}
+{\b0 \cf24 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\*\bkmkstart co_docContentHeader_1}{\*\bkmkend co_docContentHeader_1}
+\par 
+{\b0 \cf24 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\*\bkmkstart co_docHeaderContainer_1}{\*\bkmkend co_docHeaderContainer_1}
+\par 
+{\b1 \cf22 \f0 \ri0 \i0 \ql \fs36 \li0 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs36 \sa0 \sb0 
+Computing Time in State Court Litigation Checklist (CA)
+\par 
+}
+}
+{\b1 \cf24 \f0 \ri0 \i0 \ql \fs22 \li0 
+{\b1 \cf24 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+by\u160\'3fPractical Law 
+}
+{\b1 \cf32 \f0 \i0 \fs22 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs22 \sa120 \sb120 
+Litigation
+}
+}
+{\b1 \cf24 \f0 \i0 \fs22 \chcbpat2 
+\par 
+}
+}
+{\b0 \cf24 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf24 \f0 \ri0 \i0 \qj \fs18 \li0 {
+{\trowd \lastrow \trleft0 
+\clpadt33 \clpadft3 \clpadr33 \clpadfr3 \clbrdrt \clbrdrb \clbrdrl \clbrdrr \trql \clvertalt \clwWidth10080 \cellx10080 
+\intbl 
+{\ri33 \li33 
+{\b1 \cf24 \f0 \ri33 \i0 \ql \fs22 \li33 
+{\b1 \cf25 \f0 \i0 \fs22 
+{\b1 \cf25 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+Maintained
+}
+}
+{\b1 \cf23 \f0 \i0 \fs17 
+{\b1 \cf23 \f0 \ul0 \strike0 \i0 \fs17 \sa0 \sb0 
+ \u8226\'3f 
+}
+}
+{\b1 \cf24 \f0 \i0 \fs22 
+{\b1 \cf24 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+California
+\par 
+}
+}
+}
+}\b1 \cf24 \f0 \ri33 \ul0 \strike0 \i0 \ql \li33 \fs22 \sa0 \sb0 \intbl \cell \row }}\par 
+}
+}
+}
+}
+{\b0 \cf19 \f0 \i0 \brdrt \brdrcf26 \brdrw20 \brdrs \fs18 \brdrr \brdrcf26 \brdrw0 \brdrs \brdrl \brdrcf26 \brdrw0 \brdrs \ri0 \qj \li0 \brdrb \brdrcf26 \brdrw0 \brdrs 
+{\*\bkmkstart co_docContentBody_1}{\*\bkmkend co_docContentBody_1}
+\par 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \chbrdr \brdrcf26 \brdrw20 \brdrs \f0 \ri0 \i0 \qj \fs22 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs22 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs22 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+A Checklist that provides California 
+}
+{\b1 \cf32 \f0 \i0 \fs22 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+litigators
+}
+}
+{\b0 \cf19 \f0 \i0 \fs22 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+ with key steps for computing time periods measured in days for state court 
+}
+{\b1 \cf32 \f0 \i0 \fs22 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+litigation
+}
+}
+{\b0 \cf19 \f0 \i0 \fs22 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+. This Checklist outlines how to identify the correct time period and triggering event, distinguish between court days and calendar days, and calculate both forward-counting and backward-counting 
+}
+{\b1 \cf32 \f0 \i0 \fs22 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+deadlines
+}
+}
+{\b0 \cf19 \f0 \i0 \fs22 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+. It explains how to apply automatic extensions of time under the California Code of 
+}
+{\b1 \cf32 \f0 \i0 \fs22 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+Civil
+}
+}
+{\b0 \cf19 \f0 \i0 \fs22 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+ Procedure and California Rules of Court, including crucial service-based extensions for documents served by US mail, express mail, fax, or electronic transmission. The Checklist also addresses how these service extensions apply to motions, including the specific notice periods for most motions and for summary judgment motions. Finally, it details the rules for extending deadlines that fall on a weekend or holiday, helping practitioners accurately determine the final due date for any filing or required act.
+\par 
+}
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs22 \sa400 \sb0 
+\u160\'3f\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\*\bkmkstart kh_toc-wrapper_1}{\*\bkmkend kh_toc-wrapper_1}
+\par 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\*\bkmkstart kh_tocContainer_1}{\*\bkmkend kh_tocContainer_1}
+\par 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf24 \f0 \ri0 \i0 \qj \fs18 \li-120 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000001_1" }{\fldrslt 
+{\b1 \cf27 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+\u160\'3fStep 1: Determine General Size of Time Period
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000011_1" }{\fldrslt 
+{\b1 \cf27 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+\u160\'3fStep 2: Identify Triggering Event and Deadline Direction
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000003_1" }{\fldrslt 
+{\b1 \cf27 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+\u160\'3fStep 3: Count Days in Time Period
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000005_1" }{\fldrslt 
+{\b1 \cf27 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+\u160\'3fStep 4: Account for Service-Based Extensions
+}}}
+\sa120 
+\par 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li0 
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000012_1" }{\fldrslt 
+{\b1 \cf27 \f0 \ul0 \strike0 \i0 \fs22 \sa0 \sb0 
+\u160\'3fStep 5: Account for Weekend and Holiday Extensions
+}}}
+\sa120 
+\par 
+}
+}
+}
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000001_1}{\*\bkmkend co_anchor_a000001_1}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b1 \cf22 \f0 \ri0 \i0 \qj \fs28 \li0 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs28 \sa0 \sb0 
+Step 1: Determine General Size of Time Period
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls1 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls1 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Number of days.
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ Check the statute or rule governing the specific task at issue to determine the time period in which the task must be completed (for example, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1005&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=134771FEC4BA4DCD3421EEC3A7EE9BEB0C9E3E2F9EC30BB18543B4473A824F61&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1005(b)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ (motion papers must be served and filed at least 16 court days before hearing date)).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls2 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls2 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Court or calendar days.
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ Determine whether the time period is computed in:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls3 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls3 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+calendar days (for example, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2030.260&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=D04F8E12D524A6F45CF7ADCB5321AC57B15226C9359EE3D95CD1341A3C93FF9E&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 2030.260(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I42995f2c136111e498db8b09b4f043e0/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+interrogatory
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+ responses to be served within 30 days after service of interrogatories)); or
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls4 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls4 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+court days, meaning days the court is open for business (for example, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1005&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=134771FEC4BA4DCD3421EEC3A7EE9BEB0C9E3E2F9EC30BB18543B4473A824F61&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1005(b)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+ (motion papers must be served and filed at least 16 court days before hearing date)).
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls5 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls5 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Default timeframe.
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ If the statute or rule does not specify the timeframe in court days, the measurement is in calendar days (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=2022877009&pubNum=0004041&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=RP&fi=co_pp_sp_4041_1276&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=376BFDF8DF5991903FD8D221A7CE25458BCC1D57B6259A371C53C51A9401F14B&contextData=(sc.Search)#co_pp_sp_4041_1276" }{\fldrslt 
+{\b0 \cf27 \f0 \i1 \fs18 
+{\b0 \cf27 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+In re R.R.
+}
+}
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 187 Cal. App. 4th 1264, 1276 (2010)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+;
+}
+{\b0 \cf19 \f0 \i1 \fs18 
+{\b0 \cf19 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+ 
+}
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=1985122357&pubNum=0000226&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=RP&fi=co_pp_sp_226_548&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=6AA9601B81F41F20419FA5E6A6122206089708A0F0EE44E6A1CF566EF76FA1B4&contextData=(sc.Search)#co_pp_sp_226_548" }{\fldrslt 
+{\b0 \cf27 \f0 \i1 \fs18 
+{\b0 \cf27 \f0 \ul0 \strike0 \i1 \fs18 \sa0 \sb0 
+Iverson v. Super. Ct.
+}
+}
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 167 Cal. App. 3d 544, 548 (1985)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000011_1}{\*\bkmkend co_anchor_a000011_1}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b1 \cf22 \f0 \ri0 \i0 \qj \fs28 \li0 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs28 \sa0 \sb0 
+Step 2: Identify Triggering Event and 
+}
+{\b1 \cf32 \f0 \i0 \fs28 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs28 \sa0 \sb0 
+Deadline
+}
+}
+{\b1 \cf22 \f0 \i0 \fs28 \chcbpat2 
+}
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs28 \sa0 \sb0 
+ Direction
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls6 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls6 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Triggering event.
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ Determine the event that triggers the running of the time period (for example, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2030.260&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=D04F8E12D524A6F45CF7ADCB5321AC57B15226C9359EE3D95CD1341A3C93FF9E&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 2030.260(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (service of interrogatories triggers 
+}
+{\b1 \cf32 \f0 \i0 \fs18 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ in which to serve interrogatory responses)).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls7 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls7 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf32 \f0 \i0 \fs18 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Deadline
+}
+}
+{\b1 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ direction.
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ Determine whether the 
+}
+{\b1 \cf32 \f0 \i0 \fs18 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ is:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls8 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls8 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+forward-counting, meaning the 
+}
+{\b1 \cf32 \f0 \i0 \fs18 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ is computed by counting the number of days 
+}
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+after
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ the event that triggers the running of the time period (for example, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS2030.260&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=D04F8E12D524A6F45CF7ADCB5321AC57B15226C9359EE3D95CD1341A3C93FF9E&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 2030.260(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (forward-counting 
+}
+{\b1 \cf32 \f0 \i0 \fs18 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+ to serve interrogatory responses)); or
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls9 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls9 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+backward-counting, meaning the 
+}
+{\b1 \cf32 \f0 \i0 \fs18 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ is computed by counting the number of days 
+}
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+before
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ the triggering event (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS12C&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=519F1144561CD3353D5DC0717F3D13AEE4911DBB3128C60FC3E5DE09D221C6A3&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 12c
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; for example, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1005&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=134771FEC4BA4DCD3421EEC3A7EE9BEB0C9E3E2F9EC30BB18543B4473A824F61&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1005(b)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (backward-counting 
+}
+{\b1 \cf32 \f0 \i0 \fs18 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+ for service and filing of initial moving papers)).
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000003_1}{\*\bkmkend co_anchor_a000003_1}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b1 \cf22 \f0 \ri0 \i0 \qj \fs28 \li0 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs28 \sa0 \sb0 
+Step 3: Count Days in Time Period
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls10 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls10 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Exclude first day.
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ Begin counting on the day immediately:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls11 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls11 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+after the triggering event, for forward-counting 
+}
+{\b1 \cf32 \f0 \i0 \fs18 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadlines
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS12&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C614485F1F230E412A3E9D66ACDD0A230ADCBDD647BEFDB07F85C46AFAB2C206&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 12
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085224&cite=CASTALLCTR1.10&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=6D67B838426F19802D8A7FD75FF34AE817C6AA5EB1806188C448B3E3F873E1B8&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 1.10(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+); and
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls12 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls12 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+before the triggering event, for backward-counting 
+}
+{\b1 \cf32 \f0 \i0 \fs18 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadlines
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS12C&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=519F1144561CD3353D5DC0717F3D13AEE4911DBB3128C60FC3E5DE09D221C6A3&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 12c(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+).
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls13 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls13 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Include intermediate days.
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ For time periods counted in:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls14 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls14 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+calendar days, include every intermediate day in the time period, even weekends and intervening holidays; and
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls15 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls15 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+court days, include only days the court is open (do not include intervening weekends and holidays).
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls16 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls16 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Include last day.
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ Include the last day of the period unless that day is a Saturday, Sunday, or holiday (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS12&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C614485F1F230E412A3E9D66ACDD0A230ADCBDD647BEFDB07F85C46AFAB2C206&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 12
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085224&cite=CASTALLCTR1.10&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=6D67B838426F19802D8A7FD75FF34AE817C6AA5EB1806188C448B3E3F873E1B8&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 1.10(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls17 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls17 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Weekend and holidays.
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ If a 
+}
+{\b1 \cf32 \f0 \i0 \fs18 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ lands on a Saturday, Sunday, or holiday, the 
+}
+{\b1 \cf32 \f0 \i0 \fs18 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ is extended to the next day that is not a Saturday, Sunday, or holiday (see 
+}
+{\field {\*\fldinst HYPERLINK "#co_anchor_a000012_1" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Step 5: Account for Weekend and Holiday Extensions
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000005_1}{\*\bkmkend co_anchor_a000005_1}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b1 \cf22 \f0 \ri0 \i0 \qj \fs28 \li0 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs28 \sa0 \sb0 
+Step 4: Account for Service-Based Extensions
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls18 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls18 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Non-motions.
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ For non-motion 
+}
+{\b1 \cf32 \f0 \i0 \fs18 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadlines
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ tied to service of a document, add:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls19 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls19 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+five, ten, 12, or 20 
+}
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+calendar
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ days to the 
+}
+{\b1 \cf32 \f0 \i0 \fs18 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (depending on where the place of mailing and place of receipt are located), if serving by US mail (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1013&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=CF4FFE22F32797E6507B734DE16753C086251AA66E43B471DC32BBB5E026D88C&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1013(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+); or
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls20 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls20 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+two 
+}
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+court 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+days to the 
+}
+{\b1 \cf32 \f0 \i0 \fs18 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ if serving by Express mail or overnight courier (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1013&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=CF4FFE22F32797E6507B734DE16753C086251AA66E43B471DC32BBB5E026D88C&contextData=(sc.Search)#co_pp_4b24000003ba5" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1013(c)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+), fax (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1013&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=CF4FFE22F32797E6507B734DE16753C086251AA66E43B471DC32BBB5E026D88C&contextData=(sc.Search)#co_pp_7fdd00001ca15" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1013(e)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+), or electronic transmission such as email (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1010.6&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=4E0ECD506BAC5AD0495F1A101B57DC97E8B4A315345E0DFAADD6B22A1443EBA9&contextData=(sc.Search)#co_pp_27d200007c2a1" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1010.6(a)(3)(B)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+).
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls21 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls21 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Motions.
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ Extend the 16-court-day notice period (applicable to most motions, with some exceptions) between the hearing date and the date the initial moving papers must be served and filed by:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls22 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls22 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+five, ten, 12, or 20 
+}
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+calendar
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ days (depending on where the place of mailing and place of receipt are located), if serving the initial motion papers by US mail (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1005&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=134771FEC4BA4DCD3421EEC3A7EE9BEB0C9E3E2F9EC30BB18543B4473A824F61&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1005(b)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS437C&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=455720B27C7F04A514A332C9A73003420DF03B0B981AE1421D11FD31492C2201&contextData=(sc.Search)#co_pp_d86d0000be040" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 437c(a)(2)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (applying rule to 81-day notice period for 
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I0f9fbfe7ef0811e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+summary judgment
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+ motions));
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls23 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls23 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+two 
+}
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+calendar
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ days if serving the initial motion papers by Express mail, overnight courier, or fax (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1005&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=134771FEC4BA4DCD3421EEC3A7EE9BEB0C9E3E2F9EC30BB18543B4473A824F61&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1005(b)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS437C&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=455720B27C7F04A514A332C9A73003420DF03B0B981AE1421D11FD31492C2201&contextData=(sc.Search)#co_pp_d86d0000be040" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 437c(a)(2)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (two 
+}
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+court days 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+added to 81-day notice period for summary judgment motions); 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085225&cite=CATRCRTR2.306&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=4C0D8EBF11DDF035F9DCB77204817372AB75111B06E5D90206BA620CD76C27DA&contextData=(sc.Search)#co_pp_5ba1000067d06" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 2.306(d)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (two 
+}
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+court 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+days added for fax service); see 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=Y&serNum=0431582867&pubNum=0103977&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=TS&docFamilyGuid=Ic77bb6e8297e11e5a977f69f36ef3c17&fi=co_pp_sp_103977_9%3a87.2&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=F519F46D614B352EFAC2849FFFFFA601F19C0B80AED8402D25A5C3A66A3CF856&contextData=(sc.Search)#co_pp_sp_103977_9:87.2" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Prac. Guide Civ. Pro. Before Trial Ch. 9(I)-B, 9:87.2
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (recognizing conflict between 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1005&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=134771FEC4BA4DCD3421EEC3A7EE9BEB0C9E3E2F9EC30BB18543B4473A824F61&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code Section 1005(b)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ and 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085225&cite=CATRCRTR2.306&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=4C0D8EBF11DDF035F9DCB77204817372AB75111B06E5D90206BA620CD76C27DA&contextData=(sc.Search)#co_pp_5ba1000067d06" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 2.306(d)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+)); or
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls24 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls24 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+two 
+}
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+court 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+days if serving the initial motion papers by electronic means such as email (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1010.6&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=4E0ECD506BAC5AD0495F1A101B57DC97E8B4A315345E0DFAADD6B22A1443EBA9&contextData=(sc.Search)#co_pp_27d200007c2a1" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 1010.6(a)(3)(B)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+).
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls25 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls25 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Exceptions. 
+}
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1013&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=CF4FFE22F32797E6507B734DE16753C086251AA66E43B471DC32BBB5E026D88C&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+California Code of 
+}
+{\b1 \cf32 \f0 \i0 \fs18 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Civil
+}
+}
+{\b0 \cf27 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ Procedure Section 1013
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\rquote s extensions do not affect the time to file a notice of intention to move for new trial, notice of intention to move to vacate judgment under 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS663A&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=13457CA096995197525A4F8B8DE82696830D8F030A9D849B62B6641144DCF257&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+California Code of 
+}
+{\b1 \cf32 \f0 \i0 \fs18 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Civil
+}
+}
+{\b0 \cf27 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ Procedure Section 663a
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, or a 
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/I0f9fe904ef0811e28578f7ccc38dcbee/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+notice of appeal
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1013&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=CF4FFE22F32797E6507B734DE16753C086251AA66E43B471DC32BBB5E026D88C&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f\u167\'3f 1013(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1013&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=CF4FFE22F32797E6507B734DE16753C086251AA66E43B471DC32BBB5E026D88C&contextData=(sc.Search)#co_pp_4b24000003ba5" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+(c)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1013&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=CF4FFE22F32797E6507B734DE16753C086251AA66E43B471DC32BBB5E026D88C&contextData=(sc.Search)#co_pp_7fdd00001ca15" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+(e)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, and 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS1010.6&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=4E0ECD506BAC5AD0495F1A101B57DC97E8B4A315345E0DFAADD6B22A1443EBA9&contextData=(sc.Search)#co_pp_27d200007c2a1" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+1010.6(a)(3)(B)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 
+{\b0 \cf19 \f0 \i0 \fs18 
+{\*\bkmkstart co_anchor_a000012_1}{\*\bkmkend co_anchor_a000012_1}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b1 \cf22 \f0 \ri0 \i0 \qj \fs28 \li0 
+{\b1 \cf22 \f0 \ul0 \strike0 \i0 \fs28 \sa0 \sb0 
+Step 5: Account for Weekend and Holiday Extensions
+\par 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+\u160\'3f
+\par 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li0 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls26 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls26 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Basic rule. 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+If a 
+}
+{\b1 \cf32 \f0 \i0 \fs18 \chcbpat33 
+{\b1 \cf32 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+deadline
+}
+}
+{\b0 \cf19 \f0 \i0 \fs18 \chcbpat2 
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ falls on a Saturday, Sunday, or holiday, the time period continues to run (forward or backward, as the case may be) to the next day that is not a Saturday, Sunday, or holiday (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS10&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=9D17E90D5F14730B2C31DA3BBA10960477F6378CA651D6B559215C6C995B0AA3&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f\u167\'3f 10
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS12&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C614485F1F230E412A3E9D66ACDD0A230ADCBDD647BEFDB07F85C46AFAB2C206&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+12
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS12A&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=304B8D4228822D5EA242ABA61E74A8BBAA9D2EAFBEC365A3A74F81B53328EB0C&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+12a(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, and 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS12B&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=527369449B74A4DF9E2CEDF1CCF5093DD4C61D7DA54559D10CD099B302AACB53&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+12b
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS12C&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=519F1144561CD3353D5DC0717F3D13AEE4911DBB3128C60FC3E5DE09D221C6A3&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 12c
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (applying rule to backward-counting deadlines); 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085224&cite=CASTALLCTR1.10&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=6D67B838426F19802D8A7FD75FF34AE817C6AA5EB1806188C448B3E3F873E1B8&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 1.10(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085224&cite=CASTALLCTR1.10&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=6D67B838426F19802D8A7FD75FF34AE817C6AA5EB1806188C448B3E3F873E1B8&contextData=(sc.Search)#co_pp_a83b000018c76" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+(b)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+).
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls27 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls27 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Holidays defined. 
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+For purposes of computing time, holidays include:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls28 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls28 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Saturdays (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS12A&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=304B8D4228822D5EA242ABA61E74A8BBAA9D2EAFBEC365A3A74F81B53328EB0C&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 12a(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+);
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls29 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls29 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Sundays (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS10&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=9D17E90D5F14730B2C31DA3BBA10960477F6378CA651D6B559215C6C995B0AA3&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f 10
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+);
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls30 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls30 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+judicial holidays designated in 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS135&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=C2F36325FAB25A826710F476BBDB5A367C6C5A66E1D8C2F8C0861A9F00D3715F&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+California Code of Civil Procedure Section 135
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS10&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=9D17E90D5F14730B2C31DA3BBA10960477F6378CA651D6B559215C6C995B0AA3&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f\u167\'3f 10
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ and 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS12A&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=304B8D4228822D5EA242ABA61E74A8BBAA9D2EAFBEC365A3A74F81B53328EB0C&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+12a(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+);
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls31 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls31 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+closures due to emergency conditions (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000211&cite=CAGTS68115&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=275EFC0CFD8BBB957A6907CF88A1B383C3E52C983253D4187E98BEA23CBD5F72&contextData=(sc.Search)#co_pp_d40e000072291" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Gov\rquote t Code \u167\'3f 68115(a)(4)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+; see also, for example, 
+}
+{\field {\*\fldinst HYPERLINK "https://www.lacourt.org/newsmedia/uploads/14202031619253220NRPJCLOSESNON-ESSENTIALOPSFORTHREEDAYS.pdf" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+LA Superior Court News Release (March 16, 2020)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ (declaring court statutory holiday to toll time and deadlines due to the outbreak of the 2019 novel coronavirus disease (
+}
+{\b0 \cf19 \f0 \i0 \fs18 
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Document/Iace5bef75d9111eaadfea82903531a62/View/FullText.html?originationContext=document&vr=3.0&rs=cblt1.0&transitionType=DocumentItem&contextData=(sc.Search)" }{\fldrslt 
+{\b1 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+COVID-19
+}}}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+)); and
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls32 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls32 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+days in which the court (other than a branch office) is closed for the entire day (
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS12A&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=SP&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=304B8D4228822D5EA242ABA61E74A8BBAA9D2EAFBEC365A3A74F81B53328EB0C&contextData=(sc.Search)#co_pp_8b3b0000958a4" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Civ. Proc. Code \u167\'3f\u167\'3f 12a(a)
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ and 
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1000201&cite=CACPS12B&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=527369449B74A4DF9E2CEDF1CCF5093DD4C61D7DA54559D10CD099B302AACB53&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+12b
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+).
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls33 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls33 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Weekend holidays.
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ A judicial holiday that falls on:
+\par {\pntext }
+}
+}
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 {\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls34 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls34 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+a Saturday is observed on the preceding Friday; and
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls35 \pnindent480 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 \u8226\'3f\tab }\ls35 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li960 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li960 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb320 
+a Sunday is observed on the following Monday.
+\par {\pntext }
+}
+}
+}
+}{\pntext }
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li570 
+}
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+(
+}
+{\field {\*\fldinst HYPERLINK "https://www.westlaw.com/Link/Document/FullText?findType=L&pubNum=1085224&cite=CASTALLCTR1.11&originatingDoc=Ibd965f1d8e9011e38578f7ccc38dcbee&refType=LQ&originationContext=document&vr=3.0&rs=cblt1.0&transitionType=PLDocumentLink&billingHash=F9601C63F7D2D499D1C4472F2DFCACC4C8BB3B776C3A663605F98CA543E18E67&contextData=(sc.Search)" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Cal. Rules of Court, rule 1.11
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb340 
+.)
+\par {\pntext }
+}
+}
+}
+}{\fi-360 \li {\*\pn \pnlvlblt \ilvl0 \ls36 \pnindent0 \pnf1 {\f2 \pntxtb \u8226\'3f}}{\listtext \b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 \u8226\'3f\tab }\ls36 {\pntext }
+{\pard }\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \qj \fs18 \li480 
+{\b0 \cf19 \f0 \ri0 \i0 \ql \fs18 \li480 
+{\b1 \cf19 \f0 \i0 \fs18 
+{\b1 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+Judicial Council.
+}
+}
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+ The Judicial Council\rquote s 
+}
+{\field {\*\fldinst HYPERLINK "https://www.courts.ca.gov/holidays.htm" }{\fldrslt 
+{\b0 \cf27 \f0 \ul0 \strike0 \i0 \fs18 \sa0 \sb0 
+website
+}}}
+\sa180 
+\sb160 
+{\b0 \cf19 \f0 \ul0 \strike0 \i0 \fs18 \sa180 \sb160 
+ lists the days when California courts are closed in observance of judicial holidays.
+\par {\pntext }
+}
+}
+}
+}
+}
+{\b0 \cf19 \f0 \ri90 \i0 \qj \fs18 \li90 
+}
+}
+}
+}
+}\sect }

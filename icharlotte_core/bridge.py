@@ -223,6 +223,22 @@ class NoteTakerBridge(QObject):
             log_event(f"Error in selectDirectory: {e}", "error")
             return None
 
+    @pyqtSlot(result=str)
+    def selectPdf(self):
+        try:
+            parent = QApplication.activeWindow() or self._parent
+            file_path, _ = QFileDialog.getOpenFileName(
+                parent,
+                "Select PDF File",
+                "",
+                "PDF Files (*.pdf);;All Files (*)"
+            )
+            log_event(f"Selected PDF: {file_path}")
+            return file_path if file_path else None
+        except Exception as e:
+            log_event(f"Error in selectPdf: {e}", "error")
+            return None
+
     @pyqtSlot(str, result=list)
     def listDirectory(self, dir_path):
         try:

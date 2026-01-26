@@ -16,6 +16,7 @@ from PyQt6.QtGui import QColor, QAction, QFont, QShortcut, QKeySequence
 from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.utils import log_event, get_case_path, BASE_PATH_WIN, parse_hearing_data
 from icharlotte_core.sent_items_monitor import SentItemsMonitorWorker
+from icharlotte_core.calendar import CalendarMonitorWorker
 
 class CalendarDialog(QDialog):
     def __init__(self, parent=None, current_date=None):
@@ -381,11 +382,17 @@ class MasterCaseTab(QWidget):
         # Email monitor worker (initialized when started)
         self.email_monitor_worker = None
 
+        # Calendar monitor worker (initialized when started)
+        self.calendar_monitor_worker = None
+
         self.setup_ui()
         self.refresh_data()
 
         # Auto-start email monitor
         QTimer.singleShot(1000, self._auto_start_email_monitor)
+
+        # Auto-start calendar monitor (after email monitor)
+        QTimer.singleShot(2000, self._auto_start_calendar_monitor)
 
     def setup_ui(self):
         main_layout = QVBoxLayout(self)
@@ -432,6 +439,29 @@ class MasterCaseTab(QWidget):
         self.email_monitor_status = QLabel("")
         self.email_monitor_status.setStyleSheet("color: gray; font-size: 10px; margin-left: 5px;")
         top_bar.addWidget(self.email_monitor_status)
+
+        # Calendar Monitor Toggle Button
+        self.calendar_monitor_btn = QPushButton("Start Calendar")
+        self.calendar_monitor_btn.setCheckable(True)
+        self.calendar_monitor_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #e3f2fd;
+                border: 1px solid #2196f3;
+                border-radius: 4px;
+                padding: 5px 10px;
+            }
+            QPushButton:checked {
+                background-color: #bbdefb;
+                border: 2px solid #1565c0;
+            }
+        """)
+        self.calendar_monitor_btn.clicked.connect(self.toggle_calendar_monitor)
+        top_bar.addWidget(self.calendar_monitor_btn)
+
+        # Calendar Monitor Status Label
+        self.calendar_monitor_status = QLabel("")
+        self.calendar_monitor_status.setStyleSheet("color: gray; font-size: 10px; margin-left: 5px;")
+        top_bar.addWidget(self.calendar_monitor_status)
 
         main_layout.addLayout(top_bar)
         
@@ -1510,3 +1540,68 @@ class MasterCaseTab(QWidget):
         self.email_monitor_status.setText("Stopped")
         self.email_monitor_status.setStyleSheet("color: gray; font-size: 10px; margin-left: 5px;")
         self.email_monitor_worker = None
+
+    # --- Calendar Monitor Methods ---
+
+    def _auto_start_calendar_monitor(self):
+        """Auto-start the calendar monitor on app launch."""
+        self.calendar_monitor_btn.setChecked(True)
+        self.start_calendar_monitor()
+
+    def toggle_calendar_monitor(self, checked):
+        """Toggle the calendar monitor on/off."""
+        if checked:
+            self.start_calendar_monitor()
+        else:
+            self.stop_calendar_monitor()
+
+    def start_calendar_monitor(self):
+        """Start the calendar monitor worker."""
+        if self.calendar_monitor_worker is not None and self.calendar_monitor_worker.isRunning():
+            return  # Already running
+
+        self.calendar_monitor_worker = CalendarMonitorWorker()
+        self.calendar_monitor_worker.calendar_event_created.connect(self.on_calendar_event_created)
+        self.calendar_monitor_worker.error.connect(self.on_calendar_monitor_error)
+        self.calendar_monitor_worker.status.connect(self.on_calendar_monitor_status)
+        self.calendar_monitor_worker.finished.connect(self.on_calendar_monitor_finished)
+        self.calendar_monitor_worker.start()
+
+        self.calendar_monitor_btn.setText("Stop Calendar")
+        self.calendar_monitor_status.setText("Starting...")
+        self.calendar_monitor_status.setStyleSheet("color: blue; font-size: 10px; margin-left: 5px;")
+
+    def stop_calendar_monitor(self):
+        """Stop the calendar monitor worker."""
+        if self.calendar_monitor_worker is None:
+            return
+
+        self.calendar_monitor_worker.request_stop()
+        self.calendar_monitor_status.setText("Stopping...")
+        self.calendar_monitor_status.setStyleSheet("color: orange; font-size: 10px; margin-left: 5px;")
+
+    def on_calendar_event_created(self, file_number, event_title):
+        """Handle calendar event created signal."""
+        self.calendar_monitor_status.setText(f"Event: {file_number}")
+        self.calendar_monitor_status.setStyleSheet("color: green; font-size: 10px; margin-left: 5px;")
+
+    def on_calendar_monitor_error(self, message):
+        """Handle error signal from calendar monitor."""
+        self.calendar_monitor_status.setText(f"Error: {message[:30]}")
+        self.calendar_monitor_status.setStyleSheet("color: red; font-size: 10px; margin-left: 5px;")
+        log_event(f"Calendar monitor error: {message}", "error")
+
+    def on_calendar_monitor_status(self, message):
+        """Handle status signal from calendar monitor."""
+        display_msg = message[:40] + "..." if len(message) > 40 else message
+        self.calendar_monitor_status.setText(display_msg)
+        if "Running" in message or "authenticated" in message.lower():
+            self.calendar_monitor_status.setStyleSheet("color: green; font-size: 10px; margin-left: 5px;")
+
+    def on_calendar_monitor_finished(self):
+        """Handle worker finished signal."""
+        self.calendar_monitor_btn.setChecked(False)
+        self.calendar_monitor_btn.setText("Start Calendar")
+        self.calendar_monitor_status.setText("Stopped")
+        self.calendar_monitor_status.setStyleSheet("color: gray; font-size: 10px; margin-left: 5px;")
+        self.calendar_monitor_worker = None

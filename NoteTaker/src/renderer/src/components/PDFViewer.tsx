@@ -28,25 +28,24 @@ const HighlightPopup = ({ comment, }: { comment: { text: string; emoji: string }
 )
 
 const PDFViewer: React.FC = () => {
-  const { 
-    pdfUrl, 
-    addHighlight, 
-    pushAction, 
-    autoNote, 
-    setAutoNote, 
-    highlights, 
-    jumpToHighlight, 
+  const {
+    pdfUrl,
+    addHighlight,
+    pushAction,
+    autoNote,
+    setAutoNote,
+    highlights,
+    jumpToHighlight,
     scrollToHighlightId,
     isOcrRunning,
     ocrMessage,
     highlightColor,
     zoom,
-    setZoom,
-    debouncedZoom,
-    setDebouncedZoom
+    setZoom
   } = useNoteStore()
   const [error, setError] = useState<string | null>(null)
   const viewerContainerRef = useRef<HTMLDivElement>(null)
+  const pdfContainerRef = useRef<HTMLDivElement>(null)
 
   // Search State
   const [searchActive, setSearchActive] = useState(false)
@@ -54,14 +53,6 @@ const PDFViewer: React.FC = () => {
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [currentSearchResultIndex, setCurrentSearchResultIndex] = useState(-1)
   const [isSearching, setIsSearching] = useState(false)
-
-  // Zoom Debounce
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedZoom(zoom);
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [zoom, setDebouncedZoom]);
 
   // Ref to access current highlights in callbacks without dependency cycles
   const highlightsRef = useRef(highlights)
@@ -98,20 +89,16 @@ const PDFViewer: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Apply zoom when store changes (triggered by Python wheel handler via window.handlePdfZoom)
   useEffect(() => {
-    const handleWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        e.preventDefault();
-        const currentZoom = useNoteStore.getState().zoom;
-        const delta = e.deltaY > 0 ? -0.1 : 0.1;
-        const newZoom = Math.min(Math.max(currentZoom + delta, 0.5), 3.0);
-        setZoom(parseFloat(newZoom.toFixed(2)));
+    if (highlighterRef.current && highlighterRef.current.viewer) {
+      try {
+        highlighterRef.current.viewer.currentScaleValue = zoom.toString();
+      } catch (e) {
+        console.error("Failed to apply zoom:", e);
       }
-    };
-
-    window.addEventListener('wheel', handleWheel, { passive: false });
-    return () => window.removeEventListener('wheel', handleWheel);
-  }, [setZoom]);
+    }
+  }, [zoom]);
 
   const executeSearch = useCallback(async (text: string, pdfDocument: any) => {
     if (!text || text.length < 3 || !pdfDocument) {
@@ -269,18 +256,6 @@ const PDFViewer: React.FC = () => {
 
   const highlighterRef = useRef<any>(null);
 
-  // Apply Zoom manually to avoid the "jump"
-  useEffect(() => {
-    if (highlighterRef.current && highlighterRef.current.viewer) {
-        try {
-            console.log("Applying zoom:", debouncedZoom);
-            highlighterRef.current.viewer.currentScaleValue = debouncedZoom.toString();
-        } catch (e) {
-            console.error("Failed to set zoom", e);
-        }
-    }
-  }, [debouncedZoom]);
-
   const highlightTransform = useCallback((
     highlight,
     index,
@@ -338,35 +313,35 @@ const PDFViewer: React.FC = () => {
       })
   ), [renderTip, addHighlightEntry])
 
-  if (!pdfUrl) {
-     return (
-        <div className="flex flex-col items-center justify-center h-full text-gray-400">
-            <p className="text-lg">Select a PDF from the sidebar</p>
-        </div>
-     )
-  }
-  
-  let finalPdfUrl = constructLocalPdfUrl(pdfUrl);
-
-  const renderPdfContent = useCallback((pdfDocument) => {
+  // This must be defined BEFORE any conditional returns to follow React's rules of hooks
+  const renderPdfContent = useCallback((pdfDocument: any) => {
       pdfDocRef.current = pdfDocument;
       return (
           <PdfHighlighter
               ref={highlighterRef}
-              key={highlightColor} 
               pdfDocument={pdfDocument}
-              enableAreaSelection={(event) => event.altKey}
+              enableAreaSelection={(event: MouseEvent) => event.altKey}
               onScrollChange={() => {}}
-              scrollRef={(scrollTo) => {
+              scrollRef={(scrollTo: any) => {
                   scrollViewerTo.current = scrollTo
-                  scrollToHighlightFromHash()
               }}
               onSelectionFinished={onSelectionFinished}
               highlightTransform={highlightTransform}
               highlights={highlights}
           />
       )
-  }, [highlightColor, highlights, onSelectionFinished, highlightTransform, scrollToHighlightFromHash]);
+  }, [highlights, onSelectionFinished, highlightTransform]);
+
+  // Compute the URL (this is not a hook, so it's fine after the useCallback)
+  const finalPdfUrl = pdfUrl ? constructLocalPdfUrl(pdfUrl) : null;
+
+  if (!pdfUrl || !finalPdfUrl) {
+     return (
+        <div className="flex flex-col items-center justify-center h-full text-gray-400">
+            <p className="text-lg">Select a PDF from the sidebar</p>
+        </div>
+     )
+  }
 
   return (
     <div className="h-full w-full relative flex flex-col bg-gray-100" ref={viewerContainerRef}>
@@ -452,8 +427,8 @@ const PDFViewer: React.FC = () => {
             )}
          </div>
 
-        <div className="flex-1 relative overflow-hidden">
-             <PdfLoader url={finalPdfUrl} beforeLoad={<div className="p-4 text-gray-500">Loading PDF...</div>}> 
+        <div className="flex-1 relative overflow-hidden" ref={pdfContainerRef}>
+             <PdfLoader url={finalPdfUrl} beforeLoad={<div className="p-4 text-gray-500">Loading PDF...</div>}>
                 {renderPdfContent}
             </PdfLoader>
         </div>
