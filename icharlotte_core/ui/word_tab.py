@@ -21,6 +21,7 @@ try:
     import win32com.client
     import win32gui
     import win32con
+    import win32process
     import pythoncom
     HAS_WIN32 = True
 except ImportError:
@@ -49,6 +50,7 @@ class WordEmbedWidget(QWidget):
         self.word_app = None
         self.word_doc = None
         self.word_hwnd = 0
+        self.word_pid = 0  # Track the specific Word process ID
         self.original_style = 0
         self.original_parent = 0
         self._com_initialized = False
@@ -122,8 +124,8 @@ class WordEmbedWidget(QWidget):
             pythoncom.CoInitialize()
             self._com_initialized = True
 
-            # Create fresh Word application
-            self.word_app = win32com.client.Dispatch("Word.Application")
+            # Create fresh Word application (DispatchEx creates a new instance)
+            self.word_app = win32com.client.DispatchEx("Word.Application")
             self.word_app.Visible = True
 
             # Prevent Word from showing its own dialogs
@@ -135,6 +137,17 @@ class WordEmbedWidget(QWidget):
                 self.document_opened.emit(file_path)
             else:
                 self.word_doc = self.word_app.Documents.Add()
+
+            # Get the window handle directly from Word COM object
+            # This ensures we get the correct window even if other Word instances exist
+            try:
+                self.word_hwnd = self.word_app.ActiveWindow.Hwnd
+                _, self.word_pid = win32process.GetWindowThreadProcessId(self.word_hwnd)
+                print(f"Word launched: hwnd={self.word_hwnd}, pid={self.word_pid}")
+            except Exception as e:
+                print(f"Could not get Word hwnd from COM: {e}")
+                self.word_hwnd = 0
+                self.word_pid = 0
 
             # Give Word time to fully initialize before embedding
             self.embed_timer.start(800)
@@ -148,14 +161,24 @@ class WordEmbedWidget(QWidget):
     def _do_embed(self):
         """Find and embed the Word window."""
         try:
-            # Find the Word window
-            self.word_hwnd = self._find_word_window()
+            # If we don't already have the hwnd from COM, search for it
+            if not self.word_hwnd:
+                self.word_hwnd = self._find_word_window()
+                if self.word_hwnd:
+                    _, self.word_pid = win32process.GetWindowThreadProcessId(self.word_hwnd)
 
             if self.word_hwnd:
+                # Find the top-level window for this hwnd (in case we got child window from COM)
+                top_hwnd = self._get_top_level_window(self.word_hwnd)
+                if top_hwnd:
+                    self.word_hwnd = top_hwnd
+                    # Update PID in case the top-level window is different
+                    _, self.word_pid = win32process.GetWindowThreadProcessId(self.word_hwnd)
+
                 self._embed_window(self.word_hwnd)
                 self.placeholder.hide()
                 self.check_timer.start(1000)  # Check every second if Word is still alive
-                print(f"Word embedded successfully, hwnd={self.word_hwnd}")
+                print(f"Word embedded successfully, hwnd={self.word_hwnd}, pid={self.word_pid}")
             else:
                 self.placeholder.setText("Word started but window not found.\nTry clicking 'New Document' again.")
                 print("Could not find Word window")
@@ -165,15 +188,22 @@ class WordEmbedWidget(QWidget):
             print(f"Embedding error: {e}")
 
     def _find_word_window(self):
-        """Find the Word application window handle."""
+        """Find the Word application window handle for our specific PID."""
         results = []
+        target_pid = self.word_pid if self.word_pid else None
 
         def enum_callback(hwnd, _):
             if win32gui.IsWindowVisible(hwnd):
                 class_name = win32gui.GetClassName(hwnd)
                 # Word's main window class is OpusApp
                 if class_name == "OpusApp":
-                    results.append(hwnd)
+                    if target_pid:
+                        # Check if this window belongs to our Word process
+                        _, pid = win32process.GetWindowThreadProcessId(hwnd)
+                        if pid == target_pid:
+                            results.append(hwnd)
+                    else:
+                        results.append(hwnd)
             return True
 
         win32gui.EnumWindows(enum_callback, None)
@@ -182,6 +212,35 @@ class WordEmbedWidget(QWidget):
             # Return the first (most recent) Word window
             return results[0]
         return 0
+
+    def _get_top_level_window(self, hwnd):
+        """Get the top-level parent window for a given window handle."""
+        if not hwnd:
+            return 0
+
+        # Walk up the parent chain to find the top-level window
+        current = hwnd
+        while True:
+            parent = win32gui.GetParent(current)
+            if not parent:
+                break
+            current = parent
+
+        # Verify it's a Word window (OpusApp class)
+        try:
+            class_name = win32gui.GetClassName(current)
+            if class_name == "OpusApp":
+                return current
+        except:
+            pass
+
+        # If we couldn't find OpusApp, search for it by PID
+        if self.word_pid:
+            _, pid = win32process.GetWindowThreadProcessId(hwnd)
+            if pid == self.word_pid:
+                return self._find_word_window()
+
+        return hwnd  # Return original if we can't find better
 
     def _embed_window(self, hwnd):
         """Embed the Word window into this widget."""
@@ -247,6 +306,7 @@ class WordEmbedWidget(QWidget):
         self.word_app = None
         self.word_doc = None
         self.word_hwnd = 0
+        self.word_pid = 0
         self.placeholder.setText("Word was closed.\nClick 'New Document' or 'Open Document' to restart.")
         self.placeholder.show()
         self.word_closed.emit()
@@ -332,10 +392,11 @@ class WordEmbedWidget(QWidget):
             except Exception as e:
                 print(f"Error closing window: {e}")
 
-        # Kill any Word processes as a last resort
-        self._kill_word_processes()
+        # Kill only our specific Word process as a last resort
+        self._kill_word_process()
 
         self.word_hwnd = 0
+        self.word_pid = 0
         self.original_style = 0
         self.original_parent = 0
         self._com_initialized = False  # Reset so we reinitialize COM
@@ -347,18 +408,22 @@ class WordEmbedWidget(QWidget):
         self.placeholder.setText("Click 'New Document' or 'Open Document' to start Word")
         self.placeholder.show()
 
-    def _kill_word_processes(self):
-        """Kill any Word processes that might be hanging."""
+    def _kill_word_process(self):
+        """Kill only the specific Word process that iCharlotte created."""
+        if not self.word_pid:
+            return
+
         import subprocess
         try:
-            # Use taskkill to ensure Word is closed
-            subprocess.run(
-                ['taskkill', '/F', '/IM', 'WINWORD.EXE'],
+            # Use taskkill to kill only the specific Word process by PID
+            result = subprocess.run(
+                ['taskkill', '/F', '/PID', str(self.word_pid)],
                 capture_output=True,
                 timeout=5
             )
+            print(f"Killed Word process PID {self.word_pid}: {result.returncode}")
         except Exception as e:
-            print(f"Error killing Word processes: {e}")
+            print(f"Error killing Word process {self.word_pid}: {e}")
 
 
 class WordTab(QWidget):
