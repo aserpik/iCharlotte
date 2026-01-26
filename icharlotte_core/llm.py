@@ -1,8 +1,16 @@
 import requests
 import datetime
-from PySide6.QtCore import QThread, Signal
 from .config import API_KEYS
 from .utils import log_event
+
+# Try to import PySide6 for worker classes (optional - needed for UI integration)
+try:
+    from PySide6.QtCore import QThread, Signal
+    PYSIDE6_AVAILABLE = True
+except ImportError:
+    PYSIDE6_AVAILABLE = False
+    QThread = object
+    Signal = lambda *args: property(lambda self: None)
 
 try:
     from google import genai
@@ -222,96 +230,102 @@ class LLMHandler:
         
         return "Provider not implemented."
 
-class LLMWorker(QThread):
-    finished = Signal(str)
-    new_token = Signal(str) # For streaming
-    error = Signal(str)
-    
-    def __init__(self, provider, model, system, user, files, settings, history=None):
-        super().__init__()
-        self.provider = provider
-        self.model = model
-        self.system = system
-        self.user = user
-        self.files = files
-        self.settings = settings
-        self.history = history
-        
-    def run(self):
-        try:
-            result = LLMHandler.generate(
-                self.provider, self.model, self.system, 
-                self.user, self.files, self.settings,
-                history=self.history
-            )
-            
-            if self.settings.get('stream', False):
-                full_text = ""
-                for chunk in result:
-                    if chunk:
-                        full_text += chunk
-                        self.new_token.emit(chunk)
-                self.finished.emit(full_text)
-            else:
-                self.finished.emit(result)
-                
-        except Exception as e:
-            self.error.emit(str(e))
+# Worker classes - only available when PySide6 is installed
+if PYSIDE6_AVAILABLE:
+    class LLMWorker(QThread):
+        finished = Signal(str)
+        new_token = Signal(str)  # For streaming
+        error = Signal(str)
 
-class ModelFetcher(QThread):
-    finished = Signal(str, list)
-    error = Signal(str)
+        def __init__(self, provider, model, system, user, files, settings, history=None):
+            super().__init__()
+            self.provider = provider
+            self.model = model
+            self.system = system
+            self.user = user
+            self.files = files
+            self.settings = settings
+            self.history = history
 
-    def __init__(self, provider, api_key):
-        super().__init__()
-        self.provider = provider
-        self.api_key = api_key
+        def run(self):
+            try:
+                result = LLMHandler.generate(
+                    self.provider, self.model, self.system,
+                    self.user, self.files, self.settings,
+                    history=self.history
+                )
 
-    def run(self):
-        try:
-            models = []
-            if self.provider == "OpenAI":
-                url = "https://api.openai.com/v1/models"
-                headers = {"Authorization": f"Bearer {self.api_key}"}
-                resp = requests.get(url, headers=headers)
-                if resp.status_code == 200:
-                    all_models = resp.json()['data']
-                    models = [m['id'] for m in all_models if m['id'].startswith(('gpt', 'o1', 'o3'))]
+                if self.settings.get('stream', False):
+                    full_text = ""
+                    for chunk in result:
+                        if chunk:
+                            full_text += chunk
+                            self.new_token.emit(chunk)
+                    self.finished.emit(full_text)
+                else:
+                    self.finished.emit(result)
+
+            except Exception as e:
+                self.error.emit(str(e))
+
+    class ModelFetcher(QThread):
+        finished = Signal(str, list)
+        error = Signal(str)
+
+        def __init__(self, provider, api_key):
+            super().__init__()
+            self.provider = provider
+            self.api_key = api_key
+
+        def run(self):
+            try:
+                models = []
+                if self.provider == "OpenAI":
+                    url = "https://api.openai.com/v1/models"
+                    headers = {"Authorization": f"Bearer {self.api_key}"}
+                    resp = requests.get(url, headers=headers)
+                    if resp.status_code == 200:
+                        all_models = resp.json()['data']
+                        models = [m['id'] for m in all_models if m['id'].startswith(('gpt', 'o1', 'o3'))]
+                        models.sort(reverse=True)
+                    else:
+                        raise Exception(f"OpenAI Error: {resp.status_code} {resp.text}")
+
+                elif self.provider == "Gemini":
+                    if genai:
+                        client = genai.Client(api_key=self.api_key)
+                        # Try iterating; if fails, catch exception
+                        found_models = list(client.models.list())
+                        for m in found_models:
+                            name = m.name if hasattr(m, 'name') else str(m)
+                            if name.startswith('models/'):
+                                name = name[7:]
+                            if 'gemini' in name.lower():
+                                models.append(name)
+                    else:
+                        raise ImportError("google.genai not installed")
+
                     models.sort(reverse=True)
-                else:
-                    raise Exception(f"OpenAI Error: {resp.status_code} {resp.text}")
 
-            elif self.provider == "Gemini":
-                if genai:
-                    client = genai.Client(api_key=self.api_key)
-                    # Try iterating; if fails, catch exception
-                    found_models = list(client.models.list())
-                    for m in found_models:
-                        name = m.name if hasattr(m, 'name') else str(m)
-                        if name.startswith('models/'):
-                            name = name[7:]
-                        if 'gemini' in name.lower():
-                            models.append(name)
-                else:
-                    raise ImportError("google.genai not installed")
-                        
-                models.sort(reverse=True)
+                elif self.provider == "Claude":
+                    url = "https://api.anthropic.com/v1/models"
+                    headers = {
+                        "x-api-key": self.api_key,
+                        "anthropic-version": "2023-06-01"
+                    }
+                    resp = requests.get(url, headers=headers)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        models = [m['id'] for m in data['data']]
+                        models.sort(reverse=True)
+                    else:
+                        raise Exception(f"Claude Error: {resp.status_code} {resp.text}")
 
-            elif self.provider == "Claude":
-                url = "https://api.anthropic.com/v1/models"
-                headers = {
-                    "x-api-key": self.api_key,
-                    "anthropic-version": "2023-06-01"
-                }
-                resp = requests.get(url, headers=headers)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    models = [m['id'] for m in data['data']]
-                    models.sort(reverse=True)
-                else:
-                    raise Exception(f"Claude Error: {resp.status_code} {resp.text}")
-            
-            self.finished.emit(self.provider, models)
+                self.finished.emit(self.provider, models)
 
-        except Exception as e:
-            self.error.emit(str(e))
+            except Exception as e:
+                self.error.emit(str(e))
+else:
+    # Placeholder classes when PySide6 is not available
+    LLMWorker = None
+    ModelFetcher = None

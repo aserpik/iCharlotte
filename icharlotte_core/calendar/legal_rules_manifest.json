@@ -1,0 +1,315 @@
+{
+  "meta": {
+    "version": "1.0",
+    "jurisdiction": "California",
+    "description": "California civil litigation deadline rules"
+  },
+  "holidays": {
+    "holiday_dates": {
+      "2026": [
+        {"date": "2026-01-01", "name": "New Year's Day"},
+        {"date": "2026-01-19", "name": "Martin Luther King Jr. Day"},
+        {"date": "2026-02-16", "name": "Presidents Day"},
+        {"date": "2026-03-31", "name": "Cesar Chavez Day"},
+        {"date": "2026-05-25", "name": "Memorial Day"},
+        {"date": "2026-07-03", "name": "Independence Day (Observed)"},
+        {"date": "2026-09-07", "name": "Labor Day"},
+        {"date": "2026-11-11", "name": "Veterans Day"},
+        {"date": "2026-11-26", "name": "Thanksgiving Day"},
+        {"date": "2026-11-27", "name": "Day After Thanksgiving"},
+        {"date": "2026-12-25", "name": "Christmas Day"}
+      ],
+      "2027": [
+        {"date": "2027-01-01", "name": "New Year's Day"},
+        {"date": "2027-01-18", "name": "Martin Luther King Jr. Day"},
+        {"date": "2027-02-15", "name": "Presidents Day"},
+        {"date": "2027-03-31", "name": "Cesar Chavez Day"},
+        {"date": "2027-05-31", "name": "Memorial Day"},
+        {"date": "2027-07-05", "name": "Independence Day (Observed)"},
+        {"date": "2027-09-06", "name": "Labor Day"},
+        {"date": "2027-11-11", "name": "Veterans Day"},
+        {"date": "2027-11-25", "name": "Thanksgiving Day"},
+        {"date": "2027-11-26", "name": "Day After Thanksgiving"},
+        {"date": "2027-12-24", "name": "Christmas Day (Observed)"}
+      ]
+    }
+  },
+  "rules": [
+    {
+      "rule_slug": "msj-notice",
+      "name": "MSJ Notice of Motion",
+      "statute": "CCP § 437c(a)(2)",
+      "description": "Motion for summary judgment must be served 75 calendar days before hearing",
+      "logic": {
+        "offset": 75,
+        "unit": "calendar_days",
+        "direction": "backward"
+      },
+      "service_extensions": {
+        "electronic": {"days": 2, "unit": "court_days"},
+        "mail_ca": {"days": 5, "unit": "calendar_days"},
+        "mail_other_state": {"days": 10, "unit": "calendar_days"},
+        "overnight": {"days": 2, "unit": "calendar_days"}
+      }
+    },
+    {
+      "rule_slug": "msj-opposition",
+      "name": "MSJ Opposition",
+      "statute": "CCP § 437c(b)(2)",
+      "description": "Opposition to MSJ must be served 14 calendar days before hearing",
+      "logic": {
+        "offset": 14,
+        "unit": "calendar_days",
+        "direction": "backward"
+      },
+      "service_extensions": {
+        "electronic": {"days": 2, "unit": "court_days"},
+        "mail_ca": {"days": 5, "unit": "calendar_days"},
+        "mail_other_state": {"days": 10, "unit": "calendar_days"},
+        "overnight": {"days": 2, "unit": "calendar_days"}
+      }
+    },
+    {
+      "rule_slug": "msj-reply",
+      "name": "MSJ Reply",
+      "statute": "CCP § 437c(b)(4)",
+      "description": "Reply to MSJ opposition must be served 5 calendar days before hearing",
+      "logic": {
+        "offset": 5,
+        "unit": "calendar_days",
+        "direction": "backward"
+      },
+      "service_extensions": {}
+    },
+    {
+      "rule_slug": "msa-notice",
+      "name": "MSA Notice of Motion",
+      "statute": "CCP § 437c(a)(2)",
+      "description": "Motion for summary adjudication uses same deadlines as MSJ",
+      "logic": {
+        "offset": 75,
+        "unit": "calendar_days",
+        "direction": "backward"
+      },
+      "service_extensions": {
+        "electronic": {"days": 2, "unit": "court_days"},
+        "mail_ca": {"days": 5, "unit": "calendar_days"},
+        "mail_other_state": {"days": 10, "unit": "calendar_days"},
+        "overnight": {"days": 2, "unit": "calendar_days"}
+      }
+    },
+    {
+      "rule_slug": "msa-opposition",
+      "name": "MSA Opposition",
+      "statute": "CCP § 437c(b)(2)",
+      "description": "Opposition to MSA uses same deadlines as MSJ",
+      "logic": {
+        "offset": 14,
+        "unit": "calendar_days",
+        "direction": "backward"
+      },
+      "service_extensions": {
+        "electronic": {"days": 2, "unit": "court_days"},
+        "mail_ca": {"days": 5, "unit": "calendar_days"},
+        "mail_other_state": {"days": 10, "unit": "calendar_days"},
+        "overnight": {"days": 2, "unit": "calendar_days"}
+      }
+    },
+    {
+      "rule_slug": "msa-reply",
+      "name": "MSA Reply",
+      "statute": "CCP § 437c(b)(4)",
+      "description": "Reply to MSA opposition uses same deadlines as MSJ",
+      "logic": {
+        "offset": 5,
+        "unit": "calendar_days",
+        "direction": "backward"
+      },
+      "service_extensions": {}
+    },
+    {
+      "rule_slug": "standard-motion-notice",
+      "name": "Standard Motion Notice",
+      "statute": "CCP § 1005(b)",
+      "description": "Standard motion must be served 16 court days before hearing",
+      "logic": {
+        "offset": 16,
+        "unit": "court_days",
+        "direction": "backward"
+      },
+      "service_extensions": {
+        "electronic": {"days": 2, "unit": "court_days"},
+        "mail_ca": {"days": 5, "unit": "calendar_days"},
+        "mail_other_state": {"days": 10, "unit": "calendar_days"},
+        "overnight": {"days": 2, "unit": "calendar_days"}
+      }
+    },
+    {
+      "rule_slug": "standard-motion-opposition",
+      "name": "Standard Motion Opposition",
+      "statute": "CCP § 1005(b)",
+      "description": "Opposition to standard motion must be served 9 court days before hearing",
+      "logic": {
+        "offset": 9,
+        "unit": "court_days",
+        "direction": "backward"
+      },
+      "service_extensions": {
+        "electronic": {"days": 2, "unit": "court_days"},
+        "mail_ca": {"days": 5, "unit": "calendar_days"},
+        "mail_other_state": {"days": 10, "unit": "calendar_days"},
+        "overnight": {"days": 2, "unit": "calendar_days"}
+      }
+    },
+    {
+      "rule_slug": "standard-motion-reply",
+      "name": "Standard Motion Reply",
+      "statute": "CCP § 1005(b)",
+      "description": "Reply to standard motion opposition must be served 5 court days before hearing",
+      "logic": {
+        "offset": 5,
+        "unit": "court_days",
+        "direction": "backward"
+      },
+      "service_extensions": {}
+    },
+    {
+      "rule_slug": "demurrer-notice",
+      "name": "Demurrer Notice",
+      "statute": "CCP § 1005(b)",
+      "description": "Demurrer uses standard motion deadlines",
+      "logic": {
+        "offset": 16,
+        "unit": "court_days",
+        "direction": "backward"
+      },
+      "service_extensions": {
+        "electronic": {"days": 2, "unit": "court_days"},
+        "mail_ca": {"days": 5, "unit": "calendar_days"},
+        "mail_other_state": {"days": 10, "unit": "calendar_days"},
+        "overnight": {"days": 2, "unit": "calendar_days"}
+      }
+    },
+    {
+      "rule_slug": "demurrer-opposition",
+      "name": "Demurrer Opposition",
+      "statute": "CCP § 1005(b)",
+      "description": "Opposition to demurrer follows standard motion deadlines",
+      "logic": {
+        "offset": 9,
+        "unit": "court_days",
+        "direction": "backward"
+      },
+      "service_extensions": {
+        "electronic": {"days": 2, "unit": "court_days"},
+        "mail_ca": {"days": 5, "unit": "calendar_days"},
+        "mail_other_state": {"days": 10, "unit": "calendar_days"},
+        "overnight": {"days": 2, "unit": "calendar_days"}
+      }
+    },
+    {
+      "rule_slug": "demurrer-reply",
+      "name": "Demurrer Reply",
+      "statute": "CCP § 1005(b)",
+      "description": "Reply to demurrer opposition follows standard motion deadlines",
+      "logic": {
+        "offset": 5,
+        "unit": "court_days",
+        "direction": "backward"
+      },
+      "service_extensions": {}
+    },
+    {
+      "rule_slug": "discovery-motion-notice",
+      "name": "Discovery Motion Notice",
+      "statute": "CCP § 1005(b)",
+      "description": "Discovery motion uses standard motion deadlines",
+      "logic": {
+        "offset": 16,
+        "unit": "court_days",
+        "direction": "backward"
+      },
+      "service_extensions": {
+        "electronic": {"days": 2, "unit": "court_days"},
+        "mail_ca": {"days": 5, "unit": "calendar_days"},
+        "mail_other_state": {"days": 10, "unit": "calendar_days"},
+        "overnight": {"days": 2, "unit": "calendar_days"}
+      }
+    },
+    {
+      "rule_slug": "discovery-motion-opposition",
+      "name": "Discovery Motion Opposition",
+      "statute": "CCP § 1005(b)",
+      "description": "Opposition to discovery motion follows standard deadlines",
+      "logic": {
+        "offset": 9,
+        "unit": "court_days",
+        "direction": "backward"
+      },
+      "service_extensions": {
+        "electronic": {"days": 2, "unit": "court_days"},
+        "mail_ca": {"days": 5, "unit": "calendar_days"},
+        "mail_other_state": {"days": 10, "unit": "calendar_days"},
+        "overnight": {"days": 2, "unit": "calendar_days"}
+      }
+    },
+    {
+      "rule_slug": "discovery-motion-reply",
+      "name": "Discovery Motion Reply",
+      "statute": "CCP § 1005(b)",
+      "description": "Reply to discovery motion opposition follows standard deadlines",
+      "logic": {
+        "offset": 5,
+        "unit": "court_days",
+        "direction": "backward"
+      },
+      "service_extensions": {}
+    },
+    {
+      "rule_slug": "motion-to-strike-notice",
+      "name": "Motion to Strike Notice",
+      "statute": "CCP § 1005(b)",
+      "description": "Motion to strike uses standard motion deadlines",
+      "logic": {
+        "offset": 16,
+        "unit": "court_days",
+        "direction": "backward"
+      },
+      "service_extensions": {
+        "electronic": {"days": 2, "unit": "court_days"},
+        "mail_ca": {"days": 5, "unit": "calendar_days"},
+        "mail_other_state": {"days": 10, "unit": "calendar_days"},
+        "overnight": {"days": 2, "unit": "calendar_days"}
+      }
+    },
+    {
+      "rule_slug": "motion-to-strike-opposition",
+      "name": "Motion to Strike Opposition",
+      "statute": "CCP § 1005(b)",
+      "description": "Opposition to motion to strike follows standard deadlines",
+      "logic": {
+        "offset": 9,
+        "unit": "court_days",
+        "direction": "backward"
+      },
+      "service_extensions": {
+        "electronic": {"days": 2, "unit": "court_days"},
+        "mail_ca": {"days": 5, "unit": "calendar_days"},
+        "mail_other_state": {"days": 10, "unit": "calendar_days"},
+        "overnight": {"days": 2, "unit": "calendar_days"}
+      }
+    },
+    {
+      "rule_slug": "motion-to-strike-reply",
+      "name": "Motion to Strike Reply",
+      "statute": "CCP § 1005(b)",
+      "description": "Reply to motion to strike opposition follows standard deadlines",
+      "logic": {
+        "offset": 5,
+        "unit": "court_days",
+        "direction": "backward"
+      },
+      "service_extensions": {}
+    }
+  ]
+}

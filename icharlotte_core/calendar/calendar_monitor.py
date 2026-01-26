@@ -12,12 +12,32 @@ import tempfile
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
-from PySide6.QtCore import QThread, Signal
+# PySide6 is optional - provide fallback for testing
+try:
+    from PySide6.QtCore import QThread, Signal
+    PYSIDE6_AVAILABLE = True
+except ImportError:
+    PYSIDE6_AVAILABLE = False
+    # Create a mock QThread for testing without Qt
+    class QThread:
+        def __init__(self):
+            pass
+        def msleep(self, ms):
+            import time
+            time.sleep(ms / 1000.0)
+    Signal = lambda *args: property(lambda self: None)
 
 from icharlotte_core.ui.logs_tab import LogManager
-from icharlotte_core.calendar.gcal_client import GoogleCalendarClient
 from icharlotte_core.calendar.deadline_calculator import DeadlineCalculator
 from icharlotte_core.calendar.attachment_classifier import AttachmentClassifier
+
+# Conditional import for GoogleCalendarClient (requires google-api-python-client)
+try:
+    from icharlotte_core.calendar.gcal_client import GoogleCalendarClient
+    GCAL_AVAILABLE = True
+except ImportError:
+    GoogleCalendarClient = None
+    GCAL_AVAILABLE = False
 
 
 class CalendarMonitorWorker(QThread):
@@ -41,10 +61,11 @@ class CalendarMonitorWorker(QThread):
         status(str): Status update message
     """
 
-    # Signals
-    calendar_event_created = Signal(str, str)  # (file_number, event_title)
-    error = Signal(str)
-    status = Signal(str)
+    # Signals - only define when PySide6 is available
+    if PYSIDE6_AVAILABLE:
+        calendar_event_created = Signal(str, str)  # (file_number, event_title)
+        error = Signal(str)
+        status = Signal(str)
 
     # Configuration
     POLL_INTERVAL = 30  # seconds
@@ -60,7 +81,8 @@ class CalendarMonitorWorker(QThread):
         super().__init__()
         self.stop_requested = False
         self.log = LogManager()
-        self.gcal_client = GoogleCalendarClient()
+        # GoogleCalendarClient may not be available if google libraries aren't installed
+        self.gcal_client = GoogleCalendarClient() if GCAL_AVAILABLE else None
         self.deadline_calc = DeadlineCalculator()
         self.classifier = AttachmentClassifier()
 

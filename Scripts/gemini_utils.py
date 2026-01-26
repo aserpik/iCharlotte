@@ -5,11 +5,15 @@ import datetime
 import time
 
 # Third-party imports
+GENAI_AVAILABLE = False
+genai = None
 try:
     from google import genai
+    GENAI_AVAILABLE = True
 except ImportError as e:
-    print(f"Critical Error: Missing dependency {e}. Please ensure google-genai is installed.", file=sys.stderr)
-    sys.exit(1)
+    # Don't exit - just mark as unavailable
+    # Functions that need genai will raise ImportError when called
+    pass
 
 # Default configuration
 DEFAULT_MODEL = "gemini-2.0-flash"
@@ -53,15 +57,19 @@ def clean_json_string(s: str) -> str:
 def call_gemini_api(prompt: str, context_text: str = "", models: list = None) -> str:
     """
     Calls Gemini with fallback models using the new google-genai SDK.
-    
+
     Args:
         prompt: The instruction for the AI.
         context_text: The document or data to analyze (optional).
         models: List of model names to try. Defaults to [DEFAULT_MODEL] + FALLBACK_MODELS.
-        
+
     Returns:
         The text response from the AI, or None if all attempts fail.
     """
+    if not GENAI_AVAILABLE:
+        log_event("google-genai library not available. Install with: pip install google-genai", level="error")
+        return None
+
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         log_event("GEMINI_API_KEY not set.", level="error")
