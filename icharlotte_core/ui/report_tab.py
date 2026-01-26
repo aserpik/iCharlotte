@@ -3,7 +3,7 @@ import sys
 import json
 import shutil
 import time
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, 
     QListWidget, QSplitter, QFrame, QFileDialog, QMessageBox,
     QDialog, QFormLayout, QLineEdit, QComboBox, QGroupBox,
@@ -11,10 +11,10 @@ from PyQt6.QtWidgets import (
     QCheckBox, QPlainTextEdit, QTableWidget, QTableWidgetItem, QHeaderView,
     QWidgetAction
 )
-from PyQt6.QtCore import Qt, QUrl, QTimer, QSize, pyqtSignal
-from PyQt6.QtGui import QAction, QIcon, QDragEnterEvent, QDropEvent
-from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtWebEngineCore import QWebEnginePage
+from PySide6.QtCore import Qt, QUrl, QTimer, QSize, Signal
+from PySide6.QtGui import QAction, QIcon, QDragEnterEvent, QDropEvent
+from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtWebEngineCore import QWebEnginePage
 
 from icharlotte_core.config import SCRIPTS_DIR, GEMINI_DATA_DIR, TEMP_DIR
 from icharlotte_core.ui.widgets import StatusWidget, AgentRunner
@@ -414,7 +414,7 @@ class RuleDialog(QDialog):
         
         self.nl_trig_btn.setText("Generating...")
         self.nl_trig_btn.setEnabled(False)
-        from PyQt6.QtWidgets import QApplication
+        from PySide6.QtWidgets import QApplication
         QApplication.processEvents()
         
         import subprocess
@@ -469,7 +469,7 @@ class RuleDialog(QDialog):
         # Show loading...
         self.adv_gen_btn.setText("Generating...")
         self.adv_gen_btn.setEnabled(False)
-        from PyQt6.QtWidgets import QApplication
+        from PySide6.QtWidgets import QApplication
         QApplication.processEvents()
         
         import subprocess
@@ -524,7 +524,7 @@ class RuleDialog(QDialog):
             QMessageBox.information(self, "Preset Loaded", f"Loaded preset: {self.rule['name']}")
 
     def ai_build_rule(self):
-        from PyQt6.QtWidgets import QInputDialog
+        from PySide6.QtWidgets import QInputDialog
         desc, ok = QInputDialog.getMultiLineText(self, "AI Rule Builder", 
                                                  "Describe the rule you want to create (e.g., 'Make paragraphs starting with Note bold and blue'):")
         if not ok or not desc.strip(): return
@@ -651,7 +651,7 @@ class RuleDialog(QDialog):
         QMessageBox.information(self, "Success", "Formatting extracted from Preview selection!")
 
     def ai_generate_pattern(self):
-        from PyQt6.QtWidgets import QInputDialog
+        from PySide6.QtWidgets import QInputDialog
         examples, ok = QInputDialog.getMultiLineText(self, "AI Pattern Generator", 
                                                     "Paste examples of text you want this rule to match (one per line):")
         if not ok or not examples.strip(): return
@@ -1093,7 +1093,7 @@ class DroppableWebView(QWebEngineView):
 
 
 class DroppableListWidget(QListWidget):
-    fileDropped = pyqtSignal(list)
+    fileDropped = Signal(list)
 
     def __init__(self, parent=None):
         super().__init__(parent)

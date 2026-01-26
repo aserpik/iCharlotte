@@ -12,17 +12,17 @@ import json
 import html
 from datetime import datetime
 
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QFrame,
     QLabel, QPushButton, QComboBox, QLineEdit, QTreeWidget,
     QTreeWidgetItem, QStackedWidget, QMenu, QMessageBox,
     QDialog, QDialogButtonBox, QListWidget, QListWidgetItem,
     QAbstractItemView, QApplication, QFileIconProvider, QInputDialog
 )
-from PyQt6.QtCore import Qt, QUrl, QFileInfo, pyqtSignal
-from PyQt6.QtGui import QAction
-from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtWebEngineCore import QWebEngineSettings
+from PySide6.QtCore import Qt, QUrl, QFileInfo, Signal
+from PySide6.QtGui import QAction
+from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtWebEngineCore import QWebEngineSettings
 
 from ..config import TEMPLATES_DIR, RESOURCES_DIR, TEMPLATE_EXTENSIONS, RESOURCE_EXTENSIONS, GEMINI_DATA_DIR
 from ..templates_db import TemplatesDatabase
@@ -33,8 +33,8 @@ from ..bridge import LocalFileSchemeHandler
 class TemplateTreeWidget(QTreeWidget):
     """Custom tree widget with context menu and tagging support."""
 
-    item_selected = pyqtSignal(str, str)  # path, type ('template' or 'resource')
-    request_refresh = pyqtSignal()
+    item_selected = Signal(str, str)  # path, type ('template' or 'resource')
+    request_refresh = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)

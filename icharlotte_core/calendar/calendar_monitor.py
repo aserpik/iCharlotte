@@ -12,7 +12,7 @@ import tempfile
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 from icharlotte_core.ui.logs_tab import LogManager
 from icharlotte_core.calendar.gcal_client import GoogleCalendarClient
@@ -42,9 +42,9 @@ class CalendarMonitorWorker(QThread):
     """
 
     # Signals
-    calendar_event_created = pyqtSignal(str, str)  # (file_number, event_title)
-    error = pyqtSignal(str)
-    status = pyqtSignal(str)
+    calendar_event_created = Signal(str, str)  # (file_number, event_title)
+    error = Signal(str)
+    status = Signal(str)
 
     # Configuration
     POLL_INTERVAL = 30  # seconds
@@ -504,7 +504,7 @@ Return ONLY the short event title, nothing else. If no clear action is mentioned
             # Use Gemini for quick extraction
             response = LLMHandler.generate(
                 provider="Gemini",
-                model="gemini-2.0-flash",
+                model="gemini-3-flash-preview",
                 system_prompt="You extract short calendar event titles from emails.",
                 user_prompt=prompt,
                 file_contents="",

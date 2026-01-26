@@ -1,11 +1,11 @@
 import os
 import json
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QComboBox, QDialogButtonBox, 
     QTableWidget, QHeaderView, QPushButton, QHBoxLayout, QMessageBox, 
     QTableWidgetItem, QDoubleSpinBox, QSpinBox, QTextEdit
 )
-from PyQt6.QtCore import Qt, QByteArray
+from PySide6.QtCore import Qt, QByteArray
 from ..config import GEMINI_DATA_DIR
 from ..utils import log_event
 

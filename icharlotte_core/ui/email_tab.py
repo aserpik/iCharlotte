@@ -1,14 +1,14 @@
 import os
 import json
 import sys
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
     QPlainTextEdit, QListWidget, QListWidgetItem, QLabel, QMessageBox, QSplitter,
     QCheckBox, QLineEdit, QTextBrowser,
     QProgressBar, QDialog, QFrame, QScrollArea, QSizePolicy
 )
-from PyQt6.QtGui import QTextCursor, QDesktopServices, QColor, QFont, QIcon, QPainter, QPen, QBrush
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSize, QTimer, QRect
+from PySide6.QtGui import QTextCursor, QDesktopServices, QColor, QFont, QIcon, QPainter, QPen, QBrush
+from PySide6.QtCore import Qt, QThread, Signal, QSize, QTimer, QRect
 
 try:
     import win32com.client
@@ -29,8 +29,8 @@ from ..email_manager import EmailSyncWorker, EmailDatabase
 from ..utils import format_date_to_mm_dd_yyyy
 
 class CacheWorker(QThread):
-    finished = pyqtSignal(str) # Returns cache name
-    error = pyqtSignal(str)
+    finished = Signal(str) # Returns cache name
+    error = Signal(str)
 
     def __init__(self, provider, model, content, system_instruction=None):
         super().__init__()
@@ -91,7 +91,7 @@ class ComposeDialog(QDialog):
         }
 
 class EmailChatDialog(QDialog):
-    open_email = pyqtSignal(dict) # Emits the full email data
+    open_email = Signal(dict) # Emits the full email data
 
     def __init__(self, parent=None, email_list=None):
         super().__init__(parent)
@@ -294,8 +294,8 @@ class EmailChatDialog(QDialog):
         self.send_btn.setEnabled(True)
 
 class EmailWorker(QThread):
-    finished = pyqtSignal()
-    error = pyqtSignal(str)
+    finished = Signal()
+    error = Signal(str)
 
     def __init__(self, recipient, subject, body):
         super().__init__()
@@ -642,59 +642,7 @@ class EmailTab(QWidget):
 
     def show_body_context_menu(self, pos):
         menu = self.body_view.createStandardContextMenu()
-        
-        cursor = self.body_view.textCursor()
-        if cursor.hasSelection():
-            menu.addSeparator()
-            send_to_note_action = menu.addAction("Send to NoteTaker")
-            send_to_note_action.triggered.connect(self.send_selection_to_notetaker)
-            
         menu.exec(self.body_view.mapToGlobal(pos))
-
-    def send_selection_to_notetaker(self):
-        text = self.body_view.textCursor().selectedText().strip()
-        if not text:
-            return
-            
-        file_num = self.get_file_number()
-        if not file_num:
-            return
-
-        # Prepare metadata for snippet
-        row_item = self.email_list_widget.currentItem()
-        email_data = {}
-        if row_item:
-            widget = self.email_list_widget.itemWidget(row_item)
-            if widget:
-                email_data = widget.email_data
-
-        snippet = {
-            "type": "email_snippet",
-            "content": text,
-            "source": f"Email from {email_data.get('sender', 'Unknown')} regarding '{email_data.get('subject', 'No Subject')}'",
-            "date": email_data.get('received_time', 'Unknown'),
-            "timestamp": str(datetime.datetime.now())
-        }
-
-        # Save to a snippets file in case directory
-        case_dir = os.path.join(GEMINI_DATA_DIR, file_num)
-        os.makedirs(case_dir, exist_ok=True)
-        snippets_path = os.path.join(case_dir, "snippets.json")
-        
-        try:
-            snippets = []
-            if os.path.exists(snippets_path):
-                with open(snippets_path, 'r', encoding='utf-8') as f:
-                    snippets = json.load(f)
-            
-            snippets.append(snippet)
-            
-            with open(snippets_path, 'w', encoding='utf-8') as f:
-                json.dump(snippets, f, indent=4)
-                
-            self.status_label.setText(f"Snippet saved to NoteTaker ({len(text)} chars)")
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"Failed to save snippet: {e}")
 
     def get_file_number(self):
         # Try to get file number from MainWindow

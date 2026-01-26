@@ -1,7 +1,7 @@
 import sqlite3
 import os
 import datetime
-from PyQt6.QtCore import QObject, pyqtSignal, QThread
+from PySide6.QtCore import QObject, Signal, QThread
 import win32com.client
 import pythoncom
 
@@ -190,9 +190,9 @@ class EmailDatabase:
         return [dict(row) for row in rows]
 
 class EmailSyncWorker(QThread):
-    progress = pyqtSignal(str) # Status messages
-    finished = pyqtSignal()
-    error = pyqtSignal(str)
+    progress = Signal(str) # Status messages
+    finished = Signal()
+    error = Signal(str)
     
     def __init__(self, case_number, full_sync=False):
         super().__init__()

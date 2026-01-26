@@ -53,6 +53,8 @@ except ImportError:
 LOG_FILE = r"C:\GeminiTerminal\Summarize_Discovery_activity.log"
 PROMPT_FILE = r"C:\GeminiTerminal\Scripts\SUMMARIZE_DISCOVERY_PROMPT.txt"
 CONSOLIDATE_PROMPT_FILE = r"C:\GeminiTerminal\Scripts\CONSOLIDATE_DISCOVERY_PROMPT.txt"
+EXTRACTION_PROMPT_FILE = r"C:\GeminiTerminal\Scripts\EXTRACTION_PASS_PROMPT.txt"
+CROSS_CHECK_PROMPT_FILE = r"C:\GeminiTerminal\Scripts\CROSS_CHECK_PROMPT.txt"
 
 # Set up logging
 logging.basicConfig(
@@ -258,6 +260,81 @@ def call_gemini(prompt, text):
     log_event("Error: All model attempts failed.", level="error")
     return None
 
+def call_gemini_cross_check(prompt, extraction_text, summary_text):
+    """Calls Gemini API for cross-checking two text sections."""
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        log_event("Error: GEMINI_API_KEY environment variable not set.", level="error")
+        return None
+
+    client = genai.Client(api_key=api_key)
+
+    full_prompt = f"""{prompt}
+
+=== PASS 1 (EXTRACTED RESPONSES) ===
+{extraction_text}
+
+=== PASS 2 (NARRATIVE SUMMARY) ===
+{summary_text}
+"""
+
+    model_sequence = [
+        "gemini-3-pro-preview",
+        "gemini-3-flash-preview",
+        "gemini-2.5-pro",
+        "gemini-2.5-flash"
+    ]
+
+    for model_name in model_sequence:
+        log_event(f"Cross-check: Attempting model: {model_name}")
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=full_prompt
+            )
+            if response and response.text:
+                log_event(f"Cross-check: Success with model: {model_name}")
+                return response.text
+        except BaseException as e:
+            log_event(f"Cross-check: Failed with model {model_name}: {e}", level="warning")
+            continue
+
+    log_event("Cross-check: All model attempts failed.", level="error")
+    return None
+
+def add_section_divider(doc, section_title):
+    """Adds a visual divider with section title to the document."""
+    # Add some spacing
+    p = doc.add_paragraph()
+    p.paragraph_format.line_spacing = 1.0
+
+    # Add horizontal line (using underscores for compatibility)
+    divider_line = "─" * 80
+    p = doc.add_paragraph()
+    p.paragraph_format.line_spacing = 1.0
+    run = p.add_run(divider_line)
+    run.font.name = 'Times New Roman'
+    run.font.size = Pt(10)
+
+    # Add section title (bold, centered)
+    p = doc.add_paragraph()
+    p.paragraph_format.line_spacing = 1.0
+    p.alignment = 1  # Center alignment
+    run = p.add_run(section_title)
+    run.bold = True
+    run.font.name = 'Times New Roman'
+    run.font.size = Pt(12)
+
+    # Add another divider line
+    p = doc.add_paragraph()
+    p.paragraph_format.line_spacing = 1.0
+    run = p.add_run(divider_line)
+    run.font.name = 'Times New Roman'
+    run.font.size = Pt(10)
+
+    # Add spacing after
+    doc.add_paragraph()
+
 def add_markdown_to_doc(doc, content):
     """Parses basic Markdown and adds it to the docx Document."""
     lines = content.split('\n')
@@ -370,12 +447,12 @@ def consolidate_file(file_path):
     # 4. Overwrite file
     return overwrite_docx(consolidated_summary, file_path)
 
-def save_to_docx(content, output_path, title_text, discovery_type="Written Discovery"):
-    """Saves the content to a DOCX file. Appends if exists. Handles locking."""
+def save_to_docx(extraction_content, summary_content, output_path, title_text, discovery_type="Written Discovery"):
+    """Saves both extraction and summary content to a DOCX file with section dividers. Appends if exists. Handles locking."""
     base_name, ext = os.path.splitext(output_path)
     counter = 1
     current_output_path = output_path
-    
+
     while True:
         try:
             if os.path.exists(current_output_path):
@@ -394,7 +471,7 @@ def save_to_docx(content, output_path, title_text, discovery_type="Written Disco
             style.font.name = 'Times New Roman'
             style.font.size = Pt(12)
             style.paragraph_format.line_spacing = 1.0
-            
+
             # Count existing subheadings to determine the next number
             # We look for paragraphs that match our subheading pattern
             next_num = 1
@@ -409,14 +486,14 @@ def save_to_docx(content, output_path, title_text, discovery_type="Written Disco
                 party_name = party_name.replace(skip, "").replace(skip.upper(), "")
             party_name = party_name.strip(" _-")
 
-            # Subheading: [Number]. [Party Name]’s Responses to [Discovery Type]
+            # Subheading: [Number]. [Party Name]'s Responses to [Discovery Type]
             # Indentation: Number at 1.0", text at 1.5"
             p = doc.add_paragraph()
             p.paragraph_format.line_spacing = 1.0
             # Left indent 1.5", First line indent -0.5" (relative to 1.5") = 1.0" for the number
             p.paragraph_format.left_indent = Inches(1.5)
             p.paragraph_format.first_line_indent = Inches(-0.5)
-            
+
             # Add tab stop at 1.5" for the text following the number
             tab_stops = p.paragraph_format.tab_stops
             tab_stops.add_tab_stop(Inches(1.5))
@@ -427,14 +504,20 @@ def save_to_docx(content, output_path, title_text, discovery_type="Written Disco
             run_num.font.name = 'Times New Roman'
             run_num.font.size = Pt(12)
 
-            run_title = p.add_run(f"{party_name}’s Responses to {discovery_type}")
+            run_title = p.add_run(f"{party_name}'s Responses to {discovery_type}")
             run_title.bold = True
             run_title.underline = True
             run_title.font.name = 'Times New Roman'
             run_title.font.size = Pt(12)
-            
-            add_markdown_to_doc(doc, content)
-                
+
+            # Add Section A: Extracted Responses
+            add_section_divider(doc, "SECTION A: EXTRACTED RESPONSES")
+            add_markdown_to_doc(doc, extraction_content)
+
+            # Add Section B: Narrative Summary
+            add_section_divider(doc, "SECTION B: NARRATIVE SUMMARY")
+            add_markdown_to_doc(doc, summary_content)
+
             doc.save(current_output_path)
             log_event(f"Saved summary to: {current_output_path}")
             return True
@@ -444,7 +527,7 @@ def save_to_docx(content, output_path, title_text, discovery_type="Written Disco
             counter += 1
             # Format: Original v.2.docx, Original v.3.docx
             current_output_path = f"{base_name} v.{counter}{ext}"
-            
+
             if counter > 10:
                 log_event("Failed to save after 10 attempts.", level="error")
                 return False
@@ -687,47 +770,102 @@ def main():
     if not text:
         sys.exit(1)
 
-    # 2. Load Prompt
+    # ========== TWO-PASS EXTRACTION AND SUMMARIZATION ==========
+
+    # --- PASS 1: Extraction ---
+    log_event("Starting Pass 1: Extraction...")
+    try:
+        with open(EXTRACTION_PROMPT_FILE, "r", encoding="utf-8") as f:
+            extraction_prompt = f.read()
+    except Exception as e:
+        log_event(f"Error reading extraction prompt file {EXTRACTION_PROMPT_FILE}: {e}", level="error")
+        sys.exit(1)
+
+    extraction_result = call_gemini(extraction_prompt, text)
+    if not extraction_result:
+        log_event("Pass 1 (Extraction) failed.", level="error")
+        sys.exit(1)
+    log_event("Pass 1 (Extraction) completed successfully.")
+
+    # --- PASS 2: Narrative Summary ---
+    log_event("Starting Pass 2: Narrative Summary...")
     try:
         with open(PROMPT_FILE, "r", encoding="utf-8") as f:
-            prompt_instruction = f.read()
+            summary_prompt = f.read()
     except Exception as e:
-        log_event(f"Error reading prompt file {PROMPT_FILE}: {e}", level="error")
+        log_event(f"Error reading summary prompt file {PROMPT_FILE}: {e}", level="error")
         sys.exit(1)
 
-    # 3. Call LLM
-    summary = call_gemini(prompt_instruction, text)
-    if not summary:
+    summary_result = call_gemini(summary_prompt, text)
+    if not summary_result:
+        log_event("Pass 2 (Summary) failed.", level="error")
         sys.exit(1)
+    log_event("Pass 2 (Narrative Summary) completed successfully.")
 
-    # Strip extraction layer if present
-    summary = re.sub(r'<extraction_layer>.*?</extraction_layer>', '', summary, flags=re.DOTALL).strip()
+    # Strip extraction layer from summary if present (legacy behavior)
+    summary_result = re.sub(r'<extraction_layer>.*?</extraction_layer>', '', summary_result, flags=re.DOTALL).strip()
 
-    # Parse Responding Party and Discovery Type
-    lines = summary.split('\n')
+    # --- PASS 3: Cross-Check ---
+    log_event("Starting Pass 3: Cross-Check...")
+    try:
+        with open(CROSS_CHECK_PROMPT_FILE, "r", encoding="utf-8") as f:
+            cross_check_prompt = f.read()
+    except Exception as e:
+        log_event(f"Error reading cross-check prompt file {CROSS_CHECK_PROMPT_FILE}: {e}", level="error")
+        # If cross-check prompt fails, proceed with unchecked summary
+        log_event("Proceeding without cross-check.", level="warning")
+        final_summary = summary_result
+    else:
+        cross_check_result = call_gemini_cross_check(cross_check_prompt, extraction_result, summary_result)
+        if cross_check_result:
+            log_event("Pass 3 (Cross-Check) completed successfully.")
+            final_summary = cross_check_result
+        else:
+            log_event("Pass 3 (Cross-Check) failed. Using unchecked summary.", level="warning")
+            final_summary = summary_result
+
+    # Parse Responding Party and Discovery Type from extraction result (more reliable source)
     responding_party = "Unknown_Party"
     discovery_type = "Written Discovery"
-    
-    # Check first few lines for metadata tags
-    lines_to_remove = []
-    for i in range(min(10, len(lines))):
-        line = lines[i].strip()
+
+    # Check extraction result for metadata
+    extraction_lines = extraction_result.split('\n')
+    extraction_lines_to_remove = []
+    for i in range(min(10, len(extraction_lines))):
+        line = extraction_lines[i].strip()
         if line.startswith("RESPONDING_PARTY:"):
             responding_party = line.replace("RESPONDING_PARTY:", "").strip()
-            lines_to_remove.append(i)
+            extraction_lines_to_remove.append(i)
         elif line.startswith("DISCOVERY_TYPE:"):
             discovery_type = line.replace("DISCOVERY_TYPE:", "").strip()
-            lines_to_remove.append(i)
-            
-    # Remove the metadata lines from summary. Reconstruct summary.
-    # Process in reverse order to avoid index shifting
-    for i in sorted(lines_to_remove, reverse=True):
-        lines.pop(i)
-        
-    summary = "\n".join(lines).strip()
-            
+            extraction_lines_to_remove.append(i)
+
+    # Remove metadata lines from extraction content
+    for i in sorted(extraction_lines_to_remove, reverse=True):
+        extraction_lines.pop(i)
+    extraction_content = "\n".join(extraction_lines).strip()
+
+    # Also check and clean summary for metadata (in case cross-check included it)
+    summary_lines = final_summary.split('\n')
+    summary_lines_to_remove = []
+    for i in range(min(10, len(summary_lines))):
+        line = summary_lines[i].strip()
+        if line.startswith("RESPONDING_PARTY:"):
+            if responding_party == "Unknown_Party":
+                responding_party = line.replace("RESPONDING_PARTY:", "").strip()
+            summary_lines_to_remove.append(i)
+        elif line.startswith("DISCOVERY_TYPE:"):
+            if discovery_type == "Written Discovery":
+                discovery_type = line.replace("DISCOVERY_TYPE:", "").strip()
+            summary_lines_to_remove.append(i)
+
+    # Remove metadata lines from summary content
+    for i in sorted(summary_lines_to_remove, reverse=True):
+        summary_lines.pop(i)
+    summary_content = "\n".join(summary_lines).strip()
+
     if responding_party == "Unknown_Party":
-         log_event("Warning: RESPONDING_PARTY tag not found in LLM response.", level="warning")
+        log_event("Warning: RESPONDING_PARTY tag not found in LLM response.", level="warning")
 
     # Save to Case Data
     data_manager = CaseDataManager()
@@ -770,7 +908,7 @@ def main():
         var_key = f"discovery_summary_{clean_var_name}"
         
         log_event(f"Saving discovery summary to case variable: {var_key} for {file_num}")
-        data_manager.save_variable(file_num, var_key, summary, source="discovery_agent", extra_tags=["Discovery"])
+        data_manager.save_variable(file_num, var_key, summary_content, source="discovery_agent", extra_tags=["Discovery"])
     else:
         log_event("Could not extract file number from path. Skipping variable save.", level="warning")
 
@@ -876,8 +1014,8 @@ def main():
         output_filename = f"Discovery_Responses_{safe_party_name}.docx"
 
     output_file = os.path.join(output_dir, output_filename)
-    
-    save_success = save_to_docx(summary, output_file, responding_party, discovery_type)
+
+    save_success = save_to_docx(extraction_content, summary_content, output_file, responding_party, discovery_type)
     
     if save_success:
         if report_dir:

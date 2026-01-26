@@ -20,18 +20,18 @@ from functools import partial
 
 # --- Imports ---
 try:
-    from PyQt6.QtWidgets import (
-        QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
-        QPushButton, QTreeWidgetItem, QHeaderView, QMessageBox, QLabel, 
-        QFrame, QSplitter, QAbstractItemView, QLineEdit, 
+    from PySide6.QtWidgets import (
+        QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+        QPushButton, QTreeWidgetItem, QHeaderView, QMessageBox, QLabel,
+        QFrame, QSplitter, QAbstractItemView, QLineEdit,
         QTreeWidgetItemIterator, QTabWidget, QScrollArea, QMenu, QDialog,
         QFileIconProvider, QToolButton
     )
-    from PyQt6.QtCore import Qt, QThread, pyqtSignal, QFileInfo
-    from PyQt6.QtGui import QAction
-    from PyQt6.QtWebEngineCore import QWebEngineUrlScheme
+    from PySide6.QtCore import Qt, QThread, Signal, QFileInfo
+    from PySide6.QtGui import QAction
+    from PySide6.QtWebEngineCore import QWebEngineUrlScheme
 except ImportError:
-    print("Error: PyQt6 or its components are not installed. Please run: pip install PyQt6 PyQt6-WebEngine")
+    print("Error: PySide6 or its components are not installed. Please run: pip install PySide6 PySide6-WebEngine")
     sys.exit(1)
 
 # --- Core Modules ---
@@ -44,18 +44,18 @@ from icharlotte_core.ui.widgets import (
 )
 from icharlotte_core.ui.dialogs import FileNumberDialog, VariablesDialog, PromptsDialog
 from icharlotte_core.ui.tabs import ChatTab, IndexTab
-from icharlotte_core.ui.browser import NoteTakerTab
 from icharlotte_core.ui.email_tab import EmailTab
 from icharlotte_core.ui.email_update_tab import EmailUpdateTab
 from icharlotte_core.ui.report_tab import ReportTab
+from icharlotte_core.ui.word_tab import WordTab
 from icharlotte_core.ui.logs_tab import LogsTab
 from icharlotte_core.ui.liability_tab import LiabilityExposureTab
 from icharlotte_core.ui.master_case_tab import MasterCaseTab
 from icharlotte_core.ui.templates_resources_tab import TemplatesResourcesTab
 
 class DirectoryTreeWorker(QThread):
-    data_ready = pyqtSignal(list) # Emits (root, dirs, files) tuples
-    finished = pyqtSignal()
+    data_ready = Signal(list) # Emits (root, dirs, files) tuples
+    finished = Signal()
     
     def __init__(self, root_path):
         super().__init__()
@@ -312,11 +312,7 @@ class MainWindow(QMainWindow):
         if self.file_number:
             self.index_tab.load_data(self.file_number)
 
-        # --- Tab 4: Note Taker ---
-        self.note_taker_tab = NoteTakerTab(self)
-        self.tabs.addTab(self.note_taker_tab, "Note Taker")
-
-        # --- Tab 5: Chat ---
+        # --- Tab 4: Chat ---
         self.chat_tab = ChatTab()
         self.tabs.addTab(self.chat_tab, "Chat")
 
@@ -336,6 +332,10 @@ class MainWindow(QMainWindow):
         # --- Tab 7: Report ---
         self.report_tab = ReportTab(main_window=self)
         self.tabs.addTab(self.report_tab, "Report")
+
+        # --- Tab: Word ---
+        self.word_tab = WordTab(main_window=self)
+        self.tabs.addTab(self.word_tab, "Word")
 
         # --- Tab: Liability & Exposure ---
         self.liability_tab = LiabilityExposureTab()
@@ -631,8 +631,6 @@ class MainWindow(QMainWindow):
                     self.index_tab.load_data(self.file_number)
                 if hasattr(self, 'chat_tab'):
                     self.chat_tab.reset_state()
-                if hasattr(self, 'note_taker_tab'):
-                    self.note_taker_tab.reset_state()
                 if hasattr(self, 'report_tab'):
                     self.report_tab.reset_state()
                     self.report_tab.refresh_ai_outputs()
@@ -675,8 +673,6 @@ class MainWindow(QMainWindow):
                 self.index_tab.load_data(self.file_number)
             if hasattr(self, 'chat_tab'):
                 self.chat_tab.reset_state()
-            if hasattr(self, 'note_taker_tab'):
-                self.note_taker_tab.reset_state()
             if hasattr(self, 'report_tab'):
                 self.report_tab.reset_state()
                 self.report_tab.refresh_ai_outputs()

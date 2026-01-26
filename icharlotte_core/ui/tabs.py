@@ -6,15 +6,15 @@ import markdown
 import shutil
 import datetime
 from functools import partial
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QFrame, QLabel, 
     QComboBox, QPushButton, QListWidget, QListWidgetItem, QTextBrowser, QPlainTextEdit, 
     QFileDialog, QMessageBox, QDialog, QProgressBar, QTabWidget, 
     QTableWidget, QHeaderView, QTableWidgetItem, QCheckBox, QFileIconProvider,
     QLineEdit, QInputDialog, QMenu, QApplication
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QThread, QFileInfo
-from PyQt6.QtGui import QTextCursor, QDragEnterEvent, QDropEvent, QAction
+from PySide6.QtCore import Qt, Signal, QThread, QFileInfo
+from PySide6.QtGui import QTextCursor, QDragEnterEvent, QDropEvent, QAction
 
 from ..config import API_KEYS, SCRIPTS_DIR, GEMINI_DATA_DIR
 from ..utils import log_event, sanitize_filename, format_date_to_mm_dd_yyyy
@@ -58,8 +58,8 @@ class DateTableWidgetItem(QTableWidgetItem):
 # --- OCR Runner ---
 
 class OCRRunner(QThread):
-    finished = pyqtSignal(bool, str, str) # success, message, final_path
-    progress = pyqtSignal(int) # percentage
+    finished = Signal(bool, str, str) # success, message, final_path
+    progress = Signal(int) # percentage
 
     def __init__(self, script_path, file_path):
         super().__init__()
@@ -818,7 +818,7 @@ class IndexTab(QWidget):
     def refresh_org_folder_list(self):
         self.org_folder_list.clear()
         for folder in sorted(self.suggestions.keys()):
-            from PyQt6.QtWidgets import QListWidgetItem
+            from PySide6.QtWidgets import QListWidgetItem
             display_name = os.path.basename(folder) if folder else "Root"
             item = QListWidgetItem(display_name)
             item.setData(Qt.ItemDataRole.UserRole, folder)

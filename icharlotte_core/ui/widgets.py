@@ -3,19 +3,19 @@ import re
 import shutil
 import subprocess
 import uuid
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QProgressBar, QTextEdit, QSizePolicy, QMessageBox, 
     QTreeWidget, QAbstractItemView, QMenu, QApplication
 )
-from PyQt6.QtCore import Qt, QProcess, QObject, pyqtSignal
-from PyQt6.QtGui import QTextCursor, QAction, QDragEnterEvent, QDropEvent
+from PySide6.QtCore import Qt, QProcess, QObject, Signal
+from PySide6.QtGui import QTextCursor, QAction, QDragEnterEvent, QDropEvent
 from ..utils import log_event
 
 # --- Status System Classes ---
 
 class StatusWidget(QFrame):
-    cancel_requested = pyqtSignal()
+    cancel_requested = Signal()
 
     def __init__(self, agent_name, details, parent=None):
         super().__init__(parent)
@@ -157,10 +157,10 @@ class StatusWidget(QFrame):
 
 class AgentRunner(QObject):
     # Signals to update UI safely
-    progress_update = pyqtSignal(int, str)
-    log_update = pyqtSignal(str)
-    output_file_found = pyqtSignal(str)
-    finished = pyqtSignal(bool)
+    progress_update = Signal(int, str)
+    log_update = Signal(str)
+    output_file_found = Signal(str)
+    finished = Signal(bool)
 
     def __init__(self, command, args, status_widget=None, task_id=None, file_number=None):
         super().__init__()
@@ -303,7 +303,7 @@ class AgentRunner(QObject):
             self.progress_update.emit(new_prog, new_stat)
 
 class FileTreeWidget(QTreeWidget):
-    item_moved = pyqtSignal(str, str) # old_path, new_folder_path
+    item_moved = Signal(str, str) # old_path, new_folder_path
 
     def __init__(self, parent=None):
         super().__init__(parent)

@@ -27,3 +27,9 @@ iCharlotte is a legal document management and automation suite. It consists of a
 - **Python App:** `python iCharlotte.py`
 - **NoteTaker (Dev):** `cd NoteTaker && npm run dev`
 - **NoteTaker (Build):** `cd NoteTaker && npm run build`
+
+## Screenshots
+When taking a screenshot of the iCharlotte app, always use Monitor 0:
+```powershell
+powershell -ExecutionPolicy Bypass -File "C:\geminiterminal2\screenshot_util.ps1" -Monitor 0
+```

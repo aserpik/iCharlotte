@@ -326,7 +326,7 @@ Return ONLY the JSON object, no other text."""
         try:
             result = LLMHandler.generate(
                 provider="Gemini",
-                model="gemini-2.0-flash",
+                model="gemini-3-flash-preview",
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 file_contents="",

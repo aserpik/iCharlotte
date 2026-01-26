@@ -2,13 +2,13 @@ import os
 import json
 import re
 import markdown
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QFrame, QLabel, 
     QComboBox, QPushButton, QListWidget, QListWidgetItem, QTextBrowser, 
     QPlainTextEdit, QMessageBox, QDialog, QFormLayout, QDialogButtonBox, QTextEdit
 )
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent, QTextCursor
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QDragEnterEvent, QDropEvent, QTextCursor
 
 from ..config import API_KEYS, GEMINI_DATA_DIR
 from ..utils import log_event

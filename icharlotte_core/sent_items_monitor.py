@@ -5,7 +5,7 @@ with body starting with "AS -" and creates todos in the Master List.
 
 import re
 from datetime import datetime, timedelta
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.ui.logs_tab import LogManager
@@ -21,9 +21,9 @@ class SentItemsMonitorWorker(QThread):
     """
 
     # Signals
-    todo_created = pyqtSignal(str, str)  # (file_number, todo_text)
-    error = pyqtSignal(str)  # error message
-    status = pyqtSignal(str)  # status message
+    todo_created = Signal(str, str)  # (file_number, todo_text)
+    error = Signal(str)  # error message
+    status = Signal(str)  # status message
 
     # Configuration
     POLL_INTERVAL = 30  # seconds

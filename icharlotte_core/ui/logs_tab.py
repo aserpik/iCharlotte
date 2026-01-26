@@ -1,12 +1,12 @@
 import datetime
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTextEdit, 
     QComboBox, QLabel, QPushButton
 )
-from PyQt6.QtCore import QObject, pyqtSignal, Qt
+from PySide6.QtCore import QObject, Signal, Qt
 
 class _LogManager(QObject):
-    log_added = pyqtSignal(str, str) # category, message
+    log_added = Signal(str, str) # category, message
 
     def __init__(self):
         super().__init__()

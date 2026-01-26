@@ -2,13 +2,13 @@ import os
 import datetime
 import re
 import json
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
     QTextEdit, QListWidget, QListWidgetItem, QLabel, QMessageBox, QSplitter,
     QCheckBox, QFileDialog, QProgressBar, QFrame, QAbstractItemView, QDialog
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QMimeData, QSize, QTimer
-from PyQt6.QtGui import QDragEnterEvent, QDropEvent
+from PySide6.QtCore import Qt, QThread, Signal, QMimeData, QSize, QTimer
+from PySide6.QtGui import QDragEnterEvent, QDropEvent
 
 try:
     import win32com.client
@@ -27,7 +27,7 @@ from ..config import GEMINI_DATA_DIR
 # --- Custom Widgets ---
 
 class DragDropListWidget(QListWidget):
-    fileDropped = pyqtSignal(list)
+    fileDropped = Signal(list)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -113,8 +113,8 @@ class EditPromptsDialog(QDialog):
         }
 
 class EmailSenderWorker(QThread):
-    finished = pyqtSignal()
-    error = pyqtSignal(str)
+    finished = Signal()
+    error = Signal(str)
 
     def __init__(self, recipient, cc, subject, body_html):
         super().__init__()

@@ -1,6 +1,6 @@
 import requests
 import datetime
-from PyQt6.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 from .config import API_KEYS
 from .utils import log_event
 
@@ -223,9 +223,9 @@ class LLMHandler:
         return "Provider not implemented."
 
 class LLMWorker(QThread):
-    finished = pyqtSignal(str)
-    new_token = pyqtSignal(str) # For streaming
-    error = pyqtSignal(str)
+    finished = Signal(str)
+    new_token = Signal(str) # For streaming
+    error = Signal(str)
     
     def __init__(self, provider, model, system, user, files, settings, history=None):
         super().__init__()
@@ -259,8 +259,8 @@ class LLMWorker(QThread):
             self.error.emit(str(e))
 
 class ModelFetcher(QThread):
-    finished = pyqtSignal(str, list)
-    error = pyqtSignal(str)
+    finished = Signal(str, list)
+    error = Signal(str)
 
     def __init__(self, provider, api_key):
         super().__init__()

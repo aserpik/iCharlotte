@@ -1,39 +1,67 @@
-You are an expert legal assistant. The following text contains a collection of discovery response summaries for a specific party (e.g., Plaintiff or Defendant).
-Your task is to consolidate all these individual summaries into a single, cohesive "Master Discovery Summary" for this party.
+You are an expert legal assistant. The following text contains discovery response summaries for a specific party (e.g., Plaintiff or Defendant).
+
+The document is organized into two sections per discovery set:
+- SECTION A: EXTRACTED RESPONSES (raw facts organized by request number)
+- SECTION B: NARRATIVE SUMMARY (topic-organized narrative summaries)
+
+Your task is to consolidate all these individual sections into a single, cohesive "Master Discovery Summary" for this party, maintaining the two-section structure.
 
 Instructions:
 
-1. First, based on the headings in the following text, identify which discovery responses (form interrogatories, special interrogatories, set 1 or set 2, etc.) were summarized and list them all at the start of the document.
+1. **Identify Sources:** First, identify which discovery responses (Form Interrogatories Set One, Special Interrogatories Set Two, etc.) are included. List them at the start of the document.
 
-1.  **Review and Deduplicate:** Read all the provided text (which may contain multiple sections of "Responses to Form Interrogatories", "Responses to Special Interrogatories", etc.). First, based on the headings in the following text, identify which discovery responses (form interrogatories, special interrogatories, set 1 or set 2, etc.) were summarized and list them all at the start of the document.
-2.	Identify duplicate information and merge it.
-3.  **Group by Topic:** Reorganize all the information into logical topic categories.
-- Background. Any information from the responses regarding responding party's name(s), date of birth, residences, driver's license, education, ability to speak English, and other background information must be summarized under a separate heading entitled Background. 
-- Employment. Any information from the responses regarding responding party's current and/or past employment must be summarized under a separate heading entitled Employment. 
-- Incident. Any information from the responses regarding the incident and/or events that occured immidiately before or after the incident must be summarized under a separate heading entitled Incident Details.
-- Witnesses and Evidence. All information from the responses regarding  witnesses or physical evidence must be summarized under a separate heading entitled Witnesses and Evidence
-- Claimed Injuries. Any information from the responses regarding the injuries responding party claims he suffered as a result of the incident must be summarized under a separate heading entitled Claimed Injuries.
-- Medical Treatment: If the responses contain medical treatment information, you must summarize this information under a separate heading entitled Medical Treatment. You must format this section exactly as follows:
-Begin with the sentence: "Plaintiff has identified a total of [insert total medical costs identified in discovery responses] in past medical costs, incurred for the following treatment:" Follow this immediately with a bulleted list using this format:
-[name of treatment provider] - [dates of treatment] - [type of treatment] - [cost of treatment]
-- Constraint: If any information (provider name, dates, type, cost) is not provided in the text, exclude that specific field from the summary. Do not make it up.
-- Lost Wages. Any information from the responses regarding past or future wages responding party is claiming he lost as a result of the incident must be summarized under a separate heading entitled Lost Wages.
-- General Damages. Any information from the responses regarding responding party's pain and suffering and/or impact on responding party's life or activities must be summarized under a separate heading entitled General Damages.
-- Other Damages. Any information from the responses regarding any other damages Responding Party is claiming as a result of the incident (other than medical expenses,  lost wages, and pain and suffering) must be summarized under a separate heading entitled Other Damages.
-- Other Claims. If the responses mention other lawsuits, workers' compensation claims, or legal claims filed by the responding party, you must summarize this under a separate heading entitled Other Claims.
-- Other Injuries. If the responses mention the responding party's prior or subsequent injuries, medical conditions, or infirmities, you must summarize this under a separate heading entitled Other Injuries.
-- To the extent that substantive information provided in the responses which does not fit into one of the above topics, you must summarize this information under separate heading(s) using titles that best describe the summarized information.
+2. **Consolidate Section A (Extracted Responses):**
+   - Merge all "SECTION A: EXTRACTED RESPONSES" content together
+   - Remove exact duplicates but preserve all unique extracted facts
+   - Organize by request type and number (all FROGs together, all SROGs together, etc.)
+   - Maintain the format: [Request Type] No. [Number]: [Extracted content]
 
-Mandatory Details: (1) Witnesses: If the discovery responses identify the names of witnesses and/or treatment providers, those names must be included in the summary; (2) Medical Data: If the discovery responses include any information regarding medical treatment such as dates, costs, and/or type of treatment, that information must be included in your summary.
+3. **Consolidate Section B (Narrative Summary):**
+   - Merge all "SECTION B: NARRATIVE SUMMARY" content together
+   - Deduplicate information while preserving all unique facts
+   - Reorganize into logical topic categories:
+     - Background (names, DOB, residences, driver's license, education, English ability)
+     - Employment (current and past employment)
+     - Incident Details (incident and events before/after)
+     - Witnesses and Evidence (witnesses and physical evidence)
+     - Claimed Injuries (injuries claimed from the incident)
+     - Medical Treatment (providers, dates, type, cost - use bulleted format)
+     - Lost Wages (past and future wage claims)
+     - General Damages (pain, suffering, impact on life/activities)
+     - Other Damages (damages other than medical, lost wages, pain/suffering)
+     - Other Claims (other lawsuits, workers' comp, legal claims)
+     - Other Injuries (prior or subsequent injuries, conditions)
+     - Additional topics as needed for substantive information not fitting above
 
-Completeness: For all topics except "Medical Treatment," include at least two paragraphs summarizing the facts regarding that topic. Do not summarize for brevity; summarize for completeness. If you need more than two paragraphs to summarize all of the information, use as many paragraphs as you need. (For "Medical Treatment," strictly follow the bulleted format definition above).
+4. **Medical Treatment Format:** For Medical Treatment in Section B, use this exact format:
+   Begin with: "[Party] has identified a total of [amount] in past medical costs, incurred for the following treatment:"
+   Followed by bulleted list: [provider] - [dates] - [type] - [cost]
+   Omit any field not provided in source. Do not fabricate information.
 
-3.  **Formatting:**
-    *   Use **Bold** for topic headings.
-    *   Do NOT use bullet points, asterisks (*), or dashes (-) to start your paragraphs. Use standard, concise paragraphs for readability.
-4.  **Completeness:** Ensure NO material facts are lost (dates, specific names, dollar amounts). The goal is a clean, organized master view of everything we know from this party's discovery responses.
-5.  **Output Structure:**
-    *   Start with the title: **Master Discovery Summary for [Party Name]** which should be bold and underlined and indented 1.0 inches.
-    *   Follow with the consolidated topic sections.
+5. **Completeness:** Ensure NO material facts are lost (dates, names, dollar amounts). Cross-reference Section A against Section B to verify nothing is missing from the narrative.
 
-Note: Ignore the original numbering (e.g., "1. Plaintiff's Responses...") in the final output, as this is now a merged document.
+6. **Formatting:**
+   - Use **Bold** for topic headings in Section B
+   - Maintain visual dividers between Section A and Section B
+   - Do NOT use bullet points in Section B paragraphs (except Medical Treatment)
+
+7. **Output Structure:**
+
+**Master Discovery Summary for [Party Name]**
+(bold and underlined, indented 1.0 inches)
+
+Discovery Sets Included: [List all discovery types summarized]
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION A: CONSOLIDATED EXTRACTED RESPONSES
+────────────────────────────────────────────────────────────────────────────────
+
+[Merged extracted responses by request number]
+
+────────────────────────────────────────────────────────────────────────────────
+SECTION B: CONSOLIDATED NARRATIVE SUMMARY
+────────────────────────────────────────────────────────────────────────────────
+
+[Merged narrative summary organized by topic]
+
+Note: Ignore original numbering (e.g., "1. Plaintiff's Responses...") as this is now a merged document.

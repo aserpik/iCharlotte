@@ -6,7 +6,6 @@ SCRIPTS_DIR = os.path.join(os.getcwd(), "Scripts")
 LOG_FILE = os.path.join(os.getcwd(), "icharlotte_Activity.log")
 GEMINI_DATA_DIR = os.path.join(os.getcwd(), ".gemini", "case_data")
 TEMP_DIR = os.path.join(os.getcwd(), ".gemini", "tmp")
-NOTETAKER_DIR = os.path.join(os.getcwd(), "NoteTaker", "out", "renderer")
 
 # Templates & Resources
 TEMPLATES_DIR = os.path.join(os.getcwd(), "Templates")

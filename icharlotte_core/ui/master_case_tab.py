@@ -2,7 +2,7 @@ import sys
 import os
 import json
 import datetime
-from PyQt6.QtWidgets import (
+from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
     QHeaderView, QSplitter, QFrame, QLabel, QLineEdit, QPushButton,
     QDateEdit, QListWidget, QListWidgetItem, QMenu, QMessageBox,
@@ -10,8 +10,8 @@ from PyQt6.QtWidgets import (
     QComboBox, QProgressBar, QCheckBox, QToolTip, QTextEdit, QInputDialog,
     QCalendarWidget
 )
-from PyQt6.QtCore import Qt, QDate, QThread, pyqtSignal, QTimer
-from PyQt6.QtGui import QColor, QAction, QFont, QShortcut, QKeySequence
+from PySide6.QtCore import Qt, QDate, QThread, Signal, QTimer
+from PySide6.QtGui import QColor, QAction, QFont, QShortcut, QKeySequence
 
 from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.utils import log_event, get_case_path, BASE_PATH_WIN, parse_hearing_data
@@ -115,8 +115,8 @@ class HearingCellWidget(QWidget):
         menu.exec(self.btn.mapToGlobal(self.btn.rect().bottomLeft()))
 
 class CaseScannerWorker(QThread):
-    progress = pyqtSignal(str)
-    finished = pyqtSignal(int, int) # Count of found cases, Count of removed cases
+    progress = Signal(str)
+    finished = Signal(int, int) # Count of found cases, Count of removed cases
 
     def __init__(self, db):
         super().__init__()
@@ -257,9 +257,9 @@ class DateTableWidgetItem(QTableWidgetItem):
         return super().__lt__(other)
 
 class TodoItemWidget(QWidget):
-    statusChanged = pyqtSignal(bool) # Checked/Unchecked
-    colorChanged = pyqtSignal(str)   # New color
-    assignmentChanged = pyqtSignal(str, str) # New initials, New date string
+    statusChanged = Signal(bool) # Checked/Unchecked
+    colorChanged = Signal(str)   # New color
+    assignmentChanged = Signal(str, str) # New initials, New date string
 
     def __init__(self, text, status, color, created_date, assigned_to, assigned_date, case_assigned_attorney=""):
         super().__init__()
@@ -435,11 +435,6 @@ class MasterCaseTab(QWidget):
         self.email_monitor_btn.clicked.connect(self.toggle_email_monitor)
         top_bar.addWidget(self.email_monitor_btn)
 
-        # Email Monitor Status Label
-        self.email_monitor_status = QLabel("")
-        self.email_monitor_status.setStyleSheet("color: gray; font-size: 10px; margin-left: 5px;")
-        top_bar.addWidget(self.email_monitor_status)
-
         # Calendar Monitor Toggle Button
         self.calendar_monitor_btn = QPushButton("Start Calendar")
         self.calendar_monitor_btn.setCheckable(True)
@@ -457,11 +452,6 @@ class MasterCaseTab(QWidget):
         """)
         self.calendar_monitor_btn.clicked.connect(self.toggle_calendar_monitor)
         top_bar.addWidget(self.calendar_monitor_btn)
-
-        # Calendar Monitor Status Label
-        self.calendar_monitor_status = QLabel("")
-        self.calendar_monitor_status.setStyleSheet("color: gray; font-size: 10px; margin-left: 5px;")
-        top_bar.addWidget(self.calendar_monitor_status)
 
         main_layout.addLayout(top_bar)
         
@@ -1496,8 +1486,6 @@ class MasterCaseTab(QWidget):
         self.email_monitor_worker.start()
 
         self.email_monitor_btn.setText("Stop Email Monitor")
-        self.email_monitor_status.setText("Running...")
-        self.email_monitor_status.setStyleSheet("color: green; font-size: 10px; margin-left: 5px;")
 
     def stop_email_monitor(self):
         """Stop the sent items monitor worker."""
@@ -1505,8 +1493,6 @@ class MasterCaseTab(QWidget):
             return
 
         self.email_monitor_worker.request_stop()
-        self.email_monitor_status.setText("Stopping...")
-        self.email_monitor_status.setStyleSheet("color: orange; font-size: 10px; margin-left: 5px;")
 
     def on_email_todo_created(self, file_number, todo_text):
         """Handle todo created signal from email monitor."""
@@ -1518,27 +1504,18 @@ class MasterCaseTab(QWidget):
             self.refresh_details()
             self.restore_selection()
 
-        # Update status
-        self.email_monitor_status.setText(f"Todo added: {file_number}")
-
     def on_email_monitor_error(self, message):
         """Handle error signal from email monitor."""
-        self.email_monitor_status.setText(f"Error: {message[:30]}")
-        self.email_monitor_status.setStyleSheet("color: red; font-size: 10px; margin-left: 5px;")
         log_event(f"Email monitor error: {message}", "error")
 
     def on_email_monitor_status(self, message):
         """Handle status signal from email monitor."""
-        # Show truncated status
-        display_msg = message[:40] + "..." if len(message) > 40 else message
-        self.email_monitor_status.setText(display_msg)
+        pass  # Status logged in logs tab
 
     def on_email_monitor_finished(self):
         """Handle worker finished signal."""
         self.email_monitor_btn.setChecked(False)
         self.email_monitor_btn.setText("Start Email Monitor")
-        self.email_monitor_status.setText("Stopped")
-        self.email_monitor_status.setStyleSheet("color: gray; font-size: 10px; margin-left: 5px;")
         self.email_monitor_worker = None
 
     # --- Calendar Monitor Methods ---
@@ -1568,8 +1545,6 @@ class MasterCaseTab(QWidget):
         self.calendar_monitor_worker.start()
 
         self.calendar_monitor_btn.setText("Stop Calendar")
-        self.calendar_monitor_status.setText("Starting...")
-        self.calendar_monitor_status.setStyleSheet("color: blue; font-size: 10px; margin-left: 5px;")
 
     def stop_calendar_monitor(self):
         """Stop the calendar monitor worker."""
@@ -1577,31 +1552,21 @@ class MasterCaseTab(QWidget):
             return
 
         self.calendar_monitor_worker.request_stop()
-        self.calendar_monitor_status.setText("Stopping...")
-        self.calendar_monitor_status.setStyleSheet("color: orange; font-size: 10px; margin-left: 5px;")
 
     def on_calendar_event_created(self, file_number, event_title):
         """Handle calendar event created signal."""
-        self.calendar_monitor_status.setText(f"Event: {file_number}")
-        self.calendar_monitor_status.setStyleSheet("color: green; font-size: 10px; margin-left: 5px;")
+        pass  # Event logged in logs tab
 
     def on_calendar_monitor_error(self, message):
         """Handle error signal from calendar monitor."""
-        self.calendar_monitor_status.setText(f"Error: {message[:30]}")
-        self.calendar_monitor_status.setStyleSheet("color: red; font-size: 10px; margin-left: 5px;")
         log_event(f"Calendar monitor error: {message}", "error")
 
     def on_calendar_monitor_status(self, message):
         """Handle status signal from calendar monitor."""
-        display_msg = message[:40] + "..." if len(message) > 40 else message
-        self.calendar_monitor_status.setText(display_msg)
-        if "Running" in message or "authenticated" in message.lower():
-            self.calendar_monitor_status.setStyleSheet("color: green; font-size: 10px; margin-left: 5px;")
+        pass  # Status logged in logs tab
 
     def on_calendar_monitor_finished(self):
         """Handle worker finished signal."""
         self.calendar_monitor_btn.setChecked(False)
         self.calendar_monitor_btn.setText("Start Calendar")
-        self.calendar_monitor_status.setText("Stopped")
-        self.calendar_monitor_status.setStyleSheet("color: gray; font-size: 10px; margin-left: 5px;")
         self.calendar_monitor_worker = None
