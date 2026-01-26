@@ -336,10 +336,13 @@ class CalendarMonitorWorker(QThread):
         now = datetime.now()
 
         # First, try to find explicit date patterns
+        # Order matters: patterns with year first, then patterns without year
+        # The pattern without year uses negative lookahead to avoid matching dates that have a year
         explicit_patterns = [
             r'(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?,?\s*\d{4}',
-            r'(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?',
             r'\d{1,2}[/-]\d{1,2}[/-]\d{2,4}',
+            # Month DD without year - negative lookahead to skip if followed by year
+            r'(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?(?!,?\s*\d{4})',
         ]
 
         for pattern in explicit_patterns:
@@ -376,6 +379,12 @@ class CalendarMonitorWorker(QThread):
         # Check if "day after tomorrow" exists - if so, don't match plain "tomorrow"
         has_day_after_tomorrow = 'day after tomorrow' in body_lower
 
+        # Day name to weekday mapping (Monday=0, Sunday=6)
+        day_names = {
+            'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+            'friday': 4, 'saturday': 5, 'sunday': 6
+        }
+
         for pattern, skip_if in natural_patterns:
             # Skip plain "tomorrow" if "day after tomorrow" exists
             if skip_if == 'tomorrow' and has_day_after_tomorrow:
@@ -383,10 +392,41 @@ class CalendarMonitorWorker(QThread):
 
             matches = re.findall(pattern, body, re.IGNORECASE)
             for match in matches:
-                parsed = dateparser.parse(match, settings={
-                    'PREFER_DATES_FROM': 'future',
-                    'RELATIVE_BASE': now
-                })
+                parsed = None
+
+                # Handle "next Monday", "next Tuesday", etc. manually since dateparser doesn't
+                next_day_match = re.match(r'next\s+(\w+)', match, re.IGNORECASE)
+                if next_day_match:
+                    day_name = next_day_match.group(1).lower()
+                    if day_name in day_names:
+                        target_weekday = day_names[day_name]
+                        current_weekday = now.weekday()
+                        days_ahead = target_weekday - current_weekday
+                        if days_ahead <= 0:  # Target day already passed this week
+                            days_ahead += 7
+                        parsed = now + timedelta(days=days_ahead)
+
+                # Handle "this Monday", "this Tuesday", etc.
+                this_day_match = re.match(r'this\s+(\w+)', match, re.IGNORECASE)
+                if this_day_match and not parsed:
+                    day_name = this_day_match.group(1).lower()
+                    if day_name in day_names:
+                        target_weekday = day_names[day_name]
+                        current_weekday = now.weekday()
+                        days_ahead = target_weekday - current_weekday
+                        if days_ahead < 0:  # Target day already passed this week
+                            days_ahead += 7
+                        elif days_ahead == 0:  # It's today
+                            days_ahead = 0  # Keep it as today
+                        parsed = now + timedelta(days=days_ahead)
+
+                # Fall back to dateparser for other patterns
+                if not parsed:
+                    parsed = dateparser.parse(match, settings={
+                        'PREFER_DATES_FROM': 'future',
+                        'RELATIVE_BASE': now
+                    })
+
                 if parsed and parsed >= now and parsed not in dates:
                     # For "today", only add if there's a time component or it's explicitly mentioned
                     if 'today' in match.lower() and parsed.date() == now.date():

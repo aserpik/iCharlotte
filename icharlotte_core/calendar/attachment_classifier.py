@@ -54,6 +54,19 @@ class AttachmentClassifier:
             r'notice\s+of\s+(?:video(?:taped)?|remote)?\s*deposition',
             r'notice\s+to\s+take\s+deposition',
         ],
+        # NOTE: discovery_response MUST be checked before discovery_request
+        # because response documents often contain the request text they're responding to
+        'discovery_response': [
+            r'response\s+to\s+(?:form\s+)?interrogator',
+            r'response\s+to\s+(?:special\s+)?interrogator',
+            r'response\s+to\s+request\s+for\s+production',
+            r'response\s+to\s+request\s+for\s+admission',
+            r'response\s+to\s+demand',
+            r"plaintiff's\s+response\s+to",
+            r"defendant's\s+response\s+to",
+            r"responses?\s+to\s+(?:form\s+)?interrogator",
+            r"responses?\s+to\s+request",
+        ],
         'discovery_request': [
             r'form\s+interrogator',
             r'special\s+interrogator',
@@ -62,12 +75,18 @@ class AttachmentClassifier:
             r'demand\s+for\s+inspection',
             r'set\s+(?:one|two|three|four|five|\d+)',
         ],
-        'discovery_response': [
-            r'response\s+to\s+(?:form\s+)?interrogator',
-            r'response\s+to\s+(?:special\s+)?interrogator',
-            r'response\s+to\s+request\s+for\s+production',
-            r'response\s+to\s+request\s+for\s+admission',
-            r'response\s+to\s+demand',
+        # NOTE: opposition and reply MUST be checked before motion
+        # because opposition/reply documents often contain "motion" in their text
+        'opposition': [
+            r'opposition\s+to',
+            r'opposing\s+(?:the\s+)?motion',
+            r'in\s+opposition',
+            r'memorandum\s+of\s+points\s+and\s+authorities\s+in\s+opposition',
+        ],
+        'reply': [
+            r'reply\s+(?:brief|memorandum|to\s+opposition)',
+            r'reply\s+in\s+support',
+            r'moving\s+party.{0,20}reply',
         ],
         'motion': [
             r'motion\s+for\s+summary\s+judgment',
@@ -80,17 +99,6 @@ class AttachmentClassifier:
             r'motion\s+in\s+limine',
             r'ex\s+parte\s+application',
         ],
-        'opposition': [
-            r'opposition\s+to',
-            r'opposing\s+(?:the\s+)?motion',
-            r'in\s+opposition',
-            r'memorandum\s+of\s+points\s+and\s+authorities\s+in\s+opposition',
-        ],
-        'reply': [
-            r'reply\s+(?:brief|memorandum|to\s+opposition)',
-            r'reply\s+in\s+support',
-            r'moving\s+party.{0,20}reply',
-        ],
         'correspondence': [
             r'^dear\s+',
             r'sincerely,',
@@ -100,13 +108,15 @@ class AttachmentClassifier:
     }
 
     # Motion type patterns
+    # NOTE: Order matters - anti_slapp must be checked before motion_to_strike
+    # because anti-SLAPP is a "special motion to strike"
     MOTION_TYPE_PATTERNS = {
         'msj': [r'summary\s+judgment', r'\bmsj\b'],
         'msa': [r'summary\s+adjudication', r'\bmsa\b'],
         'demurrer': [r'\bdemurrer\b'],
-        'motion_to_strike': [r'motion\s+to\s+strike'],
+        'anti_slapp': [r'anti-?slapp', r'special\s+motion\s+to\s+strike', r'425\.16', r'ccp\s*425\.16'],
+        'motion_to_strike': [r'(?<!special\s)motion\s+to\s+strike'],  # Negative lookbehind to skip anti-SLAPP
         'motion_to_compel': [r'motion\s+to\s+compel'],
-        'anti_slapp': [r'anti-?slapp', r'special\s+motion\s+to\s+strike', r'425\.16'],
         'protective_order': [r'protective\s+order'],
         'in_limine': [r'in\s+limine', r'\bmil\b'],
         'ex_parte': [r'ex\s+parte'],
