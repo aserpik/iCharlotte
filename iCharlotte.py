@@ -492,27 +492,91 @@ class MainWindow(QMainWindow):
             pos = self.tree.visualItemRect(item).bottomLeft()
             pos.setX(self.tree.columnViewportPosition(3))
             global_pos = self.tree.viewport().mapToGlobal(pos)
-            self.show_agent_menu(item, global_pos)
 
-    def show_agent_menu(self, item, global_pos):
+            # Get all selected items (for multi-select support)
+            selected_items = self.tree.selectedItems()
+
+            # If clicked item is not in selection, use just the clicked item
+            if item not in selected_items:
+                selected_items = [item]
+
+            self.show_agent_menu(selected_items, global_pos)
+
+    def show_agent_menu(self, items, global_pos):
+        """Show agent menu for one or more selected items."""
         menu = QMenu(self)
-        current_tasks = item.data(0, Qt.ItemDataRole.UserRole + 2) or []
-        
+
+        # For multiple items, show count in header
+        if len(items) > 1:
+            header_action = QAction(f"Apply to {len(items)} selected items:", menu)
+            header_action.setEnabled(False)
+            menu.addAction(header_action)
+            menu.addSeparator()
+
+        # Determine which tasks are common across all items
+        # A task is "checked" if ALL items have it, "partial" if some have it
+        task_states = {}
         for agent in self.AGENTS:
+            agent_id = agent["id"]
+            has_count = sum(1 for item in items if agent_id in (item.data(0, Qt.ItemDataRole.UserRole + 2) or []))
+            if has_count == len(items):
+                task_states[agent_id] = "all"
+            elif has_count > 0:
+                task_states[agent_id] = "partial"
+            else:
+                task_states[agent_id] = "none"
+
+        for agent in self.AGENTS:
+            state = task_states[agent["id"]]
             action = QAction(agent["name"], menu)
             action.setCheckable(True)
-            action.setChecked(agent["id"] in current_tasks)
-            action.triggered.connect(partial(self.toggle_agent_task, item, agent["id"]))
+            action.setChecked(state in ["all", "partial"])
+
+            # Visual indication for partial selection
+            if state == "partial":
+                action.setText(f"{agent['name']} (partial)")
+
+            action.triggered.connect(partial(self.toggle_agent_task_multi, items, agent["id"], state))
             menu.addAction(action)
-            
+
         menu.addSeparator()
         clear_act = QAction("Clear All Tasks", menu)
-        clear_act.triggered.connect(lambda: self.set_item_tasks(item, []))
+        clear_act.triggered.connect(lambda: self.clear_tasks_multi(items))
         menu.addAction(clear_act)
-        
+
         menu.exec(global_pos)
 
+    def toggle_agent_task_multi(self, items, agent_id, current_state):
+        """Toggle a task for multiple items. If partial/none, add to all. If all, remove from all."""
+        self.tree.blockSignals(True)
+
+        # If all items have it, remove from all. Otherwise, add to all.
+        should_add = current_state != "all"
+
+        for item in items:
+            current_tasks = list(item.data(0, Qt.ItemDataRole.UserRole + 2) or [])
+            if should_add:
+                if agent_id not in current_tasks:
+                    current_tasks.append(agent_id)
+            else:
+                if agent_id in current_tasks:
+                    current_tasks.remove(agent_id)
+
+            item.setData(0, Qt.ItemDataRole.UserRole + 2, current_tasks)
+            self.update_item_tasks_ui(item)
+
+        self.tree.blockSignals(False)
+
+    def clear_tasks_multi(self, items):
+        """Clear all tasks from multiple items."""
+        self.tree.blockSignals(True)
+        for item in items:
+            item.setData(0, Qt.ItemDataRole.UserRole + 2, [])
+            self.update_item_tasks_ui(item)
+        self.tree.blockSignals(False)
+
     def toggle_agent_task(self, item, agent_id):
+        """Toggle a task for a single item (legacy support)."""
         current_tasks = item.data(0, Qt.ItemDataRole.UserRole + 2) or []
         if agent_id in current_tasks:
             current_tasks.remove(agent_id)
@@ -791,7 +855,21 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Error", f"Could not open file: {e}")
 
     def on_tree_selection_changed(self):
-        pass
+        selected = self.tree.selectedItems()
+        count = len(selected)
+        if count > 1:
+            # Count only files (not directories)
+            file_count = sum(1 for item in selected if item.data(0, Qt.ItemDataRole.UserRole + 1) == "file")
+            if file_count > 0:
+                self.status_label.setText(f"{file_count} files selected - Click 'Queued Tasks' column to apply tasks to all")
+        elif count == 1:
+            item = selected[0]
+            path = item.data(0, Qt.ItemDataRole.UserRole)
+            if path:
+                self.status_label.setText(f"Selected: {os.path.basename(path)}")
+        else:
+            if hasattr(self, 'file_number') and self.file_number:
+                self.status_label.setText(f"Case: {self.file_number}")
 
     def run_separator_path(self, path):
         # Switch to Status Tab to show progress

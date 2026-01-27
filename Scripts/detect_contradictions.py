@@ -318,7 +318,7 @@ def detect_contradictions(
         logger.warning("Need at least 2 summaries for contradiction detection")
         return None
 
-    memory_monitor = MemoryMonitor(warn_mb=1500, abort_mb=2000, logger=logger.info)
+    memory_monitor = MemoryMonitor(warn_threshold_mb=1500, abort_threshold_mb=2000, logger=logger.info)
     llm_caller = LLMCaller(logger=logger)
 
     # Load prompt

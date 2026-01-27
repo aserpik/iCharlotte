@@ -666,7 +666,7 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
         True if successful.
     """
     # Initialize components
-    memory_monitor = MemoryMonitor(warn_mb=1500, abort_mb=2000, logger=logger.info)
+    memory_monitor = MemoryMonitor(warn_threshold_mb=1500, abort_threshold_mb=2000, logger=logger.info)
     llm_caller = LLMCaller(logger=logger)
 
     # Load prompts

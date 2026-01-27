@@ -472,20 +472,27 @@ class MasterCaseTab(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(7) # File #, Plaintiff, Assigned, Hearings, Trial, Last Report, Tasks
         self.table.setHorizontalHeaderLabels(["File #", "Plaintiff Name", "Assigned", "Hearings", "Trial Date", "Last Report", "Tasks"])
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+
+        # Disable auto-stretch of last section so all columns resize independently
+        self.table.horizontalHeader().setStretchLastSection(False)
+
+        # Set each column to Interactive mode individually
+        for col in range(7):
+            self.table.horizontalHeader().setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
+
         self.table.setColumnWidth(0, 100) # File #
         self.table.setColumnWidth(1, 300) # Plaintiff Name
         self.table.setColumnWidth(2, 60) # Assigned
         self.table.setColumnWidth(3, 120) # Hearings
         self.table.setColumnWidth(4, 120) # Trial Date
         self.table.setColumnWidth(5, 120) # Last Report
-        self.table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch) # Tasks stretch
+        self.table.setColumnWidth(6, 150) # Tasks
         
         self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.setSortingEnabled(True)
         self.table.itemSelectionChanged.connect(self.on_case_selected)
-        self.table.itemDoubleClicked.connect(self.on_case_double_clicked)
+        self.table.cellDoubleClicked.connect(self.on_case_double_clicked)
         self.table.cellClicked.connect(self.on_cell_clicked)
         
         self.load_column_settings()
@@ -1316,12 +1323,11 @@ class MasterCaseTab(QWidget):
         self.refresh_data()
         self.restore_selection()
 
-    def on_case_double_clicked(self, item):
+    def on_case_double_clicked(self, row, col):
         # Only load case and switch to Case View when double-clicking the Tasks column (index 6)
-        if item.column() != 6:
+        if col != 6:
             return
 
-        row = item.row()
         file_number = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
 
         if self.main_window:

@@ -414,7 +414,7 @@ def process_document(input_path: str, logger: AgentLogger, report_dir: str = Non
         True if successful.
     """
     # Initialize components
-    memory_monitor = MemoryMonitor(warn_mb=1500, abort_mb=2000, logger=logger.info)
+    memory_monitor = MemoryMonitor(warn_threshold_mb=1500, abort_threshold_mb=2000, logger=logger.info)
     llm_caller = LLMCaller(logger=logger)
     total_passes = 4  # Extraction, Summary, Cross-Check, Save
 

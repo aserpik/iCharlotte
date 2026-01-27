@@ -111,13 +111,13 @@ def process_pdf(file_path):
     agent_log(f"OCR INFO: Processing {total_pages} pages sequentially for memory safety...")
     
     for i in range(total_pages):
-        task = (i, file_path, DPI, JPEG_QUALITY, queue)
+        task = (i, file_path, DPI, JPEG_QUALITY)
         p_num, p_bytes = process_page(task)
         if p_bytes:
             results[p_num] = p_bytes
-            agent_log(queue, f"OCR TRACE: Page {p_num + 1} completed.")
+            agent_log(f"OCR TRACE: Page {p_num + 1} completed.")
         else:
-            agent_log(queue, f"OCR ERROR: Page {p_num + 1} returned no data.")
+            agent_log(f"OCR ERROR: Page {p_num + 1} returned no data.")
         
         # Report progress for UI
         percentage = int(((i + 1) / total_pages) * 100)

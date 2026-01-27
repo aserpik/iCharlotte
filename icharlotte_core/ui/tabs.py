@@ -605,6 +605,21 @@ class IndexTab(QWidget):
         right_layout.addWidget(self.doc_table)
 
         btn_layout = QHBoxLayout()
+
+        self.add_doc_btn = QPushButton("Add Document")
+        self.add_doc_btn.setToolTip("Add a document that was not identified by the agent (e.g., a missed page range)")
+        self.add_doc_btn.setStyleSheet("background-color: #FF9800; color: white; font-weight: bold; padding: 10px;")
+        self.add_doc_btn.clicked.connect(self.add_document_row)
+        btn_layout.addWidget(self.add_doc_btn)
+
+        self.delete_doc_btn = QPushButton("Delete Selected")
+        self.delete_doc_btn.setToolTip("Delete the selected document rows")
+        self.delete_doc_btn.setStyleSheet("background-color: #f44336; color: white; font-weight: bold; padding: 10px;")
+        self.delete_doc_btn.clicked.connect(self.delete_selected_rows)
+        btn_layout.addWidget(self.delete_doc_btn)
+
+        btn_layout.addStretch()
+
         self.process_btn = QPushButton("Process Documents")
         self.process_btn.setToolTip("Extracts checked 'Sep.' items and builds merged PDFs for 'Merge Group' items.")
         self.process_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 10px;")
@@ -908,11 +923,11 @@ class IndexTab(QWidget):
         text = text.lower()
         for row in range(self.doc_table.rowCount()):
             date_item = self.doc_table.item(row, 3)
-            title_item = self.doc_table.item(row, 5)
-            
+            title_widget = self.doc_table.cellWidget(row, 5)  # Title is now a QLineEdit
+
             date_text = date_item.text().lower() if date_item else ""
-            title_text = title_item.text().lower() if title_item else ""
-            
+            title_text = title_widget.text().lower() if isinstance(title_widget, QLineEdit) else ""
+
             if text in date_text or text in title_text:
                 self.doc_table.setRowHidden(row, False)
             else:
@@ -922,54 +937,190 @@ class IndexTab(QWidget):
         if not current: return
         path = current.text()
         docs = self.index_data.get(path, [])
-        
+
         self.doc_table.setSortingEnabled(False)
         self.doc_table.setRowCount(0)
         for doc in docs:
-            row = self.doc_table.rowCount()
-            self.doc_table.insertRow(row)
-            
-            # Col 0: Sep. Checkbox
-            chk_item = QTableWidgetItem()
-            chk_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-            chk_item.setCheckState(Qt.CheckState.Unchecked)
-            self.doc_table.setItem(row, 0, chk_item)
-            
-            # Col 1: Merge Group (LineEdit)
-            merge_edit = QLineEdit()
-            merge_edit.setPlaceholderText("")
-            # Store the widget to access it later
-            self.doc_table.setCellWidget(row, 1, merge_edit)
-            
-            self.doc_table.setItem(row, 2, QTableWidgetItem(str(doc.get('id', ''))))
-            
-            date_val = doc.get('date', '')
-            formatted_date = format_date_to_mm_dd_yyyy(date_val)
-            self.doc_table.setItem(row, 3, DateTableWidgetItem(formatted_date))
-            
-            start = doc.get('start', '')
-            end = doc.get('end', '')
-            pages = f"{start}-{end}" if start != end else str(start)
-            self.doc_table.setItem(row, 4, QTableWidgetItem(pages))
-            
-            self.doc_table.setItem(row, 5, QTableWidgetItem(str(doc.get('title', ''))))
-            
+            self._add_doc_to_table(doc)
+
         self.doc_table.setSortingEnabled(True)
 
         # Apply filter
         if hasattr(self, 'search_input'):
             self.filter_documents(self.search_input.text())
 
+    def _add_doc_to_table(self, doc, check_sep=False):
+        """Helper to add a document row to the table. Used both for loading and adding new docs."""
+        row = self.doc_table.rowCount()
+        self.doc_table.insertRow(row)
+
+        # Col 0: Sep. Checkbox
+        chk_item = QTableWidgetItem()
+        chk_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+        chk_item.setCheckState(Qt.CheckState.Checked if check_sep else Qt.CheckState.Unchecked)
+        self.doc_table.setItem(row, 0, chk_item)
+
+        # Col 1: Merge Group (LineEdit)
+        merge_edit = QLineEdit()
+        merge_edit.setPlaceholderText("")
+        self.doc_table.setCellWidget(row, 1, merge_edit)
+
+        # Col 2: ID (read-only)
+        id_item = QTableWidgetItem(str(doc.get('id', '')))
+        id_item.setFlags(id_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        self.doc_table.setItem(row, 2, id_item)
+
+        # Col 3: Date (read-only display, but stored)
+        date_val = doc.get('date', '')
+        formatted_date = format_date_to_mm_dd_yyyy(date_val)
+        date_item = DateTableWidgetItem(formatted_date)
+        date_item.setFlags(date_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+        self.doc_table.setItem(row, 3, date_item)
+
+        # Col 4: Pages (EDITABLE - use LineEdit for better UX)
+        start = doc.get('start', '')
+        end = doc.get('end', '')
+        pages = f"{start}-{end}" if start != end else str(start)
+        pages_edit = QLineEdit(pages)
+        pages_edit.setPlaceholderText("e.g., 5-7")
+        pages_edit.setToolTip("Edit page range (format: start-end or single page)")
+        self.doc_table.setCellWidget(row, 4, pages_edit)
+
+        # Col 5: Title (EDITABLE - use LineEdit)
+        title_edit = QLineEdit(str(doc.get('title', '')))
+        title_edit.setPlaceholderText("Document title")
+        title_edit.setToolTip("Edit document title")
+        self.doc_table.setCellWidget(row, 5, title_edit)
+
+        return row
+
+    def add_document_row(self):
+        """Add a new document row that the user can fill in manually."""
+        current_item = self.pdf_list.currentItem()
+        if not current_item:
+            QMessageBox.warning(self, "Warning", "Please select a PDF first.")
+            return
+
+        # Find the next available ID
+        max_id = 0
+        for row in range(self.doc_table.rowCount()):
+            id_item = self.doc_table.item(row, 2)
+            if id_item:
+                try:
+                    max_id = max(max_id, int(id_item.text()))
+                except ValueError:
+                    pass
+
+        new_id = max_id + 1
+
+        # Create a new doc dict for the new row
+        new_doc = {
+            'id': str(new_id),
+            'title': 'New Document',
+            'date': '',
+            'start': '',
+            'end': ''
+        }
+
+        # Disable sorting temporarily to add at the end
+        self.doc_table.setSortingEnabled(False)
+        row = self._add_doc_to_table(new_doc, check_sep=True)
+        self.doc_table.setSortingEnabled(True)
+
+        # Select and scroll to the new row
+        self.doc_table.selectRow(row)
+        self.doc_table.scrollToItem(self.doc_table.item(row, 0))
+
+        # Focus on the Pages field for immediate editing
+        pages_widget = self.doc_table.cellWidget(row, 4)
+        if pages_widget:
+            pages_widget.setFocus()
+            pages_widget.selectAll()
+
+    def delete_selected_rows(self):
+        """Delete the selected document rows."""
+        selected_rows = set()
+        for range_ in self.doc_table.selectedRanges():
+            for r in range(range_.topRow(), range_.bottomRow() + 1):
+                selected_rows.add(r)
+
+        if not selected_rows:
+            QMessageBox.information(self, "Info", "No rows selected.")
+            return
+
+        reply = QMessageBox.question(
+            self, "Confirm Delete",
+            f"Delete {len(selected_rows)} selected document(s)?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            # Delete in reverse order to maintain correct indices
+            for row in sorted(selected_rows, reverse=True):
+                self.doc_table.removeRow(row)
+
+    def save_table_to_index(self):
+        """Save the current table state (including edits and additions) back to index_data and file."""
+        current_item = self.pdf_list.currentItem()
+        if not current_item:
+            QMessageBox.warning(self, "Warning", "No PDF selected.")
+            return
+
+        pdf_path = current_item.text()
+        new_docs = []
+
+        for row in range(self.doc_table.rowCount()):
+            doc_obj = self._get_doc_from_row(row)
+
+            # Validate page range
+            if doc_obj['start'] is None or doc_obj['end'] is None:
+                QMessageBox.warning(
+                    self, "Validation Error",
+                    f"Row {row + 1} (ID {doc_obj['id']}): Invalid page range. Cannot save."
+                )
+                return
+
+            new_docs.append({
+                'id': doc_obj['id'],
+                'title': doc_obj['title'],
+                'date': doc_obj['date'],
+                'start': doc_obj['start'],
+                'end': doc_obj['end']
+            })
+
+        # Update in-memory data
+        self.index_data[pdf_path] = new_docs
+        self.save_data()
+
+        QMessageBox.information(self, "Success", f"Saved {len(new_docs)} document(s) to index.")
+
     def show_context_menu(self, position):
         menu = QMenu()
+
+        add_doc_action = QAction("Add New Document", self)
+        add_doc_action.triggered.connect(self.add_document_row)
+        menu.addAction(add_doc_action)
+
+        delete_action = QAction("Delete Selected Row(s)", self)
+        delete_action.triggered.connect(self.delete_selected_rows)
+        menu.addAction(delete_action)
+
+        menu.addSeparator()
+
         set_group_action = QAction("Set Merge Group for Selected", self)
         set_group_action.triggered.connect(self.set_merge_group_batch)
         menu.addAction(set_group_action)
-        
+
         clear_group_action = QAction("Clear Merge Group for Selected", self)
         clear_group_action.triggered.connect(self.clear_merge_group_batch)
         menu.addAction(clear_group_action)
-        
+
+        menu.addSeparator()
+
+        save_changes_action = QAction("Save Changes to Index", self)
+        save_changes_action.triggered.connect(self.save_table_to_index)
+        menu.addAction(save_changes_action)
+
         menu.exec(self.doc_table.viewport().mapToGlobal(position))
 
     def set_merge_group_batch(self):
@@ -1001,43 +1152,108 @@ class IndexTab(QWidget):
             if isinstance(widget, QLineEdit):
                 widget.setText("")
 
+    def _parse_pages(self, pages_str):
+        """Parse a pages string like '5-7' or '8' into (start, end) tuple."""
+        pages_str = pages_str.strip()
+        if '-' in pages_str:
+            parts = pages_str.split('-')
+            try:
+                start = int(parts[0].strip())
+                end = int(parts[1].strip())
+                return start, end
+            except (ValueError, IndexError):
+                return None, None
+        else:
+            try:
+                page = int(pages_str)
+                return page, page
+            except ValueError:
+                return None, None
+
+    def _get_doc_from_row(self, row):
+        """Extract document data from a table row, reading from the editable widgets."""
+        doc_id = self.doc_table.item(row, 2).text() if self.doc_table.item(row, 2) else ""
+
+        # Get pages from widget
+        pages_widget = self.doc_table.cellWidget(row, 4)
+        pages_str = pages_widget.text() if isinstance(pages_widget, QLineEdit) else ""
+        start, end = self._parse_pages(pages_str)
+
+        # Get title from widget
+        title_widget = self.doc_table.cellWidget(row, 5)
+        title = title_widget.text() if isinstance(title_widget, QLineEdit) else ""
+
+        # Get date from item
+        date_item = self.doc_table.item(row, 3)
+        date = date_item.text() if date_item else ""
+
+        return {
+            'id': doc_id,
+            'title': title,
+            'date': date,
+            'start': start,
+            'end': end
+        }
+
     def process_documents(self):
         current_item = self.pdf_list.currentItem()
         if not current_item: return
-        
+
         pdf_path = current_item.text()
         if not os.path.exists(pdf_path):
             QMessageBox.warning(self, "Error", f"Source PDF not found: {pdf_path}")
             return
 
-        docs = self.index_data.get(pdf_path, [])
-        if not docs: return
+        # Check if table has any rows
+        if self.doc_table.rowCount() == 0:
+            QMessageBox.information(self, "Info", "No documents in the table.")
+            return
 
-        # 1. Collect Tasks
-        separate_tasks = [] # List of doc dicts
-        merge_groups = {}   # { group_name: [doc_dicts] }
-        
+        # 1. Collect Tasks - read directly from the table, not from self.index_data
+        separate_tasks = []  # List of doc dicts built from table data
+        merge_groups = {}    # { group_name: [doc_dicts] }
+
         rows = self.doc_table.rowCount()
+        validation_errors = []
+
         for row in range(rows):
             if self.doc_table.isRowHidden(row): continue
-            
-            # Identify doc using ID
-            doc_id = self.doc_table.item(row, 2).text()
-            doc_obj = next((d for d in docs if str(d.get('id')) == doc_id), None)
-            if not doc_obj: continue
-            
+
+            # Build doc_obj from current table values (user edits)
+            doc_obj = self._get_doc_from_row(row)
+
             # Check "Sep."
-            if self.doc_table.item(row, 0).checkState() == Qt.CheckState.Checked:
-                separate_tasks.append(doc_obj)
-            
+            is_sep_checked = self.doc_table.item(row, 0).checkState() == Qt.CheckState.Checked
+
             # Check "Merge Group"
-            widget = self.doc_table.cellWidget(row, 1)
-            if isinstance(widget, QLineEdit):
-                group_name = widget.text().strip()
-                if group_name:
-                    if group_name not in merge_groups:
-                        merge_groups[group_name] = []
-                    merge_groups[group_name].append(doc_obj)
+            merge_widget = self.doc_table.cellWidget(row, 1)
+            group_name = merge_widget.text().strip() if isinstance(merge_widget, QLineEdit) else ""
+
+            # Skip if neither sep nor merge group
+            if not is_sep_checked and not group_name:
+                continue
+
+            # Validate page range
+            if doc_obj['start'] is None or doc_obj['end'] is None:
+                validation_errors.append(f"Row {row + 1} (ID {doc_obj['id']}): Invalid page range")
+                continue
+
+            if not doc_obj['title'].strip():
+                validation_errors.append(f"Row {row + 1} (ID {doc_obj['id']}): Title is empty")
+                continue
+
+            if is_sep_checked:
+                separate_tasks.append(doc_obj)
+
+            if group_name:
+                if group_name not in merge_groups:
+                    merge_groups[group_name] = []
+                merge_groups[group_name].append(doc_obj)
+
+        # Show validation errors if any
+        if validation_errors:
+            error_msg = "The following rows have issues:\n\n" + "\n".join(validation_errors)
+            QMessageBox.warning(self, "Validation Errors", error_msg)
 
         if not separate_tasks and not merge_groups:
             QMessageBox.information(self, "Info", "No actions selected (Check 'Sep.' or enter a 'Merge Group').")

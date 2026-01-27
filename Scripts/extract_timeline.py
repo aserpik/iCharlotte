@@ -353,7 +353,7 @@ def extract_timeline_from_document(
     Returns:
         Timeline object or None on failure.
     """
-    memory_monitor = MemoryMonitor(warn_mb=1500, abort_mb=2000, logger=logger.info)
+    memory_monitor = MemoryMonitor(warn_threshold_mb=1500, abort_threshold_mb=2000, logger=logger.info)
     llm_caller = LLMCaller(logger=logger)
 
     # Load prompt

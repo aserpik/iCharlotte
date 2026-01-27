@@ -88,7 +88,7 @@ class MemoryMonitor:
     - Automatic garbage collection suggestions
 
     Usage:
-        monitor = MemoryMonitor(warn_mb=1500, abort_mb=2000)
+        monitor = MemoryMonitor(warn_threshold_mb=1500, abort_threshold_mb=2000)
 
         # Check memory status
         status = monitor.check()
@@ -351,13 +351,13 @@ class MemoryMonitor:
 _default_monitor: Optional[MemoryMonitor] = None
 
 
-def get_monitor(warn_mb: float = 1500, abort_mb: float = 2000) -> MemoryMonitor:
+def get_monitor(warn_threshold_mb: float = 1500, abort_threshold_mb: float = 2000) -> MemoryMonitor:
     """
     Get or create the global memory monitor.
 
     Args:
-        warn_mb: Warning threshold in MB.
-        abort_mb: Abort threshold in MB.
+        warn_threshold_mb: Warning threshold in MB.
+        abort_threshold_mb: Abort threshold in MB.
 
     Returns:
         MemoryMonitor instance.
@@ -365,7 +365,7 @@ def get_monitor(warn_mb: float = 1500, abort_mb: float = 2000) -> MemoryMonitor:
     global _default_monitor
 
     if _default_monitor is None:
-        _default_monitor = MemoryMonitor(warn_mb, abort_mb)
+        _default_monitor = MemoryMonitor(warn_threshold_mb, abort_threshold_mb)
 
     return _default_monitor
 
