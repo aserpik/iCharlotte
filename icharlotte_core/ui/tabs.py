@@ -157,7 +157,7 @@ class ChatTab(QWidget):
         self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
         main_layout.addWidget(self.main_splitter)
 
-        # --- Conversation Sidebar (Left) ---
+        # --- Conversation Sidebar (Left) - Collapsible ---
         self.conv_sidebar = ConversationSidebar(theme=self.theme)
         self.conv_sidebar.setFixedWidth(200)
         self.conv_sidebar.conversation_selected.connect(self.on_conversation_selected)
@@ -166,11 +166,21 @@ class ChatTab(QWidget):
         self.conv_sidebar.conversation_deleted.connect(self.on_conversation_deleted)
         self.main_splitter.addWidget(self.conv_sidebar)
 
+        # Collapse sidebar by default
+        self.sidebar_collapsed = True
+        self.conv_sidebar.setVisible(False)
+
         # --- Settings Panel (Middle-Left) ---
         settings_panel = QFrame()
         settings_layout = QVBoxLayout(settings_panel)
         settings_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         settings_layout.setContentsMargins(8, 8, 8, 8)
+
+        # Toggle conversations sidebar button
+        self.toggle_sidebar_btn = QPushButton("Show Conversations")
+        self.toggle_sidebar_btn.setToolTip("Show/hide the conversations sidebar")
+        self.toggle_sidebar_btn.clicked.connect(self.toggle_sidebar)
+        settings_layout.addWidget(self.toggle_sidebar_btn)
 
         # Provider
         settings_layout.addWidget(QLabel("Provider:"))
@@ -924,6 +934,16 @@ class ChatTab(QWidget):
         self.stop_btn.setEnabled(False)
 
     # --- Helper Methods ---
+
+    def toggle_sidebar(self):
+        """Toggle the conversations sidebar visibility."""
+        self.sidebar_collapsed = not self.sidebar_collapsed
+        self.conv_sidebar.setVisible(not self.sidebar_collapsed)
+
+        if self.sidebar_collapsed:
+            self.toggle_sidebar_btn.setText("Show Conversations")
+        else:
+            self.toggle_sidebar_btn.setText("Hide Conversations")
 
     def get_attachment_info(self) -> list:
         """Get attachment information for the current message."""

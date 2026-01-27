@@ -36,8 +36,8 @@ try:
         QFileIconProvider, QToolButton, QGroupBox, QCheckBox, QComboBox,
         QInputDialog
     )
-    from PySide6.QtCore import Qt, QThread, Signal, QFileInfo, QMetaObject, Q_ARG, QSettings
-    from PySide6.QtGui import QAction, QShortcut, QKeySequence, QIcon
+    from PySide6.QtCore import Qt, QThread, Signal, QFileInfo, QMetaObject, Q_ARG, QSettings, QTimer
+    from PySide6.QtGui import QAction, QShortcut, QKeySequence, QIcon, QCursor
     from PySide6.QtWebEngineCore import QWebEngineUrlScheme
 except ImportError:
     print("Error: PySide6 or its components are not installed. Please run: pip install PySide6 PySide6-WebEngine")
@@ -184,13 +184,40 @@ class QuickOpenDialog(QDialog):
 
     def showEvent(self, event):
         super().showEvent(event)
-        # Center on screen
-        screen = QApplication.primaryScreen().geometry()
+        # Center on the screen where the mouse cursor is (for multi-monitor support)
+        cursor_pos = QCursor.pos()
+        screen = QApplication.screenAt(cursor_pos)
+        if screen is None:
+            screen = QApplication.primaryScreen()
+        screen_geom = screen.geometry()
         self.move(
-            (screen.width() - self.width()) // 2,
-            screen.height() // 3
+            screen_geom.x() + (screen_geom.width() - self.width()) // 2,
+            screen_geom.y() + screen_geom.height() // 3
         )
-        # Activate window and focus the input
+        # Use a timer to ensure focus is set after window is fully rendered
+        # This is necessary for multi-monitor setups where focus can be unreliable
+        # 100ms delay needed on Windows for reliable focus stealing
+        QTimer.singleShot(100, self._ensure_focus)
+
+    def _ensure_focus(self):
+        """Ensure the input field has focus after the window is shown."""
+        # On Windows, we need to use native APIs to force foreground focus
+        if sys.platform == 'win32':
+            try:
+                import ctypes
+                hwnd = int(self.winId())
+                # Attach to the foreground window's thread to get permission to set foreground
+                user32 = ctypes.windll.user32
+                foreground_hwnd = user32.GetForegroundWindow()
+                foreground_thread = user32.GetWindowThreadProcessId(foreground_hwnd, None)
+                current_thread = ctypes.windll.kernel32.GetCurrentThreadId()
+                # Attach threads to allow focus stealing
+                user32.AttachThreadInput(foreground_thread, current_thread, True)
+                user32.SetForegroundWindow(hwnd)
+                user32.AttachThreadInput(foreground_thread, current_thread, False)
+            except Exception:
+                pass  # Fall back to Qt methods if native approach fails
+
         self.activateWindow()
         self.raise_()
         self.file_input.setFocus()
