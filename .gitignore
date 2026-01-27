@@ -36,6 +36,16 @@ NoteTaker/dist/
 .env.local
 *.env
 
+# Build artifacts
+build/
+dist/
+*.exe
+*.lnk
+*.spec
+
+# Screenshots (auto-generated)
+screenshot*.png
+
 # OS
 .DS_Store
 Thumbs.db

@@ -3,7 +3,7 @@ Enhanced Case View Tab Components
 
 This module contains improved UI components for the Case View Tab including:
 - Enhanced Agent Buttons with running indicator, last docket date, and settings
-- Enhanced File Tree with processing status, tags, and page count columns
+- Enhanced File Tree with processing status and tags columns
 - File Preview Pane
 - Advanced Filtering
 - Output Browser with compare, search, and export functionality
@@ -1860,12 +1860,138 @@ class OutputBrowserWidget(QDialog):
             return
 
         path = items[0].data(Qt.ItemDataRole.UserRole)
+        ext = os.path.splitext(path)[1].lower()
+
+        # Handle .docx files with mammoth
+        if ext == '.docx':
+            self._show_docx_preview(path)
+            return
+
+        # Skip binary files that can't be previewed as text
+        binary_extensions = {'.pdf', '.doc', '.xlsx', '.xls', '.pptx', '.ppt',
+                           '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.zip', '.rar'}
+        if ext in binary_extensions:
+            self.output_preview.setPlainText(
+                f"Binary file cannot be previewed as text.\n\n"
+                f"File: {os.path.basename(path)}\n"
+                f"Type: {ext}\n\n"
+                f"Double-click to open with default application."
+            )
+            return
+
         try:
-            with open(path, 'r', encoding='utf-8', errors='ignore') as f:
-                content = f.read()
-            self.output_preview.setPlainText(content)
+            content = None
+
+            # Try different encodings in order of likelihood
+            encodings = ['utf-8', 'utf-16', 'utf-16-le', 'utf-16-be', 'cp1252', 'latin-1']
+
+            for encoding in encodings:
+                try:
+                    with open(path, 'r', encoding=encoding) as f:
+                        content = f.read()
+
+                    # Check if content looks like valid text (not garbled)
+                    # If more than 10% are control characters (except newlines/tabs), try next encoding
+                    if content:
+                        control_chars = sum(1 for c in content[:1000] if ord(c) < 32 and c not in '\n\r\t')
+                        sample_len = min(len(content), 1000)
+                        if sample_len > 0 and control_chars / sample_len > 0.1:
+                            content = None
+                            continue
+                        break  # Content looks valid
+                except (UnicodeDecodeError, UnicodeError):
+                    continue
+
+            if content:
+                self.output_preview.setPlainText(content)
+            else:
+                # Fallback: read as binary and try to decode
+                with open(path, 'rb') as f:
+                    raw = f.read()
+                # Try to detect BOM
+                if raw.startswith(b'\xff\xfe'):
+                    content = raw.decode('utf-16-le', errors='replace')
+                elif raw.startswith(b'\xfe\xff'):
+                    content = raw.decode('utf-16-be', errors='replace')
+                elif raw.startswith(b'\xef\xbb\xbf'):
+                    content = raw[3:].decode('utf-8', errors='replace')
+                else:
+                    content = raw.decode('utf-8', errors='replace')
+                self.output_preview.setPlainText(content)
+
         except Exception as e:
             self.output_preview.setPlainText(f"Error reading file: {e}")
+
+    def _show_docx_preview(self, file_path):
+        """Show preview for .docx files using mammoth."""
+        try:
+            import mammoth
+
+            with open(file_path, "rb") as docx_file:
+                result = mammoth.convert_to_html(docx_file)
+                html_content = result.value
+
+            if not html_content.strip():
+                self.output_preview.setPlainText("Document appears to be empty.")
+                return
+
+            # Style the HTML for better display
+            styled_html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body {{
+                        font-family: Calibri, Arial, sans-serif;
+                        font-size: 11pt;
+                        line-height: 1.4;
+                        padding: 20px;
+                        background-color: white;
+                        color: black;
+                    }}
+                    table {{
+                        border-collapse: collapse;
+                        margin: 10px 0;
+                        width: 100%;
+                    }}
+                    td, th {{
+                        border: 1px solid #ccc;
+                        padding: 6px 10px;
+                        text-align: left;
+                    }}
+                    th {{
+                        background-color: #f0f0f0;
+                        font-weight: bold;
+                    }}
+                    p {{
+                        margin: 0 0 10px 0;
+                    }}
+                    h1, h2, h3, h4, h5, h6 {{
+                        margin: 15px 0 10px 0;
+                    }}
+                    ul, ol {{
+                        margin: 10px 0;
+                        padding-left: 30px;
+                    }}
+                </style>
+            </head>
+            <body>
+                {html_content}
+            </body>
+            </html>
+            """
+
+            # QTextEdit supports basic HTML rendering
+            self.output_preview.setHtml(styled_html)
+
+        except ImportError:
+            self.output_preview.setPlainText(
+                "mammoth library not installed.\n\n"
+                "Install with: pip install mammoth\n\n"
+                "Double-click to open with default application."
+            )
+        except Exception as e:
+            self.output_preview.setPlainText(f"Error reading .docx file: {e}")
 
     def _open_selected_output(self):
         items = self.output_list.selectedItems()
@@ -1876,6 +2002,56 @@ class OutputBrowserWidget(QDialog):
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"Could not open file: {e}")
 
+    def _read_text_file(self, path):
+        """Read a text file with automatic encoding detection."""
+        ext = os.path.splitext(path)[1].lower()
+
+        # Handle .docx files using mammoth
+        if ext == '.docx':
+            try:
+                import mammoth
+                with open(path, "rb") as docx_file:
+                    result = mammoth.extract_raw_text(docx_file)
+                    return result.value
+            except:
+                return None
+
+        binary_extensions = {'.pdf', '.doc', '.xlsx', '.xls', '.pptx', '.ppt',
+                           '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.zip', '.rar'}
+        if ext in binary_extensions:
+            return None
+
+        encodings = ['utf-8', 'utf-16', 'utf-16-le', 'utf-16-be', 'cp1252', 'latin-1']
+
+        for encoding in encodings:
+            try:
+                with open(path, 'r', encoding=encoding) as f:
+                    content = f.read()
+                # Validate content looks like text
+                if content:
+                    control_chars = sum(1 for c in content[:1000] if ord(c) < 32 and c not in '\n\r\t')
+                    sample_len = min(len(content), 1000)
+                    if sample_len > 0 and control_chars / sample_len > 0.1:
+                        continue
+                    return content
+            except (UnicodeDecodeError, UnicodeError):
+                continue
+
+        # Fallback with BOM detection
+        try:
+            with open(path, 'rb') as f:
+                raw = f.read()
+            if raw.startswith(b'\xff\xfe'):
+                return raw.decode('utf-16-le', errors='replace')
+            elif raw.startswith(b'\xfe\xff'):
+                return raw.decode('utf-16-be', errors='replace')
+            elif raw.startswith(b'\xef\xbb\xbf'):
+                return raw[3:].decode('utf-8', errors='replace')
+            else:
+                return raw.decode('utf-8', errors='replace')
+        except:
+            return None
+
     def _do_compare(self):
         left_path = self.compare_left.currentData()
         right_path = self.compare_right.currentData()
@@ -1884,10 +2060,13 @@ class OutputBrowserWidget(QDialog):
             return
 
         try:
-            with open(left_path, 'r', encoding='utf-8', errors='ignore') as f:
-                left_content = f.read()
-            with open(right_path, 'r', encoding='utf-8', errors='ignore') as f:
-                right_content = f.read()
+            left_content = self._read_text_file(left_path)
+            right_content = self._read_text_file(right_path)
+
+            if left_content is None:
+                left_content = f"Cannot preview binary file: {os.path.basename(left_path)}"
+            if right_content is None:
+                right_content = f"Cannot preview binary file: {os.path.basename(right_path)}"
 
             self.compare_left_text.setPlainText(left_content)
             self.compare_right_text.setPlainText(right_content)
@@ -1903,8 +2082,9 @@ class OutputBrowserWidget(QDialog):
 
         for output in self.outputs:
             try:
-                with open(output["path"], 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read()
+                content = self._read_text_file(output["path"])
+                if content is None:
+                    continue  # Skip binary files
 
                 if query in content.lower():
                     # Find context around match

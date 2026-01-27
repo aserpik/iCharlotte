@@ -1,6 +1,13 @@
 import sys
 import os
 import argparse
+import ctypes
+
+# Set Windows App User Model ID BEFORE any Qt imports for proper taskbar icon
+try:
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('iCharlotte.LegalSuite.1')
+except Exception:
+    pass
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
@@ -30,7 +37,7 @@ try:
         QInputDialog
     )
     from PySide6.QtCore import Qt, QThread, Signal, QFileInfo, QMetaObject, Q_ARG, QSettings
-    from PySide6.QtGui import QAction, QShortcut, QKeySequence
+    from PySide6.QtGui import QAction, QShortcut, QKeySequence, QIcon
     from PySide6.QtWebEngineCore import QWebEngineUrlScheme
 except ImportError:
     print("Error: PySide6 or its components are not installed. Please run: pip install PySide6 PySide6-WebEngine")
@@ -255,6 +262,22 @@ class MainWindow(QMainWindow):
         self.case_path = case_path
         self._update_window_title()
         self.resize(1200, 800)
+
+        # Set application icon
+        icon_path = os.path.join(os.path.dirname(__file__), 'icharlotte.ico')
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+
+        # Set AppUserModelID on window handle for proper taskbar grouping
+        try:
+            from ctypes import wintypes
+            hwnd = int(self.winId())
+            shell32 = ctypes.windll.shell32
+            propvariant = ctypes.create_unicode_buffer('iCharlotte.LegalSuite.1')
+            shell32.SHGetPropertyStoreForWindow.argtypes = [wintypes.HWND, ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_void_p)]
+            shell32.SHGetPropertyStoreForWindow.restype = ctypes.HRESULT
+        except Exception:
+            pass
 
         self.agent_runners = [] # Keep references to prevent GC
         self.cached_models = {} # Cache for models: {provider: [list]}
@@ -564,7 +587,6 @@ class MainWindow(QMainWindow):
             "Category / File",
             "Size",
             "Date Modified",
-            "Pages",
             "Status",
             "Tags",
             "Queued Tasks (Click to Add ➕)"
@@ -573,10 +595,9 @@ class MainWindow(QMainWindow):
         self.tree.setColumnWidth(0, 300)
         self.tree.setColumnWidth(1, 70)
         self.tree.setColumnWidth(2, 100)
-        self.tree.setColumnWidth(3, 50)
-        self.tree.setColumnWidth(4, 80)
-        self.tree.setColumnWidth(5, 100)
-        self.tree.setColumnWidth(6, 200)
+        self.tree.setColumnWidth(3, 80)
+        self.tree.setColumnWidth(4, 100)
+        self.tree.setColumnWidth(5, 200)
         self.tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.tree.setAlternatingRowColors(True)
         self.tree.itemSelectionChanged.connect(self.on_tree_selection_changed)
@@ -885,10 +906,10 @@ class MainWindow(QMainWindow):
         self.tree.blockSignals(False)
 
     def on_tree_item_clicked(self, item, column):
-        if column == 6:  # Queued Tasks column (index 6)
+        if column == 5:  # Queued Tasks column (index 5)
             # Get click position relative to the tree's viewport
             pos = self.tree.visualItemRect(item).bottomLeft()
-            pos.setX(self.tree.columnViewportPosition(6))
+            pos.setX(self.tree.columnViewportPosition(5))
             global_pos = self.tree.viewport().mapToGlobal(pos)
 
             # Get all selected items (for multi-select support)
@@ -1001,8 +1022,8 @@ class MainWindow(QMainWindow):
     def update_item_tasks_ui(self, item):
         task_ids = item.data(0, Qt.ItemDataRole.UserRole + 2) or []
         if not task_ids:
-            item.setText(6, " [ + Add Tasks ]")
-            item.setForeground(6, Qt.GlobalColor.gray)
+            item.setText(5, " [ + Add Tasks ]")
+            item.setForeground(5, Qt.GlobalColor.gray)
             return
 
         # Create a visual string of short tags
@@ -1012,9 +1033,9 @@ class MainWindow(QMainWindow):
             if agent:
                 tags.append(f"[{agent['short']}]")
 
-        item.setText(6, " ".join(tags))
-        # Optional: set color for column 6 text
-        item.setForeground(6, Qt.GlobalColor.blue)
+        item.setText(5, " ".join(tags))
+        # Optional: set color for column 5 text
+        item.setForeground(5, Qt.GlobalColor.blue)
 
     def filter_tree(self, text):
         search_text = text.lower()
@@ -1637,15 +1658,33 @@ class MainWindow(QMainWindow):
         for i in range(self.tree.topLevelItemCount()):
             check_item(self.tree.topLevelItem(i))
 
-    def add_status_task(self, name, details, command, args):
+    def add_status_task(self, name, details, command, args, script_name=None, file_path=None):
         status_widget = StatusWidget(name, details)
         self.status_list_layout.insertWidget(0, status_widget) # Add to top
-        
+
         runner = AgentRunner(command, args, status_widget, task_id=status_widget.task_id, file_number=self.file_number)
         self.agent_runners.append(runner) # Keep alive
         runner.finished.connect(lambda: self.cleanup_runner(runner))
+
+        # Log processing entry when agent finishes
+        if script_name and file_path and self.file_number:
+            runner.finished.connect(lambda success: self._log_processing_entry(script_name, file_path, success))
+
         runner.start()
         return runner
+
+    def _log_processing_entry(self, script_name, file_path, success):
+        """Log a processing entry when an agent finishes."""
+        try:
+            if not self.file_number:
+                return
+            proc_log = ProcessingLogDB(self.file_number)
+            status = "success" if success else "failed"
+            proc_log.add_entry(file_path, script_name, status)
+            # Refresh the tree to show updated status
+            self.populate_tree()
+        except Exception as e:
+            log_event(f"Error logging processing entry: {e}", "error")
 
     def cleanup_runner(self, runner):
         # Only cleanup if it matches the current file number (meaning the user saw it finish)
@@ -1930,9 +1969,10 @@ class MainWindow(QMainWindow):
                     filename = os.path.basename(path)
                     display_name = agent["name"]
                     details = f"{filename}"
-                    
-                    args = [os.path.join(SCRIPTS_DIR, agent["script"]), path]
-                    self.add_status_task(display_name, details, sys.executable, args)
+                    script_name = agent["script"]
+
+                    args = [os.path.join(SCRIPTS_DIR, script_name), path]
+                    self.add_status_task(display_name, details, sys.executable, args, script_name=script_name, file_path=path)
                     count += 1
             
             iterator += 1
@@ -2038,12 +2078,6 @@ class MainWindow(QMainWindow):
         self._icon_cache[ext] = self._file_icon
         return self._file_icon
 
-    def _get_pdf_page_count(self, file_path):
-        """Get page count for a PDF file."""
-        # DISABLED: Reading PDF files on network drives causes UI freeze
-        # TODO: Move this to background thread or cache results
-        return ""
-
     def _get_file_processing_status(self, file_path):
         """Get processing status for a file."""
         if not hasattr(self, 'file_number') or not self.file_number:
@@ -2065,6 +2099,12 @@ class MainWindow(QMainWindow):
                     task = log.get("task_type", "").lower()
                     if "ocr" in task:
                         successful.add("OCR")
+                    elif "discovery" in task or "disc" in task:
+                        successful.add("S-DISC")
+                    elif "deposition" in task or "depo" in task:
+                        successful.add("S-DEPO")
+                    elif "med_record" in task or "med_rec" in task:
+                        successful.add("MED-REC")
                     elif "summar" in task:
                         successful.add("SUM")
                     elif "timeline" in task:
@@ -2167,9 +2207,6 @@ class MainWindow(QMainWindow):
                 size_str = f"{size / 1024:.1f} KB" if size < 1024 * 1024 else f"{size / (1024 * 1024):.1f} MB"
                 date_str = format_date_to_mm_dd_yyyy(mtime)
 
-                # Page count disabled - too slow on network drives
-                page_count = ""
-
                 # Get processing status (uses cached DB)
                 proc_status = self._get_file_processing_status(file_path) if self.file_number else ""
 
@@ -2187,9 +2224,8 @@ class MainWindow(QMainWindow):
                     f_item.setData(0, Qt.ItemDataRole.UserRole + 1, "file")
                     f_item.setText(1, size_str)
                     f_item.setText(2, date_str)
-                    f_item.setText(3, page_count)
-                    f_item.setText(4, proc_status)
-                    f_item.setText(5, tags_str)
+                    f_item.setText(3, proc_status)
+                    f_item.setText(4, tags_str)
 
                     self.tree_item_map[file_path] = f_item
                 else:
@@ -2197,9 +2233,8 @@ class MainWindow(QMainWindow):
                     try:
                         f_item.setText(1, size_str)
                         f_item.setText(2, date_str)
-                        f_item.setText(3, page_count)
-                        f_item.setText(4, proc_status)
-                        f_item.setText(5, tags_str)
+                        f_item.setText(3, proc_status)
+                        f_item.setText(4, tags_str)
                     except RuntimeError:
                         continue
         
@@ -2256,6 +2291,11 @@ if __name__ == "__main__":
 
         app = QApplication(sys.argv)
 
+        # Set application icon (for taskbar)
+        icon_path = os.path.join(os.path.dirname(__file__), 'icharlotte.ico')
+        if os.path.exists(icon_path):
+            app.setWindowIcon(QIcon(icon_path))
+
         # Log startup parameters
         log_event(f"Starting with args: file_number={args.file_number}, case_path={args.case_path}, tab={args.tab}")
 
@@ -2266,6 +2306,7 @@ if __name__ == "__main__":
             initial_tab=args.tab
         )
         window.show()
+
         sys.exit(app.exec())
     except Exception as e:
         print(f"CRITICAL MAIN ERROR: {e}")
