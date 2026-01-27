@@ -1,4 +1,5 @@
 import requests
+import json
 import datetime
 from .config import API_KEYS
 from .utils import log_event
@@ -182,51 +183,124 @@ class LLMHandler:
                     raise
 
         elif provider == "OpenAI":
-            # (Existing OpenAI logic - simplified: no streaming support added yet)
             url = "https://api.openai.com/v1/chat/completions"
             headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-            
+
             messages = [{"role": "system", "content": system_prompt}]
             if history:
                 messages.extend(history)
-            
+
             full_user_content = user_prompt
             if file_contents: full_user_content += "\n\n[ATTACHED FILES]:\n" + file_contents
             messages.append({"role": "user", "content": full_user_content})
-            
+
             payload = {
                 "model": model, "messages": messages,
                 "temperature": temp, "top_p": top_p
             }
             if max_tokens > 0: payload["max_tokens"] = max_tokens
-            
-            resp = requests.post(url, headers=headers, json=payload)
-            if resp.status_code == 200:
-                return resp.json()['choices'][0]['message']['content']
-            raise Exception(f"OpenAI Error {resp.status_code}: {resp.text}")
+
+            if do_stream:
+                # Streaming mode
+                payload["stream"] = True
+                log_event(f"Sending streaming request to OpenAI (Model: {model})")
+                resp = requests.post(url, headers=headers, json=payload, stream=True)
+
+                if resp.status_code != 200:
+                    raise Exception(f"OpenAI Error {resp.status_code}: {resp.text}")
+
+                def openai_stream():
+                    try:
+                        for line in resp.iter_lines():
+                            if line:
+                                line_str = line.decode('utf-8')
+                                if line_str.startswith('data: '):
+                                    data_str = line_str[6:]
+                                    if data_str.strip() == '[DONE]':
+                                        break
+                                    try:
+                                        data = json.loads(data_str)
+                                        delta = data.get('choices', [{}])[0].get('delta', {})
+                                        if 'content' in delta and delta['content']:
+                                            yield delta['content']
+                                    except json.JSONDecodeError:
+                                        pass
+                    except Exception as e:
+                        log_event(f"OpenAI stream error: {e}", "error")
+                        yield f"[Stream Error: {e}]"
+
+                return openai_stream()
+            else:
+                # Non-streaming mode
+                log_event(f"Sending request to OpenAI (Model: {model})")
+                resp = requests.post(url, headers=headers, json=payload)
+                if resp.status_code == 200:
+                    return resp.json()['choices'][0]['message']['content']
+                raise Exception(f"OpenAI Error {resp.status_code}: {resp.text}")
 
         elif provider == "Claude":
-             # (Existing Claude logic - simplified)
             url = "https://api.anthropic.com/v1/messages"
-            headers = {"x-api-key": api_key, "anthropic-version": "2023-06-01", "content-type": "application/json"}
-            
+            headers = {
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json"
+            }
+
             messages = []
             if history:
                 messages.extend(history)
-                
+
             full_user_content = user_prompt
             if file_contents: full_user_content += "\n\n[ATTACHED FILES]:\n" + file_contents
             messages.append({"role": "user", "content": full_user_content})
-            
+
             claude_max = max_tokens if max_tokens > 0 else 8192
             payload = {
                 "model": model, "max_tokens": claude_max, "temperature": temp, "top_p": top_p,
                 "system": system_prompt, "messages": messages
             }
-            resp = requests.post(url, headers=headers, json=payload)
-            if resp.status_code == 200:
-                return resp.json()['content'][0]['text']
-            raise Exception(f"Claude Error {resp.status_code}: {resp.text}")
+
+            if do_stream:
+                # Streaming mode
+                payload["stream"] = True
+                log_event(f"Sending streaming request to Claude (Model: {model})")
+                resp = requests.post(url, headers=headers, json=payload, stream=True)
+
+                if resp.status_code != 200:
+                    raise Exception(f"Claude Error {resp.status_code}: {resp.text}")
+
+                def claude_stream():
+                    try:
+                        for line in resp.iter_lines():
+                            if line:
+                                line_str = line.decode('utf-8')
+                                if line_str.startswith('data: '):
+                                    data_str = line_str[6:]
+                                    try:
+                                        data = json.loads(data_str)
+                                        event_type = data.get('type', '')
+                                        if event_type == 'content_block_delta':
+                                            delta = data.get('delta', {})
+                                            if delta.get('type') == 'text_delta':
+                                                text = delta.get('text', '')
+                                                if text:
+                                                    yield text
+                                        elif event_type == 'message_stop':
+                                            break
+                                    except json.JSONDecodeError:
+                                        pass
+                    except Exception as e:
+                        log_event(f"Claude stream error: {e}", "error")
+                        yield f"[Stream Error: {e}]"
+
+                return claude_stream()
+            else:
+                # Non-streaming mode
+                log_event(f"Sending request to Claude (Model: {model})")
+                resp = requests.post(url, headers=headers, json=payload)
+                if resp.status_code == 200:
+                    return resp.json()['content'][0]['text']
+                raise Exception(f"Claude Error {resp.status_code}: {resp.text}")
         
         return "Provider not implemented."
 
@@ -246,6 +320,11 @@ if PYSIDE6_AVAILABLE:
             self.files = files
             self.settings = settings
             self.history = history
+            self._stop_requested = False
+
+        def request_stop(self):
+            """Request the worker to stop processing."""
+            self._stop_requested = True
 
         def run(self):
             try:
@@ -258,6 +337,9 @@ if PYSIDE6_AVAILABLE:
                 if self.settings.get('stream', False):
                     full_text = ""
                     for chunk in result:
+                        if self._stop_requested:
+                            log_event("Stream stopped by user request")
+                            break
                         if chunk:
                             full_text += chunk
                             self.new_token.emit(chunk)
@@ -266,7 +348,8 @@ if PYSIDE6_AVAILABLE:
                     self.finished.emit(result)
 
             except Exception as e:
-                self.error.emit(str(e))
+                if not self._stop_requested:
+                    self.error.emit(str(e))
 
     class ModelFetcher(QThread):
         finished = Signal(str, list)

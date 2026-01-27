@@ -44,7 +44,7 @@ from icharlotte_core.ui.widgets import (
     StatusWidget, AgentRunner, FileTreeWidget
 )
 from icharlotte_core.ui.case_view_enhanced import (
-    EnhancedAgentButton, AgentSettingsDB, AgentSettingsDialog,
+    EnhancedAgentButton, AgentSettingsDB, AgentSettingsDialog, ContradictionSettingsDialog,
     AdvancedFilterWidget, FilePreviewWidget, OutputBrowserWidget,
     ProcessingLogWidget, ProcessingLogDB, FileTagsDB, EnhancedFileTreeWidget
 )
@@ -115,6 +115,10 @@ class MainWindow(QMainWindow):
 
         log_event(f"Initializing MainWindow for {file_number} at {case_path}")
         self.icon_provider = QFileIconProvider()
+        # Cache icons to avoid slow network file access
+        self._icon_cache = {}
+        self._folder_icon = self.icon_provider.icon(QFileIconProvider.IconType.Folder)
+        self._file_icon = self.icon_provider.icon(QFileIconProvider.IconType.File)
         self.setup_ui()
 
         # Restore tab if specified
@@ -188,7 +192,7 @@ class MainWindow(QMainWindow):
         # Initialize agent settings database
         self.agent_settings_db = AgentSettingsDB()
         self.agent_buttons = {}  # Track enhanced agent buttons
-        self.running_agents = {}  # Track which agents are running
+        self.running_agents = {}  # Track which agents are running {script: file_number}
 
         # Left Panel (Case Agents)
         left_panel = QFrame()
@@ -225,7 +229,7 @@ class MainWindow(QMainWindow):
         new_label.setStyleSheet("font-weight: bold; font-size: 12px; color: #666;")
         left_layout.addWidget(new_label)
 
-        self.create_enhanced_agent_button("Timeline Agent", "extract_timeline.py", left_layout, arg_type="case_path")
+        self.create_enhanced_agent_button("Timeline Agent", "extract_timeline.py", left_layout, arg_type="file_picker")
         self.create_enhanced_agent_button("Contradiction Detector", "detect_contradictions.py", left_layout, arg_type="file_number")
 
         left_layout.addStretch()
@@ -785,7 +789,7 @@ class MainWindow(QMainWindow):
                 if hasattr(self, 'index_tab'):
                     self.index_tab.load_data(self.file_number)
                 if hasattr(self, 'chat_tab'):
-                    self.chat_tab.reset_state()
+                    self.chat_tab.load_case(self.file_number)
                 if hasattr(self, 'report_tab'):
                     self.report_tab.reset_state()
                     self.report_tab.refresh_ai_outputs()
@@ -818,16 +822,21 @@ class MainWindow(QMainWindow):
             self._update_window_title()
             self.populate_tree()
             self.clear_all_status()
+
+            # Reset all agent button running states when switching cases
+            for btn in self.agent_buttons.values():
+                btn.set_running(False)
+
             self.load_status_history()
-            
+
             # Switch to Case View tab (Index 1)
             self.tabs.setCurrentIndex(1)
-            
+
             # Reset Tabs
             if hasattr(self, 'index_tab'):
                 self.index_tab.load_data(self.file_number)
             if hasattr(self, 'chat_tab'):
-                self.chat_tab.reset_state()
+                self.chat_tab.load_case(self.file_number)
             if hasattr(self, 'report_tab'):
                 self.report_tab.reset_state()
                 self.report_tab.refresh_ai_outputs()
@@ -837,7 +846,7 @@ class MainWindow(QMainWindow):
                 self.email_tab.search_bar.clear()
                 self.email_tab.check_db_init()
                 self.email_tab.perform_search()
-                
+
             log_event(f"Switched to case {self.file_number}")
             self.check_docket_expiry(file_number)
         else:
@@ -1040,40 +1049,52 @@ class MainWindow(QMainWindow):
         """Run agent with enhanced status tracking."""
         # Set button to running state
         btn_widget.set_running(True)
-        self.running_agents[script] = True
+        # Store the file_number this agent was started for
+        started_for_case = self.file_number
+        self.running_agents[script] = started_for_case
 
         # Run the agent
         runner = self.run_agent(name, script, arg_type, extra_flags)
 
         # Connect finished signal to update button
         if runner:
-            runner.finished.connect(partial(self.on_agent_finished, script, btn_widget))
-
-    def on_agent_finished(self, script, btn_widget, success):
-        """Handle agent completion and update button status."""
-        btn_widget.set_running(False)
-        self.running_agents[script] = False
-
-        # Update status message
-        if success:
-            btn_widget.set_status("Last: Just now")
+            runner.finished.connect(partial(self.on_agent_finished, script, btn_widget, started_for_case))
         else:
-            btn_widget.set_status("Last: Failed")
+            # User cancelled (e.g., file picker dialog) - reset button state
+            btn_widget.set_running(False)
+            if script in self.running_agents:
+                del self.running_agents[script]
 
-        # Update docket download date if docket agent finished
-        if script == "docket.py" and success:
+    def on_agent_finished(self, script, btn_widget, started_for_case, success):
+        """Handle agent completion and update button status."""
+        # Clear the running state
+        if script in self.running_agents:
+            del self.running_agents[script]
+
+        # Only update button UI if we're still on the same case the agent was started for
+        if self.file_number == started_for_case:
+            btn_widget.set_running(False)
+            # Update status message
+            if success:
+                btn_widget.set_status("Last: Just now")
+            else:
+                btn_widget.set_status("Last: Failed")
+
+        # Update docket download date for the ORIGINAL case (not current case)
+        if script == "docket.py" and success and started_for_case:
             from datetime import datetime
             today = datetime.now().strftime("%Y-%m-%d")
-            if self.file_number:
-                self.master_db.update_last_docket_download(self.file_number, today)
-            btn_widget.set_last_run(today)
+            self.master_db.update_last_docket_download(started_for_case, today)
+            # Only update button if still on the same case
+            if self.file_number == started_for_case:
+                btn_widget.set_last_run(today)
 
     def update_docket_agent_status(self):
         """Update the docket agent button with last download date."""
         if not self.file_number or "docket.py" not in self.agent_buttons:
             return
 
-        case_data = self.master_db.get_case(self.file_number)
+        case_data = self.master_tab.db.get_case(self.file_number)
         if case_data:
             last_download = case_data.get("last_docket_download")
             if last_download:
@@ -1083,7 +1104,11 @@ class MainWindow(QMainWindow):
 
     def open_agent_settings(self, script):
         """Open the settings dialog for an agent."""
-        dialog = AgentSettingsDialog(script, self.agent_settings_db, self)
+        if script == "detect_contradictions.py":
+            # Use custom dialog for Contradiction Detector
+            dialog = ContradictionSettingsDialog(self.file_number, self.agent_settings_db, self)
+        else:
+            dialog = AgentSettingsDialog(script, self.agent_settings_db, self)
         dialog.exec()
 
     def open_output_browser(self):
@@ -1288,6 +1313,11 @@ class MainWindow(QMainWindow):
                     widget.deleteLater()
                     
     def clear_all_status(self):
+        # Disconnect all runners from their widgets before deleting
+        # to prevent signals being sent to deleted widgets
+        for runner in self.agent_runners:
+            runner.disconnect_widget()
+
         for i in range(self.status_list_layout.count() - 1, -1, -1):
             item = self.status_list_layout.itemAt(i)
             widget = item.widget()
@@ -1375,10 +1405,33 @@ class MainWindow(QMainWindow):
         if arg_type == "file_number":
             args.append(self.file_number)
             details = f"File: {self.file_number}"
+
+            # Special handling for Contradiction Detector - pass selected summaries
+            if script == "detect_contradictions.py":
+                settings = self.agent_settings_db.get_settings(script)
+                selected_summaries = settings.get("selected_summaries")
+
+                if selected_summaries:
+                    args.extend(["--summaries", ",".join(selected_summaries)])
+                    details = f"{len(selected_summaries)} summaries"
+
         elif arg_type == "case_path":
             args.append(self.case_path)
             details = "Scanning Case Directory"
-            
+        elif arg_type == "file_picker":
+            # Show file picker dialog, starting in the case directory
+            start_dir = self.case_path if hasattr(self, 'case_path') and self.case_path else ""
+            files, _ = QFileDialog.getOpenFileNames(
+                self,
+                f"Select files for {name}",
+                start_dir,
+                "Documents (*.pdf *.docx *.txt);;All Files (*.*)"
+            )
+            if not files:
+                return  # User cancelled
+            args.extend(files)
+            details = f"{len(files)} file(s) selected"
+
         if extra_flags:
             args.extend(extra_flags)
             
@@ -1390,11 +1443,12 @@ class MainWindow(QMainWindow):
                 subprocess.Popen([sys.executable] + args, creationflags=creation_flags)
             except Exception as e:
                 QMessageBox.critical(self, "Error", f"Failed to launch: {e}")
+            return None
         else:
             if script in ["docket.py", "complaint.py"]:
                 args.append("--headless")
-                
-            self.add_status_task(name, details, sys.executable, args)
+
+            return self.add_status_task(name, details, sys.executable, args)
 
     def organize_checked_items(self):
         log_event("Organizing checked items...")
@@ -1538,13 +1592,13 @@ class MainWindow(QMainWindow):
         cache_path = os.path.join(GEMINI_DATA_DIR, f"{self.file_number}_tree.json")
         if not os.path.exists(cache_path):
             return False
-            
+
         try:
             with open(cache_path, 'r') as f:
                 data = json.load(f)
-            
+
             entries = sorted(data, key=lambda x: len(x['path']))
-            
+
             for entry in entries:
                 path = entry['path']
                 if path == self.case_path: continue
@@ -1557,12 +1611,12 @@ class MainWindow(QMainWindow):
                     item.setText(0, os.path.basename(path))
                     item.setData(0, Qt.ItemDataRole.UserRole, path)
                     item.setData(0, Qt.ItemDataRole.UserRole + 1, entry['type'])
-                    
+
                     if entry['type'] == 'dir':
-                        item.setIcon(0, self.icon_provider.icon(QFileInfo(path)))
+                        item.setIcon(0, self._get_cached_icon(path, is_dir=True))
                         item.setExpanded(False)
                     else:
-                        item.setIcon(0, self.icon_provider.icon(QFileInfo(path)))
+                        item.setIcon(0, self._get_cached_icon(path))
                         item.setText(1, entry.get('size_str', ''))
                         
                         # Convert cached date to standard format
@@ -1604,22 +1658,34 @@ class MainWindow(QMainWindow):
         except Exception as e:
             log_event(f"Error saving cache: {e}", "error")
 
+    def _get_cached_icon(self, file_path, is_dir=False):
+        """Get icon from cache based on file extension to avoid network access."""
+        if is_dir:
+            return self._folder_icon
+
+        # Get extension and check cache
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext in self._icon_cache:
+            return self._icon_cache[ext]
+
+        # For first occurrence of each extension, get icon from a local temp file
+        # This avoids accessing network files while still getting proper icons
+        if ext in ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+                   '.txt', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff',
+                   '.mp3', '.mp4', '.avi', '.mov', '.zip', '.rar', '.7z']:
+            # Use the icon provider with just the extension info
+            icon = self.icon_provider.icon(QFileInfo(f"dummy{ext}"))
+            self._icon_cache[ext] = icon
+            return icon
+
+        # Default file icon for unknown extensions
+        self._icon_cache[ext] = self._file_icon
+        return self._file_icon
+
     def _get_pdf_page_count(self, file_path):
         """Get page count for a PDF file."""
-        try:
-            with open(file_path, 'rb') as f:
-                content = f.read(100000)  # Read first 100KB for speed
-            # Simple regex to find page count in PDF
-            import re
-            matches = re.findall(rb'/Type\s*/Page[^s]', content)
-            if matches:
-                return str(len(matches))
-            # Alternative: look for /Count in page tree
-            count_match = re.search(rb'/Count\s+(\d+)', content)
-            if count_match:
-                return count_match.group(1).decode()
-        except:
-            pass
+        # DISABLED: Reading PDF files on network drives causes UI freeze
+        # TODO: Move this to background thread or cache results
         return ""
 
     def _get_file_processing_status(self, file_path):
@@ -1628,8 +1694,11 @@ class MainWindow(QMainWindow):
             return ""
 
         try:
-            proc_log = ProcessingLogDB(self.file_number)
-            logs = proc_log.get_file_processing_status(file_path)
+            # Use cached processing log instead of creating new instance per file
+            if not hasattr(self, '_cached_proc_log') or self._cached_proc_log is None:
+                return ""
+
+            logs = self._cached_proc_log.get_file_processing_status(file_path)
             if not logs:
                 return ""
 
@@ -1657,8 +1726,11 @@ class MainWindow(QMainWindow):
             return ""
 
         try:
-            tags_db = FileTagsDB(self.file_number)
-            tags = tags_db.get_tags(file_path)
+            # Use cached tags db instead of creating new instance per file
+            if not hasattr(self, '_cached_tags_db') or self._cached_tags_db is None:
+                return ""
+
+            tags = self._cached_tags_db.get_tags(file_path)
             return ", ".join(tags) if tags else ""
         except:
             return ""
@@ -1671,10 +1743,16 @@ class MainWindow(QMainWindow):
         self.tree.setSortingEnabled(False)
 
         # Set up enhanced tree databases for the current case
+        # Cache these once to avoid re-reading JSON for every file
         if hasattr(self, 'file_number') and self.file_number:
             self.tree.set_databases(self.file_number)
+            self._cached_proc_log = ProcessingLogDB(self.file_number)
+            self._cached_tags_db = FileTagsDB(self.file_number)
             # Also update docket agent status
             self.update_docket_agent_status()
+        else:
+            self._cached_proc_log = None
+            self._cached_tags_db = None
 
         self.tree_item_map = {}
         self.visited_paths = set()
@@ -1720,12 +1798,12 @@ class MainWindow(QMainWindow):
                 if dir_path not in self.tree_item_map:
                     d_item = QTreeWidgetItem(parent_item)
                     d_item.setText(0, d)
-                    d_item.setIcon(0, self.icon_provider.icon(QFileInfo(dir_path)))
+                    d_item.setIcon(0, self._get_cached_icon(dir_path, is_dir=True))
                     d_item.setData(0, Qt.ItemDataRole.UserRole, dir_path)
                     d_item.setData(0, Qt.ItemDataRole.UserRole + 1, "dir")
                     d_item.setExpanded(False)
                     self.tree_item_map[dir_path] = d_item
-                
+
             for f, size, mtime in files:
                 file_path = os.path.join(root, f)
                 self.visited_paths.add(file_path)
@@ -1733,28 +1811,21 @@ class MainWindow(QMainWindow):
                 size_str = f"{size / 1024:.1f} KB" if size < 1024 * 1024 else f"{size / (1024 * 1024):.1f} MB"
                 date_str = format_date_to_mm_dd_yyyy(mtime)
 
-                # Get page count for PDFs
+                # Page count disabled - too slow on network drives
                 page_count = ""
-                if f.lower().endswith('.pdf'):
-                    page_count = self._get_pdf_page_count(file_path)
 
-                # Get processing status
-                proc_status = ""
-                if hasattr(self, 'file_number') and self.file_number:
-                    proc_status = self._get_file_processing_status(file_path)
+                # Get processing status (uses cached DB)
+                proc_status = self._get_file_processing_status(file_path) if self.file_number else ""
 
-                # Get tags
-                tags_str = ""
-                if hasattr(self, 'file_number') and self.file_number:
-                    tags_str = self._get_file_tags(file_path)
+                # Get tags (uses cached DB)
+                tags_str = self._get_file_tags(file_path) if self.file_number else ""
 
                 if file_path not in self.tree_item_map:
                     f_item = QTreeWidgetItem(parent_item)
                     f_item.setText(0, f)
 
-                    # Use QFileIconProvider for typical PDF/Word icons
-                    icon = self.icon_provider.icon(QFileInfo(file_path))
-                    f_item.setIcon(0, icon)
+                    # Use cached extension-based icons to avoid network access
+                    f_item.setIcon(0, self._get_cached_icon(file_path))
 
                     f_item.setData(0, Qt.ItemDataRole.UserRole, file_path)
                     f_item.setData(0, Qt.ItemDataRole.UserRole + 1, "file")

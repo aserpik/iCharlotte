@@ -1191,13 +1191,18 @@ class ReportTab(QWidget):
             print(f"Error saving context state: {e}")
 
     def load_state(self):
+        """Load saved state but DON'T auto-launch Word. Only restore path/label."""
         if os.path.exists(self.state_path):
             try:
                 with open(self.state_path, 'r') as f:
                     state = json.load(f)
                     last_path = state.get('last_doc_path')
                     if last_path and os.path.exists(last_path):
-                        self.load_document_path(last_path)
+                        # Just restore the path and label, don't launch Word
+                        self.current_doc_path = last_path
+                        self.file_label.setText(os.path.basename(last_path))
+                        self.process_btn.setEnabled(True)
+                        self.refresh_ai_outputs()
             except Exception as e:
                 print(f"Error loading report state: {e}")
 

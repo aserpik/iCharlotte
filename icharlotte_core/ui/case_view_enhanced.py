@@ -181,9 +181,7 @@ class AgentSettingsDB:
             "date_format": "MM/DD/YYYY"
         },
         "detect_contradictions.py": {
-            "sensitivity": "medium",
-            "include_depositions": True,
-            "include_discovery": True
+            "selected_summaries": None  # None means all summaries
         }
     }
 
@@ -543,6 +541,253 @@ class AgentSettingsDialog(QDialog):
 
 
 # =============================================================================
+# Contradiction Detector Settings Dialog
+# =============================================================================
+
+class ContradictionSettingsDialog(QDialog):
+    """Custom settings dialog for the Contradiction Detector agent."""
+
+    def __init__(self, file_number, settings_db, parent=None):
+        super().__init__(parent)
+        self.file_number = file_number
+        self.settings_db = settings_db
+        self.script_name = "detect_contradictions.py"
+        self.setWindowTitle("Contradiction Detector Settings")
+        self.setMinimumSize(600, 500)
+
+        # Load current settings
+        self.current_settings = self.settings_db.get_settings(self.script_name)
+
+        # Load prompt from file
+        self.prompt_path = os.path.join(SCRIPTS_DIR, "CONTRADICTION_DETECTION_PROMPT.txt")
+        self.original_prompt = self._load_prompt()
+
+        self._setup_ui()
+        self._load_summaries()
+
+    def _load_prompt(self):
+        """Load the prompt from file."""
+        try:
+            if os.path.exists(self.prompt_path):
+                with open(self.prompt_path, 'r', encoding='utf-8') as f:
+                    return f.read()
+        except Exception as e:
+            log_event(f"Error loading prompt: {e}", "error")
+        return ""
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+
+        # Create tab widget for organization
+        tabs = QTabWidget()
+        layout.addWidget(tabs)
+
+        # --- Tab 1: Summary Selection ---
+        summary_tab = QWidget()
+        summary_layout = QVBoxLayout(summary_tab)
+
+        # Header with toggle button
+        header_layout = QHBoxLayout()
+        header_layout.addWidget(QLabel("<b>Select Summaries to Analyze:</b>"))
+        header_layout.addStretch()
+
+        self.toggle_btn = QPushButton("Deselect All")
+        self.toggle_btn.setFixedWidth(100)
+        self.toggle_btn.clicked.connect(self._toggle_selection)
+        header_layout.addWidget(self.toggle_btn)
+
+        summary_layout.addLayout(header_layout)
+
+        # Summary list with checkboxes
+        self.summary_list = QListWidget()
+        self.summary_list.setAlternatingRowColors(True)
+        summary_layout.addWidget(self.summary_list)
+
+        # Info label
+        self.info_label = QLabel("Loading summaries...")
+        self.info_label.setStyleSheet("color: #666; font-style: italic;")
+        summary_layout.addWidget(self.info_label)
+
+        tabs.addTab(summary_tab, "Summaries")
+
+        # --- Tab 2: Prompt Editor ---
+        prompt_tab = QWidget()
+        prompt_layout = QVBoxLayout(prompt_tab)
+
+        prompt_header = QHBoxLayout()
+        prompt_header.addWidget(QLabel("<b>Detection Prompt:</b>"))
+        prompt_header.addStretch()
+
+        reset_prompt_btn = QPushButton("Reset to Default")
+        reset_prompt_btn.clicked.connect(self._reset_prompt)
+        prompt_header.addWidget(reset_prompt_btn)
+
+        prompt_layout.addLayout(prompt_header)
+
+        self.prompt_edit = QTextEdit()
+        self.prompt_edit.setPlainText(self.original_prompt)
+        self.prompt_edit.setStyleSheet("font-family: Consolas, monospace; font-size: 11px;")
+        prompt_layout.addWidget(self.prompt_edit)
+
+        tabs.addTab(prompt_tab, "Prompt")
+
+        # --- Buttons ---
+        btn_layout = QHBoxLayout()
+
+        reset_all_btn = QPushButton("Reset All to Defaults")
+        reset_all_btn.clicked.connect(self._reset_all)
+        btn_layout.addWidget(reset_all_btn)
+
+        btn_layout.addStretch()
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        save_btn = QPushButton("Save")
+        save_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px 16px;")
+        save_btn.clicked.connect(self._save)
+        btn_layout.addWidget(save_btn)
+
+        layout.addLayout(btn_layout)
+
+    def _load_summaries(self):
+        """Load available summaries from CaseDataManager."""
+        self.summary_list.clear()
+
+        if not self.file_number:
+            self.info_label.setText("No case selected. Open a case first.")
+            return
+
+        try:
+            # Import CaseDataManager
+            import sys
+            sys.path.insert(0, SCRIPTS_DIR)
+            from case_data_manager import CaseDataManager
+
+            data_manager = CaseDataManager()
+            variables = data_manager.get_all_variables(self.file_number)
+
+            # Get previously selected summaries from settings
+            selected_summaries = self.current_settings.get("selected_summaries", None)
+
+            summary_count = 0
+            for var_name, var_data in variables.items():
+                # Filter for summary-type variables (same logic as detect_contradictions.py)
+                if any(tag in var_name.lower() for tag in ['summary', 'depo', 'extraction']):
+                    value = var_data.get('value', '')
+                    if value and len(value) > 100:
+                        item = QListWidgetItem(var_name)
+                        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+
+                        # Check by default, or use saved selection
+                        if selected_summaries is None:
+                            item.setCheckState(Qt.CheckState.Checked)
+                        else:
+                            item.setCheckState(
+                                Qt.CheckState.Checked if var_name in selected_summaries else Qt.CheckState.Unchecked
+                            )
+
+                        # Store source info as tooltip
+                        source = var_data.get('source', 'Unknown')
+                        item.setToolTip(f"Source: {source}\nLength: {len(value)} chars")
+
+                        self.summary_list.addItem(item)
+                        summary_count += 1
+
+            if summary_count == 0:
+                self.info_label.setText("No summaries found. Run summarization agents first.")
+            else:
+                self.info_label.setText(f"Found {summary_count} summaries for case {self.file_number}")
+                self._update_toggle_button()
+
+        except Exception as e:
+            log_event(f"Error loading summaries: {e}", "error")
+            self.info_label.setText(f"Error loading summaries: {e}")
+
+    def _toggle_selection(self):
+        """Toggle between select all and deselect all."""
+        # Check if all are currently selected
+        all_checked = all(
+            self.summary_list.item(i).checkState() == Qt.CheckState.Checked
+            for i in range(self.summary_list.count())
+        )
+
+        new_state = Qt.CheckState.Unchecked if all_checked else Qt.CheckState.Checked
+
+        for i in range(self.summary_list.count()):
+            self.summary_list.item(i).setCheckState(new_state)
+
+        self._update_toggle_button()
+
+    def _update_toggle_button(self):
+        """Update toggle button text based on current selection."""
+        if self.summary_list.count() == 0:
+            return
+
+        all_checked = all(
+            self.summary_list.item(i).checkState() == Qt.CheckState.Checked
+            for i in range(self.summary_list.count())
+        )
+
+        self.toggle_btn.setText("Deselect All" if all_checked else "Select All")
+
+    def _reset_prompt(self):
+        """Reset prompt to the file default."""
+        self.prompt_edit.setPlainText(self.original_prompt)
+
+    def _reset_all(self):
+        """Reset all settings to defaults."""
+        # Reset prompt
+        self._reset_prompt()
+
+        # Reset summary selection (all checked)
+        for i in range(self.summary_list.count()):
+            self.summary_list.item(i).setCheckState(Qt.CheckState.Checked)
+        self._update_toggle_button()
+
+    def _save(self):
+        """Save all settings."""
+        # Gather selected summaries
+        selected_summaries = []
+        for i in range(self.summary_list.count()):
+            item = self.summary_list.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                selected_summaries.append(item.text())
+
+        if not selected_summaries:
+            QMessageBox.warning(self, "No Selection", "Please select at least one summary to analyze.")
+            return
+
+        # Save settings (model is configured in LLM Settings)
+        settings = {
+            "selected_summaries": selected_summaries,
+        }
+        self.settings_db.update_settings(self.script_name, settings)
+
+        # Save prompt if modified
+        current_prompt = self.prompt_edit.toPlainText()
+        if current_prompt != self.original_prompt:
+            try:
+                with open(self.prompt_path, 'w', encoding='utf-8') as f:
+                    f.write(current_prompt)
+                log_event("Saved updated contradiction detection prompt")
+            except Exception as e:
+                QMessageBox.warning(self, "Warning", f"Could not save prompt: {e}")
+
+        self.accept()
+
+    def get_selected_summaries(self):
+        """Return list of selected summary names."""
+        selected = []
+        for i in range(self.summary_list.count()):
+            item = self.summary_list.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                selected.append(item.text())
+        return selected
+
+
+# =============================================================================
 # Advanced Filter Widget
 # =============================================================================
 
@@ -770,12 +1015,20 @@ class AdvancedFilterWidget(QFrame):
 # =============================================================================
 
 class FilePreviewWidget(QFrame):
-    """Split view preview pane for files."""
+    """Split view preview pane for files with PDF navigation."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFrameShape(QFrame.Shape.StyledPanel)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # Enable keyboard focus
         self.current_file = None
+        self._doc_worker = None  # For async .doc extraction
+
+        # PDF navigation state
+        self._pdf_doc = None
+        self._pdf_current_page = 0
+        self._pdf_total_pages = 0
+        self._pdf_zoom = 1.5  # Default zoom level
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
@@ -805,6 +1058,36 @@ class FilePreviewWidget(QFrame):
         self.info_label = QLabel()
         self.info_label.setStyleSheet("color: gray; font-size: 10px;")
         layout.addWidget(self.info_label)
+
+        # Page navigation bar (for PDFs)
+        self.nav_bar = QWidget()
+        nav_layout = QHBoxLayout(self.nav_bar)
+        nav_layout.setContentsMargins(0, 2, 0, 2)
+        nav_layout.setSpacing(4)
+
+        self.prev_btn = QPushButton("◀")
+        self.prev_btn.setFixedSize(28, 24)
+        self.prev_btn.clicked.connect(self._prev_page)
+        self.prev_btn.setEnabled(False)
+        self.prev_btn.setToolTip("Previous page (Left/Up/PageUp)")
+        nav_layout.addWidget(self.prev_btn)
+
+        self.page_label = QLabel("Page 1 / 1")
+        self.page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.page_label.setMinimumWidth(80)
+        self.page_label.setToolTip("Home=First, End=Last")
+        nav_layout.addWidget(self.page_label)
+
+        self.next_btn = QPushButton("▶")
+        self.next_btn.setFixedSize(28, 24)
+        self.next_btn.clicked.connect(self._next_page)
+        self.next_btn.setEnabled(False)
+        self.next_btn.setToolTip("Next page (Right/Down/PageDown/Space)")
+        nav_layout.addWidget(self.next_btn)
+
+        nav_layout.addStretch()
+        self.nav_bar.hide()  # Hidden until PDF is loaded
+        layout.addWidget(self.nav_bar)
 
         # Preview content area
         self.preview_stack = QStackedWidget()
@@ -836,6 +1119,10 @@ class FilePreviewWidget(QFrame):
 
     def show_file(self, file_path):
         """Display preview for the given file."""
+        # Close any previously open PDF when switching files
+        self._close_pdf()
+        self.nav_bar.hide()
+
         self.current_file = file_path
         self.open_btn.setEnabled(True)
 
@@ -861,6 +1148,10 @@ class FilePreviewWidget(QFrame):
             self._show_image_preview(file_path)
         elif ext == '.pdf':
             self._show_pdf_info(file_path)
+        elif ext == '.docx':
+            self._show_docx_preview(file_path)
+        elif ext == '.doc':
+            self._show_doc_preview(file_path)
         else:
             self.preview_stack.setCurrentWidget(self.no_preview_label)
 
@@ -874,23 +1165,208 @@ class FilePreviewWidget(QFrame):
             self.no_preview_label.setText(f"Error reading file:\n{str(e)}")
             self.preview_stack.setCurrentWidget(self.no_preview_label)
 
-    def _show_image_preview(self, file_path):
+    def _show_image_preview(self, file_path, pixmap=None, scale_to_fit=True):
+        """Show image preview. Can accept a pre-created pixmap or load from file.
+
+        Args:
+            file_path: Path to the file (used if pixmap is None)
+            pixmap: Pre-rendered QPixmap (optional)
+            scale_to_fit: If True, scale to fit pane. If False, show at actual size (for zoom).
+        """
         from PySide6.QtGui import QPixmap
-        pixmap = QPixmap(file_path)
+        if pixmap is None:
+            pixmap = QPixmap(file_path)
         if not pixmap.isNull():
-            # Scale to fit
-            scaled = pixmap.scaled(
-                400, 400,
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            )
-            self.image_label.setPixmap(scaled)
+            if scale_to_fit:
+                # Scale to fit preview pane width while maintaining aspect ratio
+                available_width = max(400, self.width() - 20)
+                available_height = max(500, self.height() - 80)
+                scaled = pixmap.scaled(
+                    available_width, available_height,
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.SmoothTransformation
+                )
+                self.image_label.setPixmap(scaled)
+            else:
+                # Show at actual size (respects zoom level, scrollable)
+                self.image_label.setPixmap(pixmap)
             self.preview_stack.setCurrentIndex(1)
         else:
             self.preview_stack.setCurrentWidget(self.no_preview_label)
 
     def _show_pdf_info(self, file_path):
-        """Show PDF info and first page text if available."""
+        """Show PDF preview - renders pages as images using PyMuPDF with navigation."""
+        # Close any previously open PDF
+        self._close_pdf()
+
+        try:
+            import fitz  # PyMuPDF
+
+            # Open PDF and store reference for navigation
+            self._pdf_doc = fitz.open(file_path)
+            self._pdf_total_pages = self._pdf_doc.page_count
+            self._pdf_current_page = 0
+
+            if self._pdf_total_pages > 0:
+                # Update info label with page count
+                self.info_label.setText(
+                    f"{self.info_label.text()} | Pages: {self._pdf_total_pages}"
+                )
+
+                # Show navigation bar
+                self._update_nav_bar()
+                self.nav_bar.show()
+
+                # Render first page
+                self._render_pdf_page(0)
+                return
+
+            self._close_pdf()
+        except ImportError:
+            pass  # Fall back to text info if PyMuPDF not available
+        except Exception as e:
+            self._close_pdf()
+            pass  # Fall back on any error
+
+        # Fallback: show text info with OCR if available
+        self.nav_bar.hide()
+        self._show_pdf_text_fallback(file_path)
+
+    def _render_pdf_page(self, page_num):
+        """Render a specific PDF page."""
+        if not self._pdf_doc or page_num < 0 or page_num >= self._pdf_total_pages:
+            return
+
+        try:
+            import fitz
+            from PySide6.QtGui import QPixmap, QImage
+
+            page = self._pdf_doc[page_num]
+            # Render at current zoom level
+            mat = fitz.Matrix(self._pdf_zoom, self._pdf_zoom)
+            pix = page.get_pixmap(matrix=mat)
+
+            # Convert to QPixmap
+            img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
+            pixmap = QPixmap.fromImage(img)
+
+            self._pdf_current_page = page_num
+            self._update_nav_bar()
+
+            # Show in image preview without scaling (zoom is already applied in rendering)
+            self._show_image_preview(self.current_file, pixmap, scale_to_fit=False)
+        except Exception as e:
+            self.no_preview_label.setText(f"Error rendering page {page_num + 1}:\n{str(e)}")
+            self.preview_stack.setCurrentWidget(self.no_preview_label)
+
+    def _update_nav_bar(self):
+        """Update navigation bar state."""
+        zoom_pct = int(self._pdf_zoom / 1.5 * 100)  # Show as percentage relative to default
+        self.page_label.setText(f"Page {self._pdf_current_page + 1} / {self._pdf_total_pages} ({zoom_pct}%)")
+        self.prev_btn.setEnabled(self._pdf_current_page > 0)
+        self.next_btn.setEnabled(self._pdf_current_page < self._pdf_total_pages - 1)
+
+    def _prev_page(self):
+        """Navigate to previous page."""
+        if self._pdf_current_page > 0:
+            self._render_pdf_page(self._pdf_current_page - 1)
+
+    def _next_page(self):
+        """Navigate to next page."""
+        if self._pdf_current_page < self._pdf_total_pages - 1:
+            self._render_pdf_page(self._pdf_current_page + 1)
+
+    def _close_pdf(self):
+        """Close currently open PDF document."""
+        if self._pdf_doc:
+            try:
+                self._pdf_doc.close()
+            except:
+                pass
+            self._pdf_doc = None
+        self._pdf_current_page = 0
+        self._pdf_total_pages = 0
+        self._pdf_zoom = 1.5  # Reset zoom to default
+
+    def keyPressEvent(self, event):
+        """Handle keyboard navigation for PDF pages."""
+        from PySide6.QtCore import Qt
+        if self._pdf_doc:
+            if event.key() in (Qt.Key.Key_Right, Qt.Key.Key_Down, Qt.Key.Key_PageDown, Qt.Key.Key_Space):
+                self._next_page()
+                event.accept()
+                return
+            elif event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Up, Qt.Key.Key_PageUp, Qt.Key.Key_Backspace):
+                self._prev_page()
+                event.accept()
+                return
+            elif event.key() == Qt.Key.Key_Home:
+                self._render_pdf_page(0)
+                event.accept()
+                return
+            elif event.key() == Qt.Key.Key_End:
+                self._render_pdf_page(self._pdf_total_pages - 1)
+                event.accept()
+                return
+            # Zoom with +/- keys
+            elif event.key() in (Qt.Key.Key_Plus, Qt.Key.Key_Equal):
+                self._zoom_in()
+                event.accept()
+                return
+            elif event.key() == Qt.Key.Key_Minus:
+                self._zoom_out()
+                event.accept()
+                return
+            elif event.key() == Qt.Key.Key_0:
+                self._zoom_reset()
+                event.accept()
+                return
+        super().keyPressEvent(event)
+
+    def wheelEvent(self, event):
+        """Handle mouse wheel for page navigation and zoom."""
+        from PySide6.QtCore import Qt
+        if self._pdf_doc:
+            # Ctrl+Wheel = Zoom
+            if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+                delta = event.angleDelta().y()
+                if delta > 0:
+                    self._zoom_in()
+                elif delta < 0:
+                    self._zoom_out()
+                event.accept()
+                return
+            else:
+                # Regular scroll = page navigation
+                delta = event.angleDelta().y()
+                if delta < 0:  # Scroll down = next page
+                    self._next_page()
+                elif delta > 0:  # Scroll up = previous page
+                    self._prev_page()
+                event.accept()
+                return
+        super().wheelEvent(event)
+
+    def _zoom_in(self):
+        """Zoom in on PDF."""
+        if self._pdf_doc and self._pdf_zoom < 4.0:
+            self._pdf_zoom = min(4.0, self._pdf_zoom + 0.25)
+            self._render_pdf_page(self._pdf_current_page)
+
+    def _zoom_out(self):
+        """Zoom out on PDF."""
+        if self._pdf_doc and self._pdf_zoom > 0.5:
+            self._pdf_zoom = max(0.5, self._pdf_zoom - 0.25)
+            self._render_pdf_page(self._pdf_current_page)
+
+    def _zoom_reset(self):
+        """Reset zoom to default."""
+        if self._pdf_doc:
+            self._pdf_zoom = 1.5
+            self._render_pdf_page(self._pdf_current_page)
+
+    def _show_pdf_text_fallback(self, file_path):
+        """Fallback PDF preview showing OCR text if available."""
         info_text = f"PDF File: {os.path.basename(file_path)}\n\n"
 
         # Try to get page count
@@ -917,6 +1393,104 @@ class FilePreviewWidget(QFrame):
         self.text_preview.setPlainText(info_text)
         self.preview_stack.setCurrentWidget(self.text_preview)
 
+    def _show_docx_preview(self, file_path):
+        """Show preview for .docx files using python-docx."""
+        try:
+            from docx import Document
+
+            doc = Document(file_path)
+            text_parts = []
+
+            # Extract text from paragraphs
+            for para in doc.paragraphs:
+                if para.text.strip():
+                    text_parts.append(para.text)
+
+            # Also extract from tables
+            for table in doc.tables:
+                for row in table.rows:
+                    row_text = ' | '.join(cell.text.strip() for cell in row.cells if cell.text.strip())
+                    if row_text:
+                        text_parts.append(row_text)
+
+            content = '\n\n'.join(text_parts[:200])  # Limit paragraphs
+            if len(content) > 50000:
+                content = content[:50000] + '\n\n... (content truncated)'
+
+            if content.strip():
+                self.text_preview.setPlainText(content)
+                self.preview_stack.setCurrentWidget(self.text_preview)
+            else:
+                self.no_preview_label.setText("Document appears to be empty or contains only images.")
+                self.preview_stack.setCurrentWidget(self.no_preview_label)
+
+        except ImportError:
+            self.no_preview_label.setText("python-docx not installed.\nCannot preview .docx files.")
+            self.preview_stack.setCurrentWidget(self.no_preview_label)
+        except Exception as e:
+            self.no_preview_label.setText(f"Error reading .docx file:\n{str(e)}")
+            self.preview_stack.setCurrentWidget(self.no_preview_label)
+
+    def _show_doc_preview(self, file_path):
+        """Show preview for legacy .doc files using Windows COM automation."""
+        from PySide6.QtCore import QThread, Signal
+
+        # Show loading message while extracting
+        self.text_preview.setPlainText("Loading .doc preview...")
+        self.preview_stack.setCurrentWidget(self.text_preview)
+
+        class DocExtractWorker(QThread):
+            finished = Signal(str, str)  # content, error
+
+            def __init__(self, path):
+                super().__init__()
+                self.path = path
+
+            def run(self):
+                try:
+                    import win32com.client
+                    import pythoncom
+
+                    pythoncom.CoInitialize()
+                    try:
+                        word = win32com.client.Dispatch("Word.Application")
+                        word.Visible = False
+                        word.DisplayAlerts = False
+
+                        doc = word.Documents.Open(self.path, ReadOnly=True)
+                        content = doc.Content.Text
+                        doc.Close(False)
+                        word.Quit()
+
+                        if len(content) > 50000:
+                            content = content[:50000] + '\n\n... (content truncated)'
+                        self.finished.emit(content, "")
+                    finally:
+                        pythoncom.CoUninitialize()
+
+                except ImportError:
+                    self.finished.emit("", "pywin32 not installed.\nCannot preview legacy .doc files.")
+                except Exception as e:
+                    self.finished.emit("", f"Error reading .doc file:\n{str(e)}\n\nTry opening with Microsoft Word.")
+
+        def on_doc_extracted(content, error):
+            if error:
+                self.no_preview_label.setText(error)
+                self.preview_stack.setCurrentWidget(self.no_preview_label)
+            elif content.strip():
+                self.text_preview.setPlainText(content)
+                self.preview_stack.setCurrentWidget(self.text_preview)
+            else:
+                self.no_preview_label.setText("Document appears to be empty.")
+                self.preview_stack.setCurrentWidget(self.no_preview_label)
+            # Clean up worker
+            self._doc_worker = None
+
+        # Run extraction in background thread
+        self._doc_worker = DocExtractWorker(file_path)
+        self._doc_worker.finished.connect(on_doc_extracted)
+        self._doc_worker.start()
+
     def _get_pdf_page_count(self, file_path):
         """Get PDF page count without external dependencies."""
         try:
@@ -936,6 +1510,8 @@ class FilePreviewWidget(QFrame):
                 QMessageBox.warning(self, "Error", f"Could not open file: {e}")
 
     def clear(self):
+        self._close_pdf()
+        self.nav_bar.hide()
         self.current_file = None
         self.title_label.setText("Preview")
         self.info_label.setText("")

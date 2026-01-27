@@ -217,6 +217,31 @@ FAST_MODEL_SEQUENCE = [
     ),
 ]
 
+# Gemini 3 model sequence for cross-check/contradiction tasks
+GEMINI3_MODEL_SEQUENCE = [
+    ModelSpec(
+        provider="Gemini",
+        model="gemini-3-pro-preview",
+        max_tokens=8192,
+        supports_thinking=True,
+        cost_tier="high"
+    ),
+    ModelSpec(
+        provider="Gemini",
+        model="gemini-3-flash-preview",
+        max_tokens=8192,
+        supports_thinking=True,
+        cost_tier="standard"
+    ),
+    ModelSpec(
+        provider="Claude",
+        model="claude-sonnet-4-20250514",
+        max_tokens=8192,
+        supports_thinking=False,
+        cost_tier="high"
+    ),
+]
+
 # Default task configurations
 DEFAULT_TASK_CONFIGS = {
     "general": TaskConfig(
@@ -239,7 +264,7 @@ DEFAULT_TASK_CONFIGS = {
     ),
     "cross_check": TaskConfig(
         name="cross_check",
-        model_sequence=DEFAULT_MODEL_SEQUENCE,
+        model_sequence=GEMINI3_MODEL_SEQUENCE,
         max_retries=2,
         timeout_seconds=120
     ),
@@ -636,6 +661,17 @@ class LLMCaller:
                 pass
         return self._clients.get("Gemini")
 
+    def _detect_provider(self, model: str) -> Optional[str]:
+        """Detect the provider from a model name."""
+        model_lower = model.lower()
+        if "gemini" in model_lower:
+            return "Gemini"
+        elif "claude" in model_lower or "haiku" in model_lower or "sonnet" in model_lower or "opus" in model_lower:
+            return "Claude"
+        elif "gpt" in model_lower or "o1" in model_lower or "o3" in model_lower:
+            return "OpenAI"
+        return None
+
     def _call_gemini(self, model: str, prompt: str, text: str) -> Optional[str]:
         """Call Gemini API."""
         client = self._get_gemini_client()
@@ -719,7 +755,7 @@ class LLMCaller:
         return None
 
     def call(self, prompt: str, text: str, task_type: str = "general",
-             agent_id: str = None) -> Optional[str]:
+             agent_id: str = None, model_override: str = None) -> Optional[str]:
         """
         Call LLM with automatic fallback through configured models.
 
@@ -728,19 +764,33 @@ class LLMCaller:
             text: The document content.
             task_type: Type of task for model selection (fallback).
             agent_id: Specific agent ID for model selection (priority).
+            model_override: Specific model to use (e.g., "gemini-2.5-pro").
+                           Bypasses model sequence and uses only this model.
 
         Returns:
             LLM response text or None if all models fail.
         """
+        # Handle model override - create a single-model sequence
+        if model_override:
+            provider = self._detect_provider(model_override)
+            if provider:
+                model_sequence = [ModelSpec(provider=provider, model=model_override)]
+                max_retries = 3
+                self._log(f"Using model override: {model_override} ({provider})")
+            else:
+                self._log(f"Unknown provider for model: {model_override}, falling back to default", "warning")
+                model_override = None
+
         # Get model sequence - prefer agent-specific, fallback to task type
-        if agent_id:
-            model_sequence = self.config.get_model_sequence_for_agent(agent_id, task_type)
-            agent_config = self.config.get_agent_config(agent_id)
-            max_retries = agent_config.max_retries if not agent_config.use_default else 3
-        else:
-            model_sequence = self.config.get_model_sequence(task_type)
-            task_config = self.config.get_task_config(task_type)
-            max_retries = task_config.max_retries
+        if not model_override:
+            if agent_id:
+                model_sequence = self.config.get_model_sequence_for_agent(agent_id, task_type)
+                agent_config = self.config.get_agent_config(agent_id)
+                max_retries = agent_config.max_retries if not agent_config.use_default else 3
+            else:
+                model_sequence = self.config.get_model_sequence(task_type)
+                task_config = self.config.get_task_config(task_type)
+                max_retries = task_config.max_retries
 
         last_error = None
 

@@ -380,6 +380,8 @@ class PromptsDialog(QDialog):
 # Available models per provider
 AVAILABLE_MODELS = {
     "Gemini": [
+        ("gemini-3-pro-preview", "Gemini 3 Pro Preview"),
+        ("gemini-3-flash-preview", "Gemini 3 Flash Preview"),
         ("gemini-2.5-pro", "Gemini 2.5 Pro"),
         ("gemini-2.5-flash", "Gemini 2.5 Flash"),
         ("gemini-2.0-flash", "Gemini 2.0 Flash"),
@@ -394,6 +396,10 @@ AVAILABLE_MODELS = {
         ("claude-3-opus-20240229", "Claude 3 Opus"),
     ],
     "OpenAI": [
+        ("gpt-5.2-thinking", "GPT-5.2 Thinking"),
+        ("gpt-5.2-instant", "GPT-5.2 Instant"),
+        ("gpt-5.1-thinking", "GPT-5.1 Thinking"),
+        ("gpt-5.1-instant", "GPT-5.1 Instant"),
         ("gpt-4o", "GPT-4o"),
         ("gpt-4o-mini", "GPT-4o Mini"),
         ("gpt-4-turbo", "GPT-4 Turbo"),

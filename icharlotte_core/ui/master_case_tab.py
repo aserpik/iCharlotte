@@ -752,52 +752,56 @@ class MasterCaseTab(QWidget):
 
         for i, case in enumerate(cases):
             file_number = case['file_number']
-            
+
+            # --- Load JSON once per case for all data ---
+            json_path = os.path.join(GEMINI_DATA_DIR, f"{file_number}.json")
+            vars_data = None
+            if os.path.exists(json_path):
+                try:
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        vars_data = json.load(f)
+                except:
+                    pass
+
+            # Helper to extract value from potentially nested dict
+            def get_val(key):
+                if vars_data is None:
+                    return ""
+                v = vars_data.get(key)
+                if isinstance(v, dict) and "value" in v:
+                    return v["value"]
+                return v or ""
+
             # --- Auto-Populate Logic ---
             # If dates are missing in DB, try to load from case variables JSON
             hearing_date = case['next_hearing_date']
             trial_date = case['trial_date']
-            
-            updated = False
-            
-            if not hearing_date or not trial_date:
-                json_path = os.path.join(GEMINI_DATA_DIR, f"{file_number}.json")
-                if os.path.exists(json_path):
-                    try:
-                        with open(json_path, 'r', encoding='utf-8') as f:
-                            vars_data = json.load(f)
-                            
-                        # Helper to extract value from potentially nested dict
-                        def get_val(key):
-                            v = vars_data.get(key)
-                            if isinstance(v, dict) and "value" in v:
-                                return v["value"]
-                            return v or ""
 
-                        if not hearing_date:
-                            found_hearing = get_val("next_hearing_date") or get_val("next_hearing")
-                            if found_hearing:
-                                hearing_date = found_hearing
-                                updated = True
-                                
-                        if not trial_date:
-                            found_trial = get_val("trial_date")
-                            if found_trial:
-                                trial_date = found_trial
-                                updated = True
-                                
-                        if updated:
-                            self.db.upsert_case(
-                                file_number, 
-                                case['plaintiff_last_name'], 
-                                hearing_date, 
-                                trial_date, 
-                                case['case_path'],
-                                plaintiff_override=case.get('plaintiff_override', 0)
-                            )
-                    except:
-                        pass
-            
+            updated = False
+
+            if vars_data and (not hearing_date or not trial_date):
+                if not hearing_date:
+                    found_hearing = get_val("next_hearing_date") or get_val("next_hearing")
+                    if found_hearing:
+                        hearing_date = found_hearing
+                        updated = True
+
+                if not trial_date:
+                    found_trial = get_val("trial_date")
+                    if found_trial:
+                        trial_date = found_trial
+                        updated = True
+
+                if updated:
+                    self.db.upsert_case(
+                        file_number,
+                        case['plaintiff_last_name'],
+                        hearing_date,
+                        trial_date,
+                        case['case_path'],
+                        plaintiff_override=case.get('plaintiff_override', 0)
+                    )
+
             # ---------------------------
 
             # File Number
@@ -808,30 +812,25 @@ class MasterCaseTab(QWidget):
             font.setUnderline(True)
             item_num.setFont(font)
             self.table.setItem(i, 0, item_num)
-            
+
             # Name
             self.table.setItem(i, 1, QTableWidgetItem(case['plaintiff_last_name']))
-            
+
             # Assigned Attorney
             assigned = case.get('assigned_attorney', '') or ""
             item_assigned = QTableWidgetItem(assigned)
             item_assigned.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setItem(i, 2, item_assigned)
 
-            # Hearings (Column 3) - Uses other_hearings variable
-            json_path = os.path.join(GEMINI_DATA_DIR, f"{file_number}.json")
+            # Hearings (Column 3) - Uses other_hearings variable (from cached vars_data)
             other_hearings_str = ""
-            if os.path.exists(json_path):
-                try:
-                    with open(json_path, 'r', encoding='utf-8') as f:
-                        vars_data = json.load(f)
-                        # Check for other_hearings or other_hearing
-                        v = vars_data.get("other_hearings") or vars_data.get("other_hearing")
-                        if isinstance(v, dict) and "value" in v:
-                            other_hearings_str = v["value"]
-                        elif isinstance(v, str):
-                            other_hearings_str = v
-                except: pass
+            if vars_data:
+                # Check for other_hearings or other_hearing
+                v = vars_data.get("other_hearings") or vars_data.get("other_hearing")
+                if isinstance(v, dict) and "value" in v:
+                    other_hearings_str = v["value"]
+                elif isinstance(v, str):
+                    other_hearings_str = v
             
             # If no other_hearings found in JSON, fall back to DB 'next_hearing_date'
             if not other_hearings_str and hearing_date:

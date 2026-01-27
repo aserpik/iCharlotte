@@ -178,13 +178,24 @@ class TestAgentSettingsDB(unittest.TestCase):
         self.original_data_dir = module.GEMINI_DATA_DIR
         module.GEMINI_DATA_DIR = self.test_dir
 
+        # Create a fresh db instance - need to ensure settings file is clean
         self.db = AgentSettingsDB()
+        # Delete any existing settings file and reload defaults
+        if os.path.exists(self.db.settings_path):
+            os.remove(self.db.settings_path)
+        self.db.settings = self.db._load()
 
     def tearDown(self):
         """Clean up test fixtures."""
         import icharlotte_core.ui.case_view_enhanced as module
         module.GEMINI_DATA_DIR = self.original_data_dir
         shutil.rmtree(self.test_dir, ignore_errors=True)
+        # Also clean up the settings file if it exists
+        if hasattr(self, 'db') and os.path.exists(self.db.settings_path):
+            try:
+                os.remove(self.db.settings_path)
+            except:
+                pass
 
     def test_default_settings(self):
         """Test that default settings are loaded."""
@@ -460,6 +471,10 @@ class TestIntegration(unittest.TestCase):
         import icharlotte_core.ui.case_view_enhanced as module
         module.GEMINI_DATA_DIR = self.original_data_dir
         shutil.rmtree(self.test_dir, ignore_errors=True)
+        # Also clean up the config folder that may have been created at parent level
+        config_dir = os.path.join(self.test_dir, "..", "config")
+        if os.path.exists(config_dir):
+            shutil.rmtree(config_dir, ignore_errors=True)
 
     def test_full_workflow(self):
         """Test a full workflow with multiple components."""

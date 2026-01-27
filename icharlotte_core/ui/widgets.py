@@ -440,7 +440,29 @@ class AgentRunner(QObject):
         if self.status_widget:
             self.connect_widget(self.status_widget)
 
+    def disconnect_widget(self):
+        """Disconnect signals from the current widget before connecting a new one."""
+        if self.status_widget is None:
+            return
+        try:
+            self.progress_update.disconnect(self.status_widget.update_progress)
+            self.log_update.disconnect(self.status_widget.append_log)
+            self.output_file_found.disconnect(self.status_widget.set_output_file)
+            self.finished.disconnect(self.status_widget.set_finished)
+            self.pass_started.disconnect(self.status_widget.update_pass_start)
+            self.pass_completed.disconnect(self.status_widget.update_pass_complete)
+            self.pass_failed.disconnect(self.status_widget.update_pass_failed)
+            self.status_widget.cancel_requested.disconnect(self.cancel)
+            self.status_widget.retry_pass_requested.disconnect(self.retry_pass)
+        except (TypeError, RuntimeError):
+            # Signals may not be connected or widget may already be deleted
+            pass
+        self.status_widget = None
+
     def connect_widget(self, widget):
+        # Disconnect from old widget first to prevent signals to deleted widgets
+        self.disconnect_widget()
+
         self.status_widget = widget
         self.progress_update.connect(self.status_widget.update_progress)
         self.log_update.connect(self.status_widget.append_log)

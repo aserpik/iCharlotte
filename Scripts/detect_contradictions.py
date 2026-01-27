@@ -16,6 +16,7 @@ import sys
 import re
 import json
 import datetime
+import argparse
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass, field, asdict
 from docx import Document
@@ -263,13 +264,16 @@ def save_report_to_docx(report: ContradictionReport, output_path: str, logger: A
 # Main Processing
 # =============================================================================
 
-def gather_case_summaries(file_number: str, logger: AgentLogger) -> Dict[str, str]:
+def gather_case_summaries(file_number: str, logger: AgentLogger,
+                          selected_summaries: List[str] = None) -> Dict[str, str]:
     """
     Gather all summaries for a case from CaseDataManager.
 
     Args:
         file_number: The case file number.
         logger: AgentLogger instance.
+        selected_summaries: Optional list of specific summary names to include.
+                           If None, includes all available summaries.
 
     Returns:
         Dictionary of document_name -> summary_text.
@@ -285,6 +289,10 @@ def gather_case_summaries(file_number: str, logger: AgentLogger) -> Dict[str, st
         for var_name, var_data in variables.items():
             # Filter for summary-type variables
             if any(tag in var_name.lower() for tag in ['summary', 'depo', 'extraction']):
+                # If selected_summaries is provided, only include those
+                if selected_summaries is not None and var_name not in selected_summaries:
+                    continue
+
                 value = var_data.get('value', '')
                 source = var_data.get('source', var_name)
 
@@ -338,7 +346,8 @@ def detect_contradictions(
 
     try:
         with memory_monitor.track_operation("Contradiction Analysis"):
-            response = llm_caller.call(prompt, doc_content, task_type="extraction")
+            # Use agent_contradict config from LLM settings (default: gemini-3-pro-preview)
+            response = llm_caller.call(prompt, doc_content, agent_id="agent_contradict")
 
             if not response:
                 raise LLMError("LLM returned empty response")
@@ -426,13 +435,21 @@ def get_output_directory(file_number: str) -> str:
 
 def main():
     """Main entry point."""
-    if len(sys.argv) < 2:
-        print("Error: No file number provided.", flush=True)
-        print("Usage: python detect_contradictions.py <file_number>", flush=True)
-        print("Example: python detect_contradictions.py 2024.123", flush=True)
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="Detect contradictions between document summaries in a case."
+    )
+    parser.add_argument("file_number", help="The case file number (e.g., 2024.123)")
+    parser.add_argument("--summaries", type=str, default=None,
+                        help="Comma-separated list of summary names to include (default: all)")
 
-    file_number = sys.argv[1].strip()
+    args = parser.parse_args()
+
+    file_number = args.file_number.strip()
+
+    # Parse selected summaries if provided
+    selected_summaries = None
+    if args.summaries:
+        selected_summaries = [s.strip() for s in args.summaries.split(",") if s.strip()]
 
     # Validate file number format
     if not re.match(r'\d{4}\.\d{3}', file_number):
@@ -442,8 +459,11 @@ def main():
     logger = AgentLogger("Contradiction", file_number=file_number)
     logger.info(f"Starting contradiction detection for case: {file_number}")
 
+    if selected_summaries:
+        logger.info(f"Filtering to {len(selected_summaries)} selected summaries")
+
     # Gather summaries
-    summaries = gather_case_summaries(file_number, logger)
+    summaries = gather_case_summaries(file_number, logger, selected_summaries)
 
     if not summaries:
         logger.error("No summaries found for this case. Run summarization agents first.")
@@ -451,7 +471,7 @@ def main():
 
     logger.info(f"Found {len(summaries)} document summaries")
 
-    # Detect contradictions
+    # Detect contradictions (uses agent_contradict config from LLM settings)
     report = detect_contradictions(summaries, file_number, logger)
 
     if not report:
