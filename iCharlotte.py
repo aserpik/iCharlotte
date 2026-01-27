@@ -16,6 +16,7 @@ import json
 import uuid
 import subprocess
 import datetime
+import time
 from functools import partial
 
 # --- Imports ---
@@ -28,12 +29,20 @@ try:
         QFileIconProvider, QToolButton, QGroupBox, QCheckBox, QComboBox,
         QInputDialog
     )
-    from PySide6.QtCore import Qt, QThread, Signal, QFileInfo
-    from PySide6.QtGui import QAction
+    from PySide6.QtCore import Qt, QThread, Signal, QFileInfo, QMetaObject, Q_ARG, QSettings
+    from PySide6.QtGui import QAction, QShortcut, QKeySequence
     from PySide6.QtWebEngineCore import QWebEngineUrlScheme
 except ImportError:
     print("Error: PySide6 or its components are not installed. Please run: pip install PySide6 PySide6-WebEngine")
     sys.exit(1)
+
+# Global hotkey support
+try:
+    import keyboard
+    KEYBOARD_AVAILABLE = True
+except ImportError:
+    KEYBOARD_AVAILABLE = False
+    print("Warning: 'keyboard' library not installed. Global hotkeys (Win+F, Win+C) disabled. Install with: pip install keyboard")
 
 # --- Core Modules ---
 from icharlotte_core.config import SCRIPTS_DIR, GEMINI_DATA_DIR, BASE_PATH_WIN
@@ -58,10 +67,134 @@ from icharlotte_core.ui.liability_tab import LiabilityExposureTab
 from icharlotte_core.ui.master_case_tab import MasterCaseTab
 from icharlotte_core.ui.templates_resources_tab import TemplatesResourcesTab
 
+class QuickOpenDialog(QDialog):
+    """Lightweight popup dialog for quick file number entry via double-Ctrl tap."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Quick Open Case Folder")
+        self.setFixedSize(350, 100)
+        self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
+
+        # Load recent cases for autocomplete
+        self.recent_file = os.path.join(GEMINI_DATA_DIR, "recent_cases.json")
+        self.recent_cases = self._load_recent_cases()
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 15, 15, 15)
+
+        # Style the dialog (light/white theme)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #ffffff;
+                border: 2px solid #1565C0;
+                border-radius: 10px;
+            }
+            QComboBox {
+                background-color: #f5f5f5;
+                color: #333;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                padding: 8px 12px;
+                font-size: 16px;
+                min-height: 30px;
+            }
+            QComboBox:focus {
+                border: 2px solid #1565C0;
+                background-color: #fff;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 20px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #fff;
+                color: #333;
+                selection-background-color: #1565C0;
+                selection-color: #fff;
+            }
+            QLabel {
+                color: #666;
+                font-size: 11px;
+            }
+        """)
+
+        # File number input with autocomplete
+        self.file_input = QComboBox()
+        self.file_input.setEditable(True)
+        self.file_input.lineEdit().setPlaceholderText("Enter file number (####.###)")
+        self.file_input.addItems(self.recent_cases)
+        self.file_input.setCurrentIndex(-1)  # Start empty
+        self.file_input.lineEdit().returnPressed.connect(self._on_enter)
+        layout.addWidget(self.file_input)
+
+        # Help text
+        help_label = QLabel("Press Enter to open folder • Esc to close")
+        help_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(help_label)
+
+        self.result_file_number = None
+
+    def _load_recent_cases(self):
+        if os.path.exists(self.recent_file):
+            try:
+                with open(self.recent_file, 'r') as f:
+                    return json.load(f)
+            except:
+                return []
+        return []
+
+    def _save_recent_case(self, file_num):
+        if not file_num:
+            return
+        if file_num in self.recent_cases:
+            self.recent_cases.remove(file_num)
+        self.recent_cases.insert(0, file_num)
+        self.recent_cases = self.recent_cases[:10]
+
+        if not os.path.exists(GEMINI_DATA_DIR):
+            os.makedirs(GEMINI_DATA_DIR)
+
+        try:
+            with open(self.recent_file, 'w') as f:
+                json.dump(self.recent_cases, f)
+        except:
+            pass
+
+    def _on_enter(self):
+        file_num = self.file_input.currentText().strip()
+        if file_num:
+            self.result_file_number = file_num
+            self._save_recent_case(file_num)
+            self.accept()
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape:
+            self.reject()
+        else:
+            super().keyPressEvent(event)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        # Center on screen
+        screen = QApplication.primaryScreen().geometry()
+        self.move(
+            (screen.width() - self.width()) // 2,
+            screen.height() // 3
+        )
+        # Activate window and focus the input
+        self.activateWindow()
+        self.raise_()
+        self.file_input.setFocus()
+        self.file_input.lineEdit().setFocus()
+        self.file_input.lineEdit().selectAll()
+
+
 class DirectoryTreeWorker(QThread):
     data_ready = Signal(list) # Emits (root, dirs, files) tuples
     finished = Signal()
-    
+
     def __init__(self, root_path):
         super().__init__()
         self.root_path = root_path
@@ -102,8 +235,22 @@ class DirectoryTreeWorker(QThread):
         self.running = False
 
 class MainWindow(QMainWindow):
+    # Signals for thread-safe hotkey callbacks
+    open_file_signal = Signal()
+    change_file_signal = Signal()
+    quick_open_signal = Signal()  # For double-Ctrl quick open
+
     def __init__(self, file_number=None, case_path=None, initial_tab=None):
         super().__init__()
+
+        # Connect signals for global hotkeys (thread-safe)
+        self.open_file_signal.connect(self._on_open_file_hotkey)
+        self.change_file_signal.connect(self._on_change_file_hotkey)
+        self.quick_open_signal.connect(self._on_quick_open_hotkey)
+
+        # Double-Ctrl tap detection state
+        self._last_ctrl_release_time = 0
+        self._ctrl_tap_threshold = 0.4  # seconds between taps
         self.file_number = file_number
         self.case_path = case_path
         self._update_window_title()
@@ -131,6 +278,67 @@ class MainWindow(QMainWindow):
             self.load_status_history()
             self.check_docket_expiry(file_number)
 
+        # Register global hotkeys (Win+F for Open File, Win+C for Change File)
+        self._setup_global_hotkeys()
+
+    def _setup_global_hotkeys(self):
+        """Register global hotkeys for Open File (Win+F), Change File (Win+C), and double-Ctrl quick open."""
+        if not KEYBOARD_AVAILABLE:
+            return
+
+        try:
+            # Register Win+F for Open File
+            keyboard.add_hotkey('win+f', lambda: self.open_file_signal.emit(), suppress=True)
+            # Register Win+C for Change File
+            keyboard.add_hotkey('win+c', lambda: self.change_file_signal.emit(), suppress=True)
+            # Register Ctrl key release for double-tap detection
+            keyboard.on_release_key('ctrl', self._on_ctrl_release)
+            log_event("Global hotkeys registered: Win+F (Open File), Win+C (Change File), Double-Ctrl (Quick Open)")
+        except Exception as e:
+            log_event(f"Failed to register global hotkeys: {e}", "error")
+
+    def _on_ctrl_release(self, event):
+        """Detect double-tap of Ctrl key for quick open dialog."""
+        current_time = time.time()
+        time_since_last = current_time - self._last_ctrl_release_time
+
+        if time_since_last < self._ctrl_tap_threshold:
+            # Double-tap detected - emit signal (thread-safe)
+            self.quick_open_signal.emit()
+            self._last_ctrl_release_time = 0  # Reset to prevent triple-tap triggering
+        else:
+            self._last_ctrl_release_time = current_time
+
+    def _on_open_file_hotkey(self):
+        """Handle Win+F hotkey - bring window to front and open file."""
+        self.activateWindow()
+        self.raise_()
+        self.showNormal()
+        self.open_root_folder()
+
+    def _on_change_file_hotkey(self):
+        """Handle Win+C hotkey - bring window to front and change file."""
+        self.activateWindow()
+        self.raise_()
+        self.showNormal()
+        self.change_file()
+
+    def _on_quick_open_hotkey(self):
+        """Handle double-Ctrl hotkey - show quick open dialog to open case folder."""
+        dialog = QuickOpenDialog(None)  # No parent for independent focus
+        dialog.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
+        if dialog.exec() == QDialog.DialogCode.Accepted and dialog.result_file_number:
+            file_num = dialog.result_file_number
+            case_path = get_case_path(file_num)
+            if case_path and os.path.exists(case_path):
+                try:
+                    os.startfile(case_path)
+                    log_event(f"Quick open: Opened folder for {file_num}")
+                except Exception as e:
+                    QMessageBox.warning(self, "Error", f"Could not open folder: {e}")
+            else:
+                QMessageBox.warning(self, "Error", f"Folder not found for {file_num}")
+
     def _update_window_title(self):
         """Update window title based on current file_number and case_path."""
         if self.file_number and self.case_path:
@@ -141,7 +349,41 @@ class MainWindow(QMainWindow):
     def setup_ui(self):
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
-        
+
+        # Make tabs expand to fill available width (no scroll arrows needed)
+        self.tabs.tabBar().setExpanding(True)
+        self.tabs.setUsesScrollButtons(False)
+
+        # Style the tab bar for larger, more visible tabs
+        self.tabs.setStyleSheet("""
+            QTabWidget::pane {
+                border: 1px solid #ccc;
+                border-top: none;
+            }
+            QTabBar::tab {
+                background-color: #e0e0e0;
+                color: #333;
+                font-size: 13px;
+                font-weight: 500;
+                padding: 10px 6px;
+                margin-right: 1px;
+                border: 1px solid #ccc;
+                border-bottom: none;
+                border-top-left-radius: 6px;
+                border-top-right-radius: 6px;
+            }
+            QTabBar::tab:selected {
+                background-color: #fff;
+                color: #1565C0;
+                font-weight: bold;
+                border-bottom: 2px solid #1565C0;
+            }
+            QTabBar::tab:hover:!selected {
+                background-color: #f0f0f0;
+                color: #1976D2;
+            }
+        """)
+
         # --- Tab 0: Master List ---
         self.master_tab = MasterCaseTab(self)
         self.tabs.addTab(self.master_tab, "Master List")
@@ -184,8 +426,9 @@ class MainWindow(QMainWindow):
         wrapper_layout.addLayout(toolbar_layout)
 
         # Main horizontal splitter (agents | tree | preview)
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        wrapper_layout.addWidget(splitter)
+        self.main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        wrapper_layout.addWidget(self.main_splitter)
+        self.main_splitter.splitterMoved.connect(self._on_splitter_moved)
 
         main_layout.addLayout(wrapper_layout)
 
@@ -233,7 +476,7 @@ class MainWindow(QMainWindow):
         self.create_enhanced_agent_button("Contradiction Detector", "detect_contradictions.py", left_layout, arg_type="file_number")
 
         left_layout.addStretch()
-        splitter.addWidget(left_panel)
+        self.main_splitter.addWidget(left_panel)
         
         # Center Panel (File Tree with Enhanced Features)
         center_panel = QFrame()
@@ -354,17 +597,17 @@ class MainWindow(QMainWindow):
 
         center_layout.addLayout(btn_layout)
 
-        splitter.addWidget(center_panel)
+        self.main_splitter.addWidget(center_panel)
 
         # Right Panel (File Preview - Hidden by default)
         self.preview_pane = FilePreviewWidget()
         self.preview_pane.hide()
-        splitter.addWidget(self.preview_pane)
+        self.main_splitter.addWidget(self.preview_pane)
 
-        splitter.setSizes([180, 800, 0])
-        splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 1)
-        splitter.setStretchFactor(2, 0)
+        self.main_splitter.setSizes([180, 800, 0])
+        self.main_splitter.setStretchFactor(0, 0)
+        self.main_splitter.setStretchFactor(1, 1)
+        self.main_splitter.setStretchFactor(2, 0)
         
         # --- Tab 2: Status ---
         self.status_tab = QWidget()
@@ -423,29 +666,86 @@ class MainWindow(QMainWindow):
         self.logs_tab = LogsTab(self)
         self.tabs.addTab(self.logs_tab, "Logs")
 
-        # Add Restart and View Buttons next to the tabs
+        # Add corner buttons next to the tabs
         self.corner_widget = QWidget()
         self.corner_layout = QHBoxLayout(self.corner_widget)
-        self.corner_layout.setContentsMargins(0, 0, 0, 0)
-        self.corner_layout.setSpacing(5)
+        self.corner_layout.setContentsMargins(5, 5, 10, 5)
+        self.corner_layout.setSpacing(8)
 
+        # Common button style for primary actions (colored buttons)
+        primary_btn_style = """
+            QPushButton {{
+                background-color: {bg};
+                color: white;
+                font-weight: bold;
+                font-size: 13px;
+                padding: 0px 16px;
+                border: none;
+                border-radius: 4px;
+                height: 34px;
+            }}
+            QPushButton:hover {{
+                background-color: {hover};
+            }}
+            QPushButton:pressed {{
+                background-color: {pressed};
+            }}
+        """
+
+        # Common button style for secondary actions (neutral buttons)
+        secondary_btn_style = """
+            QPushButton {
+                background-color: #f5f5f5;
+                color: #333;
+                font-weight: 500;
+                font-size: 13px;
+                padding: 0px 14px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                height: 34px;
+            }
+            QPushButton:hover {
+                background-color: #e8e8e8;
+                border-color: #999;
+            }
+            QPushButton:pressed {
+                background-color: #ddd;
+            }
+        """
+
+        # Open File button (blue - primary)
         self.btn_open_root = QPushButton("Open File")
+        self.btn_open_root.setStyleSheet(primary_btn_style.format(
+            bg="#1976D2", hover="#1565C0", pressed="#0D47A1"
+        ))
+        self.btn_open_root.setToolTip("Open case folder in Explorer (Win+F)")
         self.btn_open_root.clicked.connect(self.open_root_folder)
         self.corner_layout.addWidget(self.btn_open_root)
 
+        # Change File button (green - primary)
         self.btn_change_file = QPushButton("Change File")
+        self.btn_change_file.setStyleSheet(primary_btn_style.format(
+            bg="#388E3C", hover="#2E7D32", pressed="#1B5E20"
+        ))
+        self.btn_change_file.setToolTip("Switch to different case (Win+C)")
         self.btn_change_file.clicked.connect(self.change_file)
         self.corner_layout.addWidget(self.btn_change_file)
 
+        # View menu button
         self.setup_view_menu()
         self.corner_layout.addWidget(self.view_btn)
 
+        # Settings button (secondary)
         self.settings_btn = QPushButton("Settings")
+        self.settings_btn.setStyleSheet(secondary_btn_style)
         self.settings_btn.clicked.connect(self.open_settings_dialog)
         self.corner_layout.addWidget(self.settings_btn)
 
+        # Restart button (red - danger)
         self.restart_btn = QPushButton("Restart")
-        self.restart_btn.setStyleSheet("background-color: #f44336; color: white; font-weight: bold;")
+        self.restart_btn.setStyleSheet(primary_btn_style.format(
+            bg="#d32f2f", hover="#c62828", pressed="#b71c1c"
+        ))
         self.restart_btn.clicked.connect(self.restart_app)
         self.corner_layout.addWidget(self.restart_btn)
 
@@ -453,9 +753,30 @@ class MainWindow(QMainWindow):
 
     def setup_view_menu(self):
         self.view_btn = QToolButton()
-        self.view_btn.setText("View ▾") 
+        self.view_btn.setText("View ▾")
         self.view_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.view_btn.setStyleSheet("font-weight: bold; padding: 5px;")
+        self.view_btn.setStyleSheet("""
+            QToolButton {
+                background-color: #f5f5f5;
+                color: #333;
+                font-weight: 500;
+                font-size: 13px;
+                padding: 0px 14px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                height: 34px;
+            }
+            QToolButton:hover {
+                background-color: #e8e8e8;
+                border-color: #999;
+            }
+            QToolButton:pressed {
+                background-color: #ddd;
+            }
+            QToolButton::menu-indicator {
+                image: none;
+            }
+        """)
         
         self.view_menu = QMenu(self)
         self.view_btn.setMenu(self.view_menu)
@@ -1146,17 +1467,45 @@ class MainWindow(QMainWindow):
         """Toggle visibility of file preview pane."""
         if checked:
             self.preview_pane.show()
-            # Get current splitter parent
-            splitter = self.preview_pane.parentWidget()
-            if splitter and hasattr(splitter, 'setSizes'):
-                current = splitter.sizes()
-                if len(current) >= 3:
-                    # Allocate space for preview
-                    total = sum(current)
-                    splitter.setSizes([180, int(total * 0.6), int(total * 0.25)])
+            current = self.main_splitter.sizes()
+            if len(current) >= 3:
+                total = sum(current)
+                # Load saved preview width or use default (25% of total)
+                saved_width = self._load_preview_width()
+                if saved_width and saved_width > 50:
+                    preview_width = min(saved_width, total - 250)  # Leave room for left and center
+                else:
+                    preview_width = int(total * 0.25)
+                center_width = total - 180 - preview_width
+                self.main_splitter.setSizes([180, center_width, preview_width])
+            # Show currently selected file in preview
+            selected = self.tree.selectedItems()
+            if len(selected) == 1:
+                item = selected[0]
+                path = item.data(0, Qt.ItemDataRole.UserRole)
+                item_type = item.data(0, Qt.ItemDataRole.UserRole + 1)
+                if path and item_type == "file":
+                    self.preview_pane.show_file(path)
         else:
             self.preview_pane.hide()
             self.preview_pane.clear()
+
+    def _on_splitter_moved(self, pos, index):
+        """Save preview pane width when splitter is moved."""
+        if self.preview_pane.isVisible():
+            sizes = self.main_splitter.sizes()
+            if len(sizes) >= 3 and sizes[2] > 50:
+                self._save_preview_width(sizes[2])
+
+    def _save_preview_width(self, width):
+        """Save preview pane width to settings."""
+        settings = QSettings("iCharlotte", "iCharlotte")
+        settings.setValue("preview_pane_width", width)
+
+    def _load_preview_width(self):
+        """Load preview pane width from settings."""
+        settings = QSettings("iCharlotte", "iCharlotte")
+        return settings.value("preview_pane_width", type=int)
 
     def apply_advanced_filters(self, filters):
         """Apply advanced filters to the file tree."""
@@ -1390,6 +1739,13 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self.save_status_history()
+        # Clean up global hotkeys
+        if KEYBOARD_AVAILABLE:
+            try:
+                keyboard.unhook_all_hotkeys()
+                log_event("Global hotkeys unregistered")
+            except Exception as e:
+                log_event(f"Error unregistering hotkeys: {e}", "error")
         super().closeEvent(event)
 
     def run_agent(self, name, script, arg_type, extra_flags):

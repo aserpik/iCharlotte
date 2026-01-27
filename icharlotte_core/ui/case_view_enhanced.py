@@ -1022,7 +1022,7 @@ class FilePreviewWidget(QFrame):
         self.setFrameShape(QFrame.Shape.StyledPanel)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)  # Enable keyboard focus
         self.current_file = None
-        self._doc_worker = None  # For async .doc extraction
+        self._doc_worker = None  # For async .doc text extraction
 
         # PDF navigation state
         self._pdf_doc = None
@@ -1102,16 +1102,19 @@ class FilePreviewWidget(QFrame):
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_label.setStyleSheet("background-color: #f0f0f0;")
-        scroll = QScrollArea()
-        scroll.setWidget(self.image_label)
-        scroll.setWidgetResizable(True)
-        self.preview_stack.addWidget(scroll)
+        self.image_scroll = QScrollArea()
+        self.image_scroll.setWidget(self.image_label)
+        self.image_scroll.setWidgetResizable(True)
+        self.preview_stack.addWidget(self.image_scroll)
 
         # No preview placeholder
         self.no_preview_label = QLabel("No preview available.\nDouble-click to open file.")
         self.no_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.no_preview_label.setStyleSheet("color: gray;")
         self.preview_stack.addWidget(self.no_preview_label)
+
+        # HTML preview for Word documents (using QWebEngineView)
+        self.html_preview = None  # Lazy-loaded to avoid startup overhead
 
         layout.addWidget(self.preview_stack)
 
@@ -1330,10 +1333,12 @@ class FilePreviewWidget(QFrame):
             # Ctrl+Wheel = Zoom
             if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
                 delta = event.angleDelta().y()
+                # Get cursor position relative to scroll area for zoom-to-cursor
+                cursor_pos = event.position()
                 if delta > 0:
-                    self._zoom_in()
+                    self._zoom_in(cursor_pos)
                 elif delta < 0:
-                    self._zoom_out()
+                    self._zoom_out(cursor_pos)
                 event.accept()
                 return
             else:
@@ -1347,23 +1352,56 @@ class FilePreviewWidget(QFrame):
                 return
         super().wheelEvent(event)
 
-    def _zoom_in(self):
-        """Zoom in on PDF."""
+    def _zoom_in(self, cursor_pos=None):
+        """Zoom in on PDF with zoom-to-cursor."""
         if self._pdf_doc and self._pdf_zoom < 4.0:
+            old_zoom = self._pdf_zoom
             self._pdf_zoom = min(4.0, self._pdf_zoom + 0.25)
-            self._render_pdf_page(self._pdf_current_page)
+            self._render_pdf_page_with_cursor_focus(old_zoom, cursor_pos)
 
-    def _zoom_out(self):
-        """Zoom out on PDF."""
+    def _zoom_out(self, cursor_pos=None):
+        """Zoom out on PDF with zoom-to-cursor."""
         if self._pdf_doc and self._pdf_zoom > 0.5:
+            old_zoom = self._pdf_zoom
             self._pdf_zoom = max(0.5, self._pdf_zoom - 0.25)
-            self._render_pdf_page(self._pdf_current_page)
+            self._render_pdf_page_with_cursor_focus(old_zoom, cursor_pos)
 
     def _zoom_reset(self):
         """Reset zoom to default."""
         if self._pdf_doc:
             self._pdf_zoom = 1.5
             self._render_pdf_page(self._pdf_current_page)
+
+    def _render_pdf_page_with_cursor_focus(self, old_zoom, cursor_pos=None):
+        """Render PDF page and adjust scroll to keep cursor position fixed."""
+        if cursor_pos is None:
+            # No cursor position, just render normally
+            self._render_pdf_page(self._pdf_current_page)
+            return
+
+        # Get current scroll position and cursor position relative to content
+        h_scroll = self.image_scroll.horizontalScrollBar()
+        v_scroll = self.image_scroll.verticalScrollBar()
+
+        # Map cursor position to scroll area viewport
+        scroll_viewport_pos = self.image_scroll.mapFrom(self, cursor_pos.toPoint())
+
+        # Calculate the document position under the cursor before zoom
+        # doc_x = (scroll_position + cursor_in_viewport) / old_zoom
+        doc_x = (h_scroll.value() + scroll_viewport_pos.x()) / old_zoom
+        doc_y = (v_scroll.value() + scroll_viewport_pos.y()) / old_zoom
+
+        # Render the page at new zoom level
+        self._render_pdf_page(self._pdf_current_page)
+
+        # Calculate new scroll position to keep the same document point under cursor
+        # new_scroll = doc_pos * new_zoom - cursor_in_viewport
+        new_h = int(doc_x * self._pdf_zoom - scroll_viewport_pos.x())
+        new_v = int(doc_y * self._pdf_zoom - scroll_viewport_pos.y())
+
+        # Apply new scroll positions (clamped to valid range)
+        h_scroll.setValue(max(0, min(new_h, h_scroll.maximum())))
+        v_scroll.setValue(max(0, min(new_v, v_scroll.maximum())))
 
     def _show_pdf_text_fallback(self, file_path):
         """Fallback PDF preview showing OCR text if available."""
@@ -1393,49 +1431,106 @@ class FilePreviewWidget(QFrame):
         self.text_preview.setPlainText(info_text)
         self.preview_stack.setCurrentWidget(self.text_preview)
 
+    def _get_html_preview(self):
+        """Lazy-load QWebEngineView for HTML preview."""
+        if self.html_preview is None:
+            try:
+                from PySide6.QtWebEngineWidgets import QWebEngineView
+                self.html_preview = QWebEngineView()
+                self.html_preview.setStyleSheet("background-color: white;")
+                self.preview_stack.addWidget(self.html_preview)
+            except ImportError:
+                return None
+        return self.html_preview
+
     def _show_docx_preview(self, file_path):
-        """Show preview for .docx files using python-docx."""
+        """Show preview for .docx files using mammoth (fast HTML conversion)."""
         try:
-            from docx import Document
+            import mammoth
 
-            doc = Document(file_path)
-            text_parts = []
+            # Convert docx to HTML - this is fast, pure Python
+            with open(file_path, "rb") as docx_file:
+                result = mammoth.convert_to_html(docx_file)
+                html_content = result.value
 
-            # Extract text from paragraphs
-            for para in doc.paragraphs:
-                if para.text.strip():
-                    text_parts.append(para.text)
-
-            # Also extract from tables
-            for table in doc.tables:
-                for row in table.rows:
-                    row_text = ' | '.join(cell.text.strip() for cell in row.cells if cell.text.strip())
-                    if row_text:
-                        text_parts.append(row_text)
-
-            content = '\n\n'.join(text_parts[:200])  # Limit paragraphs
-            if len(content) > 50000:
-                content = content[:50000] + '\n\n... (content truncated)'
-
-            if content.strip():
-                self.text_preview.setPlainText(content)
-                self.preview_stack.setCurrentWidget(self.text_preview)
-            else:
-                self.no_preview_label.setText("Document appears to be empty or contains only images.")
+            if not html_content.strip():
+                self.no_preview_label.setText("Document appears to be empty.")
                 self.preview_stack.setCurrentWidget(self.no_preview_label)
+                return
+
+            # Wrap in styled HTML for better display
+            styled_html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <style>
+                    body {{
+                        font-family: Calibri, Arial, sans-serif;
+                        font-size: 11pt;
+                        line-height: 1.4;
+                        padding: 20px;
+                        max-width: 100%;
+                        background-color: white;
+                        color: black;
+                    }}
+                    table {{
+                        border-collapse: collapse;
+                        margin: 10px 0;
+                        width: 100%;
+                    }}
+                    td, th {{
+                        border: 1px solid #ccc;
+                        padding: 6px 10px;
+                        text-align: left;
+                    }}
+                    th {{
+                        background-color: #f0f0f0;
+                        font-weight: bold;
+                    }}
+                    img {{
+                        max-width: 100%;
+                        height: auto;
+                    }}
+                    p {{
+                        margin: 0 0 10px 0;
+                    }}
+                    h1, h2, h3, h4, h5, h6 {{
+                        margin: 15px 0 10px 0;
+                    }}
+                    ul, ol {{
+                        margin: 10px 0;
+                        padding-left: 30px;
+                    }}
+                </style>
+            </head>
+            <body>
+                {html_content}
+            </body>
+            </html>
+            """
+
+            # Try to use QWebEngineView for rich rendering
+            web_view = self._get_html_preview()
+            if web_view:
+                web_view.setHtml(styled_html)
+                self.preview_stack.setCurrentWidget(web_view)
+            else:
+                # Fallback to QTextEdit (basic HTML support)
+                self.text_preview.setHtml(styled_html)
+                self.preview_stack.setCurrentWidget(self.text_preview)
 
         except ImportError:
-            self.no_preview_label.setText("python-docx not installed.\nCannot preview .docx files.")
+            self.no_preview_label.setText("mammoth not installed.\nInstall with: pip install mammoth")
             self.preview_stack.setCurrentWidget(self.no_preview_label)
         except Exception as e:
             self.no_preview_label.setText(f"Error reading .docx file:\n{str(e)}")
             self.preview_stack.setCurrentWidget(self.no_preview_label)
 
     def _show_doc_preview(self, file_path):
-        """Show preview for legacy .doc files using Windows COM automation."""
+        """Show preview for legacy .doc files - text extraction only."""
         from PySide6.QtCore import QThread, Signal
 
-        # Show loading message while extracting
+        # Show loading message
         self.text_preview.setPlainText("Loading .doc preview...")
         self.preview_stack.setCurrentWidget(self.text_preview)
 
@@ -1469,7 +1564,7 @@ class FilePreviewWidget(QFrame):
                         pythoncom.CoUninitialize()
 
                 except ImportError:
-                    self.finished.emit("", "pywin32 not installed.\nCannot preview legacy .doc files.")
+                    self.finished.emit("", "pywin32 not installed.\nCannot preview .doc files.\n\nConvert to .docx for formatted preview.")
                 except Exception as e:
                     self.finished.emit("", f"Error reading .doc file:\n{str(e)}\n\nTry opening with Microsoft Word.")
 
@@ -1483,10 +1578,8 @@ class FilePreviewWidget(QFrame):
             else:
                 self.no_preview_label.setText("Document appears to be empty.")
                 self.preview_stack.setCurrentWidget(self.no_preview_label)
-            # Clean up worker
             self._doc_worker = None
 
-        # Run extraction in background thread
         self._doc_worker = DocExtractWorker(file_path)
         self._doc_worker.finished.connect(on_doc_extracted)
         self._doc_worker.start()
