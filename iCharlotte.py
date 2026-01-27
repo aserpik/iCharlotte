@@ -25,7 +25,8 @@ try:
         QPushButton, QTreeWidgetItem, QHeaderView, QMessageBox, QLabel,
         QFrame, QSplitter, QAbstractItemView, QLineEdit,
         QTreeWidgetItemIterator, QTabWidget, QScrollArea, QMenu, QDialog,
-        QFileIconProvider, QToolButton
+        QFileIconProvider, QToolButton, QGroupBox, QCheckBox, QComboBox,
+        QInputDialog
     )
     from PySide6.QtCore import Qt, QThread, Signal, QFileInfo
     from PySide6.QtGui import QAction
@@ -41,6 +42,11 @@ from icharlotte_core.utils import (
 )
 from icharlotte_core.ui.widgets import (
     StatusWidget, AgentRunner, FileTreeWidget
+)
+from icharlotte_core.ui.case_view_enhanced import (
+    EnhancedAgentButton, AgentSettingsDB, AgentSettingsDialog,
+    AdvancedFilterWidget, FilePreviewWidget, OutputBrowserWidget,
+    ProcessingLogWidget, ProcessingLogDB, FileTagsDB, EnhancedFileTreeWidget
 )
 from icharlotte_core.ui.dialogs import FileNumberDialog, VariablesDialog, PromptsDialog, LLMSettingsDialog
 from icharlotte_core.ui.tabs import ChatTab, IndexTab
@@ -139,69 +145,99 @@ class MainWindow(QMainWindow):
         # --- Tab 1: Case View ---
         case_view_widget = QWidget()
         self.tabs.addTab(case_view_widget, "Case View")
-        
+
         main_layout = QVBoxLayout(case_view_widget)
-        
+
         # Top Toolbar
         toolbar_layout = QHBoxLayout()
-        
+
         btn_view_docket = QPushButton("ViewDocket")
         btn_view_docket.clicked.connect(self.view_docket)
         toolbar_layout.addWidget(btn_view_docket)
-        
+
         btn_vars = QPushButton("Variables")
         btn_vars.clicked.connect(self.manage_variables)
         toolbar_layout.addWidget(btn_vars)
-        
+
         btn_prompts = QPushButton("Prompts")
         btn_prompts.clicked.connect(self.manage_prompts)
         toolbar_layout.addWidget(btn_prompts)
-        
+
+        # Output Browser Button
+        btn_outputs = QPushButton("Output Browser")
+        btn_outputs.clicked.connect(self.open_output_browser)
+        toolbar_layout.addWidget(btn_outputs)
+
+        # Processing Log Button
+        btn_proc_log = QPushButton("Processing Log")
+        btn_proc_log.clicked.connect(self.open_processing_log)
+        toolbar_layout.addWidget(btn_proc_log)
+
         toolbar_layout.addStretch()
-        
+
         # Wrapper for vertical layout of Case View
         wrapper_layout = QVBoxLayout()
         wrapper_layout.addLayout(toolbar_layout)
-        
+
+        # Main horizontal splitter (agents | tree | preview)
         splitter = QSplitter(Qt.Orientation.Horizontal)
         wrapper_layout.addWidget(splitter)
-        
+
         main_layout.addLayout(wrapper_layout)
-        
+
+        # Initialize agent settings database
+        self.agent_settings_db = AgentSettingsDB()
+        self.agent_buttons = {}  # Track enhanced agent buttons
+        self.running_agents = {}  # Track which agents are running
+
         # Left Panel (Case Agents)
         left_panel = QFrame()
         left_panel.setFrameShape(QFrame.Shape.StyledPanel)
-        left_panel.setFixedWidth(170)
+        left_panel.setFixedWidth(180)
         left_layout = QVBoxLayout(left_panel)
         left_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        left_layout.setContentsMargins(2, 5, 2, 5)
-        
+        left_layout.setContentsMargins(4, 5, 4, 5)
+        left_layout.setSpacing(4)
+
         title_label = QLabel("Case Agents")
-        title_label.setStyleSheet("font-weight: bold; font-size: 14px; margin-bottom: 10px;")
+        title_label.setStyleSheet("font-weight: bold; font-size: 14px; margin-bottom: 5px;")
         left_layout.addWidget(title_label)
-        
-        # Agent Buttons
-        self.create_agent_button("Docket Agent", "docket.py", left_layout, arg_type="file_number")
-        self.create_agent_button("Complaint Agent", "complaint.py", left_layout, arg_type="file_number")
-        self.create_agent_button("Report Agent", "report.py", left_layout, arg_type="file_number")
-        self.create_agent_button("Discovery Generate Agent", "discovery_requests.py", left_layout, arg_type="file_number", extra_flags=["--interactive"])
-        self.create_agent_button("Subpoena Tracker Agent", "subpoena_tracker.py", left_layout, arg_type="file_number")
-        
+
+        # Enhanced Agent Buttons with running indicator, status, and settings
+        self.create_enhanced_agent_button("Docket Agent", "docket.py", left_layout, arg_type="file_number")
+        self.create_enhanced_agent_button("Complaint Agent", "complaint.py", left_layout, arg_type="file_number")
+        self.create_enhanced_agent_button("Report Agent", "report.py", left_layout, arg_type="file_number")
+        self.create_enhanced_agent_button("Discovery Generate", "discovery_requests.py", left_layout, arg_type="file_number", extra_flags=["--interactive"])
+        self.create_enhanced_agent_button("Subpoena Tracker", "subpoena_tracker.py", left_layout, arg_type="file_number")
+
         # Directory-based Case Agents
-        left_layout.addSpacing(10)
-        self.create_agent_button("Liability Agent", "liability.py", left_layout, arg_type="case_path")
-        self.create_agent_button("Exposure Agent", "exposure.py", left_layout, arg_type="case_path")
-        
+        left_layout.addSpacing(8)
+        dir_label = QLabel("Analysis Agents")
+        dir_label.setStyleSheet("font-weight: bold; font-size: 12px; color: #666;")
+        left_layout.addWidget(dir_label)
+
+        self.create_enhanced_agent_button("Liability Agent", "liability.py", left_layout, arg_type="case_path")
+        self.create_enhanced_agent_button("Exposure Agent", "exposure.py", left_layout, arg_type="case_path")
+
+        # New Agents: Timeline and Contradiction Detector
+        left_layout.addSpacing(8)
+        new_label = QLabel("Document Agents")
+        new_label.setStyleSheet("font-weight: bold; font-size: 12px; color: #666;")
+        left_layout.addWidget(new_label)
+
+        self.create_enhanced_agent_button("Timeline Agent", "extract_timeline.py", left_layout, arg_type="case_path")
+        self.create_enhanced_agent_button("Contradiction Detector", "detect_contradictions.py", left_layout, arg_type="file_number")
+
         left_layout.addStretch()
         splitter.addWidget(left_panel)
         
-        # Right Panel (File Tree)
-        right_panel = QFrame()
-        right_layout = QVBoxLayout(right_panel)
-        
+        # Center Panel (File Tree with Enhanced Features)
+        center_panel = QFrame()
+        center_layout = QVBoxLayout(center_panel)
+
         # Header Layout (Status Label + Expand/Collapse Button)
         header_layout = QHBoxLayout()
-        
+
         self.refresh_btn = QPushButton()
         self.refresh_btn.setIcon(self.style().standardIcon(self.style().StandardPixmap.SP_BrowserReload))
         self.refresh_btn.setToolTip("Refresh Tree")
@@ -212,31 +248,53 @@ class MainWindow(QMainWindow):
         self.search_input.setPlaceholderText("Filter files...")
         self.search_input.textChanged.connect(self.filter_tree)
         header_layout.addWidget(self.search_input)
-        
+
         self.smart_select_btn = QPushButton("Select...")
         self.smart_select_menu = QMenu(self)
-        
+
         act_pdfs = QAction("All PDFs -> OCR", self)
         act_pdfs.triggered.connect(lambda: self.smart_select("pdf_ocr"))
         self.smart_select_menu.addAction(act_pdfs)
-        
+
+        act_unprocessed = QAction("Unprocessed Files -> OCR", self)
+        act_unprocessed.triggered.connect(lambda: self.smart_select("unprocessed_ocr"))
+        self.smart_select_menu.addAction(act_unprocessed)
+
         self.smart_select_btn.setMenu(self.smart_select_menu)
         header_layout.addWidget(self.smart_select_btn)
-        
+
+        # Advanced Filter Toggle
+        self.filter_toggle_btn = QPushButton("▼ Filters")
+        self.filter_toggle_btn.setCheckable(True)
+        self.filter_toggle_btn.clicked.connect(self.toggle_advanced_filters)
+        header_layout.addWidget(self.filter_toggle_btn)
+
         self.expand_btn = QPushButton("Expand All")
         self.expand_btn.setCheckable(True)
         self.expand_btn.clicked.connect(self.toggle_expand)
         header_layout.addWidget(self.expand_btn)
 
+        # Preview Toggle
+        self.preview_toggle_btn = QPushButton("Preview")
+        self.preview_toggle_btn.setCheckable(True)
+        self.preview_toggle_btn.clicked.connect(self.toggle_preview_pane)
+        header_layout.addWidget(self.preview_toggle_btn)
+
         self.clear_all_btn = QPushButton("Clear All")
         self.clear_all_btn.clicked.connect(self.clear_all_checkboxes)
         header_layout.addWidget(self.clear_all_btn)
-        
-        right_layout.addLayout(header_layout)
-        
+
+        center_layout.addLayout(header_layout)
+
+        # Advanced Filter Widget (Hidden by default)
+        self.advanced_filter = AdvancedFilterWidget()
+        self.advanced_filter.filter_changed.connect(self.apply_advanced_filters)
+        self.advanced_filter.hide()
+        center_layout.addWidget(self.advanced_filter)
+
         self.status_label = QLabel("Ready")
-        right_layout.addWidget(self.status_label)
-        
+        center_layout.addWidget(self.status_label)
+
         # AGENTS definition for the Task Queue
         self.AGENTS = [
             {"id": "separate", "name": "Separate", "script": "separate.py", "color": "#e91e63", "short": "SEP"},
@@ -251,26 +309,34 @@ class MainWindow(QMainWindow):
             {"id": "contradict", "name": "Conflicts", "script": "detect_contradictions.py", "color": "#f44336", "short": "CONF"},
         ]
 
-        self.tree = FileTreeWidget()
+        # Enhanced File Tree with additional columns
+        self.tree = EnhancedFileTreeWidget()
         self.tree.item_moved.connect(lambda: self.populate_tree())
+        self.tree.folder_created.connect(lambda p: self.populate_tree())
         self.tree.setHeaderLabels([
-            "Category / File", 
+            "Category / File",
             "Size",
             "Date Modified",
+            "Pages",
+            "Status",
+            "Tags",
             "Queued Tasks (Click to Add ➕)"
         ])
         self.tree.setSortingEnabled(True)
-        self.tree.setColumnWidth(1, 80)
-        self.tree.setColumnWidth(2, 120)
-        self.tree.setColumnWidth(3, 250)
-        self.tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.tree.setColumnWidth(0, 300)
+        self.tree.setColumnWidth(1, 70)
+        self.tree.setColumnWidth(2, 100)
+        self.tree.setColumnWidth(3, 50)
+        self.tree.setColumnWidth(4, 80)
+        self.tree.setColumnWidth(5, 100)
+        self.tree.setColumnWidth(6, 200)
         self.tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.tree.setAlternatingRowColors(True)
         self.tree.itemSelectionChanged.connect(self.on_tree_selection_changed)
-        self.tree.itemDoubleClicked.connect(self.on_tree_double_click) 
+        self.tree.itemDoubleClicked.connect(self.on_tree_double_click)
         self.tree.itemClicked.connect(self.on_tree_item_clicked)
-        right_layout.addWidget(self.tree)
-        
+        center_layout.addWidget(self.tree)
+
         btn_layout = QHBoxLayout()
         self.process_btn = QPushButton("Process All Queued Tasks")
         self.process_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 10px;")
@@ -281,13 +347,20 @@ class MainWindow(QMainWindow):
         self.organize_btn.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold; padding: 10px;")
         self.organize_btn.clicked.connect(self.organize_checked_items)
         btn_layout.addWidget(self.organize_btn)
-        
-        right_layout.addLayout(btn_layout)
-        
-        splitter.addWidget(right_panel)
-        splitter.setSizes([170, 1030])
+
+        center_layout.addLayout(btn_layout)
+
+        splitter.addWidget(center_panel)
+
+        # Right Panel (File Preview - Hidden by default)
+        self.preview_pane = FilePreviewWidget()
+        self.preview_pane.hide()
+        splitter.addWidget(self.preview_pane)
+
+        splitter.setSizes([180, 800, 0])
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
+        splitter.setStretchFactor(2, 0)
         
         # --- Tab 2: Status ---
         self.status_tab = QWidget()
@@ -487,10 +560,10 @@ class MainWindow(QMainWindow):
         self.tree.blockSignals(False)
 
     def on_tree_item_clicked(self, item, column):
-        if column == 3:
+        if column == 6:  # Queued Tasks column (index 6)
             # Get click position relative to the tree's viewport
             pos = self.tree.visualItemRect(item).bottomLeft()
-            pos.setX(self.tree.columnViewportPosition(3))
+            pos.setX(self.tree.columnViewportPosition(6))
             global_pos = self.tree.viewport().mapToGlobal(pos)
 
             # Get all selected items (for multi-select support)
@@ -603,20 +676,20 @@ class MainWindow(QMainWindow):
     def update_item_tasks_ui(self, item):
         task_ids = item.data(0, Qt.ItemDataRole.UserRole + 2) or []
         if not task_ids:
-            item.setText(3, " [ + Add Tasks ]")
-            item.setForeground(3, Qt.GlobalColor.gray)
+            item.setText(6, " [ + Add Tasks ]")
+            item.setForeground(6, Qt.GlobalColor.gray)
             return
-            
+
         # Create a visual string of short tags
         tags = []
         for tid in task_ids:
             agent = next((a for a in self.AGENTS if a["id"] == tid), None)
             if agent:
                 tags.append(f"[{agent['short']}]")
-        
-        item.setText(3, " ".join(tags))
-        # Optional: set color for column 3 text
-        item.setForeground(3, Qt.GlobalColor.blue)
+
+        item.setText(6, " ".join(tags))
+        # Optional: set color for column 6 text
+        item.setForeground(6, Qt.GlobalColor.blue)
 
     def filter_tree(self, text):
         search_text = text.lower()
@@ -656,7 +729,7 @@ class MainWindow(QMainWindow):
             item = iterator.value()
             path = item.data(0, Qt.ItemDataRole.UserRole)
             is_file = item.data(0, Qt.ItemDataRole.UserRole + 1) == "file"
-            
+
             if is_file and path:
                 if mode == "pdf_ocr":
                     if path.lower().endswith(".pdf"):
@@ -665,7 +738,19 @@ class MainWindow(QMainWindow):
                             current_tasks.append("ocr")
                             item.setData(0, Qt.ItemDataRole.UserRole + 2, current_tasks)
                             self.update_item_tasks_ui(item)
-            
+
+                elif mode == "unprocessed_ocr":
+                    # Only select unprocessed PDF files for OCR
+                    if path.lower().endswith(".pdf"):
+                        # Check if already processed
+                        proc_status = item.text(4)  # Status column
+                        if not proc_status or "OCR" not in proc_status:
+                            current_tasks = item.data(0, Qt.ItemDataRole.UserRole + 2) or []
+                            if "ocr" not in current_tasks:
+                                current_tasks.append("ocr")
+                                item.setData(0, Qt.ItemDataRole.UserRole + 2, current_tasks)
+                                self.update_item_tasks_ui(item)
+
             iterator += 1
         self.tree.blockSignals(False)
 
@@ -862,14 +947,23 @@ class MainWindow(QMainWindow):
             file_count = sum(1 for item in selected if item.data(0, Qt.ItemDataRole.UserRole + 1) == "file")
             if file_count > 0:
                 self.status_label.setText(f"{file_count} files selected - Click 'Queued Tasks' column to apply tasks to all")
+            # Clear preview for multi-selection
+            if hasattr(self, 'preview_pane') and self.preview_pane.isVisible():
+                self.preview_pane.clear()
         elif count == 1:
             item = selected[0]
             path = item.data(0, Qt.ItemDataRole.UserRole)
+            item_type = item.data(0, Qt.ItemDataRole.UserRole + 1)
             if path:
                 self.status_label.setText(f"Selected: {os.path.basename(path)}")
+                # Update preview pane if visible and it's a file
+                if hasattr(self, 'preview_pane') and self.preview_pane.isVisible() and item_type == "file":
+                    self.preview_pane.show_file(path)
         else:
             if hasattr(self, 'file_number') and self.file_number:
                 self.status_label.setText(f"Case: {self.file_number}")
+            if hasattr(self, 'preview_pane') and self.preview_pane.isVisible():
+                self.preview_pane.clear()
 
     def run_separator_path(self, path):
         # Switch to Status Tab to show progress
@@ -926,6 +1020,248 @@ class MainWindow(QMainWindow):
         btn.setStyleSheet("font-size: 11px; padding: 2px;")
         btn.clicked.connect(partial(self.run_agent, name, script, arg_type, extra_flags))
         layout.addWidget(btn)
+
+    def create_enhanced_agent_button(self, name, script, layout, arg_type="file_number", extra_flags=None):
+        """Create an enhanced agent button with running indicator, status, and settings."""
+        enhanced_btn = EnhancedAgentButton(name, script)
+        enhanced_btn.clicked.connect(partial(self.run_enhanced_agent, name, script, arg_type, extra_flags, enhanced_btn))
+        enhanced_btn.settings_clicked.connect(partial(self.open_agent_settings, script))
+
+        # Store reference for updating status
+        self.agent_buttons[script] = enhanced_btn
+
+        # Update last docket download date for docket agent
+        if script == "docket.py":
+            self.update_docket_agent_status()
+
+        layout.addWidget(enhanced_btn)
+
+    def run_enhanced_agent(self, name, script, arg_type, extra_flags, btn_widget):
+        """Run agent with enhanced status tracking."""
+        # Set button to running state
+        btn_widget.set_running(True)
+        self.running_agents[script] = True
+
+        # Run the agent
+        runner = self.run_agent(name, script, arg_type, extra_flags)
+
+        # Connect finished signal to update button
+        if runner:
+            runner.finished.connect(partial(self.on_agent_finished, script, btn_widget))
+
+    def on_agent_finished(self, script, btn_widget, success):
+        """Handle agent completion and update button status."""
+        btn_widget.set_running(False)
+        self.running_agents[script] = False
+
+        # Update status message
+        if success:
+            btn_widget.set_status("Last: Just now")
+        else:
+            btn_widget.set_status("Last: Failed")
+
+        # Update docket download date if docket agent finished
+        if script == "docket.py" and success:
+            from datetime import datetime
+            today = datetime.now().strftime("%Y-%m-%d")
+            if self.file_number:
+                self.master_db.update_last_docket_download(self.file_number, today)
+            btn_widget.set_last_run(today)
+
+    def update_docket_agent_status(self):
+        """Update the docket agent button with last download date."""
+        if not self.file_number or "docket.py" not in self.agent_buttons:
+            return
+
+        case_data = self.master_db.get_case(self.file_number)
+        if case_data:
+            last_download = case_data.get("last_docket_download")
+            if last_download:
+                self.agent_buttons["docket.py"].set_last_run(last_download)
+            else:
+                self.agent_buttons["docket.py"].set_status("Never downloaded")
+
+    def open_agent_settings(self, script):
+        """Open the settings dialog for an agent."""
+        dialog = AgentSettingsDialog(script, self.agent_settings_db, self)
+        dialog.exec()
+
+    def open_output_browser(self):
+        """Open the output browser dialog."""
+        if not self.case_path or not self.file_number:
+            QMessageBox.warning(self, "No Case", "Please load a case first.")
+            return
+
+        dialog = OutputBrowserWidget(self.case_path, self.file_number, self)
+        dialog.exec()
+
+    def open_processing_log(self):
+        """Open the processing log dialog."""
+        if not self.file_number:
+            QMessageBox.warning(self, "No Case", "Please load a case first.")
+            return
+
+        dialog = ProcessingLogWidget(self.file_number, self)
+        dialog.exec()
+
+    def toggle_advanced_filters(self, checked):
+        """Toggle visibility of advanced filter panel."""
+        if checked:
+            self.advanced_filter.show()
+            self.filter_toggle_btn.setText("▲ Filters")
+            # Update available tags
+            if self.file_number:
+                tags_db = FileTagsDB(self.file_number)
+                self.advanced_filter.set_available_tags(tags_db.get_all_tags())
+        else:
+            self.advanced_filter.hide()
+            self.filter_toggle_btn.setText("▼ Filters")
+
+    def toggle_preview_pane(self, checked):
+        """Toggle visibility of file preview pane."""
+        if checked:
+            self.preview_pane.show()
+            # Get current splitter parent
+            splitter = self.preview_pane.parentWidget()
+            if splitter and hasattr(splitter, 'setSizes'):
+                current = splitter.sizes()
+                if len(current) >= 3:
+                    # Allocate space for preview
+                    total = sum(current)
+                    splitter.setSizes([180, int(total * 0.6), int(total * 0.25)])
+        else:
+            self.preview_pane.hide()
+            self.preview_pane.clear()
+
+    def apply_advanced_filters(self, filters):
+        """Apply advanced filters to the file tree."""
+        iterator = QTreeWidgetItemIterator(self.tree)
+
+        while iterator.value():
+            item = iterator.value()
+            file_path = item.data(0, Qt.ItemDataRole.UserRole)
+            item_type = item.data(0, Qt.ItemDataRole.UserRole + 1)
+
+            if item_type == "file" and file_path:
+                should_show = self._file_matches_filters(file_path, filters)
+                item.setHidden(not should_show)
+            elif item_type == "dir":
+                # Directories stay visible if any child is visible
+                pass
+
+            iterator += 1
+
+        # Update directory visibility based on children
+        self._update_directory_visibility()
+
+    def _file_matches_filters(self, file_path, filters):
+        """Check if a file matches the given filters."""
+        from datetime import datetime, timedelta
+
+        # File type filter
+        ext = os.path.splitext(file_path)[1].lower().lstrip('.')
+        file_types = filters.get("file_types", [])
+
+        if file_types:
+            type_match = False
+            if ext in ["pdf"] and "pdf" in file_types:
+                type_match = True
+            elif ext in ["doc", "docx"] and any(t in file_types for t in ["doc", "docx"]):
+                type_match = True
+            elif ext in ["jpg", "jpeg", "png", "gif", "bmp", "tiff"] and any(t in file_types for t in ["jpg", "jpeg", "png", "gif", "bmp", "tiff"]):
+                type_match = True
+            elif "other" in file_types and ext not in ["pdf", "doc", "docx", "jpg", "jpeg", "png", "gif", "bmp", "tiff"]:
+                type_match = True
+
+            if not type_match:
+                return False
+
+        # Processing status filter
+        status_filter = filters.get("processing_status", [])
+        if status_filter and "all" not in status_filter:
+            if self.file_number:
+                proc_log = ProcessingLogDB(self.file_number)
+                file_status = proc_log.get_file_processing_status(file_path)
+
+                has_ocr = any("ocr" in log.get("task_type", "").lower() and log.get("status") == "success" for log in file_status)
+                has_summary = any("summar" in log.get("task_type", "").lower() and log.get("status") == "success" for log in file_status)
+                is_unprocessed = not file_status or not any(log.get("status") == "success" for log in file_status)
+
+                status_match = False
+                if "unprocessed" in status_filter and is_unprocessed:
+                    status_match = True
+                if "ocr" in status_filter and has_ocr:
+                    status_match = True
+                if "summarized" in status_filter and has_summary:
+                    status_match = True
+
+                if not status_match:
+                    return False
+
+        # Date filter
+        date_filter = filters.get("date_filter", "Any time")
+        if date_filter != "Any time":
+            try:
+                mtime = os.path.getmtime(file_path)
+                file_date = datetime.fromtimestamp(mtime)
+                now = datetime.now()
+
+                if date_filter == "Today":
+                    if file_date.date() != now.date():
+                        return False
+                elif date_filter == "Last 7 days":
+                    if (now - file_date).days > 7:
+                        return False
+                elif date_filter == "Last 30 days":
+                    if (now - file_date).days > 30:
+                        return False
+                elif date_filter == "Last 90 days":
+                    if (now - file_date).days > 90:
+                        return False
+                elif date_filter == "Custom range...":
+                    date_from = filters.get("date_from")
+                    date_to = filters.get("date_to")
+                    if date_from:
+                        from_dt = datetime.strptime(date_from, "%Y-%m-%d")
+                        if file_date < from_dt:
+                            return False
+                    if date_to:
+                        to_dt = datetime.strptime(date_to, "%Y-%m-%d")
+                        if file_date > to_dt:
+                            return False
+            except:
+                pass
+
+        # Tag filter
+        tag_filter = filters.get("tag")
+        if tag_filter and self.file_number:
+            tags_db = FileTagsDB(self.file_number)
+            file_tags = tags_db.get_tags(file_path)
+            if tag_filter not in file_tags:
+                return False
+
+        return True
+
+    def _update_directory_visibility(self):
+        """Update directory visibility based on visible children."""
+        def check_item(item):
+            if item.data(0, Qt.ItemDataRole.UserRole + 1) == "dir":
+                has_visible_child = False
+                for i in range(item.childCount()):
+                    child = item.child(i)
+                    if not child.isHidden():
+                        has_visible_child = True
+                        break
+                    # Recursively check nested directories
+                    if child.data(0, Qt.ItemDataRole.UserRole + 1) == "dir":
+                        check_item(child)
+                        if not child.isHidden():
+                            has_visible_child = True
+
+                item.setHidden(not has_visible_child)
+
+        for i in range(self.tree.topLevelItemCount()):
+            check_item(self.tree.topLevelItem(i))
 
     def add_status_task(self, name, details, command, args):
         status_widget = StatusWidget(name, details)
@@ -1260,7 +1596,7 @@ class MainWindow(QMainWindow):
             
         if not os.path.exists(GEMINI_DATA_DIR):
             os.makedirs(GEMINI_DATA_DIR)
-            
+
         cache_path = os.path.join(GEMINI_DATA_DIR, f"{self.file_number}_tree.json")
         try:
             with open(cache_path, 'w') as f:
@@ -1268,17 +1604,82 @@ class MainWindow(QMainWindow):
         except Exception as e:
             log_event(f"Error saving cache: {e}", "error")
 
+    def _get_pdf_page_count(self, file_path):
+        """Get page count for a PDF file."""
+        try:
+            with open(file_path, 'rb') as f:
+                content = f.read(100000)  # Read first 100KB for speed
+            # Simple regex to find page count in PDF
+            import re
+            matches = re.findall(rb'/Type\s*/Page[^s]', content)
+            if matches:
+                return str(len(matches))
+            # Alternative: look for /Count in page tree
+            count_match = re.search(rb'/Count\s+(\d+)', content)
+            if count_match:
+                return count_match.group(1).decode()
+        except:
+            pass
+        return ""
+
+    def _get_file_processing_status(self, file_path):
+        """Get processing status for a file."""
+        if not hasattr(self, 'file_number') or not self.file_number:
+            return ""
+
+        try:
+            proc_log = ProcessingLogDB(self.file_number)
+            logs = proc_log.get_file_processing_status(file_path)
+            if not logs:
+                return ""
+
+            # Get unique successful task types
+            successful = set()
+            for log in logs:
+                if log.get("status") == "success":
+                    task = log.get("task_type", "").lower()
+                    if "ocr" in task:
+                        successful.add("OCR")
+                    elif "summar" in task:
+                        successful.add("SUM")
+                    elif "timeline" in task:
+                        successful.add("TL")
+                    elif "chron" in task:
+                        successful.add("CHR")
+
+            return ", ".join(sorted(successful)) if successful else ""
+        except:
+            return ""
+
+    def _get_file_tags(self, file_path):
+        """Get tags for a file."""
+        if not hasattr(self, 'file_number') or not self.file_number:
+            return ""
+
+        try:
+            tags_db = FileTagsDB(self.file_number)
+            tags = tags_db.get_tags(file_path)
+            return ", ".join(tags) if tags else ""
+        except:
+            return ""
+
     def populate_tree(self):
         self.tree.clear()
         self.status_label.setText("Scanning directory structure... Please wait.")
         self.tree.setEnabled(False)
         self.process_btn.setEnabled(False)
         self.tree.setSortingEnabled(False)
-        
+
+        # Set up enhanced tree databases for the current case
+        if hasattr(self, 'file_number') and self.file_number:
+            self.tree.set_databases(self.file_number)
+            # Also update docket agent status
+            self.update_docket_agent_status()
+
         self.tree_item_map = {}
         self.visited_paths = set()
         self.visited_paths.add(self.case_path)
-        
+
         root_text = f"{os.path.basename(self.case_path)} ({self.file_number})"
         root_item = QTreeWidgetItem(self.tree)
         root_item.setText(0, root_text)
@@ -1328,29 +1729,50 @@ class MainWindow(QMainWindow):
             for f, size, mtime in files:
                 file_path = os.path.join(root, f)
                 self.visited_paths.add(file_path)
-                
+
                 size_str = f"{size / 1024:.1f} KB" if size < 1024 * 1024 else f"{size / (1024 * 1024):.1f} MB"
                 date_str = format_date_to_mm_dd_yyyy(mtime)
+
+                # Get page count for PDFs
+                page_count = ""
+                if f.lower().endswith('.pdf'):
+                    page_count = self._get_pdf_page_count(file_path)
+
+                # Get processing status
+                proc_status = ""
+                if hasattr(self, 'file_number') and self.file_number:
+                    proc_status = self._get_file_processing_status(file_path)
+
+                # Get tags
+                tags_str = ""
+                if hasattr(self, 'file_number') and self.file_number:
+                    tags_str = self._get_file_tags(file_path)
 
                 if file_path not in self.tree_item_map:
                     f_item = QTreeWidgetItem(parent_item)
                     f_item.setText(0, f)
-                    
+
                     # Use QFileIconProvider for typical PDF/Word icons
                     icon = self.icon_provider.icon(QFileInfo(file_path))
                     f_item.setIcon(0, icon)
-                    
+
                     f_item.setData(0, Qt.ItemDataRole.UserRole, file_path)
                     f_item.setData(0, Qt.ItemDataRole.UserRole + 1, "file")
                     f_item.setText(1, size_str)
                     f_item.setText(2, date_str)
-                    
+                    f_item.setText(3, page_count)
+                    f_item.setText(4, proc_status)
+                    f_item.setText(5, tags_str)
+
                     self.tree_item_map[file_path] = f_item
                 else:
                     f_item = self.tree_item_map[file_path]
                     try:
                         f_item.setText(1, size_str)
                         f_item.setText(2, date_str)
+                        f_item.setText(3, page_count)
+                        f_item.setText(4, proc_status)
+                        f_item.setText(5, tags_str)
                     except RuntimeError:
                         continue
         
