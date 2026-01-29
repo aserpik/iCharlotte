@@ -347,7 +347,8 @@ class AvatarWidget(QWidget):
         painter.setPen(Qt.GlobalColor.white)
         font = painter.font()
         font.setBold(True)
-        font.setPixelSize(self.width() // 2)
+        pixel_size = max(1, self.width() // 2)  # Ensure minimum size of 1
+        font.setPixelSize(pixel_size)
         painter.setFont(font)
         painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, initials)
 

@@ -322,6 +322,7 @@ class TodoItemWidget(QWidget):
         layout.addStretch()
 
     def set_color_btn_style(self, color):
+        color = color or 'yellow'  # Default to yellow if None
         c_map = {'red': '#f44336', 'yellow': '#ffeb3b', 'green': '#4caf50', 'blue': '#2196f3'}
         hex_c = c_map.get(color, '#ffeb3b')
         # Circle shape
@@ -619,10 +620,15 @@ class MasterCaseTab(QWidget):
         # Handle deletion for Trial Date (4) or Hearing (3)
         row = self.table.currentRow()
         col = self.table.currentColumn()
-        
+
         if row < 0 or col < 0: return
-        
-        file_number = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+
+        item = self.table.item(row, 0)
+        if not item:
+            return
+        file_number = item.data(Qt.ItemDataRole.UserRole)
+        if not file_number:
+            return
         
         if col == 3: # Hearings
             confirm = QMessageBox.question(self, "Clear Hearings", f"Clear all hearings for case {file_number}?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
@@ -965,10 +971,16 @@ class MasterCaseTab(QWidget):
             self.details_widget.setEnabled(False)
             self.case_title.setText("Select a Case")
             return
-            
+
         row = rows[0].row()
-        file_number = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
-        name = self.table.item(row, 1).text()
+        item_num = self.table.item(row, 0)
+        item_name = self.table.item(row, 1)
+        if not item_num:
+            self.details_widget.setEnabled(False)
+            self.case_title.setText("Select a Case")
+            return
+        file_number = item_num.data(Qt.ItemDataRole.UserRole)
+        name = item_name.text() if item_name else ""
         
         self.current_file_number = file_number
         self.case_title.setText(f"{file_number} - {name}")
@@ -1001,14 +1013,14 @@ class MasterCaseTab(QWidget):
 
     def refresh_details(self):
         if not hasattr(self, 'current_file_number'): return
-        
+
         # Get Case Info for Assigned Attorney
         case = self.db.get_case(self.current_file_number)
         case_assigned_attorney = case.get('assigned_attorney', '') if case else ''
 
-        self.todo_list.blockSignals(True) 
+        self.todo_list.blockSignals(True)
         self.todo_list.clear()
-        todos = self.db.get_todos(self.current_file_number)
+        todos = self.db.get_todos(self.current_file_number) or []
         
         # Sort Logic: Red (0) > Yellow (1) > Green (2) > Blue (3) > Others
         # Then by ID desc (newest first)
@@ -1048,7 +1060,7 @@ class MasterCaseTab(QWidget):
 
         # History
         self.history_list.clear()
-        hist = self.db.get_history(self.current_file_number)
+        hist = self.db.get_history(self.current_file_number) or []
         for h in hist:
             date_str = h['date']
             # Format to MM/DD/YY
@@ -1214,10 +1226,11 @@ class MasterCaseTab(QWidget):
             )
             # Full refresh to handle formatting and sorting properly
             self.refresh_data()
-            
+
             # Reselect the row
             for i in range(self.table.rowCount()):
-                if self.table.item(i, 0).data(Qt.ItemDataRole.UserRole) == self.current_file_number:
+                item = self.table.item(i, 0)
+                if item and item.data(Qt.ItemDataRole.UserRole) == self.current_file_number:
                     self.table.selectRow(i)
                     break
 
@@ -1327,7 +1340,12 @@ class MasterCaseTab(QWidget):
         if col != 6:
             return
 
-        file_number = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        item = self.table.item(row, 0)
+        if not item:
+            return
+        file_number = item.data(Qt.ItemDataRole.UserRole)
+        if not file_number:
+            return
 
         if self.main_window:
             # Trigger switch in MainWindow
@@ -1337,7 +1355,12 @@ class MasterCaseTab(QWidget):
                 QMessageBox.information(self, "Info", f"Selected {file_number}. (Switching logic pending)")
 
     def on_cell_clicked(self, row, col):
-        file_number = self.table.item(row, 0).data(Qt.ItemDataRole.UserRole)
+        item = self.table.item(row, 0)
+        if not item:
+            return
+        file_number = item.data(Qt.ItemDataRole.UserRole)
+        if not file_number:
+            return
         
         if col == 0: # File Number -> Open Folder
             case_path = get_case_path(file_number)
@@ -1350,24 +1373,28 @@ class MasterCaseTab(QWidget):
                 QMessageBox.warning(self, "Error", f"Folder not found for {file_number}")
                 
         elif col == 1: # Plaintiff Name -> Edit Text
-            current_name = self.table.item(row, col).text()
+            col_item = self.table.item(row, col)
+            current_name = col_item.text() if col_item else ""
             new_name, ok = QInputDialog.getText(self, "Edit Plaintiff", "Plaintiff Name:", text=current_name)
             if ok:
                 self.db.update_plaintiff(file_number, new_name)
-                self.table.item(row, col).setText(new_name)
+                if col_item:
+                    col_item.setText(new_name)
                 
         elif col == 2: # Assigned -> Edit Text
-            current_val = self.table.item(row, col).text()
+            col_item = self.table.item(row, col)
+            current_val = col_item.text() if col_item else ""
             # Offer defaults + editable
             items = ["HP", "FM", "JBW", "AS", "CE"]
             if current_val and current_val not in items:
                 items.append(current_val)
-                
+
             new_val, ok = QInputDialog.getItem(self, "Edit Assigned", "Attorney Initials:", items, 0, True)
             if ok:
                 # User can type custom text in getItem if editable=True
                 self.db.update_assigned_attorney(file_number, new_val)
-                self.table.item(row, col).setText(new_val)
+                if col_item:
+                    col_item.setText(new_val)
                 
         elif col == 3: # Hearings -> Edit Text
             from icharlotte_core.config import GEMINI_DATA_DIR
@@ -1438,7 +1465,8 @@ class MasterCaseTab(QWidget):
                 self.refresh_data_row(file_number)
 
         elif col == 4: # Trial Date -> Calendar
-            current_text = self.table.item(row, col).text()
+            col_item = self.table.item(row, col)
+            current_text = col_item.text() if col_item else ""
             current_date = QDate.currentDate()
             if current_text and current_text != "N/A":
                 try:
@@ -1458,7 +1486,8 @@ class MasterCaseTab(QWidget):
                 
         elif col == 5: # Last Report -> Text/Date
             # Allow text or date. Just use InputDialog for maximum flexibility as requested ("date / text")
-            current_val = self.table.item(row, col).text()
+            col_item = self.table.item(row, col)
+            current_val = col_item.text() if col_item else ""
             new_val, ok = QInputDialog.getText(self, "Edit Last Report", "Date (YYYY-MM-DD) or Text:", text=current_val)
             if ok:
                 self.db.update_last_report_text(file_number, new_val)

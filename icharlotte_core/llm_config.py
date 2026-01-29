@@ -15,6 +15,30 @@ from enum import Enum
 
 
 # =============================================================================
+# Environment Variable Normalization
+# =============================================================================
+
+# The google-genai SDK checks both GOOGLE_API_KEY and GEMINI_API_KEY env vars.
+# When both are set, it logs a warning on every client creation.
+# Normalize to only GEMINI_API_KEY to prevent the warning.
+def _normalize_gemini_api_key():
+    """Normalize Gemini API key environment variables to prevent SDK warnings."""
+    gemini_key = os.environ.get("GEMINI_API_KEY")
+    google_key = os.environ.get("GOOGLE_API_KEY")
+
+    if gemini_key and google_key:
+        # Both are set - remove GOOGLE_API_KEY to prevent warning
+        del os.environ["GOOGLE_API_KEY"]
+    elif google_key and not gemini_key:
+        # Only GOOGLE_API_KEY is set - copy to GEMINI_API_KEY and remove original
+        os.environ["GEMINI_API_KEY"] = google_key
+        del os.environ["GOOGLE_API_KEY"]
+
+# Run normalization at module load time
+_normalize_gemini_api_key()
+
+
+# =============================================================================
 # Configuration File Path
 # =============================================================================
 

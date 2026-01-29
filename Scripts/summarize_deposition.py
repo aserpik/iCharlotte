@@ -4,7 +4,7 @@ Summarize Deposition Agent for iCharlotte
 Summarizes deposition transcripts using LLM with multi-pass processing.
 
 Features:
-- Three-pass processing: Extraction -> Narrative Summary -> Cross-Check
+- Parallel LLM calls for extraction and summary
 - Dynamic topic count based on transcript length
 - Automatic deponent name/date extraction from content
 - Impeachment material flagging
@@ -19,6 +19,7 @@ import sys
 import re
 import subprocess
 import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from docx import Document
 from docx.shared import Pt, Inches
 
@@ -34,6 +35,7 @@ from icharlotte_core.exceptions import (
     ExtractionError, LLMError, PassFailedError,
     SummaryPassError, CrossCheckPassError, MemoryLimitError
 )
+from icharlotte_core.docx_writer import get_docx_lock, LockTimeoutError
 
 # Import Case Data Manager
 try:
@@ -41,6 +43,12 @@ try:
 except ImportError:
     sys.path.append(os.path.join(os.getcwd(), 'Scripts'))
     from case_data_manager import CaseDataManager
+
+# Import Document Registry for classification
+try:
+    from document_registry import DocumentRegistry
+except ImportError:
+    from Scripts.document_registry import DocumentRegistry
 
 
 # =============================================================================
@@ -473,7 +481,7 @@ def add_markdown_to_doc(doc, content):
 def save_to_docx(content: str, output_path: str, deponent_name: str,
                  deposition_date: str, logger: AgentLogger) -> bool:
     """
-    Saves the content to a DOCX file with deposition formatting.
+    Saves the content to a DOCX file with deposition formatting and process-safe locking.
 
     Args:
         content: Summary content to save.
@@ -491,68 +499,76 @@ def save_to_docx(content: str, output_path: str, deponent_name: str,
 
     while True:
         try:
-            if os.path.exists(current_output_path):
-                try:
-                    doc = Document(current_output_path)
-                    doc.add_page_break()
-                    logger.info(f"Appending to existing file: {current_output_path}")
-                except Exception:
-                    raise PermissionError("Cannot open existing file.")
-            else:
-                doc = Document()
-                logger.info(f"Creating new file: {current_output_path}")
+            # Acquire process-level lock before accessing the file
+            with get_docx_lock(current_output_path):
+                logger.info(f"Acquired write lock for: {os.path.basename(current_output_path)}")
 
-            # Apply styles
-            style = doc.styles['Normal']
-            style.font.name = 'Times New Roman'
-            style.font.size = Pt(12)
-            style.paragraph_format.line_spacing = 1.0
+                if os.path.exists(current_output_path):
+                    try:
+                        doc = Document(current_output_path)
+                        doc.add_page_break()
+                        logger.info(f"Appending to existing file: {current_output_path}")
+                    except Exception:
+                        raise PermissionError("Cannot open existing file.")
+                else:
+                    doc = Document()
+                    logger.info(f"Creating new file: {current_output_path}")
 
-            # Count existing depositions for numbering
-            next_num = 1
-            for para in doc.paragraphs:
-                if re.match(r'^\d+\.\tDeposition of', para.text):
-                    next_num += 1
+                # Apply styles
+                style = doc.styles['Normal']
+                style.font.name = 'Times New Roman'
+                style.font.size = Pt(12)
+                style.paragraph_format.line_spacing = 1.0
 
-            # Title paragraph with numbering
-            p = doc.add_paragraph()
-            p.paragraph_format.line_spacing = 1.0
-            p.paragraph_format.left_indent = Inches(1.5)
-            p.paragraph_format.first_line_indent = Inches(-0.5)
-            tab_stops = p.paragraph_format.tab_stops
-            tab_stops.add_tab_stop(Inches(1.5))
+                # Count existing depositions for numbering
+                next_num = 1
+                for para in doc.paragraphs:
+                    if re.match(r'^\d+\.\tDeposition of', para.text):
+                        next_num += 1
 
-            run_num = p.add_run(f"{next_num}.\t")
-            run_num.bold = True
-            run_num.font.name = 'Times New Roman'
-            run_num.font.size = Pt(12)
+                # Title paragraph with numbering
+                p = doc.add_paragraph()
+                p.paragraph_format.line_spacing = 1.0
+                p.paragraph_format.left_indent = Inches(1.5)
+                p.paragraph_format.first_line_indent = Inches(-0.5)
+                tab_stops = p.paragraph_format.tab_stops
+                tab_stops.add_tab_stop(Inches(1.5))
 
-            # Format title with deponent name
-            title_name = deponent_name if deponent_name else "Unknown Deponent"
-            run_title = p.add_run(f"Deposition of {title_name}")
-            run_title.bold = True
-            run_title.underline = True
-            run_title.font.name = 'Times New Roman'
-            run_title.font.size = Pt(12)
+                run_num = p.add_run(f"{next_num}.\t")
+                run_num.bold = True
+                run_num.font.name = 'Times New Roman'
+                run_num.font.size = Pt(12)
 
-            # Add date if available
-            if deposition_date:
-                p2 = doc.add_paragraph()
-                p2.paragraph_format.line_spacing = 1.0
-                run_date = p2.add_run(f"Date: {deposition_date}")
-                run_date.font.name = 'Times New Roman'
-                run_date.font.size = Pt(12)
-                run_date.italic = True
+                # Format title with deponent name
+                title_name = deponent_name if deponent_name else "Unknown Deponent"
+                run_title = p.add_run(f"Deposition of {title_name}")
+                run_title.bold = True
+                run_title.underline = True
+                run_title.font.name = 'Times New Roman'
+                run_title.font.size = Pt(12)
 
-            # Add summary content
-            add_markdown_to_doc(doc, content)
+                # Add date if available
+                if deposition_date:
+                    p2 = doc.add_paragraph()
+                    p2.paragraph_format.line_spacing = 1.0
+                    run_date = p2.add_run(f"Date: {deposition_date}")
+                    run_date.font.name = 'Times New Roman'
+                    run_date.font.size = Pt(12)
+                    run_date.italic = True
 
-            doc.save(current_output_path)
-            logger.output_file(current_output_path)
-            return True
+                # Add summary content
+                add_markdown_to_doc(doc, content)
+
+                doc.save(current_output_path)
+                logger.output_file(current_output_path)
+                return True
+
+        except LockTimeoutError as e:
+            logger.error(f"Lock timeout waiting for file: {e}")
+            return False
 
         except (PermissionError, IOError) as e:
-            logger.warning(f"File locked: {current_output_path}. Trying next version.")
+            logger.warning(f"File locked by app: {current_output_path}. Trying next version.")
             counter += 1
             current_output_path = f"{base_name} v.{counter}{ext}"
 
@@ -649,14 +665,13 @@ def build_narrative_prompt(base_prompt: str, topic_count: int, deponent_name: st
 
 def process_document(input_path: str, logger: AgentLogger) -> bool:
     """
-    Process a single deposition transcript through the 3-pass pipeline.
+    Process a single deposition transcript through the pipeline.
 
     Pipeline:
     1. Extract text
-    2. Pass 1: Structured extraction (deponent, topics, key Q&A, exhibits)
-    3. Pass 2: Narrative summary (dynamic topic count)
-    4. Pass 3: Cross-check with impeachment detection
-    5. Save to DOCX
+    2. Pass 1: Extraction + Summary (parallel)
+    3. Pass 2: Cross-check with impeachment detection
+    4. Save to DOCX
 
     Args:
         input_path: Path to the deposition file.
@@ -668,6 +683,8 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
     # Initialize components
     memory_monitor = MemoryMonitor(warn_threshold_mb=1500, abort_threshold_mb=2000, logger=logger.info)
     llm_caller = LLMCaller(logger=logger)
+
+    logger.progress(2, "Initializing deposition summarization...")
 
     # Load prompts
     extraction_prompt = None
@@ -690,20 +707,21 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
         logger.error(f"Error reading prompt files: {e}")
         return False
 
+    logger.progress(5, "Prompts loaded, starting text extraction...")
+
     # Determine number of passes
-    total_passes = 2  # Extraction + Narrative minimum
-    if extraction_prompt:
-        total_passes += 1  # Add extraction pass
+    total_passes = 2  # Text Extraction + LLM passes (extraction+summary run in parallel)
     if cross_check_prompt:
         total_passes += 1  # Add cross-check pass
 
     pass_number = 0
 
     # ==========================================================================
-    # Pass 1: Text Extraction
+    # Pass 1: Text Extraction (5% - 20%)
     # ==========================================================================
     pass_number += 1
     logger.pass_start("Text Extraction", pass_number, total_passes)
+    logger.progress(7, "Reading deposition transcript...")
 
     try:
         with memory_monitor.track_operation("Text Extraction"):
@@ -711,12 +729,14 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
                 ocr_config=OCRConfig(adaptive=True),
                 logger=logger
             )
+            logger.progress(10, "Running text extraction (OCR if needed)...")
             result = processor.extract_with_dynamic_ocr(input_path)
 
             if not result.success:
                 raise ExtractionError(f"Failed to extract text: {result.error}", file_path=input_path)
 
             text = result.text
+            logger.progress(18, f"Extracted {result.char_count} chars from {result.page_count} pages")
             logger.info(f"Extracted {result.char_count} chars from {result.page_count} pages")
             logger.info(f"OCR used on {len(result.ocr_pages)} pages ({result.ocr_percentage:.1f}%)")
 
@@ -727,11 +747,13 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
         logger.pass_failed("Text Extraction", str(e), recoverable=False)
         return False
 
+    logger.progress(20, "Text extraction complete")
     logger.pass_complete("Text Extraction", success=True)
 
     # ==========================================================================
-    # Extract Deponent Information from Content
+    # Extract Deponent Information from Content (20% - 25%)
     # ==========================================================================
+    logger.progress(21, "Extracting deponent information...")
     deponent_name = DeponentExtractor.extract_deponent_name(text)
     deposition_date = DeponentExtractor.extract_deposition_date(text)
     deponent_type = DeponentExtractor.detect_deponent_type(text, deponent_name)
@@ -752,6 +774,7 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
 
     logger.info(f"Recommended topic count: {topic_count} (based on ~{DeponentExtractor.estimate_page_count(text)} pages)")
 
+    logger.progress(23, "Scanning for exhibits and impeachment material...")
     # Extract exhibits
     exhibits = ExhibitExtractor.extract_exhibits(text)
     if exhibits:
@@ -762,65 +785,115 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
     if impeachment_findings:
         logger.info(f"Found {len(impeachment_findings)} potential impeachment items")
 
-    # ==========================================================================
-    # Pass 2: Structured Extraction (if prompt available)
-    # ==========================================================================
-    extraction_result = None
-
-    if extraction_prompt:
-        pass_number += 1
-        logger.pass_start("Structured Extraction", pass_number, total_passes)
-
-        try:
-            with memory_monitor.track_operation("Structured Extraction"):
-                extraction_result = llm_caller.call(extraction_prompt, text, task_type="extraction")
-
-                if not extraction_result:
-                    logger.warning("Extraction pass returned empty. Continuing without extraction.")
-                else:
-                    logger.info(f"Extraction complete: {len(extraction_result)} chars")
-
-        except Exception as e:
-            logger.pass_failed("Structured Extraction", str(e), recoverable=True)
-            logger.warning("Continuing with narrative pass only")
-
-        logger.pass_complete("Structured Extraction", success=bool(extraction_result))
+    logger.progress(25, f"Deponent identified: {deponent_name}")
 
     # ==========================================================================
-    # Pass 3: Narrative Summary
+    # Pass 2: Extraction + Summary (Parallel) (25% - 70%)
     # ==========================================================================
     pass_number += 1
-    logger.pass_start("Narrative Summary", pass_number, total_passes)
+
+    if extraction_prompt:
+        logger.pass_start("Extraction + Summary", pass_number, total_passes)
+        logger.progress(28, "Starting parallel extraction and summary...")
+        logger.info("Running extraction and summary passes in parallel...")
+    else:
+        logger.pass_start("Narrative Summary", pass_number, total_passes)
+        logger.progress(28, "Starting narrative summary generation...")
+
+    extraction_result = None
+    summary = None
+    extraction_error = None
+    summary_error = None
+    extraction_done = False
+    summary_done = False
+
+    # Build prompt with dynamic topic count
+    modified_prompt = build_narrative_prompt(
+        narrative_prompt,
+        topic_count,
+        deponent_name,
+        deponent_type
+    )
+
+    def run_extraction():
+        """Run structured extraction pass."""
+        with memory_monitor.track_operation("Structured Extraction"):
+            result = llm_caller.call(extraction_prompt, text, task_type="extraction")
+            return result  # Can be None/empty, that's OK
+
+    def run_summary():
+        """Run narrative summary pass."""
+        with memory_monitor.track_operation("Narrative Summary"):
+            result = llm_caller.call(modified_prompt, text, task_type="summary")
+            if not result:
+                raise SummaryPassError("LLM returned empty response for narrative summary")
+            return result
 
     try:
-        with memory_monitor.track_operation("Narrative Summary"):
-            # Build prompt with dynamic topic count
-            modified_prompt = build_narrative_prompt(
-                narrative_prompt,
-                topic_count,
-                deponent_name,
-                deponent_type
-            )
+        if extraction_prompt:
+            # Run both in parallel
+            logger.progress(35, "Sending to LLM for parallel processing...")
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                extraction_future = executor.submit(run_extraction)
+                summary_future = executor.submit(run_summary)
 
-            summary = llm_caller.call(modified_prompt, text, task_type="summary")
-
-            if not summary:
-                raise SummaryPassError("LLM returned empty response for narrative summary")
-
+                for future in as_completed([extraction_future, summary_future]):
+                    try:
+                        if future == extraction_future:
+                            extraction_result = future.result()
+                            extraction_done = True
+                            if extraction_result:
+                                if summary_done:
+                                    logger.progress(65, "Both LLM passes complete")
+                                else:
+                                    logger.progress(50, "Extraction complete, waiting for summary...")
+                                logger.info(f"Extraction complete: {len(extraction_result)} chars")
+                            else:
+                                logger.warning("Extraction pass returned empty.")
+                        else:
+                            summary = future.result()
+                            summary_done = True
+                            if extraction_done:
+                                logger.progress(65, "Both LLM passes complete")
+                            else:
+                                logger.progress(50, "Summary complete, waiting for extraction...")
+                            logger.info(f"Generated narrative summary: {len(summary)} chars")
+                    except Exception as e:
+                        if future == extraction_future:
+                            extraction_error = e
+                        else:
+                            summary_error = e
+        else:
+            # No extraction prompt, just run summary
+            logger.progress(40, "Sending deposition to LLM for summarization...")
+            summary = run_summary()
+            logger.progress(65, f"Summary generated: {len(summary)} chars")
             logger.info(f"Generated narrative summary: {len(summary)} chars")
 
     except Exception as e:
-        logger.pass_failed("Narrative Summary", str(e), recoverable=True)
+        logger.pass_failed("Extraction + Summary" if extraction_prompt else "Narrative Summary",
+                          str(e), recoverable=False)
         return False
 
-    logger.pass_complete("Narrative Summary", success=True)
+    # Check for errors
+    if extraction_error:
+        logger.warning(f"Extraction failed: {extraction_error}. Continuing without extraction.")
+
+    if summary_error:
+        logger.pass_failed("Narrative Summary", str(summary_error), recoverable=False)
+        return False
+
+    logger.progress(70, "LLM processing complete")
+    logger.pass_complete("Extraction + Summary" if extraction_prompt else "Narrative Summary",
+                        success=True)
 
     # ==========================================================================
-    # Pass 4: Cross-Check with Impeachment Enhancement (if prompt available)
+    # Pass 3: Cross-Check with Impeachment Enhancement (if prompt available) (70% - 85%)
     # ==========================================================================
     if cross_check_prompt and extraction_result:
         pass_number += 1
         logger.pass_start("Cross-Check", pass_number, total_passes)
+        logger.progress(72, "Starting cross-check verification...")
 
         try:
             with memory_monitor.track_operation("Cross-Check"):
@@ -833,23 +906,30 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
                     "{original}", text[:75000]  # Limit original text
                 )
 
+                logger.progress(75, "Sending to LLM for cross-check...")
                 verified_summary = llm_caller.call(formatted_prompt, "", task_type="cross_check")
 
                 if verified_summary and len(verified_summary) > len(summary) * 0.8:
                     summary = verified_summary
+                    logger.progress(83, "Cross-check completed with enhancements")
                     logger.info("Cross-check completed with enhancements")
                 else:
+                    logger.progress(83, "Cross-check returned shorter result, using original")
                     logger.warning("Cross-check returned shorter/empty result. Using original summary.")
 
         except Exception as e:
             logger.pass_failed("Cross-Check", str(e), recoverable=True)
             logger.warning("Continuing with unverified summary")
 
+        logger.progress(85, "Cross-check complete")
         logger.pass_complete("Cross-Check", success=True)
+    else:
+        logger.progress(85, "Cross-check skipped")
 
     # ==========================================================================
-    # Add Exhibit List and Impeachment Summary
+    # Add Exhibit List and Impeachment Summary (85% - 88%)
     # ==========================================================================
+    logger.progress(86, "Adding exhibit and impeachment sections...")
 
     # Add exhibit list if we have exhibits
     if exhibits:
@@ -867,9 +947,12 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
         if impeachment_summary:
             summary += "\n\n" + impeachment_summary
 
+    logger.progress(88, "Summary sections complete")
+
     # ==========================================================================
-    # Save Output
+    # Save Output (88% - 95%)
     # ==========================================================================
+    logger.progress(89, "Preparing to save output...")
     output_dir = get_output_directory(input_path)
 
     if not os.path.exists(output_dir):
@@ -882,12 +965,16 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
 
     output_file = os.path.join(output_dir, "Deposition_summaries.docx")
 
+    logger.progress(91, f"Saving to {os.path.basename(output_file)}...")
     if not save_to_docx(summary, output_file, deponent_name, deposition_date, logger):
         return False
 
+    logger.progress(95, "Document saved successfully")
+
     # ==========================================================================
-    # Save to Case Data
+    # Save to Case Data (95% - 98%)
     # ==========================================================================
+    logger.progress(96, "Saving to case database...")
     try:
         data_manager = CaseDataManager()
         file_num_match = re.search(r"(\d{4}\.\d{3})", input_path)
@@ -919,6 +1006,43 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
     except Exception as e:
         logger.warning(f"Could not save to case data: {e}")
 
+    # ==========================================================================
+    # Register Document in Registry (98% - 100%)
+    # ==========================================================================
+    logger.progress(98, "Registering document...")
+    try:
+        file_num_match = re.search(r"(\d{4}\.\d{3})", input_path)
+        if file_num_match:
+            file_num = file_num_match.group(1)
+            base_name = os.path.splitext(os.path.basename(input_path))[0]
+
+            # Map deponent_type to registry document type
+            depo_type_map = {
+                "Plaintiff": "Deposition - Plaintiff",
+                "Defendant": "Deposition - Defendant",
+                "Witness": "Deposition - Witness",
+                "Expert Witness": "Deposition - Expert",
+                "Expert/Physician": "Deposition - Expert",
+                "Treating Physician": "Deposition - Expert",
+                "Corporate Representative": "Deposition - Corporate Representative",
+            }
+            registry_doc_type = depo_type_map.get(deponent_type, "Deposition - Witness")
+
+            registry = DocumentRegistry()
+            registry.register_document(
+                file_number=file_num,
+                name=base_name,
+                document_type=registry_doc_type,
+                source_path=input_path,
+                summary_location=output_file,
+                agent="summarize_deposition",
+                char_count=len(summary)
+            )
+            logger.info(f"Registered document as: {registry_doc_type}")
+    except Exception as e:
+        logger.warning(f"Could not register document: {e}")
+
+    logger.progress(100, "Deposition summarization complete")
     return True
 
 

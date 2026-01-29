@@ -1,16 +1,15 @@
 """
 Summarize Discovery Agent for iCharlotte
 
-Processes discovery response documents with three-pass LLM pipeline:
-1. Extraction Pass - Extract substantive responses
-2. Summary Pass - Create narrative summary
-3. Cross-Check Pass - Verify completeness
+Processes discovery response documents with LLM pipeline:
+1. Extraction + Summary Pass (parallel) - Extract responses and create summary
+2. Cross-Check Pass - Verify completeness
 
 Features:
+- Parallel LLM calls for extraction and summary
 - Dynamic OCR threshold for text extraction
 - Party name extraction from document content
 - Document type classification (FROG, SROG, RFP, RFA)
-- Improved verification page detection
 - Auto-consolidation of multiple discovery sets
 - Structured progress reporting for UI integration
 - Multi-provider LLM fallback
@@ -24,6 +23,7 @@ import datetime
 import time
 import tempfile
 import shutil
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from docx import Document
 from docx.shared import Pt, Inches
 
@@ -32,7 +32,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import shared infrastructure
 from icharlotte_core.document_processor import (
-    DocumentProcessor, OCRConfig, VerificationDetector,
+    DocumentProcessor, OCRConfig,
     DocumentTypeClassifier, PartyExtractor
 )
 from icharlotte_core.agent_logger import AgentLogger, create_legacy_log_event
@@ -43,6 +43,7 @@ from icharlotte_core.exceptions import (
     ExtractionPassError, SummaryPassError, CrossCheckPassError,
     MemoryLimitError, ValidationError
 )
+from icharlotte_core.docx_writer import get_docx_lock, LockTimeoutError
 
 # Import Case Data Manager
 try:
@@ -50,6 +51,12 @@ try:
 except ImportError:
     sys.path.append(os.path.join(os.getcwd(), 'Scripts'))
     from case_data_manager import CaseDataManager
+
+# Import Document Registry for classification
+try:
+    from document_registry import classify_and_register, DocumentRegistry
+except ImportError:
+    from Scripts.document_registry import classify_and_register, DocumentRegistry
 
 
 # =============================================================================
@@ -165,75 +172,83 @@ def add_markdown_to_doc(doc, content):
 
 def save_to_docx(extraction_content: str, summary_content: str, output_path: str,
                  title_text: str, discovery_type: str, logger: AgentLogger) -> bool:
-    """Saves both extraction and summary content to a DOCX file."""
+    """Saves both extraction and summary content to a DOCX file with process-safe locking."""
     base_name, ext = os.path.splitext(output_path)
     counter = 1
     current_output_path = output_path
 
     while True:
         try:
-            if os.path.exists(current_output_path):
-                try:
-                    doc = Document(current_output_path)
-                    logger.info(f"Appending to existing file: {current_output_path}")
-                except Exception:
-                    raise PermissionError("Cannot open existing file.")
-            else:
-                doc = Document()
-                logger.info(f"Creating new file: {current_output_path}")
+            # Acquire process-level lock before accessing the file
+            with get_docx_lock(current_output_path):
+                logger.info(f"Acquired write lock for: {os.path.basename(current_output_path)}")
 
-            # Apply styles
-            style = doc.styles['Normal']
-            style.font.name = 'Times New Roman'
-            style.font.size = Pt(12)
-            style.paragraph_format.line_spacing = 1.0
+                if os.path.exists(current_output_path):
+                    try:
+                        doc = Document(current_output_path)
+                        logger.info(f"Appending to existing file: {current_output_path}")
+                    except Exception:
+                        raise PermissionError("Cannot open existing file.")
+                else:
+                    doc = Document()
+                    logger.info(f"Creating new file: {current_output_path}")
 
-            # Count existing subheadings for numbering
-            next_num = 1
-            for para in doc.paragraphs:
-                if re.match(r'^\d+\.\t.*Responses to', para.text):
-                    next_num += 1
+                # Apply styles
+                style = doc.styles['Normal']
+                style.font.name = 'Times New Roman'
+                style.font.size = Pt(12)
+                style.paragraph_format.line_spacing = 1.0
 
-            # Determine party name
-            party_name = title_text
-            for skip in [".pdf", ".docx", "discovery", "responses", "response"]:
-                party_name = party_name.replace(skip, "").replace(skip.upper(), "")
-            party_name = party_name.strip(" _-")
+                # Count existing subheadings for numbering
+                next_num = 1
+                for para in doc.paragraphs:
+                    if re.match(r'^\d+\.\t.*Responses to', para.text):
+                        next_num += 1
 
-            # Subheading
-            p = doc.add_paragraph()
-            p.paragraph_format.line_spacing = 1.0
-            p.paragraph_format.left_indent = Inches(1.5)
-            p.paragraph_format.first_line_indent = Inches(-0.5)
+                # Determine party name
+                party_name = title_text
+                for skip in [".pdf", ".docx", "discovery", "responses", "response"]:
+                    party_name = party_name.replace(skip, "").replace(skip.upper(), "")
+                party_name = party_name.strip(" _-")
 
-            tab_stops = p.paragraph_format.tab_stops
-            tab_stops.add_tab_stop(Inches(1.5))
+                # Subheading
+                p = doc.add_paragraph()
+                p.paragraph_format.line_spacing = 1.0
+                p.paragraph_format.left_indent = Inches(1.5)
+                p.paragraph_format.first_line_indent = Inches(-0.5)
 
-            run_num = p.add_run(f"{next_num}.\t")
-            run_num.bold = True
-            run_num.font.name = 'Times New Roman'
-            run_num.font.size = Pt(12)
+                tab_stops = p.paragraph_format.tab_stops
+                tab_stops.add_tab_stop(Inches(1.5))
 
-            run_title = p.add_run(f"{party_name}'s Responses to {discovery_type}")
-            run_title.bold = True
-            run_title.underline = True
-            run_title.font.name = 'Times New Roman'
-            run_title.font.size = Pt(12)
+                run_num = p.add_run(f"{next_num}.\t")
+                run_num.bold = True
+                run_num.font.name = 'Times New Roman'
+                run_num.font.size = Pt(12)
 
-            # Section A: Extracted Responses
-            add_section_divider(doc, "SECTION A: EXTRACTED RESPONSES")
-            add_markdown_to_doc(doc, extraction_content)
+                run_title = p.add_run(f"{party_name}'s Responses to {discovery_type}")
+                run_title.bold = True
+                run_title.underline = True
+                run_title.font.name = 'Times New Roman'
+                run_title.font.size = Pt(12)
 
-            # Section B: Narrative Summary
-            add_section_divider(doc, "SECTION B: NARRATIVE SUMMARY")
-            add_markdown_to_doc(doc, summary_content)
+                # Section A: Extracted Responses
+                add_section_divider(doc, "SECTION A: EXTRACTED RESPONSES")
+                add_markdown_to_doc(doc, extraction_content)
 
-            doc.save(current_output_path)
-            logger.output_file(current_output_path)
-            return True
+                # Section B: Narrative Summary
+                add_section_divider(doc, "SECTION B: NARRATIVE SUMMARY")
+                add_markdown_to_doc(doc, summary_content)
+
+                doc.save(current_output_path)
+                logger.output_file(current_output_path)
+                return True
+
+        except LockTimeoutError as e:
+            logger.error(f"Lock timeout waiting for file: {e}")
+            return False
 
         except (PermissionError, IOError) as e:
-            logger.warning(f"File locked: {current_output_path}. Trying next version.")
+            logger.warning(f"File locked by app: {current_output_path}. Trying next version.")
             counter += 1
             current_output_path = f"{base_name} v.{counter}{ext}"
 
@@ -336,6 +351,7 @@ def extract_party_from_content(text: str, logger: AgentLogger) -> tuple:
 def consolidate_file(file_path: str, logger: AgentLogger, show_diff: bool = False) -> bool:
     """Reads the current file content, calls LLM to consolidate, and overwrites."""
     logger.info(f"Starting consolidation for: {file_path}")
+    logger.progress(98, f"Consolidating: {os.path.basename(file_path)}")
 
     # Read existing content
     processor = DocumentProcessor(logger=logger)
@@ -354,6 +370,7 @@ def consolidate_file(file_path: str, logger: AgentLogger, show_diff: bool = Fals
         return False
 
     # Call LLM
+    logger.progress(99, "Running consolidation LLM pass...")
     llm_caller = LLMCaller(logger=logger)
     consolidated = llm_caller.call(prompt, result.text, task_type="summary")
 
@@ -398,12 +415,11 @@ def process_document(input_path: str, logger: AgentLogger, report_dir: str = Non
     Process a single discovery document through the three-pass pipeline.
 
     Pipeline:
-    1. Text Extraction (with verification check)
-    2. Pass 1: Extraction
-    3. Pass 2: Narrative Summary
-    4. Pass 3: Cross-Check Verification
-    5. Save to DOCX
-    6. Auto-consolidate if not in batch mode
+    1. Text Extraction
+    2. Pass 1: Extraction + Summary (parallel)
+    3. Pass 2: Cross-Check Verification
+    4. Save to DOCX
+    5. Auto-consolidate if not in batch mode
 
     Args:
         input_path: Path to the document.
@@ -416,7 +432,11 @@ def process_document(input_path: str, logger: AgentLogger, report_dir: str = Non
     # Initialize components
     memory_monitor = MemoryMonitor(warn_threshold_mb=1500, abort_threshold_mb=2000, logger=logger.info)
     llm_caller = LLMCaller(logger=logger)
-    total_passes = 4  # Extraction, Summary, Cross-Check, Save
+    total_passes = 3  # Extraction+Summary (parallel), Cross-Check, Save
+
+    # Progress tracking - define stage weights (total = 100%)
+    # Text extraction: 5-15%, LLM calls: 15-75%, Cross-check: 75-90%, Save: 90-100%
+    logger.progress(2, "Initializing document processing...")
 
     # Load prompts
     prompts = {}
@@ -434,18 +454,13 @@ def process_document(input_path: str, logger: AgentLogger, report_dir: str = Non
                 logger.error(f"Error reading {name} prompt: {e}")
                 return False
 
-    # ==========================================================================
-    # Pre-Check: Verification Detection
-    # ==========================================================================
-    is_verification, reason = VerificationDetector.is_verification_document(input_path, max_pages=5)
-    if is_verification:
-        logger.warning(f"Skipping document: Identified as verification only ({reason})")
-        return False
+    logger.progress(5, "Prompts loaded, starting text extraction...")
 
     # ==========================================================================
-    # Pass 0: Text Extraction
+    # Pass 0: Text Extraction (5% - 15%)
     # ==========================================================================
     logger.pass_start("Extraction", 1, total_passes)
+    logger.progress(7, "Reading document and extracting text...")
 
     try:
         with memory_monitor.track_operation("Text Extraction"):
@@ -453,6 +468,7 @@ def process_document(input_path: str, logger: AgentLogger, report_dir: str = Non
                 ocr_config=OCRConfig(adaptive=True),
                 logger=logger
             )
+            logger.progress(10, "Running text extraction (OCR if needed)...")
             result = processor.extract_with_dynamic_ocr(input_path)
 
             if not result.success:
@@ -460,6 +476,7 @@ def process_document(input_path: str, logger: AgentLogger, report_dir: str = Non
                                       file_path=input_path)
 
             text = result.text
+            logger.progress(15, f"Extracted {result.char_count} chars from {result.page_count} pages")
             logger.info(f"Extracted {result.char_count} chars from {result.page_count} pages")
 
     except Exception as e:
@@ -469,8 +486,9 @@ def process_document(input_path: str, logger: AgentLogger, report_dir: str = Non
     logger.pass_complete("Extraction", success=True)
 
     # ==========================================================================
-    # Document Classification
+    # Document Classification (15% - 18%)
     # ==========================================================================
+    logger.progress(16, "Classifying document type...")
     doc_type, confidence = DocumentTypeClassifier.classify(text, os.path.basename(input_path))
     discovery_type = DocumentTypeClassifier.get_discovery_type(text, os.path.basename(input_path))
 
@@ -480,58 +498,102 @@ def process_document(input_path: str, logger: AgentLogger, report_dir: str = Non
         discovery_type = "Written Discovery"
         logger.info(f"Document type: {doc_type} (confidence: {confidence:.2f})")
 
-    # ==========================================================================
-    # Pass 1: Extraction
-    # ==========================================================================
-    logger.pass_start("LLM Extraction", 2, total_passes)
+    # Save classified type for registry (before LLM parsing can overwrite it)
+    classified_discovery_type = discovery_type
+    logger.progress(18, f"Document classified as {discovery_type}")
 
-    try:
+    # ==========================================================================
+    # Pass 1 & 2: Extraction + Summary (Parallel) (18% - 70%)
+    # ==========================================================================
+    logger.pass_start("LLM Extraction + Summary", 2, total_passes)
+    logger.progress(20, "Starting parallel LLM extraction and summary...")
+    logger.info("Running extraction and summary passes in parallel...")
+
+    extraction_result = None
+    summary_result = None
+    extraction_error = None
+    summary_error = None
+    extraction_done = False
+    summary_done = False
+
+    def run_extraction():
+        """Run extraction pass."""
         with memory_monitor.track_operation("Extraction Pass"):
-            extraction_result = llm_caller.call(prompts["extraction"], text, task_type="extraction")
-
-            if not extraction_result:
+            result = llm_caller.call(prompts["extraction"], text, task_type="extraction")
+            if not result:
                 raise ExtractionPassError("LLM returned empty response")
+            return result
 
-            logger.info(f"Extraction complete: {len(extraction_result)} chars")
-
-    except Exception as e:
-        logger.pass_failed("LLM Extraction", str(e), recoverable=False)
-        return False
-
-    logger.pass_complete("LLM Extraction", success=True)
-
-    # ==========================================================================
-    # Pass 2: Narrative Summary
-    # ==========================================================================
-    logger.pass_start("Summary", 3, total_passes)
+    def run_summary():
+        """Run summary pass."""
+        with memory_monitor.track_operation("Summary Pass"):
+            result = llm_caller.call(prompts["summary"], text, task_type="summary")
+            if not result:
+                raise SummaryPassError("LLM returned empty response")
+            # Strip extraction layer if present
+            result = re.sub(r'<extraction_layer>.*?</extraction_layer>',
+                            '', result, flags=re.DOTALL).strip()
+            return result
 
     try:
-        with memory_monitor.track_operation("Summary Pass"):
-            summary_result = llm_caller.call(prompts["summary"], text, task_type="summary")
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            extraction_future = executor.submit(run_extraction)
+            summary_future = executor.submit(run_summary)
 
-            if not summary_result:
-                raise SummaryPassError("LLM returned empty response")
+            # Report progress while waiting
+            logger.progress(30, "Waiting for LLM extraction response...")
 
-            # Strip extraction layer if present
-            summary_result = re.sub(r'<extraction_layer>.*?</extraction_layer>',
-                                    '', summary_result, flags=re.DOTALL).strip()
-
-            logger.info(f"Summary complete: {len(summary_result)} chars")
+            # Wait for both to complete
+            for future in as_completed([extraction_future, summary_future]):
+                try:
+                    if future == extraction_future:
+                        extraction_result = future.result()
+                        extraction_done = True
+                        # Report progress based on which completed
+                        if summary_done:
+                            logger.progress(68, "Both LLM passes complete")
+                        else:
+                            logger.progress(50, "Extraction complete, waiting for summary...")
+                        logger.info(f"Extraction complete: {len(extraction_result)} chars")
+                    else:
+                        summary_result = future.result()
+                        summary_done = True
+                        if extraction_done:
+                            logger.progress(68, "Both LLM passes complete")
+                        else:
+                            logger.progress(50, "Summary complete, waiting for extraction...")
+                        logger.info(f"Summary complete: {len(summary_result)} chars")
+                except Exception as e:
+                    if future == extraction_future:
+                        extraction_error = e
+                    else:
+                        summary_error = e
 
     except Exception as e:
-        logger.pass_failed("Summary", str(e), recoverable=False)
+        logger.pass_failed("LLM Extraction + Summary", str(e), recoverable=False)
         return False
 
-    logger.pass_complete("Summary", success=True)
+    # Check for errors
+    if extraction_error:
+        logger.pass_failed("LLM Extraction", str(extraction_error), recoverable=False)
+        return False
+
+    if summary_error:
+        logger.pass_failed("Summary", str(summary_error), recoverable=False)
+        return False
+
+    logger.progress(70, "LLM extraction and summary passes completed")
+    logger.pass_complete("LLM Extraction + Summary", success=True)
 
     # ==========================================================================
-    # Pass 3: Cross-Check (with retry on failure)
+    # Pass 2: Cross-Check (with retry on failure) (70% - 88%)
     # ==========================================================================
     final_summary = summary_result
     cross_check_failed = False
 
     if prompts["cross_check"]:
-        logger.pass_start("CrossCheck", 4, total_passes)
+        logger.pass_start("CrossCheck", 3, total_passes)
+        logger.progress(72, "Starting cross-check verification pass...")
 
         try:
             with memory_monitor.track_operation("Cross-Check Pass"):
@@ -544,10 +606,12 @@ def process_document(input_path: str, logger: AgentLogger, report_dir: str = Non
 === PASS 2 (NARRATIVE SUMMARY) ===
 {summary_result}
 """
+                logger.progress(75, "Sending cross-check to LLM...")
                 cross_check_result = llm_caller.call(cross_prompt, "", task_type="cross_check")
 
                 if cross_check_result:
                     final_summary = cross_check_result
+                    logger.progress(85, "Cross-check verification complete")
                     logger.info("Cross-check completed successfully")
                 else:
                     raise CrossCheckPassError("Cross-check returned empty")
@@ -557,25 +621,33 @@ def process_document(input_path: str, logger: AgentLogger, report_dir: str = Non
             cross_check_failed = True
 
             # Retry with different model sequence
+            logger.progress(80, "Cross-check failed, retrying with fallback model...")
             logger.info("Retrying cross-check with fallback models...")
             try:
                 cross_check_result = llm_caller.call(cross_prompt, "", task_type="quick")
                 if cross_check_result:
                     final_summary = cross_check_result
                     cross_check_failed = False
+                    logger.progress(85, "Cross-check succeeded on retry")
                     logger.info("Cross-check succeeded on retry")
             except Exception:
                 pass
 
             if cross_check_failed:
+                logger.progress(85, "Cross-check skipped, using unverified summary")
                 logger.warning("Cross-check failed. Using unverified summary.")
 
+        logger.progress(88, "Cross-check pass finished")
         logger.pass_complete("CrossCheck", success=not cross_check_failed,
                             details="with warnings" if cross_check_failed else None)
+    else:
+        # No cross-check prompt, skip to 88%
+        logger.progress(88, "Cross-check skipped (no prompt configured)")
 
     # ==========================================================================
-    # Parse Metadata
+    # Parse Metadata (88% - 90%)
     # ==========================================================================
+    logger.progress(89, "Parsing metadata from results...")
     responding_party = "Unknown_Party"
 
     # Parse from extraction result
@@ -621,9 +693,12 @@ def process_document(input_path: str, logger: AgentLogger, report_dir: str = Non
     if responding_party == "Unknown_Party":
         logger.warning("Could not determine responding party.")
 
+    logger.progress(90, f"Metadata parsed: {responding_party}")
+
     # ==========================================================================
-    # Save to Case Data
+    # Save to Case Data (90% - 92%)
     # ==========================================================================
+    logger.progress(91, "Saving to case database...")
     try:
         data_manager = CaseDataManager()
         file_num = extract_file_number(input_path)
@@ -644,9 +719,12 @@ def process_document(input_path: str, logger: AgentLogger, report_dir: str = Non
     except Exception as e:
         logger.warning(f"Could not save to case data: {e}")
 
+    logger.progress(92, "Case data saved")
+
     # ==========================================================================
-    # Save Output
+    # Save Output (92% - 96%)
     # ==========================================================================
+    logger.progress(93, "Preparing output file...")
     output_dir = get_output_directory(input_path)
 
     if not os.path.exists(output_dir):
@@ -668,17 +746,57 @@ def process_document(input_path: str, logger: AgentLogger, report_dir: str = Non
 
     output_file = os.path.join(output_dir, output_filename)
 
+    logger.progress(94, f"Saving to {output_filename}...")
     save_success = save_to_docx(extraction_content, summary_content, output_file,
                                 responding_party, discovery_type, logger)
 
     if not save_success:
         return False
 
+    logger.progress(96, "Document saved successfully")
+
     # ==========================================================================
-    # Consolidation
+    # Register Document in Registry (96% - 97%)
+    # ==========================================================================
+    logger.progress(96, "Registering document...")
+    try:
+        if file_num:
+            base_name = os.path.splitext(os.path.basename(input_path))[0]
+
+            # Map classified discovery_type to registry document type
+            # Use classified_discovery_type (from classifier), not discovery_type (may be overwritten by LLM)
+            doc_type_map = {
+                "Form Interrogatories": "Form Interrogatories - Responses",
+                "Special Interrogatories": "Special Interrogatories - Responses",
+                "Request for Admissions": "Request for Admissions - Responses",
+                "Request for Production": "Request for Production - Responses",
+                "Requests for Admission": "Request for Admissions - Responses",
+                "Requests for Production": "Request for Production - Responses",
+            }
+            registry_doc_type = doc_type_map.get(classified_discovery_type, "Form Interrogatories - Responses")
+
+            registry = DocumentRegistry()
+            registry.register_document(
+                file_number=file_num,
+                name=base_name,
+                document_type=registry_doc_type,
+                source_path=input_path,
+                summary_location=output_file,
+                agent="summarize_discovery",
+                char_count=len(summary_content)
+            )
+            logger.info(f"Registered document as: {registry_doc_type}")
+    except Exception as e:
+        logger.warning(f"Could not register document: {e}")
+
+    logger.progress(97, "Document registered")
+
+    # ==========================================================================
+    # Consolidation (97% - 100%)
     # ==========================================================================
     if report_dir:
         # Batch mode: Report output file for later consolidation
+        logger.progress(98, "Reporting to batch consolidation...")
         import random
         fname = f"worker_{os.getpid()}_{random.randint(0, 1000)}.txt"
         try:
@@ -687,9 +805,12 @@ def process_document(input_path: str, logger: AgentLogger, report_dir: str = Non
             logger.info(f"Reported output file to batch: {output_file}")
         except Exception as e:
             logger.error(f"Failed to write report file: {e}")
+        logger.progress(100, "Processing complete")
     else:
         # Single file mode: Auto-consolidate immediately
+        logger.progress(98, "Running auto-consolidation...")
         consolidate_file(output_file, logger, show_diff=True)
+        logger.progress(100, "Consolidation complete")
 
     return True
 

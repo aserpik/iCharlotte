@@ -61,7 +61,7 @@ from icharlotte_core.ui.widgets import (
 )
 from icharlotte_core.ui.case_view_enhanced import (
     EnhancedAgentButton, AgentSettingsDB, AgentSettingsDialog, ContradictionSettingsDialog,
-    AdvancedFilterWidget, FilePreviewWidget, OutputBrowserWidget,
+    TimelineSettingsDialog, AdvancedFilterWidget, FilePreviewWidget, OutputBrowserWidget,
     ProcessingLogWidget, ProcessingLogDB, FileTagsDB, EnhancedFileTreeWidget
 )
 from icharlotte_core.ui.dialogs import FileNumberDialog, VariablesDialog, PromptsDialog, LLMSettingsDialog
@@ -283,8 +283,10 @@ class MainWindow(QMainWindow):
         self.quick_open_signal.connect(self._on_quick_open_hotkey)
 
         # Double-Ctrl tap detection state
-        self._last_ctrl_release_time = 0
-        self._ctrl_tap_threshold = 0.4  # seconds between taps
+        self._last_ctrl_tap_time = 0  # Time of last valid tap (quick press+release)
+        self._ctrl_press_time = 0  # When Ctrl was pressed
+        self._ctrl_tap_threshold = 0.3  # Max seconds between taps for double-tap
+        self._ctrl_hold_threshold = 0.2  # Max seconds Ctrl can be held to count as tap
         self.file_number = file_number
         self.case_path = case_path
         self._update_window_title()
@@ -341,23 +343,42 @@ class MainWindow(QMainWindow):
             keyboard.add_hotkey('win+f', lambda: self.open_file_signal.emit(), suppress=True)
             # Register Win+C for Change File
             keyboard.add_hotkey('win+c', lambda: self.change_file_signal.emit(), suppress=True)
-            # Register Ctrl key release for double-tap detection
+            # Register Ctrl key press and release for double-tap detection
+            keyboard.on_press_key('ctrl', self._on_ctrl_press)
             keyboard.on_release_key('ctrl', self._on_ctrl_release)
             log_event("Global hotkeys registered: Win+F (Open File), Win+C (Change File), Double-Ctrl (Quick Open)")
         except Exception as e:
             log_event(f"Failed to register global hotkeys: {e}", "error")
 
-    def _on_ctrl_release(self, event):
-        """Detect double-tap of Ctrl key for quick open dialog."""
-        current_time = time.time()
-        time_since_last = current_time - self._last_ctrl_release_time
+    def _on_ctrl_press(self, event):
+        """Record when Ctrl key is pressed for tap duration calculation."""
+        self._ctrl_press_time = time.time()
 
-        if time_since_last < self._ctrl_tap_threshold:
+    def _on_ctrl_release(self, event):
+        """Detect double-tap of Ctrl key for quick open dialog.
+
+        Only triggers if:
+        1. Ctrl was held briefly (< 200ms) - this is a "tap", not a held key
+        2. Two taps occurred within 300ms of each other
+        """
+        current_time = time.time()
+        hold_duration = current_time - self._ctrl_press_time
+
+        # Only count as a tap if Ctrl was held briefly (not held for shortcuts)
+        if hold_duration > self._ctrl_hold_threshold:
+            # Ctrl was held too long - this was probably a shortcut, not a tap
+            self._last_ctrl_tap_time = 0
+            return
+
+        # This is a valid tap - check if it's a double-tap
+        time_since_last_tap = current_time - self._last_ctrl_tap_time
+
+        if time_since_last_tap < self._ctrl_tap_threshold:
             # Double-tap detected - emit signal (thread-safe)
             self.quick_open_signal.emit()
-            self._last_ctrl_release_time = 0  # Reset to prevent triple-tap triggering
+            self._last_ctrl_tap_time = 0  # Reset to prevent triple-tap triggering
         else:
-            self._last_ctrl_release_time = current_time
+            self._last_ctrl_tap_time = current_time
 
     def _on_open_file_hotkey(self):
         """Handle Win+F hotkey - bring window to front and open file."""
@@ -507,16 +528,7 @@ class MainWindow(QMainWindow):
         self.create_enhanced_agent_button("Discovery Generate", "discovery_requests.py", left_layout, arg_type="file_number", extra_flags=["--interactive"])
         self.create_enhanced_agent_button("Subpoena Tracker", "subpoena_tracker.py", left_layout, arg_type="file_number")
 
-        # Directory-based Case Agents
-        left_layout.addSpacing(8)
-        dir_label = QLabel("Analysis Agents")
-        dir_label.setStyleSheet("font-weight: bold; font-size: 12px; color: #666;")
-        left_layout.addWidget(dir_label)
-
-        self.create_enhanced_agent_button("Liability Agent", "liability.py", left_layout, arg_type="case_path")
-        self.create_enhanced_agent_button("Exposure Agent", "exposure.py", left_layout, arg_type="case_path")
-
-        # New Agents: Timeline and Contradiction Detector
+        # Document Agents
         left_layout.addSpacing(8)
         new_label = QLabel("Document Agents")
         new_label.setStyleSheet("font-weight: bold; font-size: 12px; color: #666;")
@@ -1143,9 +1155,12 @@ class MainWindow(QMainWindow):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             new_file_num = dialog.get_file_number()
             new_path = get_case_path(new_file_num)
-            
+
             if new_path:
                 self.save_status_history()
+                # Save chat conversation before switching cases
+                if hasattr(self, 'chat_tab') and self.chat_tab:
+                    self.chat_tab.save_current_state()
                 self.file_number = new_file_num
                 self.case_path = new_path
                 self.setWindowTitle(f"iCharlotte - {self.file_number} - {os.path.basename(self.case_path)}")
@@ -1186,6 +1201,9 @@ class MainWindow(QMainWindow):
 
         if new_path:
             self.save_status_history()
+            # Save chat conversation before switching cases
+            if hasattr(self, 'chat_tab') and self.chat_tab:
+                self.chat_tab.save_current_state()
             self.file_number = file_number
             self.case_path = new_path
             self._update_window_title()
@@ -1476,6 +1494,9 @@ class MainWindow(QMainWindow):
         if script == "detect_contradictions.py":
             # Use custom dialog for Contradiction Detector
             dialog = ContradictionSettingsDialog(self.file_number, self.agent_settings_db, self)
+        elif script == "extract_timeline.py":
+            # Use custom dialog for Timeline Extraction
+            dialog = TimelineSettingsDialog(self.file_number, self.agent_settings_db, self)
         else:
             dialog = AgentSettingsDialog(script, self.agent_settings_db, self)
         dialog.exec()
@@ -1805,6 +1826,9 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self.save_status_history()
+        # Save chat conversation before closing
+        if hasattr(self, 'chat_tab') and self.chat_tab:
+            self.chat_tab.save_current_state()
         # Clean up global hotkeys
         if KEYBOARD_AVAILABLE:
             try:
@@ -1837,9 +1861,20 @@ class MainWindow(QMainWindow):
                     args.extend(["--summaries", ",".join(selected_summaries)])
                     details = f"{len(selected_summaries)} summaries"
 
-        elif arg_type == "case_path":
-            args.append(self.case_path)
-            details = "Scanning Case Directory"
+            # Special handling for Timeline Extraction - pass mode and selected summaries
+            if script == "extract_timeline.py":
+                settings = self.agent_settings_db.get_settings(script)
+                from_summaries = settings.get("from_summaries", True)
+                selected_summaries = settings.get("selected_summaries")
+
+                if from_summaries:
+                    args.append("--from-summaries")
+                    if selected_summaries:
+                        args.extend(["--summaries", ",".join(selected_summaries)])
+                        details = f"{len(selected_summaries)} summaries"
+                    else:
+                        details = "All summaries"
+
         elif arg_type == "file_picker":
             # Show file picker dialog, starting in the case directory
             start_dir = self.case_path if hasattr(self, 'case_path') and self.case_path else ""

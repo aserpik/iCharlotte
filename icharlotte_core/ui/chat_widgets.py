@@ -74,7 +74,8 @@ class ConversationSidebar(QFrame):
     """Sidebar widget for managing conversations."""
 
     conversation_selected = Signal(str)  # Emits conversation ID
-    new_conversation_requested = Signal()
+    save_conversation_requested = Signal()  # Save current conversation
+    new_conversation_requested = Signal()  # Create new conversation (legacy, kept for compatibility)
     conversation_renamed = Signal(str, str)  # ID, new name
     conversation_deleted = Signal(str)  # ID
 
@@ -98,11 +99,11 @@ class ConversationSidebar(QFrame):
         header.addWidget(title)
         header.addStretch()
 
-        self.new_btn = QPushButton("+")
-        self.new_btn.setFixedSize(28, 28)
-        self.new_btn.setToolTip("New Conversation")
-        self.new_btn.clicked.connect(self.new_conversation_requested.emit)
-        header.addWidget(self.new_btn)
+        self.save_btn = QPushButton("+")
+        self.save_btn.setFixedSize(28, 28)
+        self.save_btn.setToolTip("Save Conversation")
+        self.save_btn.clicked.connect(self.save_conversation_requested.emit)
+        header.addWidget(self.save_btn)
 
         layout.addLayout(header)
 
@@ -239,9 +240,11 @@ class ConversationSidebar(QFrame):
     def on_item_clicked(self, item: QListWidgetItem):
         """Handle conversation item click."""
         conv_id = item.data(Qt.ItemDataRole.UserRole)
+        print(f"[DEBUG] on_item_clicked: conv_id={conv_id}, item_text={item.text()}")
         if conv_id:
             self.current_conversation_id = conv_id
             self.conversation_selected.emit(conv_id)
+            print(f"[DEBUG] Emitted conversation_selected signal for {conv_id}")
 
     def on_item_double_clicked(self, item: QListWidgetItem):
         """Handle double-click to rename."""

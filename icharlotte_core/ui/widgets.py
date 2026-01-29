@@ -3,6 +3,7 @@ import re
 import shutil
 import subprocess
 import uuid
+import warnings
 from PySide6.QtWidgets import (
     QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QProgressBar, QTextEdit, QSizePolicy, QMessageBox,
@@ -425,11 +426,18 @@ class AgentRunner(QObject):
         self.last_progress = 0
         self.last_status = "Starting..."
         self.output_file = None
-        self.success = None # None=Running, True=Success, False=Fail
+        self.success = None  # None=Running, True=Success, False=Fail
 
-        # Pass tracking (NEW)
+        # Pass tracking
         self.current_pass = None
         self.pass_info = {}  # name -> {number, total, status}
+
+        # Watchdog timer for detecting hung processes
+        self.watchdog_timer = QTimer()
+        self.watchdog_timer.setInterval(30000)  # Check every 30 seconds
+        self.watchdog_timer.timeout.connect(self._check_process_health)
+        self.last_output_time = None
+        self.watchdog_timeout_minutes = 10  # Warn after 10 minutes of no output
 
         # Connect internal signals
         self.process.readyReadStandardOutput.connect(self.handle_stdout)
@@ -444,19 +452,25 @@ class AgentRunner(QObject):
         """Disconnect signals from the current widget before connecting a new one."""
         if self.status_widget is None:
             return
-        try:
-            self.progress_update.disconnect(self.status_widget.update_progress)
-            self.log_update.disconnect(self.status_widget.append_log)
-            self.output_file_found.disconnect(self.status_widget.set_output_file)
-            self.finished.disconnect(self.status_widget.set_finished)
-            self.pass_started.disconnect(self.status_widget.update_pass_start)
-            self.pass_completed.disconnect(self.status_widget.update_pass_complete)
-            self.pass_failed.disconnect(self.status_widget.update_pass_failed)
-            self.status_widget.cancel_requested.disconnect(self.cancel)
-            self.status_widget.retry_pass_requested.disconnect(self.retry_pass)
-        except (TypeError, RuntimeError):
-            # Signals may not be connected or widget may already be deleted
-            pass
+
+        # Helper to safely disconnect without warnings
+        def safe_disconnect(signal, slot):
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                try:
+                    signal.disconnect(slot)
+                except (TypeError, RuntimeError):
+                    pass  # Signal was not connected
+
+        safe_disconnect(self.progress_update, self.status_widget.update_progress)
+        safe_disconnect(self.log_update, self.status_widget.append_log)
+        safe_disconnect(self.output_file_found, self.status_widget.set_output_file)
+        safe_disconnect(self.finished, self.status_widget.set_finished)
+        safe_disconnect(self.pass_started, self.status_widget.update_pass_start)
+        safe_disconnect(self.pass_completed, self.status_widget.update_pass_complete)
+        safe_disconnect(self.pass_failed, self.status_widget.update_pass_failed)
+        safe_disconnect(self.status_widget.cancel_requested, self.cancel)
+        safe_disconnect(self.status_widget.retry_pass_requested, self.retry_pass)
         self.status_widget = None
 
     def connect_widget(self, widget):
@@ -510,7 +524,36 @@ class AgentRunner(QObject):
              widget.set_finished(self.success)
 
     def start(self):
+        import time
+        self.last_output_time = time.time()
         self.process.start(self.command, self.args)
+        self.watchdog_timer.start()
+
+    def _check_process_health(self):
+        """Check if process appears to be hung (no output for extended period)."""
+        import time
+
+        if self.success is not None:
+            # Process already finished
+            self.watchdog_timer.stop()
+            return
+
+        if self.last_output_time is None:
+            return
+
+        elapsed_minutes = (time.time() - self.last_output_time) / 60
+
+        if elapsed_minutes >= self.watchdog_timeout_minutes:
+            warning_msg = (
+                f"\n--- WARNING: No output for {elapsed_minutes:.1f} minutes ---\n"
+                f"Process may be hung. Consider cancelling if no progress is expected.\n"
+            )
+            self.log_history.append(warning_msg)
+            self.log_update.emit(warning_msg)
+
+            # Update status to show warning
+            self.last_status = f"Warning: No output for {int(elapsed_minutes)} min"
+            self.progress_update.emit(self.last_progress, self.last_status)
 
     def cancel(self):
         if self.process.state() != QProcess.ProcessState.NotRunning:
@@ -527,23 +570,94 @@ class AgentRunner(QObject):
         # Future: Restart process with --retry-pass argument
 
     def handle_stdout(self):
+        import time
         data = self.process.readAllStandardOutput()
         text = bytes(data).decode("utf-8", errors="ignore")
         self.log_history.append(text)
         self.log_update.emit(text)
         self.parse_progress(text)
+        self.last_output_time = time.time()
 
     def handle_stderr(self):
+        import time
         data = self.process.readAllStandardError()
         text = bytes(data).decode("utf-8", errors="ignore")
         self.log_history.append(text)
         self.log_update.emit(text)
+        self.last_output_time = time.time()
 
     def handle_finished(self, exit_code, exit_status):
+        """Handle process completion with detailed exit code interpretation."""
+        # Stop the watchdog timer
+        self.watchdog_timer.stop()
+
         success = (exit_code == 0 and exit_status == QProcess.ExitStatus.NormalExit)
         self.success = success
+
+        # Log detailed exit information for debugging
+        if not success:
+            exit_reason = self._interpret_exit_code(exit_code, exit_status)
+            error_msg = f"\n--- PROCESS FINISHED: {exit_reason} ---\n"
+            self.log_history.append(error_msg)
+            self.log_update.emit(error_msg)
+
+            # Check crash logs directory for recent crash reports
+            crash_log_dir = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                'logs', 'crashes'
+            )
+            if os.path.exists(crash_log_dir):
+                try:
+                    recent_crashes = sorted(
+                        [f for f in os.listdir(crash_log_dir) if f.endswith('.txt')],
+                        key=lambda x: os.path.getmtime(os.path.join(crash_log_dir, x)),
+                        reverse=True
+                    )[:3]
+                    if recent_crashes:
+                        crash_msg = f"Recent crash logs available in: {crash_log_dir}\n"
+                        for cf in recent_crashes:
+                            crash_msg += f"  - {cf}\n"
+                        self.log_history.append(crash_msg)
+                        self.log_update.emit(crash_msg)
+                except Exception:
+                    pass
+
         self.finished.emit(success)
         self.process.deleteLater()
+
+    def _interpret_exit_code(self, exit_code: int, exit_status) -> str:
+        """Interpret exit code to provide helpful error message."""
+        if exit_status == QProcess.ExitStatus.CrashExit:
+            return f"Process crashed (exit code: {exit_code})"
+
+        # Common exit codes
+        exit_code_meanings = {
+            0: "Success",
+            1: "General error (check logs for details)",
+            2: "Misuse of command or invalid arguments",
+            126: "Command not executable",
+            127: "Command not found",
+            130: "Terminated by Ctrl+C",
+            137: "Killed (out of memory or SIGKILL)",
+            139: "Segmentation fault",
+            143: "Terminated by SIGTERM",
+        }
+
+        if exit_code in exit_code_meanings:
+            return f"Exit code {exit_code}: {exit_code_meanings[exit_code]}"
+
+        # Signal-based exit codes (128 + signal number)
+        if exit_code > 128:
+            signal_num = exit_code - 128
+            signal_names = {
+                1: "SIGHUP", 2: "SIGINT", 3: "SIGQUIT", 6: "SIGABRT",
+                9: "SIGKILL", 11: "SIGSEGV", 15: "SIGTERM"
+            }
+            if signal_num in signal_names:
+                return f"Killed by signal {signal_names[signal_num]} ({signal_num})"
+            return f"Killed by signal {signal_num}"
+
+        return f"Exit code {exit_code}"
 
     def parse_progress(self, text):
         """Parse agent output for progress and pass information."""
@@ -614,11 +728,13 @@ class AgentRunner(QObject):
                 if len(parts) >= 3:
                     try:
                         percent = int(parts[1])
+                        # Clamp percent to valid range to prevent overflow
+                        percent = max(0, min(100, percent))
                         message = parts[2]
                         self.last_progress = percent
                         self.last_status = message
                         self.progress_update.emit(percent, message)
-                    except ValueError:
+                    except (ValueError, OverflowError):
                         pass
                 continue
 

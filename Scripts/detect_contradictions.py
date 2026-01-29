@@ -39,6 +39,12 @@ except ImportError:
     sys.path.append(os.path.join(os.getcwd(), 'Scripts'))
     from case_data_manager import CaseDataManager
 
+# Import Document Registry
+try:
+    from document_registry import DocumentRegistry, get_available_documents, get_document_type_list
+except ImportError:
+    from Scripts.document_registry import DocumentRegistry, get_available_documents, get_document_type_list
+
 
 # =============================================================================
 # Configuration
@@ -264,10 +270,110 @@ def save_report_to_docx(report: ContradictionReport, output_path: str, logger: A
 # Main Processing
 # =============================================================================
 
+def find_ai_output_docx(file_number: str) -> Optional[str]:
+    """
+    Find the AI_OUTPUT.docx file for a case.
+
+    Args:
+        file_number: The case file number (e.g., '3850.084').
+
+    Returns:
+        Path to AI_OUTPUT.docx or None if not found.
+    """
+    base = r"C:\Current Clients"
+
+    if not os.path.exists(base):
+        return None
+
+    # Search for case folder containing the file number
+    for client_folder in os.listdir(base):
+        client_path = os.path.join(base, client_folder)
+        if not os.path.isdir(client_path):
+            continue
+
+        for case_folder in os.listdir(client_path):
+            if file_number in case_folder:
+                ai_output_path = os.path.join(
+                    client_path, case_folder, "NOTES", "AI OUTPUT", "AI_OUTPUT.docx"
+                )
+                if os.path.exists(ai_output_path):
+                    return ai_output_path
+
+    return None
+
+
+def gather_summaries_from_docx(docx_path: str, logger: AgentLogger) -> Dict[str, str]:
+    """
+    Extract individual document summaries from AI_OUTPUT.docx.
+
+    The DOCX contains multiple summaries, each starting with a bold+underlined title
+    (the original filename) followed by a "Generated on:" line and the summary content.
+
+    Args:
+        docx_path: Path to AI_OUTPUT.docx.
+        logger: AgentLogger instance.
+
+    Returns:
+        Dictionary of document_name -> summary_text.
+    """
+    summaries = {}
+
+    try:
+        doc = Document(docx_path)
+
+        current_title = None
+        current_content = []
+
+        for para in doc.paragraphs:
+            text = para.text.strip()
+
+            if not text:
+                continue
+
+            # Check if this paragraph is a title (bold + underlined)
+            is_title = False
+            if para.runs:
+                first_run = para.runs[0]
+                if first_run.bold and first_run.underline:
+                    is_title = True
+
+            if is_title:
+                # Save previous summary if exists
+                if current_title and current_content:
+                    summary_text = "\n".join(current_content)
+                    if len(summary_text) > 100:  # Skip very short entries
+                        summaries[current_title] = summary_text
+                        logger.info(f"Extracted summary: {current_title}")
+
+                # Start new summary
+                current_title = text
+                current_content = []
+
+            elif current_title:
+                # Skip "Generated on:" lines
+                if text.startswith("Generated on:"):
+                    continue
+                current_content.append(text)
+
+        # Don't forget the last summary
+        if current_title and current_content:
+            summary_text = "\n".join(current_content)
+            if len(summary_text) > 100:
+                summaries[current_title] = summary_text
+                logger.info(f"Extracted summary: {current_title}")
+
+        logger.info(f"Extracted {len(summaries)} summaries from {docx_path}")
+
+    except Exception as e:
+        logger.warning(f"Error reading AI_OUTPUT.docx: {e}")
+
+    return summaries
+
+
 def gather_case_summaries(file_number: str, logger: AgentLogger,
                           selected_summaries: List[str] = None) -> Dict[str, str]:
     """
-    Gather all summaries for a case from CaseDataManager.
+    Gather all summaries for a case from AI_OUTPUT.docx and CaseDataManager.
 
     Args:
         file_number: The case file number.
@@ -280,11 +386,25 @@ def gather_case_summaries(file_number: str, logger: AgentLogger,
     """
     summaries = {}
 
+    # First, try to load from AI_OUTPUT.docx (primary source)
+    docx_path = find_ai_output_docx(file_number)
+    if docx_path:
+        logger.info(f"Found AI_OUTPUT.docx: {docx_path}")
+        docx_summaries = gather_summaries_from_docx(docx_path, logger)
+
+        for name, text in docx_summaries.items():
+            if selected_summaries is not None and name not in selected_summaries:
+                continue
+            summaries[name] = text
+    else:
+        logger.info("AI_OUTPUT.docx not found, checking case data store...")
+
+    # Also check CaseDataManager for additional summaries (e.g., discovery summaries)
     try:
         data_manager = CaseDataManager()
 
-        # Get all variables for the case
-        variables = data_manager.get_all_variables(file_number)
+        # Get all variables for the case (flatten=False to get full objects with value/source/tags)
+        variables = data_manager.get_all_variables(file_number, flatten=False)
 
         for var_name, var_data in variables.items():
             # Filter for summary-type variables
@@ -297,11 +417,13 @@ def gather_case_summaries(file_number: str, logger: AgentLogger,
                 source = var_data.get('source', var_name)
 
                 if value and len(value) > 100:  # Skip very short entries
-                    summaries[source] = value
-                    logger.info(f"Loaded summary: {var_name}")
+                    # Avoid duplicates - use var_name as key to differentiate from docx summaries
+                    if var_name not in summaries:
+                        summaries[var_name] = value
+                        logger.info(f"Loaded summary from case data: {var_name}")
 
     except Exception as e:
-        logger.warning(f"Error loading case summaries: {e}")
+        logger.warning(f"Error loading case summaries from data store: {e}")
 
     return summaries
 
@@ -329,6 +451,8 @@ def detect_contradictions(
     memory_monitor = MemoryMonitor(warn_threshold_mb=1500, abort_threshold_mb=2000, logger=logger.info)
     llm_caller = LLMCaller(logger=logger)
 
+    logger.progress(5, "Initializing contradiction detection...")
+
     # Load prompt
     try:
         with open(PROMPT_FILE, "r", encoding="utf-8") as f:
@@ -337,20 +461,26 @@ def detect_contradictions(
         logger.error(f"Error reading prompt file: {e}")
         return None
 
+    logger.progress(10, f"Building content from {len(summaries)} summaries...")
+
     # Build document content
     doc_content = ""
     for name, text in summaries.items():
         doc_content += f"\n\n=== {name} ===\n{text[:20000]}"  # Limit per doc
 
+    logger.progress(15, "Content prepared, starting analysis...")
     logger.pass_start("Contradiction Analysis", 1, 1)
 
     try:
         with memory_monitor.track_operation("Contradiction Analysis"):
+            logger.progress(20, "Sending summaries to LLM for contradiction analysis...")
             # Use agent_contradict config from LLM settings (default: gemini-3-pro-preview)
             response = llm_caller.call(prompt, doc_content, agent_id="agent_contradict")
 
             if not response:
                 raise LLMError("LLM returned empty response")
+
+            logger.progress(70, "Parsing contradiction findings from response...")
 
             # Parse JSON from response
             json_match = re.search(r'\{[\s\S]*\}', response)
@@ -365,6 +495,8 @@ def detect_contradictions(
                 generated=datetime.datetime.now().isoformat(),
                 documents_analyzed=list(summaries.keys())
             )
+
+            logger.progress(80, "Building contradiction report...")
 
             for c_data in data.get('contradictions', []):
                 claim_1_data = c_data.get('claim_1', {})
@@ -402,6 +534,7 @@ def detect_contradictions(
                 )
                 report.contradictions.append(contradiction)
 
+            logger.progress(90, f"Found {len(report.contradictions)} contradictions")
             logger.info(f"Found {len(report.contradictions)} contradictions")
 
     except json.JSONDecodeError as e:
@@ -411,6 +544,7 @@ def detect_contradictions(
         logger.pass_failed("Contradiction Analysis", str(e), recoverable=True)
         return None
 
+    logger.progress(95, "Analysis complete")
     logger.pass_complete("Contradiction Analysis", success=True)
     return report
 
@@ -433,6 +567,45 @@ def get_output_directory(file_number: str) -> str:
     return os.path.join(os.getcwd(), "output")
 
 
+def list_available_documents(file_number: str) -> None:
+    """List available documents for a case (for pre-selection in UI)."""
+    print(f"\nAvailable documents for case {file_number}:")
+    print("=" * 60)
+
+    # Get from document registry
+    docs = get_available_documents(file_number)
+
+    if docs:
+        print(f"\nFrom Document Registry ({len(docs)} documents):")
+        for doc in docs:
+            print(f"  - {doc['name']}")
+            print(f"    Type: {doc['document_type']}")
+            print(f"    Agent: {doc['agent']}")
+            print()
+    else:
+        print("\n  No documents in registry. Run summarize agents first.")
+
+    # Also show what's in AI_OUTPUT.docx
+    docx_path = find_ai_output_docx(file_number)
+    if docx_path:
+        print(f"\nFrom AI_OUTPUT.docx ({docx_path}):")
+        try:
+            doc = Document(docx_path)
+            titles = []
+            for para in doc.paragraphs:
+                if para.runs:
+                    first_run = para.runs[0]
+                    if first_run.bold and first_run.underline and para.text.strip():
+                        titles.append(para.text.strip())
+            for title in titles:
+                print(f"  - {title}")
+            print(f"\n  Total: {len(titles)} summaries in DOCX")
+        except Exception as e:
+            print(f"  Error reading DOCX: {e}")
+
+    print()
+
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -441,10 +614,17 @@ def main():
     parser.add_argument("file_number", help="The case file number (e.g., 2024.123)")
     parser.add_argument("--summaries", type=str, default=None,
                         help="Comma-separated list of summary names to include (default: all)")
+    parser.add_argument("--list", action="store_true",
+                        help="List available documents for the case without running analysis")
 
     args = parser.parse_args()
 
     file_number = args.file_number.strip()
+
+    # If --list flag, just show available documents and exit
+    if args.list:
+        list_available_documents(file_number)
+        sys.exit(0)
 
     # Parse selected summaries if provided
     selected_summaries = None

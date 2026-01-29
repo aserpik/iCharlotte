@@ -47,9 +47,9 @@ class EmailScanWorker(QThread):
     FILE_NUMBER_REGEX = r'(\d{4})[._\-\u2013\u2014](\d{3})'
     TARGETS = [
         ("serpiklaw@gmail.com", "AS -", "AS"),
-        ("fmottola@bordinsemmer.com", "FM -", "FM"),
-        ("hproshyan@bordinsemmer.com", "HP -", "HP"),
-        ("cetmekjian@bordinsemmer.com", "CE -", "CE"),
+        ("fmottola@bordinsemmer.com", "FM -- ", "FM"),
+        ("hproshyan@bordinsemmer.com", "HP -- ", "HP"),
+        ("cetmekjian@bordinsemmer.com", "CE -- ", "CE"),
     ]
     FILLER_WORDS = ['please', 'pls', 'thnx', 'thanks', 'thx', 'ty']
 
@@ -326,7 +326,7 @@ class SentTodoScannerDialog(QDialog):
 
         # Info
         info = QLabel("This will scan the last 2 weeks of sent emails using the same\n"
-                      "logic as the email monitor (looking for 'AS -', 'FM -', etc. prefixes).")
+                      "logic as the email monitor (looking for 'AS -', 'FM -- ', etc. prefixes).")
         info.setStyleSheet("color: gray; margin-bottom: 10px;")
         layout.addWidget(info)
 

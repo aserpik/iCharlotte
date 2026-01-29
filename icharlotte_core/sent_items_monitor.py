@@ -36,9 +36,9 @@ class SentItemsMonitorWorker(QThread):
     # Each tuple: (email_address, body_prefix, assignee_initials)
     TARGETS = [
         ("serpiklaw@gmail.com", "AS -", "AS"),
-        ("fmottola@bordinsemmer.com", "FM -", "FM"),
-        ("hproshyan@bordinsemmer.com", "HP -", "HP"),
-        ("cetmekjian@bordinsemmer.com", "CE -", "CE"),
+        ("fmottola@bordinsemmer.com", "FM -- ", "FM"),
+        ("hproshyan@bordinsemmer.com", "HP -- ", "HP"),
+        ("cetmekjian@bordinsemmer.com", "CE -- ", "CE"),
     ]
 
     # Filler words to strip from todo text
@@ -510,7 +510,7 @@ class SentItemsMonitorWorker(QThread):
 
         Args:
             body: Full email body text
-            body_prefix: The prefix like "AS -" or "FM -"
+            body_prefix: The prefix like "AS -" or "FM -- "
             context: Dict with 'subject_context', 'is_forward', 'attachments', 'thread_emails'
 
         Returns:

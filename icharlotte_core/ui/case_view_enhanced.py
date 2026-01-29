@@ -178,7 +178,9 @@ class AgentSettingsDB:
         "extract_timeline.py": {
             "include_medical": True,
             "include_legal": True,
-            "date_format": "MM/DD/YYYY"
+            "date_format": "MM/DD/YYYY",
+            "from_summaries": True,  # Extract from summaries by default
+            "selected_summaries": None  # None means all summaries
         },
         "detect_contradictions.py": {
             "selected_summaries": None  # None means all summaries
@@ -652,7 +654,7 @@ class ContradictionSettingsDialog(QDialog):
         layout.addLayout(btn_layout)
 
     def _load_summaries(self):
-        """Load available summaries from CaseDataManager."""
+        """Load available summaries from Document Registry, AI_OUTPUT.docx, and CaseDataManager."""
         self.summary_list.clear()
 
         if not self.file_number:
@@ -660,40 +662,131 @@ class ContradictionSettingsDialog(QDialog):
             return
 
         try:
-            # Import CaseDataManager
             import sys
             sys.path.insert(0, SCRIPTS_DIR)
-            from case_data_manager import CaseDataManager
-
-            data_manager = CaseDataManager()
-            variables = data_manager.get_all_variables(self.file_number)
 
             # Get previously selected summaries from settings
             selected_summaries = self.current_settings.get("selected_summaries", None)
-
             summary_count = 0
-            for var_name, var_data in variables.items():
-                # Filter for summary-type variables (same logic as detect_contradictions.py)
-                if any(tag in var_name.lower() for tag in ['summary', 'depo', 'extraction']):
-                    value = var_data.get('value', '')
-                    if value and len(value) > 100:
-                        item = QListWidgetItem(var_name)
-                        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            seen_names = set()
 
-                        # Check by default, or use saved selection
+            # --- Source 1: Document Registry (preferred) ---
+            try:
+                from document_registry import get_available_documents
+                registry_docs = get_available_documents(self.file_number)
+
+                for doc in registry_docs:
+                    name = doc['name']
+                    if name in seen_names:
+                        continue
+                    seen_names.add(name)
+
+                    item = QListWidgetItem(f"{name}")
+                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                    item.setData(Qt.ItemDataRole.UserRole, name)  # Store clean name
+
+                    if selected_summaries is None:
+                        item.setCheckState(Qt.CheckState.Checked)
+                    else:
+                        item.setCheckState(
+                            Qt.CheckState.Checked if name in selected_summaries else Qt.CheckState.Unchecked
+                        )
+
+                    doc_type = doc.get('document_type', 'Unknown')
+                    agent = doc.get('agent', 'Unknown')
+                    item.setToolTip(f"Type: {doc_type}\nAgent: {agent}\nChars: {doc.get('char_count', 'N/A')}")
+
+                    # Color-code by document type
+                    if 'Deposition' in doc_type:
+                        item.setForeground(QColor("#2196F3"))  # Blue
+                    elif 'Interrogatories' in doc_type or 'Request' in doc_type:
+                        item.setForeground(QColor("#4CAF50"))  # Green
+                    elif 'Medical' in doc_type:
+                        item.setForeground(QColor("#FF9800"))  # Orange
+
+                    self.summary_list.addItem(item)
+                    summary_count += 1
+
+            except ImportError:
+                log_event("Document registry not available", "warning")
+
+            # --- Source 2: AI_OUTPUT.docx ---
+            try:
+                from detect_contradictions import find_ai_output_docx, gather_summaries_from_docx
+                from icharlotte_core.agent_logger import AgentLogger
+
+                docx_path = find_ai_output_docx(self.file_number)
+                if docx_path:
+                    # Create a simple logger that does nothing
+                    class SilentLogger:
+                        def info(self, msg): pass
+                        def warning(self, msg): pass
+                        def error(self, msg): pass
+
+                    docx_summaries = gather_summaries_from_docx(docx_path, SilentLogger())
+
+                    for name in docx_summaries.keys():
+                        if name in seen_names:
+                            continue
+                        seen_names.add(name)
+
+                        item = QListWidgetItem(f"{name}")
+                        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                        item.setData(Qt.ItemDataRole.UserRole, name)
+
                         if selected_summaries is None:
                             item.setCheckState(Qt.CheckState.Checked)
                         else:
                             item.setCheckState(
-                                Qt.CheckState.Checked if var_name in selected_summaries else Qt.CheckState.Unchecked
+                                Qt.CheckState.Checked if name in selected_summaries else Qt.CheckState.Unchecked
                             )
 
-                        # Store source info as tooltip
-                        source = var_data.get('source', 'Unknown')
-                        item.setToolTip(f"Source: {source}\nLength: {len(value)} chars")
+                        item.setToolTip(f"Source: AI_OUTPUT.docx\nLength: {len(docx_summaries[name])} chars")
+                        item.setForeground(QColor("#9C27B0"))  # Purple for DOCX-only
 
                         self.summary_list.addItem(item)
                         summary_count += 1
+
+            except Exception as e:
+                log_event(f"Error loading from AI_OUTPUT.docx: {e}", "warning")
+
+            # --- Source 3: CaseDataManager (fallback for other summaries) ---
+            try:
+                from case_data_manager import CaseDataManager
+
+                data_manager = CaseDataManager()
+                variables = data_manager.get_all_variables(self.file_number, flatten=False)
+
+                for var_name, var_data in variables.items():
+                    if var_name in seen_names:
+                        continue
+
+                    # Filter for summary-type variables
+                    if any(tag in var_name.lower() for tag in ['summary', 'depo', 'extraction']):
+                        value = var_data.get('value', '') if isinstance(var_data, dict) else var_data
+                        if value and len(str(value)) > 100:
+                            seen_names.add(var_name)
+
+                            item = QListWidgetItem(var_name)
+                            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                            item.setData(Qt.ItemDataRole.UserRole, var_name)
+
+                            if selected_summaries is None:
+                                item.setCheckState(Qt.CheckState.Checked)
+                            else:
+                                item.setCheckState(
+                                    Qt.CheckState.Checked if var_name in selected_summaries else Qt.CheckState.Unchecked
+                                )
+
+                            source = var_data.get('source', 'Unknown') if isinstance(var_data, dict) else 'legacy'
+                            item.setToolTip(f"Source: {source}\nLength: {len(str(value))} chars")
+                            item.setForeground(QColor("#607D8B"))  # Gray for case data
+
+                            self.summary_list.addItem(item)
+                            summary_count += 1
+
+            except Exception as e:
+                log_event(f"Error loading from CaseDataManager: {e}", "warning")
 
             if summary_count == 0:
                 self.info_label.setText("No summaries found. Run summarization agents first.")
@@ -748,12 +841,14 @@ class ContradictionSettingsDialog(QDialog):
 
     def _save(self):
         """Save all settings."""
-        # Gather selected summaries
+        # Gather selected summaries (use stored name from UserRole if available)
         selected_summaries = []
         for i in range(self.summary_list.count()):
             item = self.summary_list.item(i)
             if item.checkState() == Qt.CheckState.Checked:
-                selected_summaries.append(item.text())
+                # Prefer UserRole data (clean name), fallback to display text
+                name = item.data(Qt.ItemDataRole.UserRole) or item.text()
+                selected_summaries.append(name)
 
         if not selected_summaries:
             QMessageBox.warning(self, "No Selection", "Please select at least one summary to analyze.")
@@ -785,6 +880,350 @@ class ContradictionSettingsDialog(QDialog):
             if item.checkState() == Qt.CheckState.Checked:
                 selected.append(item.text())
         return selected
+
+
+# =============================================================================
+# Timeline Extraction Settings Dialog
+# =============================================================================
+
+class TimelineSettingsDialog(QDialog):
+    """Custom settings dialog for the Timeline Extraction agent."""
+
+    def __init__(self, file_number, settings_db, parent=None):
+        super().__init__(parent)
+        self.file_number = file_number
+        self.settings_db = settings_db
+        self.script_name = "extract_timeline.py"
+        self.setWindowTitle("Timeline Extraction Settings")
+        self.setMinimumSize(600, 500)
+
+        # Load current settings
+        self.current_settings = self.settings_db.get_settings(self.script_name)
+
+        # Load prompt from file
+        self.prompt_path = os.path.join(SCRIPTS_DIR, "TIMELINE_EXTRACTION_PROMPT.txt")
+        self.original_prompt = self._load_prompt()
+
+        self._setup_ui()
+        self._load_summaries()
+
+    def _load_prompt(self):
+        """Load the prompt from file."""
+        try:
+            if os.path.exists(self.prompt_path):
+                with open(self.prompt_path, 'r', encoding='utf-8') as f:
+                    return f.read()
+        except Exception as e:
+            log_event(f"Error loading prompt: {e}", "error")
+        return ""
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+
+        # Mode selection
+        mode_group = QGroupBox("Extraction Mode")
+        mode_layout = QVBoxLayout(mode_group)
+
+        self.mode_files = QCheckBox("Extract from selected files (traditional)")
+        self.mode_summaries = QCheckBox("Extract from existing summaries (faster, uses AI_OUTPUT.docx)")
+        self.mode_summaries.setChecked(self.current_settings.get("from_summaries", True))
+        self.mode_files.setChecked(not self.current_settings.get("from_summaries", True))
+
+        # Make them mutually exclusive
+        self.mode_files.toggled.connect(lambda checked: self.mode_summaries.setChecked(not checked) if checked else None)
+        self.mode_summaries.toggled.connect(lambda checked: self.mode_files.setChecked(not checked) if checked else None)
+        self.mode_summaries.toggled.connect(self._on_mode_changed)
+
+        mode_layout.addWidget(self.mode_files)
+        mode_layout.addWidget(self.mode_summaries)
+        layout.addWidget(mode_group)
+
+        # Create tab widget
+        self.tabs = QTabWidget()
+        layout.addWidget(self.tabs)
+
+        # --- Tab 1: Summary Selection ---
+        summary_tab = QWidget()
+        summary_layout = QVBoxLayout(summary_tab)
+
+        header_layout = QHBoxLayout()
+        header_layout.addWidget(QLabel("<b>Select Documents to Include:</b>"))
+        header_layout.addStretch()
+
+        self.toggle_btn = QPushButton("Deselect All")
+        self.toggle_btn.setFixedWidth(100)
+        self.toggle_btn.clicked.connect(self._toggle_selection)
+        header_layout.addWidget(self.toggle_btn)
+
+        summary_layout.addLayout(header_layout)
+
+        self.summary_list = QListWidget()
+        self.summary_list.setAlternatingRowColors(True)
+        summary_layout.addWidget(self.summary_list)
+
+        self.info_label = QLabel("Loading summaries...")
+        self.info_label.setStyleSheet("color: #666; font-style: italic;")
+        summary_layout.addWidget(self.info_label)
+
+        self.tabs.addTab(summary_tab, "Documents")
+
+        # --- Tab 2: Prompt Editor ---
+        prompt_tab = QWidget()
+        prompt_layout = QVBoxLayout(prompt_tab)
+
+        prompt_header = QHBoxLayout()
+        prompt_header.addWidget(QLabel("<b>Extraction Prompt:</b>"))
+        prompt_header.addStretch()
+
+        reset_prompt_btn = QPushButton("Reset to Default")
+        reset_prompt_btn.clicked.connect(self._reset_prompt)
+        prompt_header.addWidget(reset_prompt_btn)
+
+        prompt_layout.addLayout(prompt_header)
+
+        self.prompt_edit = QTextEdit()
+        self.prompt_edit.setPlainText(self.original_prompt)
+        self.prompt_edit.setStyleSheet("font-family: Consolas, monospace; font-size: 11px;")
+        prompt_layout.addWidget(self.prompt_edit)
+
+        self.tabs.addTab(prompt_tab, "Prompt")
+
+        # --- Buttons ---
+        btn_layout = QHBoxLayout()
+
+        reset_all_btn = QPushButton("Reset All to Defaults")
+        reset_all_btn.clicked.connect(self._reset_all)
+        btn_layout.addWidget(reset_all_btn)
+
+        btn_layout.addStretch()
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        save_btn = QPushButton("Save")
+        save_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px 16px;")
+        save_btn.clicked.connect(self._save)
+        btn_layout.addWidget(save_btn)
+
+        layout.addLayout(btn_layout)
+
+        # Initial state
+        self._on_mode_changed(self.mode_summaries.isChecked())
+
+    def _on_mode_changed(self, from_summaries):
+        """Update UI based on mode selection."""
+        self.tabs.setTabEnabled(0, from_summaries)  # Documents tab only for summary mode
+
+    def _load_summaries(self):
+        """Load available summaries from Document Registry, AI_OUTPUT.docx, and CaseDataManager."""
+        self.summary_list.clear()
+
+        if not self.file_number:
+            self.info_label.setText("No case selected. Open a case first.")
+            return
+
+        try:
+            import sys
+            sys.path.insert(0, SCRIPTS_DIR)
+
+            selected_summaries = self.current_settings.get("selected_summaries", None)
+            summary_count = 0
+            seen_names = set()
+
+            # --- Source 1: Document Registry ---
+            try:
+                from document_registry import get_available_documents
+                registry_docs = get_available_documents(self.file_number)
+
+                for doc in registry_docs:
+                    name = doc['name']
+                    if name in seen_names:
+                        continue
+                    seen_names.add(name)
+
+                    item = QListWidgetItem(f"{name}")
+                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                    item.setData(Qt.ItemDataRole.UserRole, name)
+
+                    if selected_summaries is None:
+                        item.setCheckState(Qt.CheckState.Checked)
+                    else:
+                        item.setCheckState(
+                            Qt.CheckState.Checked if name in selected_summaries else Qt.CheckState.Unchecked
+                        )
+
+                    doc_type = doc.get('document_type', 'Unknown')
+                    item.setToolTip(f"Type: {doc_type}\nAgent: {doc.get('agent', 'Unknown')}")
+
+                    if 'Deposition' in doc_type:
+                        item.setForeground(QColor("#2196F3"))
+                    elif 'Interrogatories' in doc_type or 'Request' in doc_type:
+                        item.setForeground(QColor("#4CAF50"))
+                    elif 'Medical' in doc_type:
+                        item.setForeground(QColor("#FF9800"))
+
+                    self.summary_list.addItem(item)
+                    summary_count += 1
+
+            except ImportError:
+                pass
+
+            # --- Source 2: AI_OUTPUT.docx ---
+            try:
+                from extract_timeline import find_ai_output_docx, gather_summaries_from_docx
+                from icharlotte_core.agent_logger import AgentLogger
+
+                docx_path = find_ai_output_docx(self.file_number)
+                if docx_path:
+                    class SilentLogger:
+                        def info(self, msg): pass
+                        def warning(self, msg): pass
+                        def error(self, msg): pass
+
+                    docx_summaries = gather_summaries_from_docx(docx_path, SilentLogger())
+
+                    for name in docx_summaries.keys():
+                        if name in seen_names:
+                            continue
+                        seen_names.add(name)
+
+                        item = QListWidgetItem(f"{name}")
+                        item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                        item.setData(Qt.ItemDataRole.UserRole, name)
+
+                        if selected_summaries is None:
+                            item.setCheckState(Qt.CheckState.Checked)
+                        else:
+                            item.setCheckState(
+                                Qt.CheckState.Checked if name in selected_summaries else Qt.CheckState.Unchecked
+                            )
+
+                        item.setToolTip(f"Source: AI_OUTPUT.docx")
+                        item.setForeground(QColor("#9C27B0"))
+
+                        self.summary_list.addItem(item)
+                        summary_count += 1
+
+            except Exception as e:
+                log_event(f"Error loading from AI_OUTPUT.docx: {e}", "warning")
+
+            # --- Source 3: CaseDataManager ---
+            try:
+                from case_data_manager import CaseDataManager
+
+                data_manager = CaseDataManager()
+                variables = data_manager.get_all_variables(self.file_number, flatten=False)
+
+                for var_name, var_data in variables.items():
+                    if var_name in seen_names:
+                        continue
+
+                    if any(tag in var_name.lower() for tag in ['summary', 'depo', 'extraction']):
+                        value = var_data.get('value', '') if isinstance(var_data, dict) else var_data
+                        if value and len(str(value)) > 100:
+                            seen_names.add(var_name)
+
+                            item = QListWidgetItem(var_name)
+                            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                            item.setData(Qt.ItemDataRole.UserRole, var_name)
+
+                            if selected_summaries is None:
+                                item.setCheckState(Qt.CheckState.Checked)
+                            else:
+                                item.setCheckState(
+                                    Qt.CheckState.Checked if var_name in selected_summaries else Qt.CheckState.Unchecked
+                                )
+
+                            item.setToolTip(f"Source: Case Data")
+                            item.setForeground(QColor("#607D8B"))
+
+                            self.summary_list.addItem(item)
+                            summary_count += 1
+
+            except Exception as e:
+                log_event(f"Error loading from CaseDataManager: {e}", "warning")
+
+            if summary_count == 0:
+                self.info_label.setText("No summaries found. Run summarization agents first.")
+            else:
+                self.info_label.setText(f"Found {summary_count} summaries for case {self.file_number}")
+                self._update_toggle_button()
+
+        except Exception as e:
+            log_event(f"Error loading summaries: {e}", "error")
+            self.info_label.setText(f"Error loading summaries: {e}")
+
+    def _toggle_selection(self):
+        """Toggle between select all and deselect all."""
+        all_checked = all(
+            self.summary_list.item(i).checkState() == Qt.CheckState.Checked
+            for i in range(self.summary_list.count())
+        )
+
+        new_state = Qt.CheckState.Unchecked if all_checked else Qt.CheckState.Checked
+
+        for i in range(self.summary_list.count()):
+            self.summary_list.item(i).setCheckState(new_state)
+
+        self._update_toggle_button()
+
+    def _update_toggle_button(self):
+        """Update toggle button text."""
+        if self.summary_list.count() == 0:
+            return
+
+        all_checked = all(
+            self.summary_list.item(i).checkState() == Qt.CheckState.Checked
+            for i in range(self.summary_list.count())
+        )
+
+        self.toggle_btn.setText("Deselect All" if all_checked else "Select All")
+
+    def _reset_prompt(self):
+        """Reset prompt to default."""
+        self.prompt_edit.setPlainText(self.original_prompt)
+
+    def _reset_all(self):
+        """Reset all settings."""
+        self._reset_prompt()
+        self.mode_summaries.setChecked(True)
+
+        for i in range(self.summary_list.count()):
+            self.summary_list.item(i).setCheckState(Qt.CheckState.Checked)
+        self._update_toggle_button()
+
+    def _save(self):
+        """Save settings."""
+        # Gather selected summaries
+        selected_summaries = []
+        for i in range(self.summary_list.count()):
+            item = self.summary_list.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                name = item.data(Qt.ItemDataRole.UserRole) or item.text()
+                selected_summaries.append(name)
+
+        if self.mode_summaries.isChecked() and not selected_summaries:
+            QMessageBox.warning(self, "No Selection", "Please select at least one document.")
+            return
+
+        settings = {
+            "from_summaries": self.mode_summaries.isChecked(),
+            "selected_summaries": selected_summaries if self.mode_summaries.isChecked() else None,
+        }
+        self.settings_db.update_settings(self.script_name, settings)
+
+        # Save prompt if modified
+        current_prompt = self.prompt_edit.toPlainText()
+        if current_prompt != self.original_prompt:
+            try:
+                with open(self.prompt_path, 'w', encoding='utf-8') as f:
+                    f.write(current_prompt)
+                log_event("Saved updated timeline extraction prompt")
+            except Exception as e:
+                QMessageBox.warning(self, "Warning", f"Could not save prompt: {e}")
+
+        self.accept()
 
 
 # =============================================================================
@@ -2016,7 +2455,23 @@ class OutputBrowserWidget(QDialog):
             except:
                 return None
 
-        binary_extensions = {'.pdf', '.doc', '.xlsx', '.xls', '.pptx', '.ppt',
+        # Handle PDF files using pypdf
+        if ext == '.pdf':
+            try:
+                from pypdf import PdfReader
+                reader = PdfReader(path)
+                text_parts = []
+                for page in reader.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text_parts.append(page_text)
+                if text_parts:
+                    return "\n\n".join(text_parts)
+                return "(No text could be extracted from this PDF)"
+            except Exception as e:
+                return f"(Error extracting PDF text: {e})"
+
+        binary_extensions = {'.doc', '.xlsx', '.xls', '.pptx', '.ppt',
                            '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.zip', '.rar'}
         if ext in binary_extensions:
             return None
@@ -2368,6 +2823,11 @@ class EnhancedFileTreeWidget(QTreeWidget):
                 rename_action.triggered.connect(lambda: self._start_rename(item))
                 menu.addAction(rename_action)
 
+                # Delete
+                delete_action = QAction("Delete", self)
+                delete_action.triggered.connect(lambda: self._delete_item(item))
+                menu.addAction(delete_action)
+
                 # Tags submenu
                 if item_type == "file":
                     tags_menu = QMenu("Tags", self)
@@ -2447,6 +2907,51 @@ class EnhancedFileTreeWidget(QTreeWidget):
 
         item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         self._editing_item = None
+
+    def keyPressEvent(self, event):
+        """Handle keyboard shortcuts including Delete key."""
+        if event.key() == Qt.Key.Key_Delete:
+            items = self.selectedItems()
+            if items:
+                self._delete_item(items[0])
+                event.accept()
+                return
+        super().keyPressEvent(event)
+
+    def _delete_item(self, item):
+        """Delete a file or folder after confirmation."""
+        path = item.data(0, Qt.ItemDataRole.UserRole)
+        if not path or not os.path.exists(path):
+            return
+
+        item_type = item.data(0, Qt.ItemDataRole.UserRole + 1)
+        item_name = os.path.basename(path)
+
+        if item_type == "dir":
+            msg = f"Are you sure you want to delete the folder '{item_name}' and all its contents?\n\nThis action cannot be undone."
+        else:
+            msg = f"Are you sure you want to delete '{item_name}'?\n\nThis action cannot be undone."
+
+        confirm = QMessageBox.question(
+            self,
+            "Confirm Delete",
+            msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if confirm == QMessageBox.StandardButton.Yes:
+            try:
+                if os.path.isdir(path):
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
+                log_event(f"Deleted: {path}")
+                # Emit signal to refresh the tree
+                self.item_moved.emit("", "")
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Could not delete: {e}")
+                log_event(f"Error deleting {path}: {e}", "error")
 
     def _add_tag(self, path):
         """Add a tag to a file."""

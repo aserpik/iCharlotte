@@ -161,7 +161,7 @@ class ChatTab(QWidget):
         self.conv_sidebar = ConversationSidebar(theme=self.theme)
         self.conv_sidebar.setFixedWidth(200)
         self.conv_sidebar.conversation_selected.connect(self.on_conversation_selected)
-        self.conv_sidebar.new_conversation_requested.connect(self.on_new_conversation)
+        self.conv_sidebar.save_conversation_requested.connect(self.on_save_conversation)
         self.conv_sidebar.conversation_renamed.connect(self.on_conversation_renamed)
         self.conv_sidebar.conversation_deleted.connect(self.on_conversation_deleted)
         self.main_splitter.addWidget(self.conv_sidebar)
@@ -231,6 +231,11 @@ class ChatTab(QWidget):
         clear_files_btn = QPushButton("Clear Files")
         clear_files_btn.clicked.connect(self.clear_files)
         settings_layout.addWidget(clear_files_btn)
+
+        clear_chat_btn = QPushButton("Clear Chat")
+        clear_chat_btn.setToolTip("Clear the current conversation and start a new one")
+        clear_chat_btn.clicked.connect(self.clear_current_chat)
+        settings_layout.addWidget(clear_chat_btn)
 
         settings_layout.addStretch()
 
@@ -328,6 +333,17 @@ class ChatTab(QWidget):
 
     def load_case(self, file_number: str):
         """Load conversations for a case. Called when case switches."""
+        # Stop any running threads to prevent "QThread destroyed while running" errors
+        if self.worker is not None and self.worker.isRunning():
+            self.worker.request_stop()
+            self.worker.wait(1000)
+
+        if self.fetcher is not None and self.fetcher.isRunning():
+            self.fetcher.wait(1000)
+
+        # Clear attached files from previous case
+        self.clear_files()
+
         self.file_number = file_number
         self.persistence = ChatPersistence(file_number)
 
@@ -372,15 +388,19 @@ class ChatTab(QWidget):
 
     def on_conversation_selected(self, conv_id: str):
         """Load selected conversation."""
+        print(f"[DEBUG] on_conversation_selected called with conv_id={conv_id}")
         if not self.persistence:
+            print("[DEBUG] No persistence, returning early")
             return
 
         self.save_current_state()
         self.current_conversation_id = conv_id
         self.current_conversation = self.persistence.get_conversation(conv_id)
+        print(f"[DEBUG] Got conversation: {self.current_conversation is not None}")
         self.conv_sidebar.set_current_conversation(conv_id)
 
         if self.current_conversation:
+            print(f"[DEBUG] Loading conversation with {len(self.current_conversation.messages)} messages")
             # Restore settings
             self.provider_combo.setCurrentText(self.current_conversation.provider)
             # Model will be set after provider change triggers model fetch
@@ -442,6 +462,51 @@ class ChatTab(QWidget):
                 else:
                     self.on_new_conversation()
 
+    def on_save_conversation(self):
+        """Save the current conversation and optionally rename it."""
+        if not self.persistence or not self.current_conversation_id:
+            return
+
+        # Save current state
+        self.save_current_state()
+
+        # Check if conversation has messages and might need a name
+        conv = self.persistence.get_conversation(self.current_conversation_id)
+        if conv and conv.messages:
+            # If name is still default (starts with "Chat "), offer to rename
+            if conv.name.startswith("Chat "):
+                # Generate a suggested name from first message
+                first_msg = conv.messages[0].content[:50] if conv.messages else ""
+                suggested = first_msg.split('\n')[0].strip()
+                if len(suggested) > 40:
+                    suggested = suggested[:40] + "..."
+
+                new_name, ok = QInputDialog.getText(
+                    self, "Save Conversation",
+                    "Enter a name for this conversation:",
+                    text=suggested if suggested else conv.name
+                )
+                if ok and new_name.strip():
+                    self.persistence.rename_conversation(self.current_conversation_id, new_name.strip())
+
+        # Refresh the sidebar to show the saved conversation
+        self.refresh_conversation_list()
+        self.conv_sidebar.set_current_conversation(self.current_conversation_id)
+
+        # Show confirmation
+        QMessageBox.information(self, "Saved", "Conversation saved successfully.")
+
+    def clear_current_chat(self):
+        """Clear the current chat and start a new conversation."""
+        # Save current conversation first if it has messages
+        if self.persistence and self.current_conversation_id:
+            conv = self.persistence.get_conversation(self.current_conversation_id)
+            if conv and conv.messages:
+                self.save_current_state()
+
+        # Create a new conversation
+        self.on_new_conversation()
+
     def load_conversation_messages(self):
         """Load and display messages from current conversation."""
         self.clear_chat_display()
@@ -499,7 +564,7 @@ class ChatTab(QWidget):
 
     def update_models(self, provider):
         self.model_combo.clear()
-        
+
         # Check cache first
         if provider in self.cached_models:
             self.model_combo.addItems(self.cached_models[provider])
@@ -510,10 +575,20 @@ class ChatTab(QWidget):
         if not api_key:
             self.model_combo.addItem(f"No API Key for {provider}")
             return
-            
+
         self.model_combo.addItem("Fetching models...")
         self.model_combo.setEnabled(False)
-        
+
+        # Clean up any previous fetcher to prevent "QThread destroyed while running" error
+        if self.fetcher is not None:
+            try:
+                self.fetcher.finished.disconnect()
+                self.fetcher.error.disconnect()
+            except (TypeError, RuntimeError):
+                pass  # Signals may already be disconnected
+            if self.fetcher.isRunning():
+                self.fetcher.wait(1000)  # Wait up to 1 second for it to finish
+
         self.fetcher = ModelFetcher(provider, api_key)
         self.fetcher.finished.connect(self.on_models_fetched)
         self.fetcher.error.connect(lambda err: self.on_models_fetched(provider, [f"Error: {err}"]))
@@ -606,7 +681,10 @@ class ChatTab(QWidget):
             self.file_list.addItem(item)
 
     def clear_files(self):
-        self.attached_files.clear()
+        if self.attached_files is None:
+            self.attached_files = []
+        else:
+            self.attached_files.clear()
         self.file_list.clear()
 
     def clear_chat(self):
@@ -718,12 +796,29 @@ class ChatTab(QWidget):
             event.ignore()
 
     def dropEvent(self, event: QDropEvent):
-        """Handle file drops - supports documents and images."""
+        """Handle file drops - supports documents and images.
+
+        Files are collected immediately but processed asynchronously to avoid
+        blocking Windows Explorer during OCR or other heavy operations.
+        """
         supported_extensions = (".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".gif", ".webp")
+        files_to_add = []
         for url in event.mimeData().urls():
             path = url.toLocalFile()
             if os.path.isfile(path) and path.lower().endswith(supported_extensions):
-                self.add_file(path)
+                files_to_add.append(path)
+
+        # Accept the event immediately to release Windows Explorer
+        event.accept()
+
+        # Defer file processing to after the drop handler returns
+        if files_to_add:
+            QTimer.singleShot(0, lambda: self._process_dropped_files(files_to_add))
+
+    def _process_dropped_files(self, file_paths):
+        """Process dropped files asynchronously after drop event completes."""
+        for path in file_paths:
+            self.add_file(path)
 
     def read_files_content(self):
         """Read content from attached files, including image base64 encoding."""
@@ -1160,6 +1255,14 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
 
     def reset_state(self):
         """Reset all state (called on case switch)."""
+        # Stop any running threads to prevent "QThread destroyed while running" errors
+        if self.worker is not None and self.worker.isRunning():
+            self.worker.request_stop()
+            self.worker.wait(1000)
+
+        if self.fetcher is not None and self.fetcher.isRunning():
+            self.fetcher.wait(1000)
+
         self.clear_chat()
         self.clear_files()
         self.conversation_history = []
@@ -1190,27 +1293,64 @@ class IndexTab(QWidget):
         self.sub_tabs.addTab(self.doc_index_widget, "Document Index")
         doc_layout = QHBoxLayout(self.doc_index_widget)
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        doc_layout.addWidget(splitter)
+        self.doc_splitter = QSplitter(Qt.Orientation.Horizontal)
+        doc_layout.addWidget(self.doc_splitter)
 
-        # Left: PDF List
-        left_widget = QWidget()
-        left_layout = QVBoxLayout(left_widget)
-        left_layout.addWidget(QLabel("Processed PDFs:"))
+        # Left: PDF List (collapsible)
+        self.left_widget = QWidget()
+        left_layout = QVBoxLayout(self.left_widget)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Header with collapse toggle
+        left_header = QHBoxLayout()
+        left_header.setContentsMargins(4, 4, 4, 4)
+        self.pdf_list_label = QLabel("Processed PDFs:")
+        left_header.addWidget(self.pdf_list_label)
+        left_header.addStretch()
+
+        self.collapse_pdf_btn = QToolButton()
+        self.collapse_pdf_btn.setText("◀")
+        self.collapse_pdf_btn.setToolTip("Collapse panel")
+        self.collapse_pdf_btn.setFixedSize(24, 24)
+        self.collapse_pdf_btn.setStyleSheet("QToolButton { border: none; font-size: 12px; }")
+        self.collapse_pdf_btn.clicked.connect(self.toggle_pdf_list_collapse)
+        left_header.addWidget(self.collapse_pdf_btn)
+        left_layout.addLayout(left_header)
+
         self.pdf_list = QListWidget()
         self.pdf_list.currentItemChanged.connect(self.on_pdf_selected)
         left_layout.addWidget(self.pdf_list)
-        splitter.addWidget(left_widget)
+        self.doc_splitter.addWidget(self.left_widget)
+
+        # Store original size for restore
+        self._pdf_list_width = 200
+        self._pdf_list_collapsed = False
 
         # Middle: Index Table + Controls
         middle_widget = QWidget()
         middle_layout = QVBoxLayout(middle_widget)
+        middle_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Header row with expand button (hidden by default) and search bar
+        middle_header = QHBoxLayout()
+        middle_header.setContentsMargins(4, 4, 4, 4)
+
+        self.expand_pdf_btn = QToolButton()
+        self.expand_pdf_btn.setText("▶")
+        self.expand_pdf_btn.setToolTip("Show PDF list")
+        self.expand_pdf_btn.setFixedSize(24, 24)
+        self.expand_pdf_btn.setStyleSheet("QToolButton { border: 1px solid #ccc; border-radius: 4px; font-size: 12px; background: #f0f0f0; }")
+        self.expand_pdf_btn.clicked.connect(self.toggle_pdf_list_collapse)
+        self.expand_pdf_btn.setVisible(False)  # Hidden until collapsed
+        middle_header.addWidget(self.expand_pdf_btn)
 
         # Search Bar
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search by Date or Title...")
         self.search_input.textChanged.connect(self.filter_documents)
-        middle_layout.addWidget(self.search_input)
+        middle_header.addWidget(self.search_input)
+
+        middle_layout.addLayout(middle_header)
 
         self.doc_table = QTableWidget()
         self.doc_table.setColumnCount(6)
@@ -1258,7 +1398,7 @@ class IndexTab(QWidget):
         btn_layout.addWidget(self.process_btn)
         middle_layout.addLayout(btn_layout)
 
-        splitter.addWidget(middle_widget)
+        self.doc_splitter.addWidget(middle_widget)
 
         # Right: PDF Preview
         preview_widget = QWidget()
@@ -1293,9 +1433,10 @@ class IndexTab(QWidget):
         mark_layout.addWidget(self.clear_mark_btn)
 
         preview_layout.addLayout(mark_layout)
-        splitter.addWidget(preview_widget)
+        self.doc_splitter.addWidget(preview_widget)
 
-        splitter.setSizes([200, 400, 500])
+        self.doc_splitter.setSizes([200, 400, 500])
+        self.doc_splitter.setCollapsible(0, True)
 
         # --- Sub-Tab 2: File Organization ---
         self.file_org_widget = QWidget()
@@ -1351,6 +1492,26 @@ class IndexTab(QWidget):
         
         org_splitter.addWidget(org_right_widget)
         org_splitter.setSizes([300, 900])
+
+    def toggle_pdf_list_collapse(self):
+        """Toggle collapse/expand of the processed PDFs panel."""
+        sizes = self.doc_splitter.sizes()
+        if self._pdf_list_collapsed:
+            # Expand
+            self.doc_splitter.setSizes([self._pdf_list_width, sizes[1] - self._pdf_list_width, sizes[2]])
+            self.collapse_pdf_btn.setText("◀")
+            self.collapse_pdf_btn.setToolTip("Collapse panel")
+            self.expand_pdf_btn.setVisible(False)
+            self._pdf_list_collapsed = False
+        else:
+            # Collapse - store current width first
+            if sizes[0] > 0:
+                self._pdf_list_width = sizes[0]
+            self.doc_splitter.setSizes([0, sizes[1] + sizes[0], sizes[2]])
+            self.collapse_pdf_btn.setText("▶")
+            self.collapse_pdf_btn.setToolTip("Expand panel")
+            self.expand_pdf_btn.setVisible(True)
+            self._pdf_list_collapsed = True
 
     def set_org_checkboxes(self, state):
         for i in range(self.org_table.rowCount()):
@@ -1666,6 +1827,7 @@ class IndexTab(QWidget):
         title_edit = QLineEdit(str(doc.get('title', '')))
         title_edit.setPlaceholderText("Document title")
         title_edit.setToolTip("Edit document title")
+        title_edit.setCursorPosition(0)  # Show beginning of text, not end
         self.doc_table.setCellWidget(row, 5, title_edit)
 
         return row

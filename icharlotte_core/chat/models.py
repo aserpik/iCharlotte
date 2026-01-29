@@ -48,13 +48,20 @@ class Message:
     model_used: Optional[str] = None
     response_time_ms: Optional[int] = None
 
+    def __post_init__(self):
+        """Normalize attachments to Attachment objects."""
+        self.attachments = [
+            Attachment.from_dict(a) if isinstance(a, dict) else a
+            for a in self.attachments
+        ]
+
     def to_dict(self) -> dict:
         return {
             'id': self.id,
             'role': self.role,
             'content': self.content,
             'timestamp': self.timestamp,
-            'attachments': [a.to_dict() for a in self.attachments],
+            'attachments': [a.to_dict() if hasattr(a, 'to_dict') else a for a in self.attachments],
             'pinned': self.pinned,
             'edited': self.edited,
             'original_content': self.original_content,

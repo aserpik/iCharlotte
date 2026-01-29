@@ -56,7 +56,7 @@ async def solve_image_captcha(page):
         sample_file = None
         try:
             with open(image_path, "rb") as f:
-                sample_file = client.files.upload(file=f, config={'display_name': "Captcha Image"})
+                sample_file = client.files.upload(file=f, config={'display_name': "Captcha Image", 'mime_type': 'image/png'})
         finally:
             # Delete image after upload attempt
             if os.path.exists(image_path):
@@ -67,18 +67,44 @@ async def solve_image_captcha(page):
 
         # Tailored prompt
         if is_image_captcha:
-            prompt = """
-            Return ONLY the alphanumeric characters shown in this distorted image. 
-            Be extremely precise. Look closely at each character:
-            - Distinguish carefully between numbers and letters (e.g., '8' vs 'g', '5' vs 'S', '0' vs 'O', '2' vs 'Z').
-            - Maintain exact case sensitivity (uppercase vs lowercase).
-            Return just the characters, nothing else.
-            """
+            prompt = """Look at this CAPTCHA image and return ONLY the exact alphanumeric characters shown.
+
+Rules:
+- Output ONLY the characters, nothing else (no quotes, no explanation)
+- Be case-sensitive (distinguish uppercase A from lowercase a)
+- Common confusions to watch for:
+  * 0 (zero) vs O (letter O) vs o (lowercase o)
+  * 1 (one) vs l (lowercase L) vs I (uppercase i)
+  * 5 vs S vs s
+  * 8 vs B vs g
+  * 2 vs Z vs z
+  * 6 vs b vs G
+  * 9 vs q vs g
+- Look at the shape and style carefully
+- Most CAPTCHAs are 4-6 characters long
+
+Output the characters now:"""
         else:
             prompt = "Solve this math problem (e.g., '1 + 5 ='). Return ONLY the result number."
         
-        response = client.models.generate_content(model="gemini-2.0-flash", contents=[sample_file, prompt])
+        # Use gemini-3-pro-preview for best OCR accuracy on distorted text
+        response = client.models.generate_content(model="gemini-3-pro-preview", contents=[sample_file, prompt])
         captcha_text = response.text.strip()
+
+        # Handle verbose responses - extract just the alphanumeric characters
+        # If response contains newlines or is too long, it's probably an explanation
+        if '\n' in captcha_text or len(captcha_text) > 10:
+            # Try to find a short alphanumeric sequence (typical CAPTCHA is 4-6 chars)
+            import re as regex
+            # Look for standalone alphanumeric sequences of 4-7 characters
+            matches = regex.findall(r'\b[A-Za-z0-9]{4,7}\b', captcha_text)
+            if matches:
+                # Take the last match (often the final answer)
+                captcha_text = matches[-1]
+                log_debug(f"Extracted CAPTCHA from verbose response: '{captcha_text}'")
+
+        # Remove any quotes or extra whitespace that the model might add
+        captcha_text = captcha_text.strip("'\"` \n\r")
         
         log_debug(f"Gemini solved captcha: '{captcha_text}'")
         
@@ -119,6 +145,153 @@ async def solve_math_captcha(page):
     except Exception as e:
         print(f"Warning: Could not solve math captcha automatically: {e}")
     return False
+
+async def expand_all_pagination(page):
+    """
+    Expands all paginated tables by collecting all data from each page.
+    Modifies the DOM to show all rows in each table before PDF generation.
+    """
+    try:
+        # Find all tables that have associated pagination
+        # We'll process each table section separately
+        tables = page.locator("table")
+        table_count = await tables.count()
+
+        if table_count == 0:
+            print("No tables found on page.")
+            return
+
+        print(f"Found {table_count} table(s). Checking for pagination...")
+
+        # Process tables in reverse order to avoid index shifting issues
+        for table_idx in range(table_count - 1, -1, -1):
+            table = tables.nth(table_idx)
+
+            # Find the section/container that holds this table
+            # Look for a parent with a pager nearby
+            section = await table.evaluate("""el => {
+                // Walk up to find a container that has both table and pager
+                let parent = el.parentElement;
+                for (let i = 0; i < 10 && parent; i++) {
+                    if (parent.querySelector('.pager') || parent.querySelector('.pagination')) {
+                        return parent.className || parent.id || 'found';
+                    }
+                    parent = parent.parentElement;
+                }
+                return null;
+            }""")
+
+            if not section:
+                continue
+
+            print(f"Processing table {table_idx + 1} with pagination...")
+
+            # Collect all rows from all pages for this table
+            all_rows_html = []
+            header_html = None
+            page_num = 1
+            max_pages = 50  # Safety limit
+
+            while page_num <= max_pages:
+                # Re-fetch table reference as DOM may have changed
+                current_table = page.locator("table").nth(table_idx)
+
+                if await current_table.count() == 0:
+                    break
+
+                # Get header on first page
+                if header_html is None:
+                    thead = current_table.locator("thead")
+                    if await thead.count() > 0:
+                        header_html = await thead.evaluate("el => el.outerHTML")
+
+                # Get current table body rows
+                tbody = current_table.locator("tbody")
+                if await tbody.count() > 0:
+                    rows = tbody.locator("tr")
+                    row_count = await rows.count()
+
+                    for r in range(row_count):
+                        row = rows.nth(r)
+                        row_html = await row.evaluate("el => el.outerHTML")
+                        # Avoid duplicate rows
+                        if row_html not in all_rows_html:
+                            all_rows_html.append(row_html)
+
+                    print(f"  Page {page_num}: collected {row_count} rows (total: {len(all_rows_html)})")
+
+                # Find the pager associated with this table section
+                # Look for next page link
+                pager = page.locator(".pager").first
+                next_link = pager.locator("a[title='Go to next page'], .pager-next a").first
+
+                if await next_link.count() == 0:
+                    print(f"  No more pages (stopped at page {page_num})")
+                    break
+
+                # Check if next link is actually clickable
+                is_visible = await next_link.is_visible()
+                if not is_visible:
+                    print(f"  Next link not visible (stopped at page {page_num})")
+                    break
+
+                # Click next and wait for content to load
+                await next_link.click()
+                await page.wait_for_load_state("networkidle")
+                await page.wait_for_timeout(800)  # Wait for table to update
+
+                page_num += 1
+
+            # If we collected rows from multiple pages, rebuild the table
+            if page_num > 1 and len(all_rows_html) > 0:
+                print(f"  Rebuilding table with all {len(all_rows_html)} rows...")
+
+                # Join all rows into single HTML string
+                all_rows_joined = "".join(all_rows_html)
+                total_rows = len(all_rows_html)
+
+                # Inject all collected rows into the table using evaluate with arguments
+                # This safely passes the HTML without string escaping issues
+                await page.evaluate("""([tableIdx, rowsHtml, totalRows]) => {
+                    const table = document.querySelectorAll('table')[tableIdx];
+                    if (!table) return;
+
+                    let tbody = table.querySelector('tbody');
+                    if (!tbody) {
+                        tbody = document.createElement('tbody');
+                        table.appendChild(tbody);
+                    }
+
+                    // Replace tbody content with all collected rows
+                    tbody.innerHTML = rowsHtml;
+
+                    // Hide pagination since we now show all data
+                    const pagers = document.querySelectorAll('.pager, .pagination');
+                    pagers.forEach(p => p.style.display = 'none');
+
+                    // Update any "Results X-Y of Z" text
+                    const resultTexts = document.querySelectorAll('[class*="result"], [class*="count"]');
+                    resultTexts.forEach(el => {
+                        if (el.textContent.includes('Results') || el.textContent.includes('of')) {
+                            el.textContent = 'Showing all ' + totalRows + ' results';
+                        }
+                    });
+                }""", [table_idx, all_rows_joined, total_rows])
+
+                print(f"  Table rebuilt successfully with {len(all_rows_html)} rows")
+
+        # Final cleanup: hide all pagination controls
+        await page.evaluate("""() => {
+            document.querySelectorAll('.pager, .pagination, .pager-nav').forEach(p => {
+                p.style.display = 'none';
+            });
+        }""")
+
+    except Exception as e:
+        print(f"Warning: Error expanding pagination: {e}")
+        import traceback
+        traceback.print_exc()
+        # Continue anyway - we'll get at least the first page
 
 async def main():
     if len(sys.argv) < 2:
@@ -183,10 +356,30 @@ async def main():
                     logged_in = True
                     break
                 except:
-                    print(f"Attempt {attempt} failed or timed out. Checking for CAPTCHA error...")
+                    print(f"Attempt {attempt} failed or timed out. Checking for error messages...")
                     # Check if we are still on the login page. If so, loop continues.
                     # The page often reloads with a new captcha automatically.
                     await page.wait_for_load_state("networkidle")
+
+                    # Check for specific error messages on the page
+                    error_selectors = [
+                        ".messages--error",
+                        ".error-message",
+                        ".alert-danger",
+                        "[role='alert']",
+                        ".form-item--error-message"
+                    ]
+                    for selector in error_selectors:
+                        error_el = page.locator(selector).first
+                        if await error_el.count() > 0:
+                            error_text = await error_el.inner_text()
+                            print(f"  Page error: {error_text.strip()[:200]}")
+
+                            # Check for account lockout - no point retrying
+                            if "temporarily blocked" in error_text.lower() or "too many" in error_text.lower():
+                                print("ACCOUNT LOCKED: Too many failed attempts. Please wait before retrying.")
+                                print("The account lockout typically lasts 15-30 minutes.")
+                                sys.exit(1)
             
             if not logged_in:
                 print("CRITICAL ERROR: Failed to log in after maximum attempts.")
@@ -230,7 +423,11 @@ async def main():
             
             # Wait for content rendering
             await page.wait_for_load_state("networkidle")
-            
+
+            # Expand all paginated sections (Hearings, Documents, etc.)
+            print("Expanding all paginated sections...")
+            await expand_all_pagination(page)
+
             # Apply CSS fixes for clean PDF formatting
             await page.evaluate("""() => {
                 const mainContainer = document.querySelector('.main-container');

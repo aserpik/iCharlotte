@@ -31,6 +31,7 @@ from icharlotte_core.exceptions import (
     ExtractionError, LLMError, PassFailedError,
     SummaryPassError, CrossCheckPassError, MemoryLimitError
 )
+from icharlotte_core.docx_writer import safe_append_to_docx, DocxWriteError
 
 # Import Case Data Manager
 try:
@@ -38,6 +39,12 @@ try:
 except ImportError:
     sys.path.append(os.path.join(os.getcwd(), 'Scripts'))
     from case_data_manager import CaseDataManager
+
+# Import Document Registry for classification
+try:
+    from document_registry import classify_and_register
+except ImportError:
+    from Scripts.document_registry import classify_and_register
 
 
 # =============================================================================
@@ -243,6 +250,9 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
     memory_monitor = MemoryMonitor(warn_threshold_mb=1500, abort_threshold_mb=2000, logger=logger.info)
     llm_caller = LLMCaller(logger=logger)
 
+    # Progress tracking
+    logger.progress(2, "Initializing summarization pipeline...")
+
     # Load prompts
     try:
         with open(PROMPT_FILE, "r", encoding="utf-8") as f:
@@ -260,11 +270,13 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
             logger.warning("Could not load cross-check prompt. Skipping cross-check pass.")
 
     total_passes = 3 if cross_check_prompt else 2
+    logger.progress(5, "Prompts loaded, starting text extraction...")
 
     # ==========================================================================
-    # Pass 1: Text Extraction
+    # Pass 1: Text Extraction (5% - 25%)
     # ==========================================================================
     logger.pass_start("Extraction", 1, total_passes)
+    logger.progress(7, "Reading document...")
 
     try:
         with memory_monitor.track_operation("Text Extraction"):
@@ -272,12 +284,14 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
                 ocr_config=OCRConfig(adaptive=True),
                 logger=logger
             )
+            logger.progress(10, "Running text extraction (OCR if needed)...")
             result = processor.extract_with_dynamic_ocr(input_path)
 
             if not result.success:
                 raise ExtractionError(f"Failed to extract text: {result.error}", file_path=input_path)
 
             text = result.text
+            logger.progress(22, f"Extracted {result.char_count} chars from {result.page_count} pages")
             logger.info(f"Extracted {result.char_count} chars from {result.page_count} pages")
             logger.info(f"OCR used on {len(result.ocr_pages)} pages ({result.ocr_percentage:.1f}%)")
 
@@ -288,60 +302,74 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
         logger.pass_failed("Extraction", str(e), recoverable=False)
         return False
 
+    logger.progress(25, "Text extraction complete")
     logger.pass_complete("Extraction", success=True)
 
     # ==========================================================================
-    # Pass 2: Summary Generation
+    # Pass 2: Summary Generation (25% - 65%)
     # ==========================================================================
     logger.pass_start("Summary", 2, total_passes)
+    logger.progress(28, "Starting summary generation...")
 
     try:
         with memory_monitor.track_operation("Summary Generation"):
+            logger.progress(35, "Sending document to LLM for summarization...")
             summary = llm_caller.call(summary_prompt, text, task_type="summary")
 
             if not summary:
                 raise SummaryPassError("LLM returned empty response")
 
+            logger.progress(62, f"Summary generated: {len(summary)} chars")
             logger.info(f"Generated summary: {len(summary)} chars")
 
     except Exception as e:
         logger.pass_failed("Summary", str(e), recoverable=True)
         return False
 
+    logger.progress(65, "Summary generation complete")
     logger.pass_complete("Summary", success=True)
 
     # ==========================================================================
-    # Pass 3: Cross-Check Verification (Optional)
+    # Pass 3: Cross-Check Verification (Optional) (65% - 88%)
     # ==========================================================================
     if cross_check_prompt:
         logger.pass_start("CrossCheck", 3, total_passes)
+        logger.progress(68, "Starting cross-check verification...")
 
         try:
             with memory_monitor.track_operation("Cross-Check"):
                 # Format the cross-check prompt with summary and original
                 formatted_prompt = cross_check_prompt.replace("{summary}", summary).replace("{original}", text[:50000])
 
+                logger.progress(72, "Sending to LLM for cross-check verification...")
                 verified_summary = llm_caller.call(formatted_prompt, "", task_type="cross_check")
 
                 if verified_summary:
                     # Check if cross-check made meaningful changes
                     if len(verified_summary) > len(summary) * 0.9:
                         summary = verified_summary
+                        logger.progress(85, "Cross-check completed with improvements")
                         logger.info("Cross-check completed with improvements")
                     else:
+                        logger.progress(85, "Cross-check returned shorter result, using original")
                         logger.warning("Cross-check returned shorter result. Using original summary.")
                 else:
+                    logger.progress(85, "Cross-check returned empty, using original")
                     logger.warning("Cross-check returned empty. Using original summary.")
 
         except Exception as e:
             logger.pass_failed("CrossCheck", str(e), recoverable=True)
             logger.warning("Continuing with unverified summary")
 
+        logger.progress(88, "Cross-check verification complete")
         logger.pass_complete("CrossCheck", success=True)
+    else:
+        logger.progress(88, "Cross-check skipped (no prompt configured)")
 
     # ==========================================================================
-    # Save Output
+    # Save Output (with process-safe locking) (88% - 95%)
     # ==========================================================================
+    logger.progress(89, "Preparing to save output...")
     output_dir = get_output_directory(input_path)
 
     if not os.path.exists(output_dir):
@@ -355,18 +383,30 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
     output_file = os.path.join(output_dir, "AI_OUTPUT.docx")
     title = os.path.basename(input_path)
 
-    if not save_to_docx(summary, output_file, title, logger):
+    logger.progress(91, f"Saving to {os.path.basename(output_file)}...")
+    try:
+        saved_path = safe_append_to_docx(
+            output_path=output_file,
+            content=summary,
+            title=title,
+            logger=logger
+        )
+        logger.output_file(saved_path)
+        logger.progress(95, "Document saved successfully")
+    except DocxWriteError as e:
+        logger.error(f"Failed to save output: {e}")
         return False
 
     # ==========================================================================
-    # Save to Case Data
+    # Save to Case Data (95% - 98%)
     # ==========================================================================
-    try:
-        data_manager = CaseDataManager()
-        file_num_match = re.search(r"(\d{4}\.\d{3})", input_path)
+    logger.progress(96, "Saving to case database...")
+    file_num_match = re.search(r"(\d{4}\.\d{3})", input_path)
+    file_num = file_num_match.group(1) if file_num_match else None
 
-        if file_num_match:
-            file_num = file_num_match.group(1)
+    try:
+        if file_num:
+            data_manager = CaseDataManager()
             base_name = os.path.splitext(os.path.basename(input_path))[0]
             clean_var_name = re.sub(r"[^a-zA-Z0-9_]", "_", base_name.lower())
             var_key = f"summary_{clean_var_name}"
@@ -376,6 +416,27 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
     except Exception as e:
         logger.warning(f"Could not save to case data: {e}")
 
+    # ==========================================================================
+    # Classify and Register Document (98% - 100%)
+    # ==========================================================================
+    logger.progress(98, "Registering document...")
+    try:
+        if file_num:
+            base_name = os.path.splitext(os.path.basename(input_path))[0]
+            classify_and_register(
+                file_number=file_num,
+                document_name=base_name,
+                summary=summary,
+                source_path=input_path,
+                summary_location=output_file,
+                agent="summarize",
+                logger=logger
+            )
+            logger.info(f"Registered document in case registry")
+    except Exception as e:
+        logger.warning(f"Could not register document: {e}")
+
+    logger.progress(100, "Summarization complete")
     return True
 
 
