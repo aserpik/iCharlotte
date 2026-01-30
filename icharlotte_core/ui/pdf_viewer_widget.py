@@ -92,8 +92,42 @@ class PdfViewerWidget(QWidget):
             margin: 10px auto;
             background: white;
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            position: relative;
         }
         canvas { display: block; }
+
+        /* Text layer for selection */
+        .textLayer {
+            position: absolute;
+            left: 0;
+            top: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+            opacity: 0.2;
+            line-height: 1.0;
+            user-select: text;
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+        }
+
+        .textLayer > span {
+            color: transparent;
+            position: absolute;
+            white-space: pre;
+            cursor: text;
+            transform-origin: 0% 0%;
+        }
+
+        .textLayer ::selection {
+            background: rgba(0, 0, 255, 0.3);
+        }
+
+        .textLayer ::-moz-selection {
+            background: rgba(0, 0, 255, 0.3);
+        }
+
         #loading {
             position: absolute;
             top: 50%;
@@ -190,6 +224,8 @@ class PdfViewerWidget(QWidget):
             pageDiv.className = 'page';
             pageDiv.id = 'page-' + pageNum;
             pageDiv.dataset.pageNumber = pageNum;
+            pageDiv.style.width = viewport.width + 'px';
+            pageDiv.style.height = viewport.height + 'px';
 
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
@@ -199,7 +235,25 @@ class PdfViewerWidget(QWidget):
             pageDiv.appendChild(canvas);
             document.getElementById('viewerContainer').appendChild(pageDiv);
 
+            // Render canvas
             await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+            // Add text layer for selection
+            const textContent = await page.getTextContent();
+            const textLayerDiv = document.createElement('div');
+            textLayerDiv.className = 'textLayer';
+            textLayerDiv.style.width = viewport.width + 'px';
+            textLayerDiv.style.height = viewport.height + 'px';
+            pageDiv.appendChild(textLayerDiv);
+
+            // Render text layer
+            pdfjsLib.renderTextLayer({
+                textContentSource: textContent,
+                container: textLayerDiv,
+                viewport: viewport,
+                textDivs: []
+            });
+
             renderedPages.add(pageNum);
         }
 

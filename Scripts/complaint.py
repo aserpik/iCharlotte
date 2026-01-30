@@ -318,37 +318,52 @@ def apply_markdown(cell, text: str):
 def extract_file_number_from_path(file_path: str) -> Optional[str]:
     """
     Extracts file number in format ####.### from the file path.
-    Based on structure: .../Current Clients/<Folder1>/<Folder2>/...
-    Folder1 starts with 4 digits. Folder2 starts with 3 digits.
+
+    Handles paths like:
+    - .../Current Clients/3800- NATIONWIDE/3850/084 - Dudash/...
+    - Paths containing literal "3850.084"
     """
     if not file_path:
         return None
-        
+
     try:
+        # First try: literal pattern with dot (e.g., "3850.084")
+        match = re.search(r"(\d{4}\.\d{3})", file_path)
+        if match:
+            return match.group(1)
+
         # Normalize path separators
         norm_path = os.path.normpath(file_path)
         parts = norm_path.split(os.sep)
-        
-        # Find index of "Current Clients" (case insensitive)
+
+        # Look for consecutive folders matching 4-digit/3-digit pattern
+        for i in range(len(parts) - 1):
+            # Look for 4-digit client folder (e.g., "3850" or "3850 - Name")
+            client_match = re.match(r"^(\d{4})(?:\D|$)", parts[i])
+            if client_match:
+                # Check if next folder is 3-digit matter (e.g., "084" or "084 - Name")
+                matter_match = re.match(r"^(\d{3})(?:\D|$)", parts[i + 1])
+                if matter_match:
+                    return f"{client_match.group(1)}.{matter_match.group(1)}"
+
+        # Fallback: Find "Current Clients" and check structure
         cc_index = -1
         for i, part in enumerate(parts):
             if part.lower() == "current clients":
                 cc_index = i
                 break
-        
-        if cc_index != -1 and cc_index + 2 < len(parts):
-            folder1 = parts[cc_index + 1]
-            folder2 = parts[cc_index + 2]
-            
-            # Extract numbers
-            # "The first four numbers... first four numbers of the folder"
-            match1 = re.match(r'^(\d{4})', folder1)
-            # "The last 3 numbers... first 3 numbers of the next embedded folder"
-            match2 = re.match(r'^(\d{3})', folder2)
-            
+
+        if cc_index != -1 and cc_index + 3 < len(parts):
+            # Try offset +2 and +3 (skipping group folder like "3800- NATIONWIDE")
+            folder1 = parts[cc_index + 2]  # e.g., "3850"
+            folder2 = parts[cc_index + 3]  # e.g., "084 - Dudash"
+
+            match1 = re.match(r'^(\d{4})(?:\D|$)', folder1)
+            match2 = re.match(r'^(\d{3})(?:\D|$)', folder2)
+
             if match1 and match2:
                 return f"{match1.group(1)}.{match2.group(1)}"
-                
+
         return None
     except Exception as e:
         log_event(f"Error extracting file number from path: {e}", level="error")

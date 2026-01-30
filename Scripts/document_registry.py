@@ -121,6 +121,40 @@ SUMMARY:
 DOCUMENT TYPE:"""
 
 
+NAMING_PROMPT = """You are a legal document naming assistant. Generate a standardized, professional document name based on the summary and document type provided.
+
+DOCUMENT TYPE: {document_type}
+
+SUMMARY:
+{summary}
+
+NAMING RULES:
+1. Use proper legal naming conventions
+2. Include the party name and role when relevant (e.g., "Plaintiff John Smith" or "Defendant ABC Corp")
+3. For discovery, include: party role, party name, discovery type, and set number if known
+   - Example: "Plaintiff Jane Doe's Responses to Form Interrogatories (Set One)"
+   - Example: "Defendant ABC Corp's Responses to Request for Production (Set Two)"
+4. For depositions, include: "Deposition of [Name]" and their role if known
+   - Example: "Deposition of Plaintiff John Smith"
+   - Example: "Deposition of Expert Dr. Jane Williams"
+5. For reports, use the standard name
+   - Example: "Traffic Collision Report"
+   - Example: "ISO ClaimSearch Report"
+6. For pleadings, include the filing party when known
+   - Example: "Complaint (Plaintiff John Smith)"
+   - Example: "Answer to Complaint (Defendant ABC Corp)"
+7. For medical records, include provider name if known
+   - Example: "Medical Records - Kaiser Permanente"
+   - Example: "Medical Records - Dr. Smith Orthopedics"
+8. Keep names concise but descriptive (under 80 characters)
+9. Use title case
+10. Do not include file extensions or dates in the name
+
+Return ONLY the document name, nothing else.
+
+DOCUMENT NAME:"""
+
+
 # =============================================================================
 # Data Classes
 # =============================================================================
@@ -381,6 +415,53 @@ class DocumentClassifier:
                 self.logger.warning(f"LLM classification failed: {e}")
             return "Other"
 
+    def generate_name(self, summary: str, document_type: str, fallback_name: str = "") -> str:
+        """
+        Generate a standardized document name using LLM.
+
+        Args:
+            summary: The document summary text.
+            document_type: The classified document type.
+            fallback_name: Name to use if LLM fails.
+
+        Returns:
+            Standardized document name.
+        """
+        try:
+            prompt = NAMING_PROMPT.format(
+                document_type=document_type,
+                summary=summary[:5000]  # Limit summary length
+            )
+
+            response = self.llm_caller.call(
+                prompt,
+                "",
+                agent_id="agent_chat"  # Use fast model for naming
+            )
+
+            if response:
+                # Clean up response
+                name = response.strip().strip('"').strip("'")
+
+                # Remove any file extensions that might have been added
+                for ext in ['.pdf', '.docx', '.doc', '.txt']:
+                    if name.lower().endswith(ext):
+                        name = name[:-len(ext)]
+
+                # Ensure reasonable length
+                if len(name) > 100:
+                    name = name[:97] + "..."
+
+                if name:
+                    return name
+
+            return fallback_name if fallback_name else "Untitled Document"
+
+        except Exception as e:
+            if self.logger:
+                self.logger.warning(f"LLM naming failed: {e}")
+            return fallback_name if fallback_name else "Untitled Document"
+
 
 # =============================================================================
 # Utility Functions
@@ -393,19 +474,21 @@ def classify_and_register(
     source_path: str,
     summary_location: str,
     agent: str,
-    logger=None
+    logger=None,
+    auto_name: bool = True
 ) -> RegisteredDocument:
     """
     Convenience function to classify a document and register it.
 
     Args:
         file_number: Case file number.
-        document_name: Original document filename.
+        document_name: Original document filename (used as fallback).
         summary: The summary text.
         source_path: Path to original document.
         summary_location: Where summary is stored.
         agent: Which agent processed it.
         logger: Optional logger.
+        auto_name: If True, use LLM to generate a standardized name.
 
     Returns:
         RegisteredDocument instance.
@@ -416,10 +499,17 @@ def classify_and_register(
     if logger:
         logger.info(f"Classified '{document_name}' as: {doc_type}")
 
+    # Generate standardized name if auto_name is enabled
+    final_name = document_name
+    if auto_name:
+        final_name = classifier.generate_name(summary, doc_type, fallback_name=document_name)
+        if logger and final_name != document_name:
+            logger.info(f"Generated name: '{final_name}'")
+
     registry = DocumentRegistry()
     doc = registry.register_document(
         file_number=file_number,
-        name=document_name,
+        name=final_name,
         document_type=doc_type,
         source_path=source_path,
         summary_location=summary_location,

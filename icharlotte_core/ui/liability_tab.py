@@ -216,11 +216,6 @@ class LiabilityExposureTab(ChatTab):
         self.stop_analysis_btn.clicked.connect(self.stop_generation)
         left_layout.addWidget(self.stop_analysis_btn)
         
-        # Manage Prompts Button
-        self.manage_prompts_btn = QPushButton("Manage Analysis Prompts")
-        self.manage_prompts_btn.clicked.connect(self.open_prompt_manager)
-        left_layout.addWidget(self.manage_prompts_btn)
-        
         left_layout.addStretch()
         splitter.addWidget(left_panel)
         
@@ -285,10 +280,6 @@ class LiabilityExposureTab(ChatTab):
             self.analyze_btn.setVisible(False)
             self.send_btn.setEnabled(True)
             self.chat_input.setEnabled(True)
-
-    def open_prompt_manager(self):
-        dlg = LiabilityPromptsDialog(self)
-        dlg.exec()
 
     def perform_analysis(self):
         # 1. Validate inputs

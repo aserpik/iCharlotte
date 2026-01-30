@@ -588,7 +588,7 @@ class ContradictionSettingsDialog(QDialog):
         summary_tab = QWidget()
         summary_layout = QVBoxLayout(summary_tab)
 
-        # Header with toggle button
+        # Header with toggle and delete buttons
         header_layout = QHBoxLayout()
         header_layout.addWidget(QLabel("<b>Select Summaries to Analyze:</b>"))
         header_layout.addStretch()
@@ -598,11 +598,21 @@ class ContradictionSettingsDialog(QDialog):
         self.toggle_btn.clicked.connect(self._toggle_selection)
         header_layout.addWidget(self.toggle_btn)
 
+        self.delete_btn = QPushButton("Delete Selected")
+        self.delete_btn.setFixedWidth(110)
+        self.delete_btn.setStyleSheet("background-color: #f44336; color: white;")
+        self.delete_btn.clicked.connect(self._delete_selected)
+        header_layout.addWidget(self.delete_btn)
+
         summary_layout.addLayout(header_layout)
 
         # Summary list with checkboxes
         self.summary_list = QListWidget()
         self.summary_list.setAlternatingRowColors(True)
+        self.summary_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self.summary_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.summary_list.customContextMenuRequested.connect(self._show_context_menu)
+        self.summary_list.installEventFilter(self)
         summary_layout.addWidget(self.summary_list)
 
         # Info label
@@ -872,6 +882,75 @@ class ContradictionSettingsDialog(QDialog):
 
         self.accept()
 
+    def eventFilter(self, obj, event):
+        """Handle key press events for delete functionality."""
+        if obj == self.summary_list and event.type() == event.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Delete:
+                self._delete_selected()
+                return True
+        return super().eventFilter(obj, event)
+
+    def _show_context_menu(self, position):
+        """Show context menu for the summary list."""
+        menu = QMenu(self)
+
+        delete_action = menu.addAction("Delete Selected")
+        delete_action.triggered.connect(self._delete_selected)
+
+        # Only show if there are selected items
+        selected_items = self.summary_list.selectedItems()
+        if not selected_items:
+            delete_action.setEnabled(False)
+
+        menu.exec(self.summary_list.mapToGlobal(position))
+
+    def _delete_selected(self):
+        """Delete selected items from the list and document registry."""
+        selected_items = self.summary_list.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, "No Selection", "Please select items to delete (click to select, Ctrl+click for multiple).")
+            return
+
+        # Confirm deletion
+        count = len(selected_items)
+        reply = QMessageBox.question(
+            self,
+            "Confirm Deletion",
+            f"Delete {count} item(s) from the document registry?\n\nThis will remove them from the list but NOT delete the actual summary files.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        # Delete from registry and list
+        try:
+            from document_registry import DocumentRegistry
+            registry = DocumentRegistry()
+
+            deleted_count = 0
+            for item in selected_items:
+                name = item.data(Qt.ItemDataRole.UserRole) or item.text()
+
+                # Remove from document registry
+                if registry.remove_document(self.file_number, name):
+                    deleted_count += 1
+                    log_event(f"Removed '{name}' from document registry")
+
+                # Remove from list widget
+                row = self.summary_list.row(item)
+                self.summary_list.takeItem(row)
+
+            # Update info label
+            remaining = self.summary_list.count()
+            self.info_label.setText(f"Found {remaining} summaries for case {self.file_number} ({deleted_count} deleted)")
+            self._update_toggle_button()
+
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Error deleting items: {e}")
+            log_event(f"Error deleting from registry: {e}", "error")
+
     def get_selected_summaries(self):
         """Return list of selected summary names."""
         selected = []
@@ -955,10 +1034,20 @@ class TimelineSettingsDialog(QDialog):
         self.toggle_btn.clicked.connect(self._toggle_selection)
         header_layout.addWidget(self.toggle_btn)
 
+        self.delete_btn = QPushButton("Delete Selected")
+        self.delete_btn.setFixedWidth(110)
+        self.delete_btn.setStyleSheet("background-color: #f44336; color: white;")
+        self.delete_btn.clicked.connect(self._delete_selected)
+        header_layout.addWidget(self.delete_btn)
+
         summary_layout.addLayout(header_layout)
 
         self.summary_list = QListWidget()
         self.summary_list.setAlternatingRowColors(True)
+        self.summary_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self.summary_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.summary_list.customContextMenuRequested.connect(self._show_context_menu)
+        self.summary_list.installEventFilter(self)
         summary_layout.addWidget(self.summary_list)
 
         self.info_label = QLabel("Loading summaries...")
@@ -1224,6 +1313,69 @@ class TimelineSettingsDialog(QDialog):
                 QMessageBox.warning(self, "Warning", f"Could not save prompt: {e}")
 
         self.accept()
+
+    def eventFilter(self, obj, event):
+        """Handle key press events for delete functionality."""
+        if obj == self.summary_list and event.type() == event.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Delete:
+                self._delete_selected()
+                return True
+        return super().eventFilter(obj, event)
+
+    def _show_context_menu(self, position):
+        """Show context menu for the summary list."""
+        menu = QMenu(self)
+
+        delete_action = menu.addAction("Delete Selected")
+        delete_action.triggered.connect(self._delete_selected)
+
+        selected_items = self.summary_list.selectedItems()
+        if not selected_items:
+            delete_action.setEnabled(False)
+
+        menu.exec(self.summary_list.mapToGlobal(position))
+
+    def _delete_selected(self):
+        """Delete selected items from the list and document registry."""
+        selected_items = self.summary_list.selectedItems()
+        if not selected_items:
+            QMessageBox.information(self, "No Selection", "Please select items to delete (click to select, Ctrl+click for multiple).")
+            return
+
+        count = len(selected_items)
+        reply = QMessageBox.question(
+            self,
+            "Confirm Deletion",
+            f"Delete {count} item(s) from the document registry?\n\nThis will remove them from the list but NOT delete the actual summary files.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            from document_registry import DocumentRegistry
+            registry = DocumentRegistry()
+
+            deleted_count = 0
+            for item in selected_items:
+                name = item.data(Qt.ItemDataRole.UserRole) or item.text()
+
+                if registry.remove_document(self.file_number, name):
+                    deleted_count += 1
+                    log_event(f"Removed '{name}' from document registry")
+
+                row = self.summary_list.row(item)
+                self.summary_list.takeItem(row)
+
+            remaining = self.summary_list.count()
+            self.info_label.setText(f"Found {remaining} documents for case {self.file_number} ({deleted_count} deleted)")
+            self._update_toggle_button()
+
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Error deleting items: {e}")
+            log_event(f"Error deleting from registry: {e}", "error")
 
 
 # =============================================================================
@@ -2970,15 +3122,8 @@ class EnhancedFileTreeWidget(QTreeWidget):
 
     def _update_tags_column(self, path):
         """Update the tags column for a specific file."""
-        # Find the item with this path
-        iterator = QTreeWidgetItemIterator(self)
-        while iterator.value():
-            item = iterator.value()
-            if item.data(0, Qt.ItemDataRole.UserRole) == path:
-                tags = self.tags_db.get_tags(path) if self.tags_db else []
-                item.setText(5, ", ".join(tags) if tags else "")
-                break
-            iterator += 1
+        # Tags column has been removed from the UI
+        pass
 
     def _create_folder(self, parent_path):
         """Create a new subfolder."""

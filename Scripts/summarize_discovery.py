@@ -775,10 +775,16 @@ def process_document(input_path: str, logger: AgentLogger, report_dir: str = Non
             }
             registry_doc_type = doc_type_map.get(classified_discovery_type, "Form Interrogatories - Responses")
 
+            # Generate standardized document name
+            from document_registry import DocumentClassifier
+            classifier = DocumentClassifier(logger=logger)
+            standardized_name = classifier.generate_name(summary_content, registry_doc_type, fallback_name=base_name)
+            logger.info(f"Generated name: '{standardized_name}'")
+
             registry = DocumentRegistry()
             registry.register_document(
                 file_number=file_num,
-                name=base_name,
+                name=standardized_name,
                 document_type=registry_doc_type,
                 source_path=input_path,
                 summary_location=output_file,
@@ -816,22 +822,51 @@ def process_document(input_path: str, logger: AgentLogger, report_dir: str = Non
 
 
 def extract_file_number(path: str) -> str:
-    """Extract file number from path."""
-    # Standard pattern: 1234.567
+    """Extract file number from path.
+
+    Handles paths like:
+    - Z:\\Shared\\Current Clients\\3800- NATIONWIDE\\3850\\084 - Dudash\\...
+    - Paths containing literal "3850.084"
+    """
+    # Standard pattern: 1234.567 (with literal dot)
     match = re.search(r"(\d{4}\.\d{3})", path)
     if match:
         return match.group(1)
 
     # Parse from directory structure
+    # Look for pattern: 4-digit folder followed by 3-digit folder
     parts = os.path.normpath(path).split(os.sep)
     try:
+        # Find consecutive folders matching client/matter pattern
+        for i in range(len(parts) - 1):
+            # Look for 4-digit client folder (e.g., "3850" or "3850 - Name")
+            client_match = re.match(r"^(\d{4})(?:\D|$)", parts[i])
+            if client_match:
+                # Check if next folder is 3-digit matter (e.g., "084" or "084 - Name")
+                matter_match = re.match(r"^(\d{3})(?:\D|$)", parts[i + 1])
+                if matter_match:
+                    return f"{client_match.group(1)}.{matter_match.group(1)}"
+
+        # Fallback: Look for "Current Clients" structure
+        # Pattern: Current Clients\GroupFolder\ClientFolder\MatterFolder
         cc_index = -1
         for i, part in enumerate(parts):
             if part.lower() == "current clients":
                 cc_index = i
                 break
 
-        if cc_index != -1 and cc_index + 2 < len(parts):
+        if cc_index != -1 and cc_index + 3 < len(parts):
+            # Skip the group folder (e.g., "3800- NATIONWIDE"), use folders at +2 and +3
+            client_folder = parts[cc_index + 2]  # e.g., "3850"
+            matter_folder = parts[cc_index + 3]  # e.g., "084 - Dudash"
+
+            client_code = re.match(r"^(\d{4})(?:\D|$)", client_folder)
+            matter_code = re.match(r"^(\d{3})(?:\D|$)", matter_folder)
+
+            if client_code and matter_code:
+                return f"{client_code.group(1)}.{matter_code.group(1)}"
+
+            # Try original positions if new positions don't match
             client_folder = parts[cc_index + 1]
             matter_folder = parts[cc_index + 2]
 
@@ -839,7 +874,10 @@ def extract_file_number(path: str) -> str:
             matter_code = re.match(r"^\d+", matter_folder)
 
             if client_code and matter_code:
-                return f"{client_code.group(0)}.{matter_code.group(0)}"
+                file_num = f"{client_code.group(0)}.{matter_code.group(0)}"
+                # Validate format (4 digits.3 digits)
+                if re.match(r"^\d{4}\.\d{3}$", file_num):
+                    return file_num
     except Exception:
         pass
 
@@ -957,8 +995,7 @@ def main():
         file_paths = clean_args
 
     # Extract file number for logger
-    file_num_match = re.search(r"(\d{4}\.\d{3})", " ".join(file_paths))
-    file_number = file_num_match.group(1) if file_num_match else None
+    file_number = extract_file_number(file_paths[0]) if file_paths else None
 
     logger = AgentLogger("Discovery", file_number=file_number)
 

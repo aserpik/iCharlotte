@@ -67,7 +67,6 @@ AGENT_DEFINITIONS = [
     # Case Agents
     ("agent_docket", "Docket", "Docket download and processing", "extraction"),
     ("agent_complaint", "Complaint", "Complaint document analysis", "extraction"),
-    ("agent_discovery_gen", "Discovery Generator", "Generate discovery requests", "general"),
     ("agent_subpoena", "Subpoena Tracker", "Subpoena tracking and analysis", "extraction"),
     ("agent_liability", "Liability Script", "Liability analysis script", "extraction"),
     ("agent_exposure", "Exposure", "Exposure calculation and analysis", "extraction"),

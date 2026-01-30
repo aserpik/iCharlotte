@@ -65,6 +65,56 @@ LEGACY_LOG_FILE = r"C:\GeminiTerminal\Summarize_Deposition_activity.log"
 
 
 # =============================================================================
+# File Number Extraction
+# =============================================================================
+
+def extract_file_number(path: str) -> str:
+    """Extract file number from path.
+
+    Handles paths like:
+    - Z:\\Shared\\Current Clients\\3800- NATIONWIDE\\3850\\084 - Dudash\\...
+    - Paths containing literal "3850.084"
+    """
+    # Standard pattern: 1234.567 (with literal dot)
+    match = re.search(r"(\d{4}\.\d{3})", path)
+    if match:
+        return match.group(1)
+
+    # Parse from directory structure
+    parts = os.path.normpath(path).split(os.sep)
+    try:
+        # Find consecutive folders matching client/matter pattern
+        for i in range(len(parts) - 1):
+            client_match = re.match(r"^(\d{4})(?:\D|$)", parts[i])
+            if client_match:
+                matter_match = re.match(r"^(\d{3})(?:\D|$)", parts[i + 1])
+                if matter_match:
+                    return f"{client_match.group(1)}.{matter_match.group(1)}"
+
+        # Fallback: Look for "Current Clients" structure
+        cc_index = -1
+        for i, part in enumerate(parts):
+            if part.lower() == "current clients":
+                cc_index = i
+                break
+
+        if cc_index != -1 and cc_index + 3 < len(parts):
+            client_folder = parts[cc_index + 2]
+            matter_folder = parts[cc_index + 3]
+
+            client_code = re.match(r"^(\d{4})(?:\D|$)", client_folder)
+            matter_code = re.match(r"^(\d{3})(?:\D|$)", matter_folder)
+
+            if client_code and matter_code:
+                return f"{client_code.group(1)}.{matter_code.group(1)}"
+
+    except Exception:
+        pass
+
+    return None
+
+
+# =============================================================================
 # Deponent Information Extraction
 # =============================================================================
 
@@ -977,10 +1027,9 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
     logger.progress(96, "Saving to case database...")
     try:
         data_manager = CaseDataManager()
-        file_num_match = re.search(r"(\d{4}\.\d{3})", input_path)
+        file_num = extract_file_number(input_path)
 
-        if file_num_match:
-            file_num = file_num_match.group(1)
+        if file_num:
             clean_name = re.sub(r"[^a-zA-Z0-9_]", "_", deponent_name.lower()) if deponent_name else "unknown"
             var_key = f"depo_summary_{clean_name}"
 
@@ -1011,9 +1060,8 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
     # ==========================================================================
     logger.progress(98, "Registering document...")
     try:
-        file_num_match = re.search(r"(\d{4}\.\d{3})", input_path)
-        if file_num_match:
-            file_num = file_num_match.group(1)
+        file_num = extract_file_number(input_path)
+        if file_num:
             base_name = os.path.splitext(os.path.basename(input_path))[0]
 
             # Map deponent_type to registry document type
@@ -1028,10 +1076,16 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
             }
             registry_doc_type = depo_type_map.get(deponent_type, "Deposition - Witness")
 
+            # Generate standardized document name
+            from document_registry import DocumentClassifier
+            classifier = DocumentClassifier(logger=logger)
+            standardized_name = classifier.generate_name(summary, registry_doc_type, fallback_name=base_name)
+            logger.info(f"Generated name: '{standardized_name}'")
+
             registry = DocumentRegistry()
             registry.register_document(
                 file_number=file_num,
-                name=base_name,
+                name=standardized_name,
                 document_type=registry_doc_type,
                 source_path=input_path,
                 summary_location=output_file,
@@ -1114,8 +1168,7 @@ def main():
         sys.exit(1)
 
     # Extract file number for logger context
-    file_num_match = re.search(r"(\d{4}\.\d{3})", input_path)
-    file_number = file_num_match.group(1) if file_num_match else None
+    file_number = extract_file_number(input_path)
 
     # Initialize logger
     logger = AgentLogger("Deposition", file_number=file_number)

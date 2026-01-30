@@ -72,21 +72,33 @@ from icharlotte_core.ui.report_tab import ReportTab
 from icharlotte_core.ui.logs_tab import LogsTab
 from icharlotte_core.ui.liability_tab import LiabilityExposureTab
 from icharlotte_core.ui.master_case_tab import MasterCaseTab
+from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.ui.templates_resources_tab import TemplatesResourcesTab
 
 class QuickOpenDialog(QDialog):
-    """Lightweight popup dialog for quick file number entry via double-Ctrl tap."""
+    """Lightweight popup dialog for quick file number or plaintiff name entry via double-Ctrl tap."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Quick Open Case Folder")
-        self.setFixedSize(350, 100)
+        self.setFixedSize(400, 100)
         self.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, False)
 
         # Load recent cases for autocomplete
         self.recent_file = os.path.join(GEMINI_DATA_DIR, "recent_cases.json")
         self.recent_cases = self._load_recent_cases()
+
+        # Load all cases from database for plaintiff name lookup
+        self.db = MasterCaseDatabase()
+        self.all_cases = self.db.get_all_cases()
+        # Build a mapping of plaintiff names to file numbers (lowercase for matching)
+        self.plaintiff_to_file = {}
+        for case in self.all_cases:
+            name = case.get('plaintiff_last_name', '').strip()
+            file_num = case.get('file_number', '')
+            if name and file_num:
+                self.plaintiff_to_file[name.lower()] = file_num
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(15, 15, 15, 15)
@@ -127,11 +139,23 @@ class QuickOpenDialog(QDialog):
             }
         """)
 
-        # File number input with autocomplete
+        # File number input with autocomplete (includes both file numbers and plaintiff names)
         self.file_input = QComboBox()
         self.file_input.setEditable(True)
-        self.file_input.lineEdit().setPlaceholderText("Enter file number (####.###)")
-        self.file_input.addItems(self.recent_cases)
+        self.file_input.lineEdit().setPlaceholderText("Enter file number or plaintiff name")
+
+        # Build autocomplete list: recent cases first, then all cases with names
+        autocomplete_items = list(self.recent_cases)  # Recent file numbers
+        for case in self.all_cases:
+            file_num = case.get('file_number', '')
+            name = case.get('plaintiff_last_name', '').strip()
+            if name and file_num:
+                # Add "Name (####.###)" format for easy selection
+                display = f"{name} ({file_num})"
+                if display not in autocomplete_items and file_num not in autocomplete_items:
+                    autocomplete_items.append(display)
+
+        self.file_input.addItems(autocomplete_items)
         self.file_input.setCurrentIndex(-1)  # Start empty
         self.file_input.lineEdit().returnPressed.connect(self._on_enter)
         layout.addWidget(self.file_input)
@@ -169,9 +193,49 @@ class QuickOpenDialog(QDialog):
         except:
             pass
 
+    def _resolve_to_file_number(self, text):
+        """Resolve user input to a file number.
+
+        Handles:
+        - Direct file number (####.###)
+        - "Name (####.###)" format from autocomplete
+        - Plaintiff name lookup
+        """
+        text = text.strip()
+        if not text:
+            return None
+
+        # Check if it's the "Name (####.###)" format from autocomplete
+        if '(' in text and text.endswith(')'):
+            # Extract file number from parentheses
+            start = text.rfind('(')
+            file_num = text[start + 1:-1].strip()
+            if re.match(r'^\d{4}[.\-]\d{3}$', file_num):
+                return file_num.replace('-', '.')
+
+        # Check if it's a file number format (####.### or ####-###)
+        if re.match(r'^\d{4}[.\-]\d{3}$', text):
+            return text.replace('-', '.')
+
+        # Otherwise, try to find by plaintiff name
+        text_lower = text.lower()
+
+        # Exact match first
+        if text_lower in self.plaintiff_to_file:
+            return self.plaintiff_to_file[text_lower]
+
+        # Partial match (find first case where name contains the search text)
+        for name, file_num in self.plaintiff_to_file.items():
+            if text_lower in name:
+                return file_num
+
+        # No match found - return input as-is (will fail gracefully in caller)
+        return text
+
     def _on_enter(self):
-        file_num = self.file_input.currentText().strip()
-        if file_num:
+        user_input = self.file_input.currentText().strip()
+        if user_input:
+            file_num = self._resolve_to_file_number(user_input)
             self.result_file_number = file_num
             self._save_recent_case(file_num)
             self.accept()
@@ -476,10 +540,6 @@ class MainWindow(QMainWindow):
         btn_vars.clicked.connect(self.manage_variables)
         toolbar_layout.addWidget(btn_vars)
 
-        btn_prompts = QPushButton("Prompts")
-        btn_prompts.clicked.connect(self.manage_prompts)
-        toolbar_layout.addWidget(btn_prompts)
-
         # Output Browser Button
         btn_outputs = QPushButton("Output Browser")
         btn_outputs.clicked.connect(self.open_output_browser)
@@ -525,7 +585,6 @@ class MainWindow(QMainWindow):
         self.create_enhanced_agent_button("Docket Agent", "docket.py", left_layout, arg_type="file_number")
         self.create_enhanced_agent_button("Complaint Agent", "complaint.py", left_layout, arg_type="file_number")
         self.create_enhanced_agent_button("Report Agent", "report.py", left_layout, arg_type="file_number")
-        self.create_enhanced_agent_button("Discovery Generate", "discovery_requests.py", left_layout, arg_type="file_number", extra_flags=["--interactive"])
         self.create_enhanced_agent_button("Subpoena Tracker", "subpoena_tracker.py", left_layout, arg_type="file_number")
 
         # Document Agents
@@ -626,17 +685,15 @@ class MainWindow(QMainWindow):
             "Category / File",
             "Size",
             "Date Modified",
-            "Status",
-            "Tags",
-            "Queued Tasks (Click to Add ➕)"
+            "Queued Tasks (Click to Add ➕)",
+            "Status"
         ])
         self.tree.setSortingEnabled(True)
         self.tree.setColumnWidth(0, 300)
         self.tree.setColumnWidth(1, 70)
         self.tree.setColumnWidth(2, 100)
-        self.tree.setColumnWidth(3, 80)
-        self.tree.setColumnWidth(4, 100)
-        self.tree.setColumnWidth(5, 200)
+        self.tree.setColumnWidth(3, 200)
+        self.tree.setColumnWidth(4, 80)
         self.tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.tree.setAlternatingRowColors(True)
         self.tree.itemSelectionChanged.connect(self.on_tree_selection_changed)
@@ -709,6 +766,8 @@ class MainWindow(QMainWindow):
         # --- Tab: Email Update ---
         self.email_update_tab = EmailUpdateTab()
         self.tabs.addTab(self.email_update_tab, "Email Update")
+        if self.file_number:
+            self.email_update_tab.on_case_changed(self.file_number)
 
         # --- Tab 7: Report ---
         self.report_tab = ReportTab(main_window=self)
@@ -794,6 +853,13 @@ class MainWindow(QMainWindow):
         # View menu button
         self.setup_view_menu()
         self.corner_layout.addWidget(self.view_btn)
+
+        # Prompts button (secondary)
+        self.prompts_btn = QPushButton("Prompts")
+        self.prompts_btn.setStyleSheet(secondary_btn_style)
+        self.prompts_btn.setToolTip("Open Prompt Engineering Workbench")
+        self.prompts_btn.clicked.connect(self.manage_prompts)
+        self.corner_layout.addWidget(self.prompts_btn)
 
         # Settings button (secondary)
         self.settings_btn = QPushButton("Settings")
@@ -945,10 +1011,10 @@ class MainWindow(QMainWindow):
         self.tree.blockSignals(False)
 
     def on_tree_item_clicked(self, item, column):
-        if column == 5:  # Queued Tasks column (index 5)
+        if column == 3:  # Queued Tasks column (index 3)
             # Get click position relative to the tree's viewport
             pos = self.tree.visualItemRect(item).bottomLeft()
-            pos.setX(self.tree.columnViewportPosition(5))
+            pos.setX(self.tree.columnViewportPosition(3))
             global_pos = self.tree.viewport().mapToGlobal(pos)
 
             # Get all selected items (for multi-select support)
@@ -1061,8 +1127,8 @@ class MainWindow(QMainWindow):
     def update_item_tasks_ui(self, item):
         task_ids = item.data(0, Qt.ItemDataRole.UserRole + 2) or []
         if not task_ids:
-            item.setText(5, " [ + Add Tasks ]")
-            item.setForeground(5, Qt.GlobalColor.gray)
+            item.setText(3, " [ + Add Tasks ]")
+            item.setForeground(3, Qt.GlobalColor.gray)
             return
 
         # Create a visual string of short tags
@@ -1072,9 +1138,9 @@ class MainWindow(QMainWindow):
             if agent:
                 tags.append(f"[{agent['short']}]")
 
-        item.setText(5, " ".join(tags))
-        # Optional: set color for column 5 text
-        item.setForeground(5, Qt.GlobalColor.blue)
+        item.setText(3, " ".join(tags))
+        # Optional: set color for column 3 text
+        item.setForeground(3, Qt.GlobalColor.blue)
 
     def filter_tree(self, text):
         search_text = text.lower()
@@ -1183,7 +1249,9 @@ class MainWindow(QMainWindow):
                     self.email_tab.search_bar.clear()
                     self.email_tab.check_db_init()
                     self.email_tab.perform_search()
-                    
+                if hasattr(self, 'email_update_tab'):
+                    self.email_update_tab.on_case_changed(new_file_num)
+
                 log_event(f"Switched to case {new_file_num}")
                 self.check_docket_expiry(new_file_num)
             else:
@@ -1233,6 +1301,8 @@ class MainWindow(QMainWindow):
                 self.email_tab.search_bar.clear()
                 self.email_tab.check_db_init()
                 self.email_tab.perform_search()
+            if hasattr(self, 'email_update_tab'):
+                self.email_update_tab.on_case_changed(file_number)
 
             log_event(f"Switched to case {self.file_number}")
             self.check_docket_expiry(file_number)
@@ -1324,7 +1394,10 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def manage_prompts(self):
-        dialog = PromptsDialog(self)
+        # Get current tab index to auto-select relevant agent
+        current_tab_index = self.tabs.currentIndex()
+        current_tab_name = self.tabs.tabText(current_tab_index)
+        dialog = PromptsDialog(self, current_tab=current_tab_name)
         dialog.exec()
 
     def on_tree_double_click(self, item, column):
@@ -1829,6 +1902,9 @@ class MainWindow(QMainWindow):
         # Save chat conversation before closing
         if hasattr(self, 'chat_tab') and self.chat_tab:
             self.chat_tab.save_current_state()
+        # Save email update tab state before closing
+        if hasattr(self, 'email_update_tab') and self.email_update_tab:
+            self.email_update_tab.save_state()
         # Clean up global hotkeys
         if KEYBOARD_AVAILABLE:
             try:
@@ -2272,9 +2348,6 @@ class MainWindow(QMainWindow):
                 # Get processing status (uses cached DB)
                 proc_status = self._get_file_processing_status(file_path) if self.file_number else ""
 
-                # Get tags (uses cached DB)
-                tags_str = self._get_file_tags(file_path) if self.file_number else ""
-
                 if file_path not in self.tree_item_map:
                     f_item = QTreeWidgetItem(parent_item)
                     f_item.setText(0, f)
@@ -2286,8 +2359,7 @@ class MainWindow(QMainWindow):
                     f_item.setData(0, Qt.ItemDataRole.UserRole + 1, "file")
                     f_item.setText(1, size_str)
                     f_item.setText(2, date_str)
-                    f_item.setText(3, proc_status)
-                    f_item.setText(4, tags_str)
+                    f_item.setText(4, proc_status)
 
                     self.tree_item_map[file_path] = f_item
                 else:
@@ -2295,8 +2367,7 @@ class MainWindow(QMainWindow):
                     try:
                         f_item.setText(1, size_str)
                         f_item.setText(2, date_str)
-                        f_item.setText(3, proc_status)
-                        f_item.setText(4, tags_str)
+                        f_item.setText(4, proc_status)
                     except RuntimeError:
                         continue
         

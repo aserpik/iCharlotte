@@ -60,6 +60,61 @@ LEGACY_LOG_FILE = r"C:\GeminiTerminal\Summarize_activity.log"
 
 
 # =============================================================================
+# File Number Extraction
+# =============================================================================
+
+def extract_file_number(path: str) -> str:
+    """Extract file number from path.
+
+    Handles paths like:
+    - Z:\\Shared\\Current Clients\\3800- NATIONWIDE\\3850\\084 - Dudash\\...
+    - Paths containing literal "3850.084"
+    """
+    # Standard pattern: 1234.567 (with literal dot)
+    match = re.search(r"(\d{4}\.\d{3})", path)
+    if match:
+        return match.group(1)
+
+    # Parse from directory structure
+    # Look for pattern: 4-digit folder followed by 3-digit folder
+    parts = os.path.normpath(path).split(os.sep)
+    try:
+        # Find consecutive folders matching client/matter pattern
+        for i in range(len(parts) - 1):
+            # Look for 4-digit client folder (e.g., "3850" or "3850 - Name")
+            client_match = re.match(r"^(\d{4})(?:\D|$)", parts[i])
+            if client_match:
+                # Check if next folder is 3-digit matter (e.g., "084" or "084 - Name")
+                matter_match = re.match(r"^(\d{3})(?:\D|$)", parts[i + 1])
+                if matter_match:
+                    return f"{client_match.group(1)}.{matter_match.group(1)}"
+
+        # Fallback: Look for "Current Clients" structure
+        # Pattern: Current Clients\GroupFolder\ClientFolder\MatterFolder
+        cc_index = -1
+        for i, part in enumerate(parts):
+            if part.lower() == "current clients":
+                cc_index = i
+                break
+
+        if cc_index != -1 and cc_index + 3 < len(parts):
+            # Skip the group folder (e.g., "3800- NATIONWIDE"), use folders at +2 and +3
+            client_folder = parts[cc_index + 2]  # e.g., "3850"
+            matter_folder = parts[cc_index + 3]  # e.g., "084 - Dudash"
+
+            client_code = re.match(r"^(\d{4})(?:\D|$)", client_folder)
+            matter_code = re.match(r"^(\d{3})(?:\D|$)", matter_folder)
+
+            if client_code and matter_code:
+                return f"{client_code.group(1)}.{matter_code.group(1)}"
+
+    except Exception:
+        pass
+
+    return None
+
+
+# =============================================================================
 # Document Output Functions
 # =============================================================================
 
@@ -401,8 +456,7 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
     # Save to Case Data (95% - 98%)
     # ==========================================================================
     logger.progress(96, "Saving to case database...")
-    file_num_match = re.search(r"(\d{4}\.\d{3})", input_path)
-    file_num = file_num_match.group(1) if file_num_match else None
+    file_num = extract_file_number(input_path)
 
     try:
         if file_num:
@@ -505,8 +559,7 @@ def main():
         sys.exit(1)
 
     # Extract file number for logger context
-    file_num_match = re.search(r"(\d{4}\.\d{3})", input_path)
-    file_number = file_num_match.group(1) if file_num_match else None
+    file_number = extract_file_number(input_path)
 
     # Initialize logger
     logger = AgentLogger("Summarize", file_number=file_number)

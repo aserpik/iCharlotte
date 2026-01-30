@@ -3,9 +3,9 @@ import datetime
 import re
 import json
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
+    QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QTextEdit, QListWidget, QListWidgetItem, QLabel, QMessageBox, QSplitter,
-    QCheckBox, QFileDialog, QProgressBar, QFrame, QAbstractItemView, QDialog
+    QCheckBox, QFileDialog, QProgressBar, QFrame, QAbstractItemView
 )
 from PySide6.QtCore import Qt, QThread, Signal, QMimeData, QSize, QTimer
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
@@ -48,69 +48,6 @@ class DragDropListWidget(QListWidget):
         files = [u.toLocalFile() for u in urls if u.isLocalFile()]
         if files:
             self.fileDropped.emit(files)
-
-class EditPromptsDialog(QDialog):
-    def __init__(self, parent=None, prompts=None):
-        super().__init__(parent)
-        self.setWindowTitle("Edit Generation Prompts")
-        self.resize(700, 700)
-        self.prompts = prompts or {}
-        
-        layout = QVBoxLayout(self)
-        
-        self.splitter = QSplitter(Qt.Orientation.Vertical)
-        
-        # System Prompt
-        sys_widget = QWidget()
-        sys_layout = QVBoxLayout(sys_widget)
-        sys_layout.setContentsMargins(0, 0, 0, 0)
-        sys_layout.addWidget(QLabel("<b>System Prompt</b> (Role & Style instructions):"))
-        self.txt_system = QTextEdit()
-        self.txt_system.setPlainText(self.prompts.get('system_prompt', ''))
-        sys_layout.addWidget(self.txt_system)
-        self.splitter.addWidget(sys_widget)
-        
-        # Topic Instruction
-        topic_widget = QWidget()
-        topic_layout = QVBoxLayout(topic_widget)
-        topic_layout.setContentsMargins(0, 0, 0, 0)
-        topic_layout.addWidget(QLabel("<b>Topic Instruction</b> (Specific task for New Topic):"))
-        self.txt_topic = QTextEdit()
-        self.txt_topic.setPlainText(self.prompts.get('topic_instruction', ''))
-        topic_layout.addWidget(self.txt_topic)
-        self.splitter.addWidget(topic_widget)
-
-        # Handling Instruction
-        handling_widget = QWidget()
-        handling_layout = QVBoxLayout(handling_widget)
-        handling_layout.setContentsMargins(0, 0, 0, 0)
-        handling_layout.addWidget(QLabel("<b>Handling Instruction</b> (Specific task for Further Handling):"))
-        self.txt_handling = QTextEdit()
-        self.txt_handling.setPlainText(self.prompts.get('handling_instruction', ''))
-        handling_layout.addWidget(self.txt_handling)
-        self.splitter.addWidget(handling_widget)
-        
-        layout.addWidget(self.splitter)
-        
-        # Set initial sizes to give System Prompt more room
-        self.splitter.setSizes([300, 150, 150])
-        
-        btn_layout = QHBoxLayout()
-        btn_save = QPushButton("Save")
-        btn_save.clicked.connect(self.accept)
-        btn_cancel = QPushButton("Cancel")
-        btn_cancel.clicked.connect(self.reject)
-        
-        btn_layout.addWidget(btn_save)
-        btn_layout.addWidget(btn_cancel)
-        layout.addLayout(btn_layout)
-
-    def get_prompts(self):
-        return {
-            'system_prompt': self.txt_system.toPlainText(),
-            'topic_instruction': self.txt_topic.toPlainText(),
-            'handling_instruction': self.txt_handling.toPlainText()
-        }
 
 class EmailSenderWorker(QThread):
     finished = Signal()
@@ -168,8 +105,11 @@ class EmailUpdateTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.current_case_number = None
+        self._save_timer = None  # Debounce timer for auto-save
+        self._loading_state = False  # Flag to prevent saves during load
         self.load_prompts()
         self.setup_ui()
+        self._setup_persistence()
 
     def load_prompts(self):
         # Load custom prompts from JSON, or use defaults
@@ -220,13 +160,6 @@ class EmailUpdateTab(QWidget):
                 json.dump(self.prompts, f, indent=4)
         except Exception as e:
             log_event(f"Error saving prompt config: {e}", "error")
-
-    def edit_prompts(self):
-        dlg = EditPromptsDialog(self, self.prompts)
-        if dlg.exec():
-            self.prompts = dlg.get_prompts()
-            self.save_prompts()
-            QMessageBox.information(self, "Success", "Prompts updated and saved.")
 
     def setup_ui(self):
         main_layout = QVBoxLayout(self)
@@ -282,12 +215,6 @@ class EmailUpdateTab(QWidget):
         # --- MIDDLE SECTION (Context & Output) ---
         middle_widget = QWidget()
         middle_layout = QVBoxLayout(middle_widget)
-        
-        # Edit Prompts Button (Top of Middle)
-        self.btn_edit_prompts = QPushButton("Edit Prompts")
-        self.btn_edit_prompts.clicked.connect(self.edit_prompts)
-        self.btn_edit_prompts.setStyleSheet("color: #666; font-size: 11px;")
-        middle_layout.addWidget(self.btn_edit_prompts)
         
         middle_splitter = QSplitter(Qt.Orientation.Vertical)
         
@@ -358,6 +285,162 @@ class EmailUpdateTab(QWidget):
         # Status Bar
         self.status_bar = QLabel("")
         main_layout.addWidget(self.status_bar)
+
+    # --- Persistence Methods ---
+
+    def _setup_persistence(self):
+        """Connect signals for auto-saving state changes."""
+        # Create debounce timer
+        self._save_timer = QTimer(self)
+        self._save_timer.setSingleShot(True)
+        self._save_timer.timeout.connect(self._do_save_state)
+
+        # Connect text editors to trigger save on change
+        self.ctx_topic.textChanged.connect(self._schedule_save)
+        self.ctx_handling.textChanged.connect(self._schedule_save)
+        self.txt_topic_output.textChanged.connect(self._schedule_save)
+        self.txt_handling_output.textChanged.connect(self._schedule_save)
+
+        # Connect file list changes
+        self.file_list.model().rowsInserted.connect(self._schedule_save)
+        self.file_list.model().rowsRemoved.connect(self._schedule_save)
+        self.file_list.itemChanged.connect(self._schedule_save)
+
+    def _schedule_save(self, *args):
+        """Schedule a debounced save (500ms delay)."""
+        if self._loading_state:
+            return
+        if self._save_timer:
+            self._save_timer.start(500)  # 500ms debounce
+
+    def _do_save_state(self):
+        """Perform the actual save."""
+        self.save_state()
+
+    def get_state_path(self):
+        """Get the path for the current case's state file."""
+        file_num = self.get_file_number()
+        if not file_num:
+            return None
+        return os.path.join(GEMINI_DATA_DIR, f"{file_num}_email_update_state.json")
+
+    def save_state(self):
+        """Save all persistent data for the current case."""
+        state_path = self.get_state_path()
+        if not state_path:
+            return
+
+        try:
+            # Collect reference files with their checked states
+            files_data = []
+            for i in range(self.file_list.count()):
+                item = self.file_list.item(i)
+                files_data.append({
+                    'path': item.data(Qt.ItemDataRole.UserRole),
+                    'checked': item.checkState() == Qt.CheckState.Checked
+                })
+
+            # Collect text editor contents
+            state = {
+                'reference_files': files_data,
+                'ctx_topic': self.ctx_topic.toPlainText(),
+                'ctx_handling': self.ctx_handling.toPlainText(),
+                'txt_topic_output': self.txt_topic_output.toPlainText(),
+                'txt_handling_output': self.txt_handling_output.toPlainText(),
+                'sent_reports': []
+            }
+
+            # Collect sent reports
+            for i in range(self.sent_list.count()):
+                item = self.sent_list.item(i)
+                state['sent_reports'].append({
+                    'text': item.text(),
+                    'entry_id': item.data(Qt.ItemDataRole.UserRole)
+                })
+
+            # Ensure directory exists
+            if not os.path.exists(GEMINI_DATA_DIR):
+                os.makedirs(GEMINI_DATA_DIR)
+
+            # Write state file
+            with open(state_path, 'w', encoding='utf-8') as f:
+                json.dump(state, f, indent=2)
+
+            log_event(f"EmailUpdateTab: Saved state to {state_path}")
+        except Exception as e:
+            log_event(f"EmailUpdateTab: Error saving state: {e}", "error")
+
+    def load_state(self):
+        """Load state for the current case."""
+        state_path = self.get_state_path()
+        if not state_path or not os.path.exists(state_path):
+            return
+
+        try:
+            self._loading_state = True  # Prevent save triggers during load
+
+            with open(state_path, 'r', encoding='utf-8') as f:
+                state = json.load(f)
+
+            # Clear existing data
+            self.file_list.clear()
+            self.ctx_topic.clear()
+            self.ctx_handling.clear()
+            self.txt_topic_output.clear()
+            self.txt_handling_output.clear()
+            self.sent_list.clear()
+
+            # Restore reference files
+            for file_data in state.get('reference_files', []):
+                path = file_data.get('path')
+                if path and os.path.exists(path):
+                    item = QListWidgetItem(os.path.basename(path))
+                    item.setData(Qt.ItemDataRole.UserRole, path)
+                    item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                    if file_data.get('checked', True):
+                        item.setCheckState(Qt.CheckState.Checked)
+                    else:
+                        item.setCheckState(Qt.CheckState.Unchecked)
+                    self.file_list.addItem(item)
+
+            # Restore text editors
+            self.ctx_topic.setPlainText(state.get('ctx_topic', ''))
+            self.ctx_handling.setPlainText(state.get('ctx_handling', ''))
+            self.txt_topic_output.setPlainText(state.get('txt_topic_output', ''))
+            self.txt_handling_output.setPlainText(state.get('txt_handling_output', ''))
+
+            # Restore sent reports
+            for report in state.get('sent_reports', []):
+                item = QListWidgetItem(report.get('text', ''))
+                item.setData(Qt.ItemDataRole.UserRole, report.get('entry_id'))
+                self.sent_list.addItem(item)
+
+            log_event(f"EmailUpdateTab: Loaded state from {state_path}")
+        except Exception as e:
+            log_event(f"EmailUpdateTab: Error loading state: {e}", "error")
+        finally:
+            self._loading_state = False
+
+    def on_case_changed(self, file_number):
+        """Called when the active case changes. Saves old state and loads new."""
+        # Save current state before switching
+        if self.current_case_number:
+            self.save_state()
+
+        # Clear all widgets before loading new state
+        self.file_list.clear()
+        self.ctx_topic.clear()
+        self.ctx_handling.clear()
+        self.txt_topic_output.clear()
+        self.txt_handling_output.clear()
+        self.sent_list.clear()
+
+        # Update current case number
+        self.current_case_number = file_number
+
+        # Load state for new case
+        if file_number:
+            self.load_state()
 
     # --- File Management ---
 
@@ -713,7 +796,6 @@ class EmailUpdateTab(QWidget):
     def check_sent_items(self):
         self.monitor_attempts += 1
         if self.monitor_attempts > 60: # 10 minutes timeout
-            log_event("StatusUpdate: Sent monitor timed out.")
             self.monitor_timer.stop()
             self.status_bar.setText("Draft closed or send not detected (Monitor Timed Out)")
             return

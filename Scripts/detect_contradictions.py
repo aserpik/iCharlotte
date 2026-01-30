@@ -280,24 +280,40 @@ def find_ai_output_docx(file_number: str) -> Optional[str]:
     Returns:
         Path to AI_OUTPUT.docx or None if not found.
     """
-    base = r"C:\Current Clients"
+    # Try multiple possible base paths
+    base_paths = [
+        r"Z:\Shared\Current Clients",
+        r"C:\Current Clients",
+    ]
 
-    if not os.path.exists(base):
-        return None
+    # Also check CaseDataManager for the file_path variable
+    try:
+        data_manager = CaseDataManager()
+        file_path = data_manager.get_value(file_number, "file_path")
+        if file_path and os.path.exists(file_path):
+            ai_output_path = os.path.join(file_path, "NOTES", "AI OUTPUT", "AI_OUTPUT.docx")
+            if os.path.exists(ai_output_path):
+                return ai_output_path
+    except Exception:
+        pass
 
-    # Search for case folder containing the file number
-    for client_folder in os.listdir(base):
-        client_path = os.path.join(base, client_folder)
-        if not os.path.isdir(client_path):
+    for base in base_paths:
+        if not os.path.exists(base):
             continue
 
-        for case_folder in os.listdir(client_path):
-            if file_number in case_folder:
-                ai_output_path = os.path.join(
-                    client_path, case_folder, "NOTES", "AI OUTPUT", "AI_OUTPUT.docx"
-                )
-                if os.path.exists(ai_output_path):
-                    return ai_output_path
+        # Search for case folder containing the file number
+        for client_folder in os.listdir(base):
+            client_path = os.path.join(base, client_folder)
+            if not os.path.isdir(client_path):
+                continue
+
+            for case_folder in os.listdir(client_path):
+                if file_number in case_folder:
+                    ai_output_path = os.path.join(
+                        client_path, case_folder, "NOTES", "AI OUTPUT", "AI_OUTPUT.docx"
+                    )
+                    if os.path.exists(ai_output_path):
+                        return ai_output_path
 
     return None
 
@@ -370,21 +386,171 @@ def gather_summaries_from_docx(docx_path: str, logger: AgentLogger) -> Dict[str,
     return summaries
 
 
+def _matches_selection(name: str, selected_summaries: List[str]) -> bool:
+    """
+    Check if a summary name matches any of the selected summaries.
+    Uses multiple matching strategies with careful handling of legal document types.
+    """
+    if selected_summaries is None:
+        return True
+
+    # Legal abbreviations - map abbreviation to (full_form, category)
+    # Category helps distinguish between document types
+    abbrev_to_full = {
+        'frog': ('form interrogatories', 'form_rogs'),
+        'srog': ('special interrogatories', 'special_rogs'),
+        'rfpd': ('request for production', 'rfpd'),
+        'rfa': ('request for admission', 'rfa'),
+        'depo': ('deposition', 'deposition'),
+    }
+
+    # Also map full forms to categories
+    full_to_category = {
+        'form interrogatories': 'form_rogs',
+        'special interrogatories': 'special_rogs',
+        'form interrogatory': 'form_rogs',
+        'special interrogatory': 'special_rogs',
+        'deposition': 'deposition',
+        'request for production': 'rfpd',
+        'request for admission': 'rfa',
+    }
+
+    name_lower = name.lower()
+
+    def get_doc_category(text):
+        """Determine document category from text."""
+        text_lower = text.lower()
+        # Split on common delimiters
+        words = set(re.split(r'[_\s\-\.\'\"()]+', text_lower))
+        # Check abbreviations first
+        for abbr, (full, cat) in abbrev_to_full.items():
+            if abbr in words:
+                return cat
+        # Check full forms
+        for full, cat in full_to_category.items():
+            if full in text_lower:
+                return cat
+        return None
+
+    name_category = get_doc_category(name_lower)
+
+    for selection in selected_summaries:
+        sel_lower = selection.lower()
+
+        # Exact match (case-insensitive)
+        if name_lower == sel_lower:
+            return True
+
+        # Partial match - selection is substring of name or vice versa
+        if sel_lower in name_lower or name_lower in sel_lower:
+            return True
+
+        # Match without file extension
+        name_no_ext = name_lower.rsplit('.', 1)[0] if '.' in name_lower else name_lower
+        sel_no_ext = sel_lower.rsplit('.', 1)[0] if '.' in sel_lower else sel_lower
+        if name_no_ext == sel_no_ext or sel_no_ext in name_no_ext or name_no_ext in sel_no_ext:
+            return True
+
+        # Get selection category
+        sel_category = get_doc_category(sel_lower)
+
+        # If both have categories, they must match - this is strict for legal discovery types
+        if name_category and sel_category:
+            if name_category != sel_category:
+                continue  # Category mismatch - skip entirely, don't do keyword matching
+            # Categories match! This is strong evidence - just need minimal word overlap
+            stop_words = {'the', 'and', 'for', 'with', 'from', 'set', 'one', 'two', 'summary',
+                          'discovery', 'responses', 'response', 'plaintiff', 'defendant', 'to'}
+            name_words = set(w for w in re.split(r'[_\s\-\.\'\"()]+', name_lower) if len(w) >= 3 and w not in stop_words)
+            sel_words = set(w for w in re.split(r'[_\s\-\.\'\"()]+', sel_lower) if len(w) >= 3 and w not in stop_words)
+            common_words = name_words & sel_words
+            if len(common_words) >= 1:
+                return True  # Same category + at least one common word = match
+            continue  # Categories match but no common words - still don't fall through to generic matching
+
+        # Extract significant words for keyword matching (only if categories don't apply)
+        stop_words = {'the', 'and', 'for', 'with', 'from', 'set', 'one', 'two', 'summary',
+                      'discovery', 'responses', 'response', 'plaintiff', 'defendant', 'to'}
+        name_words = set(w for w in re.split(r'[_\s\-\.\'\"()]+', name_lower) if len(w) >= 3 and w not in stop_words)
+        sel_words = set(w for w in re.split(r'[_\s\-\.\'\"()]+', sel_lower) if len(w) >= 3 and w not in stop_words)
+        common_words = name_words & sel_words
+
+        # Special case: deposition matching when only one side has the category
+        if name_category == 'deposition' or sel_category == 'deposition':
+            if 'depo' in name_lower or 'deposition' in sel_lower:
+                if len(common_words) >= 1:
+                    return True
+            continue  # Deposition type - don't fall through to generic matching
+
+        # For documents where neither has a recognized category, use keyword matching
+        if not name_category and not sel_category:
+            if len(common_words) >= 2:
+                return True
+            if len(common_words) >= 1 and len(common_words) >= min(len(name_words), len(sel_words)) * 0.5:
+                return True
+
+    return False
+
+
 def gather_case_summaries(file_number: str, logger: AgentLogger,
                           selected_summaries: List[str] = None) -> Dict[str, str]:
     """
-    Gather all summaries for a case from AI_OUTPUT.docx and CaseDataManager.
+    Gather all summaries for a case from Document Registry, AI_OUTPUT.docx, and CaseDataManager.
 
     Args:
         file_number: The case file number.
         logger: AgentLogger instance.
         selected_summaries: Optional list of specific summary names to include.
                            If None, includes all available summaries.
+                           Matching is case-insensitive and supports partial matches.
 
     Returns:
         Dictionary of document_name -> summary_text.
     """
     summaries = {}
+
+    # Debug: Log what we're looking for
+    if selected_summaries:
+        logger.info(f"Looking for summaries: {selected_summaries}")
+
+    # Build a mapping from Document Registry names to CaseDataManager variable names
+    # This allows matching UI-friendly names to actual stored variables
+    registry_name_to_var = {}
+    try:
+        docs = get_available_documents(file_number)
+        for doc in docs:
+            doc_name = doc.get('name', '')
+            # The variable name in CaseDataManager follows a pattern based on agent type
+            agent = doc.get('agent', '')
+            if agent == 'summarize_discovery':
+                # Discovery summaries use: discovery_summary_{sanitized_name}
+                sanitized = doc_name.lower().replace(' ', '_').replace('.', '_').replace('(', '_').replace(')', '_')
+                sanitized = sanitized.rstrip('_')
+                var_name = f"discovery_summary_{sanitized}"
+                registry_name_to_var[doc_name] = var_name
+            elif agent == 'summarize_deposition':
+                # Deposition summaries use: depo_summary_{sanitized_name}
+                sanitized = doc_name.lower().replace(' ', '_').replace('.', '_').replace('(', '_').replace(')', '_')
+                sanitized = sanitized.rstrip('_')
+                # Extract just the deponent name part if possible
+                if 'deposition of' in doc_name.lower():
+                    parts = doc_name.lower().split('deposition of')
+                    if len(parts) > 1:
+                        deponent = parts[1].strip().replace(' ', '_').replace('.', '_')
+                        var_name = f"depo_summary_{deponent}"
+                        registry_name_to_var[doc_name] = var_name
+                else:
+                    var_name = f"depo_summary_{sanitized}"
+                    registry_name_to_var[doc_name] = var_name
+            elif agent == 'summarize':
+                # General summaries might use: summary_{sanitized_name}
+                sanitized = doc_name.lower().replace(' ', '_').replace('.', '_').replace('(', '_').replace(')', '_')
+                var_name = f"summary_{sanitized}"
+                registry_name_to_var[doc_name] = var_name
+
+        logger.info(f"Built registry mapping for {len(registry_name_to_var)} documents")
+    except Exception as e:
+        logger.warning(f"Could not build registry mapping: {e}")
 
     # First, try to load from AI_OUTPUT.docx (primary source)
     docx_path = find_ai_output_docx(file_number)
@@ -393,24 +559,40 @@ def gather_case_summaries(file_number: str, logger: AgentLogger,
         docx_summaries = gather_summaries_from_docx(docx_path, logger)
 
         for name, text in docx_summaries.items():
-            if selected_summaries is not None and name not in selected_summaries:
+            if not _matches_selection(name, selected_summaries):
                 continue
             summaries[name] = text
     else:
         logger.info("AI_OUTPUT.docx not found, checking case data store...")
 
-    # Also check CaseDataManager for additional summaries (e.g., discovery summaries)
+    # Check CaseDataManager for summaries (discovery, deposition, etc.)
     try:
         data_manager = CaseDataManager()
 
         # Get all variables for the case (flatten=False to get full objects with value/source/tags)
         variables = data_manager.get_all_variables(file_number, flatten=False)
 
+        # Debug: Log available summary variables
+        summary_vars = [v for v in variables.keys() if any(t in v.lower() for t in ['summary', 'depo', 'extraction'])]
+        logger.info(f"Available summary variables in CaseDataManager: {summary_vars}")
+
         for var_name, var_data in variables.items():
             # Filter for summary-type variables
             if any(tag in var_name.lower() for tag in ['summary', 'depo', 'extraction']):
-                # If selected_summaries is provided, only include those
-                if selected_summaries is not None and var_name not in selected_summaries:
+                # Check if this variable matches selection directly or via registry mapping
+                matches = _matches_selection(var_name, selected_summaries)
+
+                # Also check if any registry name that maps to this var_name is selected
+                if not matches and selected_summaries:
+                    for reg_name, mapped_var in registry_name_to_var.items():
+                        if mapped_var == var_name or var_name in mapped_var or mapped_var in var_name:
+                            if _matches_selection(reg_name, selected_summaries):
+                                matches = True
+                                logger.info(f"Matched '{reg_name}' -> '{var_name}'")
+                                break
+
+                if not matches:
+                    logger.info(f"  No match for var '{var_name}'")
                     continue
 
                 value = var_data.get('value', '')
@@ -551,11 +733,26 @@ def detect_contradictions(
 
 def get_output_directory(file_number: str) -> str:
     """Get output directory for the case."""
-    # Default path structure
-    base = r"C:\Current Clients"
+    # First check CaseDataManager for the file_path variable
+    try:
+        data_manager = CaseDataManager()
+        file_path = data_manager.get_value(file_number, "file_path")
+        if file_path and os.path.exists(file_path):
+            output_dir = os.path.join(file_path, "NOTES", "AI OUTPUT")
+            if os.path.exists(output_dir):
+                return output_dir
+    except Exception:
+        pass
 
-    # Try to find case folder
-    if os.path.exists(base):
+    # Try multiple possible base paths
+    base_paths = [
+        r"Z:\Shared\Current Clients",
+        r"C:\Current Clients",
+    ]
+
+    for base in base_paths:
+        if not os.path.exists(base):
+            continue
         for client_folder in os.listdir(base):
             client_path = os.path.join(base, client_folder)
             if os.path.isdir(client_path):
@@ -641,6 +838,8 @@ def main():
 
     if selected_summaries:
         logger.info(f"Filtering to {len(selected_summaries)} selected summaries")
+        for s in selected_summaries:
+            logger.info(f"  - Selected: '{s}'")
 
     # Gather summaries
     summaries = gather_case_summaries(file_number, logger, selected_summaries)

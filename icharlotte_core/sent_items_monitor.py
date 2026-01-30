@@ -25,6 +25,7 @@ class SentItemsMonitorWorker(QThread):
 
     # Signals
     todo_created = Signal(str, str)  # (file_number, todo_text)
+    history_created = Signal(str, str)  # (file_number, history_type) - for status reports
     error = Signal(str)  # error message
     status = Signal(str)  # status message
 
@@ -40,6 +41,9 @@ class SentItemsMonitorWorker(QThread):
         ("hproshyan@bordinsemmer.com", "HP -- ", "HP"),
         ("cetmekjian@bordinsemmer.com", "CE -- ", "CE"),
     ]
+
+    # Status report email address - emails to this address create history entries
+    STATUS_REPORT_EMAIL = "reportstatusagent@gmail.com"
 
     # Filler words to strip from todo text
     FILLER_WORDS = ['please', 'pls', 'thnx', 'thanks', 'thx', 'ty']
@@ -387,6 +391,20 @@ class SentItemsMonitorWorker(QThread):
                 to_field = str(item.To or "").lower()
                 recipient_emails = [to_field]
 
+            # Check if this is a status report email (To or BCC to reportstatusagent@gmail.com)
+            is_status_report = any(self.STATUS_REPORT_EMAIL.lower() in addr for addr in recipient_emails)
+            # Also check BCC field explicitly (BCC may not always be in Recipients collection)
+            if not is_status_report:
+                try:
+                    bcc_field = str(item.BCC or "").lower()
+                    if self.STATUS_REPORT_EMAIL.lower() in bcc_field:
+                        is_status_report = True
+                except:
+                    pass
+            if is_status_report:
+                self._process_status_report_email(item, entry_id)
+                return
+
             # Check body (normalize dashes first)
             body = str(item.Body or "").strip()
             body_normalized = self._normalize_dashes(body)
@@ -495,6 +513,93 @@ class SentItemsMonitorWorker(QThread):
         except AttributeError:
             # Item doesn't have expected properties (e.g., meeting request)
             pass
+
+    def _process_status_report_email(self, item, entry_id):
+        """
+        Process an email sent to reportstatusageng@gmail.com.
+        Creates a history entry (Interim Update or FSR) for the case.
+        """
+        try:
+            subject = str(item.Subject or "")
+            body = str(item.Body or "").strip()
+
+            # Extract file number from subject (####.###)
+            file_number = self._extract_file_number(subject)
+            if not file_number:
+                self.status.emit(f"Status report skipped - no file number in subject: {subject[:50]}")
+                return
+
+            # Verify case exists in database
+            case = self.db.get_case(file_number)
+            if not case:
+                self.status.emit(f"Status report skipped - case not found: {file_number}")
+                return
+
+            # Parse the body to determine Interim Update vs FSR
+            # Skip the greeting line (e.g., "Frank,") and check first real line
+            report_subtype = self._determine_status_report_type(body)
+
+            # Create history entry with type "Status Update" so Last Report column picks it up
+            # The subtype (Interim Update or FSR) goes in the notes field
+            today = datetime.now().strftime("%Y-%m-%d")
+            self.db.add_history(
+                file_number=file_number,
+                type_val="Status Update",
+                notes=report_subtype,
+                date_val=today,
+                email_entry_id=entry_id
+            )
+
+            # Mark email as processed
+            self.db.mark_email_processed(entry_id, file_number, f"Status Report: {report_subtype}")
+
+            # Log to Email Monitor category
+            LogManager().add_log("Email Monitor", f"[{file_number}] Status Report: {report_subtype}")
+
+            # Emit signal
+            self.history_created.emit(file_number, report_subtype)
+            self.status.emit(f"Created {history_type} for {file_number}")
+
+        except Exception as e:
+            self.error.emit(f"Status report processing error: {e}")
+            LogManager().add_log("Email Monitor", f"Status report error: {e}")
+
+    def _determine_status_report_type(self, body: str) -> str:
+        """
+        Determine the status report subtype: Interim Update, Status Update, or FSR.
+
+        Skips the greeting line (name followed by comma, e.g., "Frank,")
+        and checks the first real line for keywords.
+
+        Returns "Interim Update", "Status Update", or "FSR".
+        """
+        lines = body.split('\n')
+
+        # Find the first non-empty line after skipping greeting
+        first_content_line = ""
+        for i, line in enumerate(lines):
+            line_stripped = line.strip()
+            if not line_stripped:
+                continue
+
+            # Check if this is a greeting line (name followed by comma)
+            # Pattern: word(s) ending with comma, possibly with spaces
+            if re.match(r'^[A-Za-z]+\s*,\s*$', line_stripped):
+                # This is the greeting, skip it and get next non-empty line
+                continue
+
+            # This is the first real content line
+            first_content_line = line_stripped
+            break
+
+        # Check for keywords (case insensitive)
+        first_line_lower = first_content_line.lower()
+        if "interim update" in first_line_lower:
+            return "Interim Update"
+        elif "status update" in first_line_lower:
+            return "Status Update"
+        else:
+            return "FSR"
 
     def _extract_file_number(self, subject: str) -> str:
         """Extract file number from subject line using regex."""

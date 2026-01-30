@@ -19,10 +19,11 @@ from PySide6.QtWidgets import (
     QDialog, QDialogButtonBox, QListWidget, QListWidgetItem,
     QAbstractItemView, QApplication, QFileIconProvider, QInputDialog
 )
-from PySide6.QtCore import Qt, QUrl, QFileInfo, Signal
-from PySide6.QtGui import QAction
+from PySide6.QtCore import Qt, QUrl, QFileInfo, Signal, QObject, Slot, QTimer, QEvent
+from PySide6.QtGui import QAction, QKeyEvent
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings
+from PySide6.QtWebChannel import QWebChannel
 
 from ..config import TEMPLATES_DIR, RESOURCES_DIR, TEMPLATE_EXTENSIONS, RESOURCE_EXTENSIONS, GEMINI_DATA_DIR
 from ..templates_db import TemplatesDatabase
@@ -30,10 +31,22 @@ from ..utils import log_event
 from ..bridge import LocalFileSchemeHandler
 
 
+class EditorBridge(QObject):
+    """Bridge for QWebChannel communication between JS editor and Python."""
+
+    content_changed = Signal()
+
+    @Slot()
+    def notifyContentChanged(self):
+        """Called from JavaScript when editor content changes."""
+        self.content_changed.emit()
+
+
 class TemplateTreeWidget(QTreeWidget):
     """Custom tree widget with context menu and tagging support."""
 
     item_selected = Signal(str, str)  # path, type ('template' or 'resource')
+    item_deleted = Signal(str)  # path of deleted item
     request_refresh = Signal()
 
     def __init__(self, parent=None):
@@ -106,6 +119,12 @@ class TemplateTreeWidget(QTreeWidget):
         copy_path_action.triggered.connect(lambda: QApplication.clipboard().setText(path))
         menu.addAction(copy_path_action)
 
+        if item_type == 'file':
+            menu.addSeparator()
+            delete_action = QAction("Delete", self)
+            delete_action.triggered.connect(lambda: self.delete_item(path))
+            menu.addAction(delete_action)
+
         menu.exec(self.viewport().mapToGlobal(position))
 
     def reveal_in_explorer(self, path):
@@ -138,6 +157,48 @@ class TemplateTreeWidget(QTreeWidget):
         if ok and template:
             self.db.update_template_category(template['id'], category)
             self.request_refresh.emit()
+
+    def keyPressEvent(self, event):
+        """Handle key press events - Delete key deletes selected template."""
+        if event.key() == Qt.Key.Key_Delete:
+            item = self.currentItem()
+            if item:
+                path = item.data(0, Qt.ItemDataRole.UserRole)
+                item_type = item.data(0, Qt.ItemDataRole.UserRole + 1)
+                if path and item_type == 'file':
+                    self.delete_item(path)
+                    return
+        super().keyPressEvent(event)
+
+    def delete_item(self, path):
+        """Delete a template or resource file after confirmation."""
+        filename = os.path.basename(path)
+
+        reply = QMessageBox.question(
+            self, "Delete File",
+            f"Are you sure you want to delete '{filename}'?\n\nThis cannot be undone.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            try:
+                # Remove from database if it's a template
+                if self.mode == 'templates':
+                    relative_path = os.path.relpath(path, TEMPLATES_DIR)
+                    template = self.db.get_template_by_path(relative_path)
+                    if template:
+                        self.db.delete_template(template['id'])
+
+                # Delete the file
+                os.remove(path)
+                log_event(f"Deleted {self.mode[:-1]}: {filename}", "info")
+                self.item_deleted.emit(path)
+                self.request_refresh.emit()
+
+            except Exception as e:
+                QMessageBox.critical(self, "Error", f"Failed to delete file: {e}")
+                log_event(f"Error deleting file: {e}", "error")
 
 
 class TagEditDialog(QDialog):
@@ -363,6 +424,17 @@ class TemplatesResourcesTab(QWidget):
         self.current_item_type = None  # 'templates' or 'resources'
         self.current_mode = 'templates'
         self.editor_modified = False
+
+        # Auto-save timer (debounced - fires 1.5 seconds after last change)
+        self.auto_save_timer = QTimer(self)
+        self.auto_save_timer.setSingleShot(True)
+        self.auto_save_timer.setInterval(1500)  # 1.5 seconds
+        self.auto_save_timer.timeout.connect(self._perform_auto_save)
+
+        # Bridge for JS-Python communication
+        self.editor_bridge = EditorBridge()
+        self.editor_bridge.content_changed.connect(self._on_editor_content_changed)
+
         self.setup_ui()
         self.ensure_directories()
         self.refresh_tree()
@@ -491,6 +563,7 @@ class TemplatesResourcesTab(QWidget):
         # Tree view
         self.tree = TemplateTreeWidget()
         self.tree.item_selected.connect(self.on_item_selected)
+        self.tree.item_deleted.connect(self.on_item_deleted)
         self.tree.request_refresh.connect(self.refresh_tree)
         layout.addWidget(self.tree)
 
@@ -550,9 +623,20 @@ class TemplatesResourcesTab(QWidget):
 
         # Page 2: Rich Text Editor
         self.editor = QWebEngineView()
-        self.editor.setHtml(self.get_editor_html(""))
         self.editor.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.editor.customContextMenuRequested.connect(self.show_editor_context_menu)
+
+        # Install event filter to catch Tab key before Qt handles it
+        self.editor.installEventFilter(self)
+        # Also install on the focus proxy (the actual widget that receives key events)
+        QTimer.singleShot(100, self._install_editor_event_filter)
+
+        # Set up QWebChannel for JS-Python communication
+        self.web_channel = QWebChannel(self.editor.page())
+        self.web_channel.registerObject("bridge", self.editor_bridge)
+        self.editor.page().setWebChannel(self.web_channel)
+
+        self.editor.setHtml(self.get_editor_html(""))
         self.content_stack.addWidget(self.editor)
 
         layout.addWidget(self.content_stack, 1)
@@ -825,8 +909,8 @@ class TemplatesResourcesTab(QWidget):
         }})();
         """
         self.editor.page().runJavaScript(js)
-        self.editor_modified = True
-        self.save_btn.setEnabled(True)
+        # Trigger content change handler (for auto-save)
+        self._on_editor_content_changed()
 
     def update_editor_variables(self):
         """Update the JavaScript templateVariables with current case variables."""
@@ -1215,8 +1299,8 @@ class TemplatesResourcesTab(QWidget):
             js = f"document.execCommand('{cmd}', false, null);"
 
         self.editor.page().runJavaScript(js)
-        self.editor_modified = True
-        self.save_btn.setEnabled(True)
+        # Trigger content change handler (for auto-save)
+        self._on_editor_content_changed()
 
     def on_mode_changed(self, mode_text):
         """Handle mode selector change."""
@@ -1494,16 +1578,13 @@ class TemplatesResourcesTab(QWidget):
 
     def on_item_selected(self, path, item_type):
         """Handle item selection in tree."""
+        # Stop any pending auto-save for the previous template
+        self.auto_save_timer.stop()
+
+        # With auto-save, changes are saved automatically, but check just in case
         if self.editor_modified:
-            reply = QMessageBox.question(
-                self, "Unsaved Changes",
-                "You have unsaved changes. Save before switching?",
-                QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Discard | QMessageBox.StandardButton.Cancel
-            )
-            if reply == QMessageBox.StandardButton.Save:
-                self.save_template_content()
-            elif reply == QMessageBox.StandardButton.Cancel:
-                return
+            # Perform a final save before switching
+            self._save_template_silent()
 
         self.current_item_path = path
         self.current_item_type = item_type
@@ -1518,6 +1599,127 @@ class TemplatesResourcesTab(QWidget):
             self.show_template_editor(path)
         else:
             self.show_pdf_preview(path)  # Try to preview other files
+
+    def on_item_deleted(self, path):
+        """Handle item deletion - clear preview if the deleted item was being viewed."""
+        if self.current_item_path == path:
+            self.clear_preview()
+            self.status_label.setText("Template deleted")
+
+    def _install_editor_event_filter(self):
+        """Install event filter on the editor's focus proxy widget."""
+        focus_proxy = self.editor.focusProxy()
+        if focus_proxy:
+            focus_proxy.installEventFilter(self)
+            self._editor_focus_proxy = focus_proxy
+
+    def eventFilter(self, obj, event):
+        """Filter events to catch Tab key in editor before Qt handles it."""
+        # Check if event is from editor or its focus proxy
+        is_editor_event = (obj == self.editor or
+                          (hasattr(self, '_editor_focus_proxy') and obj == self._editor_focus_proxy))
+        if is_editor_event and event.type() == QEvent.Type.KeyPress:
+            key_event = event
+            if key_event.key() == Qt.Key.Key_Tab:
+                # Only handle Tab if we're editing a template
+                if self.current_item_type == 'templates':
+                    shift_pressed = bool(key_event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+                    self.apply_tab_indent(shift_pressed)
+                    return True  # Event handled, don't propagate
+        return super().eventFilter(obj, event)
+
+    def apply_tab_indent(self, remove_indent=False):
+        """Apply or remove indent via JavaScript. Handles paragraphs and list items."""
+        js = """
+        (function() {
+            var sel = window.getSelection();
+            if (sel.rangeCount === 0) return;
+            var range = sel.getRangeAt(0);
+            var node = range.startContainer;
+            var editor = document.getElementById('editor');
+            var removeIndent = """ + ('true' if remove_indent else 'false') + """;
+
+            // Check if we're in a list item
+            var listItem = node;
+            while (listItem && listItem !== editor) {
+                if (listItem.nodeType === 1 && listItem.tagName === 'LI') {
+                    break;
+                }
+                listItem = listItem.parentNode;
+            }
+
+            if (listItem && listItem.tagName === 'LI') {
+                // Handle list item indentation
+                var currentMargin = parseInt(listItem.style.marginLeft) || 0;
+                if (removeIndent) {
+                    // Decrease indent (minimum 0)
+                    var newMargin = Math.max(0, currentMargin - 36); // 0.5in ≈ 36px
+                    listItem.style.marginLeft = newMargin > 0 ? newMargin + 'px' : '';
+                } else {
+                    // Increase indent
+                    listItem.style.marginLeft = (currentMargin + 36) + 'px';
+                }
+                return;
+            }
+
+            // Check if we're in a list (UL/OL) but not in a specific LI
+            var list = node;
+            while (list && list !== editor) {
+                if (list.nodeType === 1 && (list.tagName === 'UL' || list.tagName === 'OL')) {
+                    break;
+                }
+                list = list.parentNode;
+            }
+
+            if (list && (list.tagName === 'UL' || list.tagName === 'OL')) {
+                // Indent the entire list
+                var currentMargin = parseInt(list.style.marginLeft) || 0;
+                if (removeIndent) {
+                    var newMargin = Math.max(0, currentMargin - 36);
+                    list.style.marginLeft = newMargin > 0 ? newMargin + 'px' : '';
+                } else {
+                    list.style.marginLeft = (currentMargin + 36) + 'px';
+                }
+                return;
+            }
+
+            // Handle regular paragraph/block element
+            var block = node;
+            while (block && block !== editor && block.parentNode !== editor) {
+                block = block.parentNode;
+            }
+
+            // If we're in a text node directly under editor, wrap it in a p tag
+            if (!block || block === editor || block.nodeType === 3) {
+                if (node.nodeType === 3) {
+                    var p = document.createElement('p');
+                    p.style.margin = '0';
+                    node.parentNode.insertBefore(p, node);
+                    p.appendChild(node);
+                    block = p;
+                    // Restore cursor
+                    var newRange = document.createRange();
+                    newRange.setStart(node, range.startOffset);
+                    newRange.collapse(true);
+                    sel.removeAllRanges();
+                    sel.addRange(newRange);
+                } else {
+                    return;
+                }
+            }
+
+            // Apply first-line indent to paragraph
+            if (block && block.nodeType === 1) {
+                if (removeIndent) {
+                    block.style.textIndent = '';
+                } else {
+                    block.style.textIndent = '0.5in';
+                }
+            }
+        })();
+        """
+        self.editor.page().runJavaScript(js)
+        self._on_editor_content_changed()
 
     def show_pdf_preview(self, path):
         """Display PDF in preview."""
@@ -1601,10 +1803,69 @@ class TemplatesResourcesTab(QWidget):
 
         return ""
 
+    def _on_editor_content_changed(self):
+        """Called when editor content changes - starts/restarts the auto-save timer."""
+        if self.current_item_type == 'templates' and self.current_item_path:
+            self.editor_modified = True
+            self.save_btn.setEnabled(True)
+            # Restart the auto-save timer (debounce)
+            self.auto_save_timer.stop()
+            self.auto_save_timer.start()
+
+    def _perform_auto_save(self):
+        """Perform the actual auto-save when the timer fires."""
+        if self.current_item_type == 'templates' and self.current_item_path and self.editor_modified:
+            self._save_template_silent()
+
+    def _save_template_silent(self):
+        """Save template content without showing dialogs (for auto-save)."""
+        if not self.current_item_path:
+            return
+
+        def on_html_ready(html_content):
+            if html_content is None:
+                return
+
+            ext = os.path.splitext(self.current_item_path)[1].lower()
+
+            try:
+                if ext == '.txt':
+                    # Strip HTML tags for plain text
+                    text = re.sub(r'<br\s*/?>', '\n', html_content)
+                    text = re.sub(r'<[^>]+>', '', text)
+                    text = html.unescape(text)
+                    with open(self.current_item_path, 'w', encoding='utf-8') as f:
+                        f.write(text)
+
+                elif ext == '.html':
+                    with open(self.current_item_path, 'w', encoding='utf-8') as f:
+                        f.write(html_content)
+
+                elif ext == '.docx':
+                    # Can't auto-save docx, skip silently
+                    return
+
+                self.editor_modified = False
+                self.save_btn.setEnabled(False)
+                self.status_label.setText("Auto-saved")
+                log_event(f"Auto-saved template: {self.current_item_path}", "info")
+
+            except Exception as e:
+                log_event(f"Error auto-saving template: {e}", "error")
+                self.status_label.setText(f"Auto-save failed: {str(e)[:30]}")
+
+        # Get content from editor
+        self.editor.page().runJavaScript(
+            "document.getElementById('editor').innerHTML",
+            on_html_ready
+        )
+
     def save_template_content(self):
         """Save editor content back to file."""
         if not self.current_item_path:
             return
+        # Stop auto-save timer since we're saving manually
+        self.auto_save_timer.stop()
 
         def on_html_ready(html_content):
             ext = os.path.splitext(self.current_item_path)[1].lower()
@@ -1653,6 +1914,7 @@ class TemplatesResourcesTab(QWidget):
         return f"""<!DOCTYPE html>
 <html>
 <head>
+    <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
     <style>
         body {{ margin: 0; padding: 0; }}
         #editor {{
@@ -1676,6 +1938,12 @@ class TemplatesResourcesTab(QWidget):
     <script>
         // Variables for placeholder replacement
         var templateVariables = {vars_js};
+        var bridge = null;
+
+        // Initialize QWebChannel for Python communication
+        new QWebChannel(qt.webChannelTransport, function(channel) {{
+            bridge = channel.objects.bridge;
+        }});
 
         // Function to replace placeholders in text
         function fillPlaceholders(text) {{
@@ -1697,8 +1965,11 @@ class TemplatesResourcesTab(QWidget):
             }}
         }});
 
+        // Notify Python when content changes (for auto-save)
         document.getElementById('editor').addEventListener('input', function() {{
-            // Could notify Python of changes
+            if (bridge) {{
+                bridge.notifyContentChanged();
+            }}
         }});
     </script>
 </body>

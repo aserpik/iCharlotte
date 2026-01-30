@@ -540,13 +540,71 @@ class MasterCaseTab(QWidget):
         dates_layout.addRow("Trial Date:", self.edit_trial)
         self.details_layout.addWidget(dates_frame)
         
-        # Case Summary
-        self.details_layout.addWidget(QLabel("<b>Case Summary:</b>"))
+        # Case Summary (Collapsible)
+        summary_header = QHBoxLayout()
+        self.summary_toggle_btn = QPushButton("▼")
+        self.summary_toggle_btn.setFixedSize(20, 20)
+        self.summary_toggle_btn.setStyleSheet("""
+            QPushButton {
+                border: none;
+                font-size: 10px;
+                font-weight: bold;
+                color: #666;
+                background: transparent;
+            }
+            QPushButton:hover {
+                color: #000;
+                background: #eee;
+                border-radius: 3px;
+            }
+        """)
+        self.summary_toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.summary_toggle_btn.clicked.connect(self.toggle_summary_collapsed)
+        summary_header.addWidget(self.summary_toggle_btn)
+
+        summary_label = QLabel("<b>Case Summary:</b>")
+        summary_label.setCursor(Qt.CursorShape.PointingHandCursor)
+        summary_label.mousePressEvent = lambda e: self.toggle_summary_collapsed()
+        summary_header.addWidget(summary_label)
+        summary_header.addStretch()
+
+        self.details_layout.addLayout(summary_header)
+
+        # Summary container (for collapse/expand)
+        self.summary_container = QFrame()
+        summary_container_layout = QVBoxLayout(self.summary_container)
+        summary_container_layout.setContentsMargins(0, 0, 0, 0)
+
         self.summary_edit = QTextEdit()
         self.summary_edit.setPlaceholderText("Case summary will appear here...")
-        self.summary_edit.setFixedHeight(100) # Keep it small box as requested
+        self.summary_edit.setMinimumHeight(60)
+        self.summary_edit.setMaximumHeight(300)
         self.summary_edit.textChanged.connect(self.save_case_summary_debounced)
-        self.details_layout.addWidget(self.summary_edit)
+
+        # Add resize grip at the bottom
+        self.summary_resize_handle = QFrame()
+        self.summary_resize_handle.setFixedHeight(6)
+        self.summary_resize_handle.setCursor(Qt.CursorShape.SizeVerCursor)
+        self.summary_resize_handle.setStyleSheet("""
+            QFrame {
+                background: qlineargradient(y1:0, y2:1, stop:0 #ddd, stop:0.5 #bbb, stop:1 #ddd);
+                border-radius: 2px;
+                margin: 2px 50px;
+            }
+            QFrame:hover {
+                background: qlineargradient(y1:0, y2:1, stop:0 #ccc, stop:0.5 #999, stop:1 #ccc);
+            }
+        """)
+        self.summary_resize_handle.mousePressEvent = self._summary_resize_start
+        self.summary_resize_handle.mouseMoveEvent = self._summary_resize_move
+
+        summary_container_layout.addWidget(self.summary_edit)
+        summary_container_layout.addWidget(self.summary_resize_handle)
+
+        self.details_layout.addWidget(self.summary_container)
+
+        # Load collapsed state and height from settings
+        self._load_summary_settings()
 
         # To-Dos
         self.details_layout.addWidget(QLabel("<b>To-Do Items:</b>"))
@@ -696,6 +754,74 @@ class MasterCaseTab(QWidget):
                 json.dump(settings, f, indent=2)
         except Exception as e:
             print(f"Error saving column settings: {e}")
+
+    def toggle_summary_collapsed(self):
+        """Toggle the case summary box collapsed/expanded state."""
+        is_visible = self.summary_container.isVisible()
+        self.summary_container.setVisible(not is_visible)
+        self.summary_toggle_btn.setText("▶" if is_visible else "▼")
+        self._save_summary_settings()
+
+    def _summary_resize_start(self, event):
+        """Start resizing the summary box."""
+        self._summary_resize_start_y = event.globalPosition().y()
+        self._summary_resize_start_height = self.summary_edit.height()
+
+    def _summary_resize_move(self, event):
+        """Handle mouse move during summary box resize."""
+        if not hasattr(self, '_summary_resize_start_y'):
+            return
+        delta = event.globalPosition().y() - self._summary_resize_start_y
+        new_height = max(60, min(300, int(self._summary_resize_start_height + delta)))
+        self.summary_edit.setFixedHeight(new_height)
+        self._save_summary_settings()
+
+    def _load_summary_settings(self):
+        """Load summary box collapsed state and height from settings."""
+        settings_path = os.path.join(os.getcwd(), ".gemini", "config", "master_list_settings.json")
+        if os.path.exists(settings_path):
+            try:
+                if os.path.getsize(settings_path) == 0:
+                    return
+                with open(settings_path, 'r') as f:
+                    settings = json.load(f)
+
+                # Load collapsed state
+                collapsed = settings.get("summary_collapsed", False)
+                self.summary_container.setVisible(not collapsed)
+                self.summary_toggle_btn.setText("▶" if collapsed else "▼")
+
+                # Load height
+                height = settings.get("summary_height", 100)
+                if isinstance(height, int) and 60 <= height <= 300:
+                    self.summary_edit.setFixedHeight(height)
+                else:
+                    self.summary_edit.setFixedHeight(100)
+            except Exception as e:
+                print(f"Error loading summary settings: {e}")
+                self.summary_edit.setFixedHeight(100)
+        else:
+            self.summary_edit.setFixedHeight(100)
+
+    def _save_summary_settings(self):
+        """Save summary box collapsed state and height to settings."""
+        settings_path = os.path.join(os.getcwd(), ".gemini", "config", "master_list_settings.json")
+        try:
+            # Load existing settings first
+            settings = {}
+            if os.path.exists(settings_path) and os.path.getsize(settings_path) > 0:
+                with open(settings_path, 'r') as f:
+                    settings = json.load(f)
+
+            # Update summary settings
+            settings["summary_collapsed"] = not self.summary_container.isVisible()
+            settings["summary_height"] = self.summary_edit.height()
+
+            os.makedirs(os.path.dirname(settings_path), exist_ok=True)
+            with open(settings_path, 'w') as f:
+                json.dump(settings, f, indent=2)
+        except Exception as e:
+            print(f"Error saving summary settings: {e}")
 
     def start_scan(self):
         self.scan_btn.setEnabled(False)
@@ -1021,16 +1147,9 @@ class MasterCaseTab(QWidget):
         self.todo_list.blockSignals(True)
         self.todo_list.clear()
         todos = self.db.get_todos(self.current_file_number) or []
-        
-        # Sort Logic: Red (0) > Yellow (1) > Green (2) > Blue (3) > Others
-        # Then by ID desc (newest first)
-        def sort_key(t):
-            color = t.get('color', 'yellow')
-            priority_map = {'red': 0, 'yellow': 1, 'green': 2, 'blue': 3}
-            p = priority_map.get(color, 4)
-            return (p, -t['id'])
-            
-        todos.sort(key=sort_key)
+
+        # Sort by ID desc (newest first) - no color-based reordering
+        todos.sort(key=lambda t: -t['id'])
         
         for todo in todos:
             item = QListWidgetItem()
@@ -1075,19 +1194,27 @@ class MasterCaseTab(QWidget):
             item = QListWidgetItem(label)
             item.setData(Qt.ItemDataRole.UserRole, h['id']) # Store ID for editing
             item.setData(Qt.ItemDataRole.UserRole + 1, h['date']) # Store raw date
+            item.setData(Qt.ItemDataRole.UserRole + 2, h.get('email_entry_id')) # Store Outlook email ID
             self.history_list.addItem(item)
     
     def on_history_double_clicked(self, item):
         try:
             hist_id = item.data(Qt.ItemDataRole.UserRole)
             raw_date = item.data(Qt.ItemDataRole.UserRole + 1) # YYYY-MM-DD usually
+            email_entry_id = item.data(Qt.ItemDataRole.UserRole + 2) # Outlook email ID
             item_text = item.text() # Capture text before item might be deleted
-            
+
             if not hist_id: return
-            
+
+            # If this history entry has a linked email, open it in Outlook
+            if email_entry_id:
+                self._open_outlook_email(email_entry_id)
+                return
+
+            # Otherwise, show the date edit dialog (original behavior)
             # Convert raw_date (YYYY-MM-DD) to MM/DD/YY for display in the dialog
             display_date = str(raw_date) if raw_date else ""
-            
+
             if raw_date and "-" in raw_date:
                 try:
                     parts = raw_date.split("-")
@@ -1097,7 +1224,7 @@ class MasterCaseTab(QWidget):
                 except: pass
 
             new_text, ok = QInputDialog.getText(self, "Edit Date", "Date (MM/DD/YY):", text=display_date)
-            
+
             if ok and new_text:
                 # Try to convert back to YYYY-MM-DD
                 db_date = new_text.strip()
@@ -1111,19 +1238,57 @@ class MasterCaseTab(QWidget):
                             db_date = f"{y}-{m.zfill(2)}-{d.zfill(2)}"
                 except:
                     pass
-                
+
                 self.db.update_history_date(hist_id, db_date)
-                
+
                 # Check text captured BEFORE refresh
                 if "Status Update" in item_text:
                      self.refresh_data_row(self.current_file_number)
-                
+
                 # Refresh details last, as it clears the list and deletes 'item'
                 self.refresh_details()
-                
+
         except Exception as e:
             log_event(f"Error editing history date: {e}", "error")
             QMessageBox.warning(self, "Error", f"Could not edit date: {e}")
+
+    def _open_outlook_email(self, entry_id):
+        """Open an email in Outlook by its EntryID."""
+        try:
+            import win32com.client
+            import win32gui
+            import win32con
+            outlook = win32com.client.Dispatch("Outlook.Application")
+            mapi = outlook.GetNamespace("MAPI")
+
+            # Get the email item by EntryID
+            mail_item = mapi.GetItemFromID(entry_id)
+
+            # Display the email in a new Outlook window
+            mail_item.Display()
+
+            # Get the inspector (email window) and activate it
+            inspector = mail_item.GetInspector
+            inspector.Activate()
+
+            # Also use win32gui to ensure the window comes to foreground
+            try:
+                # Find the Outlook window by class name and bring to front
+                def bring_outlook_to_front(hwnd, _):
+                    if win32gui.IsWindowVisible(hwnd):
+                        class_name = win32gui.GetClassName(hwnd)
+                        if 'rctrl_renwnd32' in class_name.lower():  # Outlook inspector window class
+                            win32gui.SetForegroundWindow(hwnd)
+                            return False  # Stop enumeration
+                    return True
+
+                win32gui.EnumWindows(bring_outlook_to_front, None)
+            except:
+                pass  # Fallback if win32gui approach fails
+
+        except Exception as e:
+            log_event(f"Error opening email in Outlook: {e}", "error")
+            QMessageBox.warning(self, "Error", f"Could not open email in Outlook: {e}")
 
     def update_todo_status(self, tid, checked):
         status = 'done' if checked else 'pending'
@@ -1514,6 +1679,7 @@ class MasterCaseTab(QWidget):
 
         self.email_monitor_worker = SentItemsMonitorWorker(self.db)
         self.email_monitor_worker.todo_created.connect(self.on_email_todo_created)
+        self.email_monitor_worker.history_created.connect(self.on_email_history_created)
         self.email_monitor_worker.error.connect(self.on_email_monitor_error)
         self.email_monitor_worker.status.connect(self.on_email_monitor_status)
         self.email_monitor_worker.finished.connect(self.on_email_monitor_finished)
@@ -1530,6 +1696,16 @@ class MasterCaseTab(QWidget):
 
     def on_email_todo_created(self, file_number, todo_text):
         """Handle todo created signal from email monitor."""
+        # Refresh the UI
+        self.refresh_data()
+
+        # If currently viewing this case, refresh details
+        if hasattr(self, 'current_file_number') and self.current_file_number == file_number:
+            self.refresh_details()
+            self.restore_selection()
+
+    def on_email_history_created(self, file_number, history_type):
+        """Handle history created signal from email monitor (status reports)."""
         # Refresh the UI
         self.refresh_data()
 

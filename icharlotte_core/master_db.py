@@ -75,6 +75,12 @@ class MasterCaseDatabase:
             )
         ''')
 
+        # Add email_entry_id column to history table (for linking to Outlook emails)
+        cursor.execute("PRAGMA table_info(history)")
+        history_columns = [info[1] for info in cursor.fetchall()]
+        if 'email_entry_id' not in history_columns:
+            cursor.execute("ALTER TABLE history ADD COLUMN email_entry_id TEXT")
+
         # Processed Emails Table (for Sent Items Monitor - prevents duplicate todos)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS processed_emails (
@@ -136,6 +142,23 @@ class MasterCaseDatabase:
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         cursor.execute("SELECT * FROM cases WHERE file_number = ?", (file_number,))
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+
+    def find_case_by_plaintiff(self, plaintiff_name):
+        """Find a case by plaintiff name (case-insensitive partial match).
+
+        Returns the first matching case dict or None if not found.
+        """
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        # Use LIKE for case-insensitive partial match
+        cursor.execute(
+            "SELECT * FROM cases WHERE LOWER(plaintiff_last_name) LIKE LOWER(?) ORDER BY file_number",
+            (f"%{plaintiff_name}%",)
+        )
         row = cursor.fetchone()
         conn.close()
         return dict(row) if row else None
@@ -261,15 +284,15 @@ class MasterCaseDatabase:
         finally:
             conn.close()
 
-    def add_history(self, file_number, type_val, notes, date_val=None):
+    def add_history(self, file_number, type_val, notes, date_val=None, email_entry_id=None):
         if not date_val:
             date_val = datetime.now().strftime("%Y-%m-%d")
-            
+
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         try:
-            cursor.execute("INSERT INTO history (file_number, date, type, notes) VALUES (?, ?, ?, ?)", 
-                           (file_number, date_val, type_val, notes))
+            cursor.execute("INSERT INTO history (file_number, date, type, notes, email_entry_id) VALUES (?, ?, ?, ?, ?)",
+                           (file_number, date_val, type_val, notes, email_entry_id))
             conn.commit()
         finally:
             conn.close()
