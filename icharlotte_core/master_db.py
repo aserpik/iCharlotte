@@ -48,6 +48,8 @@ class MasterCaseDatabase:
             cursor.execute("ALTER TABLE todos ADD COLUMN assigned_to TEXT")
         if 'assigned_date' not in columns:
             cursor.execute("ALTER TABLE todos ADD COLUMN assigned_date TEXT")
+        if 'email_entry_id' not in columns:
+            cursor.execute("ALTER TABLE todos ADD COLUMN email_entry_id TEXT")
 
         # Check if 'assigned_attorney' column exists in 'cases', if not add it
         cursor.execute("PRAGMA table_info(cases)")
@@ -163,15 +165,15 @@ class MasterCaseDatabase:
         conn.close()
         return dict(row) if row else None
 
-    def add_todo(self, file_number, item, due_date=None, color='yellow', created_date=None):
+    def add_todo(self, file_number, item, due_date=None, color='yellow', created_date=None, email_entry_id=None):
         if not created_date:
             created_date = datetime.now().strftime("%Y-%m-%d")
 
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         try:
-            cursor.execute("INSERT INTO todos (file_number, item, due_date, color, created_date, assigned_to, assigned_date) VALUES (?, ?, ?, ?, ?, ?, ?)", 
-                           (file_number, item, due_date, color, created_date, "", ""))
+            cursor.execute("INSERT INTO todos (file_number, item, due_date, color, created_date, assigned_to, assigned_date, email_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                           (file_number, item, due_date, color, created_date, "", "", email_entry_id))
             conn.commit()
         finally:
             conn.close()

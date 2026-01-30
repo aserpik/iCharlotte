@@ -480,13 +480,14 @@ class SentItemsMonitorWorker(QThread):
                 self.status.emit(f"Skipped email - empty todo text after prefix")
                 return
 
-            # Create the todo
+            # Create the todo (with email_entry_id for linking back to the email)
             today = datetime.now().strftime("%Y-%m-%d")
             self.db.add_todo(
                 file_number=file_number,
                 item=todo_text,
                 color='yellow',
-                created_date=today
+                created_date=today,
+                email_entry_id=entry_id
             )
 
             # Assign to the matched assignee automatically
@@ -558,7 +559,7 @@ class SentItemsMonitorWorker(QThread):
 
             # Emit signal
             self.history_created.emit(file_number, report_subtype)
-            self.status.emit(f"Created {history_type} for {file_number}")
+            self.status.emit(f"Created {report_subtype} for {file_number}")
 
         except Exception as e:
             self.error.emit(f"Status report processing error: {e}")

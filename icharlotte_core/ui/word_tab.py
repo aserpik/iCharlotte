@@ -120,6 +120,9 @@ class WordEmbedWidget(QWidget):
         self.placeholder.show()
         QApplication.processEvents()
 
+        # Store file path for later reference
+        self._pending_file_path = file_path
+
         try:
             # Reinitialize COM for fresh state
             try:
@@ -129,18 +132,49 @@ class WordEmbedWidget(QWidget):
             pythoncom.CoInitialize()
             self._com_initialized = True
 
-            # Create fresh Word application (DispatchEx creates a new instance)
-            self.word_app = win32com.client.DispatchEx("Word.Application")
-            self.word_app.Visible = True
-
-            # Prevent Word from showing its own dialogs
-            self.word_app.DisplayAlerts = False
-
-            # Open or create document
             if file_path:
-                self.word_doc = self.word_app.Documents.Open(file_path)
-                self.document_opened.emit(file_path)
+                # For opening files, use shell execution first
+                # This lets Word handle Protected View and other dialogs natively
+
+                # Use os.startfile to open the document (like double-clicking)
+                os.startfile(file_path)
+
+                # Wait for Word to start and open the file
+                # Give extra time for Protected View dialogs
+                time.sleep(2.0)
+                QApplication.processEvents()
+
+                # Now connect to the running Word instance with retries
+                max_retries = 5
+                for attempt in range(max_retries):
+                    try:
+                        self.word_app = win32com.client.GetActiveObject("Word.Application")
+                        if self.word_app.Documents.Count > 0:
+                            self.word_doc = self.word_app.ActiveDocument
+                            break
+                        else:
+                            raise Exception("No document found")
+                    except Exception as e:
+                        print(f"Attempt {attempt + 1}: GetActiveObject failed: {e}")
+                        if attempt < max_retries - 1:
+                            time.sleep(0.5)
+                            QApplication.processEvents()
+                        else:
+                            # Last resort: try Dispatch
+                            try:
+                                self.word_app = win32com.client.Dispatch("Word.Application")
+                                if self.word_app.Documents.Count > 0:
+                                    self.word_doc = self.word_app.ActiveDocument
+                                else:
+                                    raise Exception("No document found after opening")
+                            except Exception as e2:
+                                raise Exception(f"Could not connect to Word: {e2}")
+
+                self.word_app.Visible = True
             else:
+                # For new documents, create via COM
+                self.word_app = win32com.client.DispatchEx("Word.Application")
+                self.word_app.Visible = True
                 self.word_doc = self.word_app.Documents.Add()
 
             # Get the window handle directly from Word COM object
@@ -186,6 +220,11 @@ class WordEmbedWidget(QWidget):
                 # Schedule a delayed resize to ensure proper sizing after layout settles
                 self.resize_timer.start(150)
                 print(f"Word embedded successfully, hwnd={self.word_hwnd}, pid={self.word_pid}")
+
+                # Emit document opened signal if we opened a file
+                if hasattr(self, '_pending_file_path') and self._pending_file_path:
+                    self.document_opened.emit(self._pending_file_path)
+                    self._pending_file_path = None
             else:
                 self.placeholder.setText("Word started but window not found.\nTry clicking 'New Document' again.")
                 print("Could not find Word window")

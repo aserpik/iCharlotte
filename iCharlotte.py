@@ -74,6 +74,7 @@ from icharlotte_core.ui.liability_tab import LiabilityExposureTab
 from icharlotte_core.ui.master_case_tab import MasterCaseTab
 from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.ui.templates_resources_tab import TemplatesResourcesTab
+from icharlotte_core.word_hotkey import init_word_hotkey, stop_word_hotkey
 
 class QuickOpenDialog(QDialog):
     """Lightweight popup dialog for quick file number or plaintiff name entry via double-Ctrl tap."""
@@ -398,7 +399,7 @@ class MainWindow(QMainWindow):
         self._setup_global_hotkeys()
 
     def _setup_global_hotkeys(self):
-        """Register global hotkeys for Open File (Win+F), Change File (Win+C), and double-Ctrl quick open."""
+        """Register global hotkeys for Open File (Win+F), Change File (Win+C), double-Ctrl quick open, and Win+V for Word AI."""
         if not KEYBOARD_AVAILABLE:
             return
 
@@ -413,6 +414,13 @@ class MainWindow(QMainWindow):
             log_event("Global hotkeys registered: Win+F (Open File), Win+C (Change File), Double-Ctrl (Quick Open)")
         except Exception as e:
             log_event(f"Failed to register global hotkeys: {e}", "error")
+
+        # Register Word AI hotkey (Win+V)
+        try:
+            if init_word_hotkey(self):
+                log_event("Word AI hotkey registered: Win+V")
+        except Exception as e:
+            log_event(f"Failed to register Word AI hotkey: {e}", "error")
 
     def _on_ctrl_press(self, event):
         """Record when Ctrl key is pressed for tap duration calculation."""
@@ -1909,6 +1917,7 @@ class MainWindow(QMainWindow):
         if KEYBOARD_AVAILABLE:
             try:
                 keyboard.unhook_all_hotkeys()
+                stop_word_hotkey()
                 log_event("Global hotkeys unregistered")
             except Exception as e:
                 log_event(f"Error unregistering hotkeys: {e}", "error")

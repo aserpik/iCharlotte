@@ -260,19 +260,28 @@ class TodoItemWidget(QWidget):
     statusChanged = Signal(bool) # Checked/Unchecked
     colorChanged = Signal(str)   # New color
     assignmentChanged = Signal(str, str) # New initials, New date string
+    emailDoubleClicked = Signal(str)  # Emits email_entry_id when double-clicked
 
-    def __init__(self, text, status, color, created_date, assigned_to, assigned_date, case_assigned_attorney=""):
+    def __init__(self, text, status, color, created_date, assigned_to, assigned_date, case_assigned_attorney="", email_entry_id=None):
         super().__init__()
         self.case_assigned_attorney = case_assigned_attorney
+        self.email_entry_id = email_entry_id  # Store for double-click handler
         layout = QHBoxLayout(self)
         layout.setContentsMargins(5, 2, 5, 2)
-        
+
+        # Email indicator icon (if this todo came from email monitor)
+        if email_entry_id:
+            email_icon = QLabel("✉")
+            email_icon.setStyleSheet("color: #1976D2; font-size: 14px; margin-right: 3px;")
+            email_icon.setToolTip("Created from email - double-click to open in Outlook")
+            layout.addWidget(email_icon)
+
         # Checkbox
         self.checkbox = QCheckBox()
         self.checkbox.setChecked(status == 'done')
         self.checkbox.stateChanged.connect(lambda: self.statusChanged.emit(self.checkbox.isChecked()))
         layout.addWidget(self.checkbox)
-        
+
         # Color Button
         self.color_btn = QPushButton()
         self.color_btn.setFixedSize(16, 16)
@@ -368,6 +377,13 @@ class TodoItemWidget(QWidget):
         self.assign_date_lbl.setText(new_date_str)
         
         self.assignmentChanged.emit(new_assigned, new_date_str)
+
+    def mouseDoubleClickEvent(self, event):
+        """Handle double-click to open linked email in Outlook."""
+        if self.email_entry_id:
+            self.emailDoubleClicked.emit(self.email_entry_id)
+        super().mouseDoubleClickEvent(event)
+
 
 class MasterCaseTab(QWidget):
     def __init__(self, main_window=None):
@@ -611,6 +627,7 @@ class MasterCaseTab(QWidget):
         self.todo_list = QListWidget()
         self.todo_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.todo_list.customContextMenuRequested.connect(self.show_todo_menu)
+        self.todo_list.itemDoubleClicked.connect(self.on_todo_double_clicked)
         self.details_layout.addWidget(self.todo_list)
         
         # Enable Delete key for To-Do List
@@ -1153,29 +1170,33 @@ class MasterCaseTab(QWidget):
         
         for todo in todos:
             item = QListWidgetItem()
-            
+
             created = todo.get('created_date', '')
             assigned = todo.get('assigned_to', '')
             assigned_date = todo.get('assigned_date', '')
-            
+            email_entry_id = todo.get('email_entry_id')
+
             w = TodoItemWidget(
-                todo['item'], 
-                todo['status'], 
+                todo['item'],
+                todo['status'],
                 todo.get('color', 'yellow'),
                 created,
                 assigned,
                 assigned_date,
-                case_assigned_attorney=case_assigned_attorney
+                case_assigned_attorney=case_assigned_attorney,
+                email_entry_id=email_entry_id
             )
-            
+
             w.statusChanged.connect(lambda s, tid=todo['id']: self.update_todo_status(tid, s))
             w.colorChanged.connect(lambda c, tid=todo['id']: self.update_todo_color(tid, c))
             w.assignmentChanged.connect(lambda a, d, tid=todo['id']: self.update_todo_assignment(tid, a, d))
-            
+            w.emailDoubleClicked.connect(self._open_outlook_email)
+
             self.todo_list.addItem(item)
             item.setSizeHint(w.sizeHint())
             self.todo_list.setItemWidget(item, w)
             item.setData(Qt.ItemDataRole.UserRole, todo['id'])
+            item.setData(Qt.ItemDataRole.UserRole + 1, email_entry_id)  # Store email entry ID for double-click
 
         # History
         self.history_list.clear()
@@ -1196,7 +1217,17 @@ class MasterCaseTab(QWidget):
             item.setData(Qt.ItemDataRole.UserRole + 1, h['date']) # Store raw date
             item.setData(Qt.ItemDataRole.UserRole + 2, h.get('email_entry_id')) # Store Outlook email ID
             self.history_list.addItem(item)
-    
+
+    def on_todo_double_clicked(self, item):
+        """Handle double-click on a todo item - opens linked email in Outlook if available."""
+        try:
+            email_entry_id = item.data(Qt.ItemDataRole.UserRole + 1)  # Get email entry ID
+
+            if email_entry_id:
+                self._open_outlook_email(email_entry_id)
+        except Exception as e:
+            log_event(f"Error handling todo double-click: {e}", "error")
+
     def on_history_double_clicked(self, item):
         try:
             hist_id = item.data(Qt.ItemDataRole.UserRole)
