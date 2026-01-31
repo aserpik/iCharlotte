@@ -179,7 +179,10 @@ def safe_append_to_docx(
             elif hasattr(logger, level):
                 getattr(logger, level)(msg)
         else:
-            print(msg, flush=True)
+            try:
+                print(msg, flush=True)
+            except OSError:
+                pass  # stdout pipe broken
 
     # Ensure output directory exists
     output_dir = os.path.dirname(output_path)

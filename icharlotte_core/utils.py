@@ -172,6 +172,10 @@ def format_date_to_mm_dd_yyyy(date_val):
     return str(date_val)
 
 def log_event(message, level="info"):
+    """Log an event to both console and log files.
+
+    Also forwards to the app crash handler logger for centralized logging.
+    """
     print(message)
     if level == "info":
         logging.info(message)
@@ -179,6 +183,18 @@ def log_event(message, level="info"):
         logging.error(message)
     elif level == "warning":
         logging.warning(message)
+
+    # Also log to the centralized app logger if available
+    try:
+        from .app_crash_handler import log_info, log_warning, log_error
+        if level == "error":
+            log_error(message)
+        elif level == "warning":
+            log_warning(message)
+        else:
+            log_info(message)
+    except ImportError:
+        pass  # App crash handler not available
 
 def sanitize_filename(name):
     return "".join(c for c in name if c.isalnum() or c in (' ', '-', '_')).strip()

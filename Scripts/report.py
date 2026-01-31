@@ -36,7 +36,10 @@ try:
     from icharlotte_core.utils import log_event, get_case_path
 except ImportError:
     def log_event(message, level="info"):
-        print(f"[{level.upper()}] {message}")
+        try:
+            print(f"[{level.upper()}] {message}")
+        except OSError:
+            pass  # stdout pipe broken
     def get_case_path(file_num):
         return None
 $', file_num):

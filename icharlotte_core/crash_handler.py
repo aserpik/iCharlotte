@@ -164,12 +164,15 @@ class CrashHandler:
         """Handle uncaught exceptions."""
         self._write_crash_report(exc_type, exc_value, exc_tb, "main")
 
-        # Also print to stderr for any capture
-        print(f"\n{'='*60}", file=sys.stderr)
-        print(f"CRASH: {self.agent_name} agent crashed!", file=sys.stderr)
-        print(f"Error: {exc_type.__name__}: {exc_value}", file=sys.stderr)
-        print(f"Crash log written to: {CRASH_LOG_DIR}", file=sys.stderr)
-        print(f"{'='*60}\n", file=sys.stderr)
+        # Also print to stderr for any capture (may fail if pipe is broken)
+        try:
+            print(f"\n{'='*60}", file=sys.stderr)
+            print(f"CRASH: {self.agent_name} agent crashed!", file=sys.stderr)
+            print(f"Error: {exc_type.__name__}: {exc_value}", file=sys.stderr)
+            print(f"Crash log written to: {CRASH_LOG_DIR}", file=sys.stderr)
+            print(f"{'='*60}\n", file=sys.stderr)
+        except OSError:
+            pass  # stderr pipe broken
 
         # Call original hook
         if self._original_excepthook:
@@ -287,7 +290,10 @@ class CrashHandler:
                            f"{mem.get('vms_mb', 'N/A')} MB VMS\n")
 
         except Exception as e:
-            print(f"Failed to write readable crash report: {e}", file=sys.stderr)
+            try:
+                print(f"Failed to write readable crash report: {e}", file=sys.stderr)
+            except OSError:
+                pass  # stderr pipe broken
 
     def _get_log_path(self, event_type: str, ext: str = ".json") -> str:
         """Generate a log file path."""
@@ -301,7 +307,10 @@ class CrashHandler:
             with open(file_path, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, default=str)
         except Exception as e:
-            print(f"Failed to write crash log: {e}", file=sys.stderr)
+            try:
+                print(f"Failed to write crash log: {e}", file=sys.stderr)
+            except OSError:
+                pass  # stderr pipe broken
 
     def _get_memory_info(self) -> Optional[dict]:
         """Get current memory usage info."""

@@ -89,6 +89,18 @@ def get_agent_logger(file_number: str = None) -> 'AgentLogger':
             _logger = None
     return _logger
 
+def safe_print(message, file=None, flush=True):
+    """
+    Print wrapper that handles OSError when stdout/stderr becomes invalid.
+    This can happen when running multiple agents simultaneously on Windows.
+    """
+    try:
+        print(message, file=file, flush=flush)
+    except OSError:
+        # stdout/stderr pipe is broken - silently ignore
+        # The AgentLogger will still capture output to log files
+        pass
+
 def log_event(message, level="info", progress=None):
     """
     Log an event with structured output for UI parsing.
@@ -102,11 +114,10 @@ def log_event(message, level="info", progress=None):
 
     # Output structured progress first if provided (for UI)
     if progress is not None:
-        print(f"PROGRESS:{progress}:{message}", flush=True)
+        safe_print(f"PROGRESS:{progress}:{message}")
 
     # Output human-readable message
-    print(f"[MedRecord] {message}", flush=True)
-    sys.stdout.flush()
+    safe_print(f"[MedRecord] {message}")
 
     # Log to file via AgentLogger
     if logger:
@@ -169,7 +180,7 @@ def extract_text_parallel(file_path):
         doc.close()
     except Exception as e:
         log_event(f"Error reading PDF structure: {e}", level="error")
-        print(f"PASS_FAILED:Extraction:PDF read error - {e}:recoverable", flush=True)
+        safe_print(f"PASS_FAILED:Extraction:PDF read error - {e}:recoverable")
         return None
 
     log_event(f"Total pages: {num_pages}", progress=10)
@@ -220,7 +231,7 @@ def extract_text_parallel(file_path):
                     memory_guard.check()
                 except MemoryError as e:
                     log_event(f"Memory limit exceeded: {e}", level="error")
-                    print(f"PASS_FAILED:Extraction:Memory limit exceeded:fatal", flush=True)
+                    safe_print("PASS_FAILED:Extraction:Memory limit exceeded:fatal")
                     # Force garbage collection and continue with what we have
                     gc.collect()
                     break
@@ -304,14 +315,14 @@ def call_gemini(prompt, text):
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
         log_event("Error: GEMINI_API_KEY environment variable not set.", level="error")
-        print("PASS_FAILED:LLM:API key not configured:fatal", flush=True)
+        safe_print("PASS_FAILED:LLM:API key not configured:fatal")
         return None
 
     try:
         client = genai.Client(api_key=api_key)
     except Exception as e:
         log_event(f"Error initializing Gemini client: {e}", level="error")
-        print(f"PASS_FAILED:LLM:Client initialization failed - {e}:fatal", flush=True)
+        safe_print(f"PASS_FAILED:LLM:Client initialization failed - {e}:fatal")
         return None
 
     total_chars = len(text)
@@ -397,7 +408,7 @@ def call_gemini(prompt, text):
     if failed_chunks > 0:
         log_event(f"LLM processing completed with {failed_chunks}/{total_chunks} failed chunks", level="warning")
         if failed_chunks == total_chunks:
-            print("PASS_FAILED:LLM:All chunks failed:fatal", flush=True)
+            safe_print("PASS_FAILED:LLM:All chunks failed:fatal")
             return None
     else:
         log_event("LLM processing completed successfully", progress=80)
@@ -592,7 +603,7 @@ def save_to_docx(content, output_dir, provider_name, original_filename):
             doc.save(output_path)
 
             # Emit structured output file path for UI
-            print(f"OUTPUT_FILE:{output_path}", flush=True)
+            safe_print(f"OUTPUT_FILE:{output_path}")
             log_event(f"Saved to: {output_path}", progress=95)
             checkpoint("Save complete")
             return True
@@ -723,18 +734,18 @@ def main():
     total_passes = 3  # Extraction, LLM, Write
 
     # === Pass 1: Extraction ===
-    print(f"PASS_START:Extraction:1:{total_passes}", flush=True)
+    safe_print(f"PASS_START:Extraction:1:{total_passes}")
     checkpoint("Starting extraction pass")
     extraction_start = time.time()
 
     text = extract_text(input_path)
     if not text:
         log_event("Extraction failed: No text extracted", level="error")
-        print("PASS_FAILED:Extraction:No text extracted:fatal", flush=True)
+        safe_print("PASS_FAILED:Extraction:No text extracted:fatal")
         sys.exit(1)
 
     extraction_duration = time.time() - extraction_start
-    print(f"PASS_COMPLETE:Extraction:success:{extraction_duration:.1f}", flush=True)
+    safe_print(f"PASS_COMPLETE:Extraction:success:{extraction_duration:.1f}")
     log_event(f"Extraction complete ({extraction_duration:.1f}s, {len(text)} chars)")
 
     # Load prompt file
@@ -743,11 +754,11 @@ def main():
             prompt_instruction = f.read()
     except FileNotFoundError:
         log_event(f"Error: Prompt file not found: {PROMPT_FILE}", level="error")
-        print(f"ERROR:Prompt file not found: {PROMPT_FILE}")
+        safe_print(f"ERROR:Prompt file not found: {PROMPT_FILE}")
         sys.exit(1)
     except Exception as e:
         log_event(f"Error reading prompt file: {e}", level="error")
-        print(f"ERROR:Failed to read prompt file: {e}")
+        safe_print(f"ERROR:Failed to read prompt file: {e}")
         sys.exit(1)
 
     # Determine Provider Name
@@ -757,22 +768,22 @@ def main():
     checkpoint(f"Provider: {provider_name}")
 
     # === Pass 2: LLM Processing ===
-    print(f"PASS_START:LLM:2:{total_passes}", flush=True)
+    safe_print(f"PASS_START:LLM:2:{total_passes}")
     checkpoint("Starting LLM pass")
     llm_start = time.time()
 
     final_content = call_gemini(prompt_instruction, text)
     if not final_content:
         log_event("LLM processing failed: No content generated", level="error")
-        print("PASS_FAILED:LLM:No content generated:fatal", flush=True)
+        safe_print("PASS_FAILED:LLM:No content generated:fatal")
         sys.exit(1)
 
     llm_duration = time.time() - llm_start
-    print(f"PASS_COMPLETE:LLM:success:{llm_duration:.1f}", flush=True)
+    safe_print(f"PASS_COMPLETE:LLM:success:{llm_duration:.1f}")
     log_event(f"LLM processing complete ({llm_duration:.1f}s)")
 
     # === Pass 3: Write Output ===
-    print(f"PASS_START:Write:3:{total_passes}", flush=True)
+    safe_print(f"PASS_START:Write:3:{total_passes}")
     checkpoint("Starting write pass")
     write_start = time.time()
 
@@ -823,12 +834,12 @@ def main():
     write_duration = time.time() - write_start
 
     if success:
-        print(f"PASS_COMPLETE:Write:success:{write_duration:.1f}", flush=True)
+        safe_print(f"PASS_COMPLETE:Write:success:{write_duration:.1f}")
         log_event(f"Write complete ({write_duration:.1f}s)", progress=100)
-        print("PROGRESS:100:Agent completed successfully", flush=True)
+        safe_print("PROGRESS:100:Agent completed successfully")
         log_event("--- Agent Finished Successfully ---")
     else:
-        print("PASS_FAILED:Write:Save failed:recoverable", flush=True)
+        safe_print("PASS_FAILED:Write:Save failed:recoverable")
         log_event("Write pass failed", level="error")
         sys.exit(1)
 
@@ -836,26 +847,26 @@ if __name__ == '__main__':
     try:
         main()
     except KeyboardInterrupt:
-        print("\nERROR:Agent cancelled by user", flush=True)
+        safe_print("\nERROR:Agent cancelled by user")
         sys.exit(130)
     except MemoryError as e:
-        print(f"ERROR:Memory exhausted - {e}", flush=True)
-        print("PASS_FAILED:Processing:Memory exhausted:fatal", flush=True)
+        safe_print(f"ERROR:Memory exhausted - {e}")
+        safe_print("PASS_FAILED:Processing:Memory exhausted:fatal")
         log_event(f"FATAL: Memory exhausted: {e}", level="error")
         sys.exit(137)
     except Exception as e:
         # This catches any unhandled exception
         import traceback
         tb = traceback.format_exc()
-        print(f"ERROR:Unhandled exception - {type(e).__name__}: {e}", flush=True)
-        print(f"PASS_FAILED:Processing:Unhandled exception:fatal", flush=True)
+        safe_print(f"ERROR:Unhandled exception - {type(e).__name__}: {e}")
+        safe_print("PASS_FAILED:Processing:Unhandled exception:fatal")
         log_event(f"FATAL: Unhandled exception: {e}\n{tb}", level="error")
 
         # Also write to stderr for any capture mechanisms
-        print(f"\n{'='*60}", file=sys.stderr)
-        print(f"FATAL ERROR in MedRecord Agent", file=sys.stderr)
-        print(f"Exception: {type(e).__name__}: {e}", file=sys.stderr)
-        print(f"{'='*60}", file=sys.stderr)
-        print(tb, file=sys.stderr)
+        safe_print(f"\n{'='*60}", file=sys.stderr)
+        safe_print("FATAL ERROR in MedRecord Agent", file=sys.stderr)
+        safe_print(f"Exception: {type(e).__name__}: {e}", file=sys.stderr)
+        safe_print(f"{'='*60}", file=sys.stderr)
+        safe_print(tb, file=sys.stderr)
 
         sys.exit(1)

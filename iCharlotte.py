@@ -75,6 +75,10 @@ from icharlotte_core.ui.master_case_tab import MasterCaseTab
 from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.ui.templates_resources_tab import TemplatesResourcesTab
 from icharlotte_core.word_hotkey import init_word_hotkey, stop_word_hotkey
+from icharlotte_core.app_crash_handler import (
+    install_crash_handler, checkpoint, add_context,
+    log_info, log_warning, log_error, log_debug, safe_slot
+)
 
 class QuickOpenDialog(QDialog):
     """Lightweight popup dialog for quick file number or plaintiff name entry via double-Ctrl tap."""
@@ -338,22 +342,29 @@ class MainWindow(QMainWindow):
     open_file_signal = Signal()
     change_file_signal = Signal()
     quick_open_signal = Signal()  # For double-Ctrl quick open
+    ctrl_press_signal = Signal()  # For thread-safe Ctrl press handling
+    ctrl_release_signal = Signal()  # For thread-safe Ctrl release handling
 
     def __init__(self, file_number=None, case_path=None, initial_tab=None):
         super().__init__()
+        checkpoint("MainWindow.__init__ starting", file_number=file_number)
 
         # Connect signals for global hotkeys (thread-safe)
         self.open_file_signal.connect(self._on_open_file_hotkey)
         self.change_file_signal.connect(self._on_change_file_hotkey)
         self.quick_open_signal.connect(self._on_quick_open_hotkey)
+        self.ctrl_press_signal.connect(self._handle_ctrl_press)
+        self.ctrl_release_signal.connect(self._handle_ctrl_release)
 
         # Double-Ctrl tap detection state
-        self._last_ctrl_tap_time = 0  # Time of last valid tap (quick press+release)
+        self._last_ctrl_tap_time = None  # Time of last valid tap (quick press+release), None = no recent tap
         self._ctrl_press_time = 0  # When Ctrl was pressed
-        self._ctrl_tap_threshold = 0.3  # Max seconds between taps for double-tap
+        self._ctrl_tap_threshold = 0.5  # Max seconds between taps for double-tap
         self._ctrl_hold_threshold = 0.2  # Max seconds Ctrl can be held to count as tap
         self.file_number = file_number
         self.case_path = case_path
+        add_context('current_file_number', file_number)
+        add_context('current_case_path', case_path)
         self._update_window_title()
         self.resize(1200, 800)
 
@@ -377,7 +388,7 @@ class MainWindow(QMainWindow):
         self.cached_models = {} # Cache for models: {provider: [list]}
         self.fetcher = None
 
-        log_event(f"Initializing MainWindow for {file_number} at {case_path}")
+        log_info(f"Initializing MainWindow for {file_number} at {case_path}")
         self.icon_provider = QFileIconProvider()
         # Cache icons to avoid slow network file access
         self._icon_cache = {}
@@ -423,15 +434,23 @@ class MainWindow(QMainWindow):
             log_event(f"Failed to register Word AI hotkey: {e}", "error")
 
     def _on_ctrl_press(self, event):
-        """Record when Ctrl key is pressed for tap duration calculation."""
-        self._ctrl_press_time = time.time()
+        """Called from keyboard library thread - emit signal for thread safety."""
+        self.ctrl_press_signal.emit()
 
     def _on_ctrl_release(self, event):
-        """Detect double-tap of Ctrl key for quick open dialog.
+        """Called from keyboard library thread - emit signal for thread safety."""
+        self.ctrl_release_signal.emit()
+
+    def _handle_ctrl_press(self):
+        """Handle Ctrl press on main thread - record time for tap duration calculation."""
+        self._ctrl_press_time = time.time()
+
+    def _handle_ctrl_release(self):
+        """Handle Ctrl release on main thread - detect double-tap for quick open dialog.
 
         Only triggers if:
         1. Ctrl was held briefly (< 200ms) - this is a "tap", not a held key
-        2. Two taps occurred within 300ms of each other
+        2. Two taps occurred within 500ms of each other
         """
         current_time = time.time()
         hold_duration = current_time - self._ctrl_press_time
@@ -439,18 +458,20 @@ class MainWindow(QMainWindow):
         # Only count as a tap if Ctrl was held briefly (not held for shortcuts)
         if hold_duration > self._ctrl_hold_threshold:
             # Ctrl was held too long - this was probably a shortcut, not a tap
-            self._last_ctrl_tap_time = 0
+            self._last_ctrl_tap_time = None
             return
 
         # This is a valid tap - check if it's a double-tap
-        time_since_last_tap = current_time - self._last_ctrl_tap_time
+        if self._last_ctrl_tap_time is not None:
+            time_since_last_tap = current_time - self._last_ctrl_tap_time
+            if time_since_last_tap < self._ctrl_tap_threshold:
+                # Double-tap detected - emit signal (thread-safe)
+                self.quick_open_signal.emit()
+                self._last_ctrl_tap_time = None  # Reset to prevent triple-tap triggering
+                return
 
-        if time_since_last_tap < self._ctrl_tap_threshold:
-            # Double-tap detected - emit signal (thread-safe)
-            self.quick_open_signal.emit()
-            self._last_ctrl_tap_time = 0  # Reset to prevent triple-tap triggering
-        else:
-            self._last_ctrl_tap_time = current_time
+        # Record this tap for potential double-tap detection
+        self._last_ctrl_tap_time = current_time
 
     def _on_open_file_hotkey(self):
         """Handle Win+F hotkey - bring window to front and open file."""
@@ -490,6 +511,7 @@ class MainWindow(QMainWindow):
             self.setWindowTitle("iCharlotte")
 
     def setup_ui(self):
+        checkpoint("setup_ui starting - creating tabs")
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
 
@@ -528,6 +550,7 @@ class MainWindow(QMainWindow):
         """)
 
         # --- Tab 0: Master List ---
+        checkpoint("Creating MasterCaseTab")
         self.master_tab = MasterCaseTab(self)
         self.tabs.addTab(self.master_tab, "Master List")
 
@@ -543,6 +566,10 @@ class MainWindow(QMainWindow):
         btn_view_docket = QPushButton("ViewDocket")
         btn_view_docket.clicked.connect(self.view_docket)
         toolbar_layout.addWidget(btn_view_docket)
+
+        btn_notes = QPushButton("Notes")
+        btn_notes.clicked.connect(self.open_notes)
+        toolbar_layout.addWidget(btn_notes)
 
         btn_vars = QPushButton("Variables")
         btn_vars.clicked.connect(self.manage_variables)
@@ -759,6 +786,7 @@ class MainWindow(QMainWindow):
             self.index_tab.load_data(self.file_number)
 
         # --- Tab 4: Chat ---
+        checkpoint("Creating ChatTab")
         self.chat_tab = ChatTab()
         self.tabs.addTab(self.chat_tab, "Chat")
 
@@ -884,6 +912,7 @@ class MainWindow(QMainWindow):
         self.corner_layout.addWidget(self.restart_btn)
 
         self.tabs.setCornerWidget(self.corner_widget, Qt.Corner.TopRightCorner)
+        checkpoint("setup_ui complete - all tabs created")
 
     def setup_view_menu(self):
         self.view_btn = QToolButton()
@@ -1384,7 +1413,7 @@ class MainWindow(QMainWindow):
         if not os.path.exists(ai_output_dir):
             QMessageBox.information(self, "Info", "AI OUTPUT directory not found.")
             return
-            
+
         dockets = glob.glob(os.path.join(ai_output_dir, "Docket_*.pdf"))
         if dockets:
             # Sort by modification time, newest first
@@ -1396,6 +1425,45 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Error", f"Could not open docket: {e}")
         else:
             QMessageBox.information(self, "Info", "No Docket PDF found in AI OUTPUT.")
+
+    def open_notes(self):
+        """Open or create the AS NOTES document for the current case."""
+        if not hasattr(self, 'case_path') or not self.case_path:
+            QMessageBox.information(self, "Info", "No case loaded.")
+            return
+        if not hasattr(self, 'file_number') or not self.file_number:
+            QMessageBox.information(self, "Info", "No case loaded.")
+            return
+
+        notes_dir = os.path.join(self.case_path, "NOTES")
+        notes_filename = f"AS NOTES - {self.file_number}.docx"
+        notes_path = os.path.join(notes_dir, notes_filename)
+
+        # Create NOTES directory if it doesn't exist
+        if not os.path.exists(notes_dir):
+            try:
+                os.makedirs(notes_dir)
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Could not create NOTES directory: {e}")
+                return
+
+        # Create the document if it doesn't exist
+        if not os.path.exists(notes_path):
+            try:
+                from docx import Document
+                doc = Document()
+                doc.add_heading(f"AS Notes - {self.file_number}", level=1)
+                doc.add_paragraph("")
+                doc.save(notes_path)
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Could not create notes document: {e}")
+                return
+
+        # Open the document
+        try:
+            os.startfile(notes_path)
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Could not open notes document: {e}")
 
     def manage_variables(self):
         dialog = VariablesDialog(self.file_number, self)
@@ -1535,27 +1603,30 @@ class MainWindow(QMainWindow):
 
     def on_agent_finished(self, script, btn_widget, started_for_case, success):
         """Handle agent completion and update button status."""
-        # Clear the running state
-        if script in self.running_agents:
-            del self.running_agents[script]
+        try:
+            # Clear the running state
+            if script in self.running_agents:
+                del self.running_agents[script]
 
-        # Only update button UI if we're still on the same case the agent was started for
-        if self.file_number == started_for_case:
-            btn_widget.set_running(False)
-            # Update status message
-            if success:
-                btn_widget.set_status("Last: Just now")
-            else:
-                btn_widget.set_status("Last: Failed")
-
-        # Update docket download date for the ORIGINAL case (not current case)
-        if script == "docket.py" and success and started_for_case:
-            from datetime import datetime
-            today = datetime.now().strftime("%Y-%m-%d")
-            self.master_db.update_last_docket_download(started_for_case, today)
-            # Only update button if still on the same case
+            # Only update button UI if we're still on the same case the agent was started for
             if self.file_number == started_for_case:
-                btn_widget.set_last_run(today)
+                btn_widget.set_running(False)
+                # Update status message
+                if success:
+                    btn_widget.set_status("Last: Just now")
+                else:
+                    btn_widget.set_status("Last: Failed")
+
+            # Update docket download date for the ORIGINAL case (not current case)
+            if script == "docket.py" and success and started_for_case:
+                from datetime import datetime
+                today = datetime.now().strftime("%Y-%m-%d")
+                self.master_db.update_last_docket_download(started_for_case, today)
+                # Only update button if still on the same case
+                if self.file_number == started_for_case:
+                    btn_widget.set_last_run(today)
+        except Exception as e:
+            log_event(f"Error in on_agent_finished: {e}", "error")
 
     def update_docket_agent_status(self):
         """Update the docket agent button with last download date."""
@@ -1816,10 +1887,13 @@ class MainWindow(QMainWindow):
             log_event(f"Error logging processing entry: {e}", "error")
 
     def cleanup_runner(self, runner):
-        # Only cleanup if it matches the current file number (meaning the user saw it finish)
-        if getattr(runner, 'file_number', None) == self.file_number:
-            if runner in self.agent_runners:
-                self.agent_runners.remove(runner)
+        try:
+            # Only cleanup if it matches the current file number (meaning the user saw it finish)
+            if getattr(runner, 'file_number', None) == self.file_number:
+                if runner in self.agent_runners:
+                    self.agent_runners.remove(runner)
+        except Exception as e:
+            log_event(f"Error in cleanup_runner: {e}", "error")
 
     def clear_completed_status(self):
         for i in range(self.status_list_layout.count() - 1, -1, -1):
@@ -2404,33 +2478,38 @@ class MainWindow(QMainWindow):
         self.status_label.setText(f"Scan Complete. Case: {self.file_number}")
         self.tree.setSortingEnabled(True)
 
-def exception_hook(exctype, value, traceback):
-    print("------------------------------------------------------------------------------")
-    print("CRITICAL ERROR CAUGHT BY EXCEPTION HOOK")
-    print("------------------------------------------------------------------------------")
-    import traceback as tb
-    tb.print_exception(exctype, value, traceback)
-    print("------------------------------------------------------------------------------")
-    sys.__excepthook__(exctype, value, traceback)
-
-sys.excepthook = exception_hook
+# Note: Exception handling is now managed by app_crash_handler module
+# The install_crash_handler() function sets up sys.excepthook automatically
+# Legacy exception_hook removed - see icharlotte_core/app_crash_handler.py
 
 if __name__ == "__main__":
+    # Install crash handler FIRST before anything else
+    crash_handler = install_crash_handler()
+    checkpoint("Application starting")
+
     try:
         # Parse command-line arguments for restart state restoration
+        checkpoint("Parsing command-line arguments")
         parser = argparse.ArgumentParser(description='iCharlotte Legal Document Management Suite')
         parser.add_argument('--file-number', type=str, help='File number to load on startup')
         parser.add_argument('--case-path', type=str, help='Case path to load on startup')
         parser.add_argument('--tab', type=int, help='Tab index to open on startup')
         args, remaining = parser.parse_known_args()
 
+        # Add startup args to crash context
+        add_context('startup_file_number', args.file_number)
+        add_context('startup_case_path', args.case_path)
+        add_context('startup_tab', args.tab)
+
         # Debug: Log received arguments
-        print(f"DEBUG: sys.argv = {sys.argv}")
-        print(f"DEBUG: Parsed args = file_number={args.file_number}, case_path={args.case_path}, tab={args.tab}")
+        log_debug(f"sys.argv = {sys.argv}")
+        log_debug(f"Parsed args = file_number={args.file_number}, case_path={args.case_path}, tab={args.tab}")
 
         # Disable Chromium sandbox and security for local file editing
+        checkpoint("Configuring Qt WebEngine")
         os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = "--no-sandbox --disable-web-security"
 
+        checkpoint("Creating QApplication")
         app = QApplication(sys.argv)
 
         # Set application icon (for taskbar)
@@ -2438,19 +2517,31 @@ if __name__ == "__main__":
         if os.path.exists(icon_path):
             app.setWindowIcon(QIcon(icon_path))
 
+        # Update crash handler with Qt references
+        crash_handler.set_qt_references(qt_app=app)
+
         # Log startup parameters
-        log_event(f"Starting with args: file_number={args.file_number}, case_path={args.case_path}, tab={args.tab}")
+        log_info(f"Starting with args: file_number={args.file_number}, case_path={args.case_path}, tab={args.tab}")
 
         # Launch Main Window with restored state if provided
+        checkpoint("Creating MainWindow")
         window = MainWindow(
             file_number=args.file_number,
             case_path=args.case_path,
             initial_tab=args.tab
         )
+
+        # Update crash handler with window reference
+        crash_handler.set_qt_references(main_window=window)
+
+        checkpoint("Showing MainWindow")
         window.show()
 
+        checkpoint("Entering Qt event loop")
         sys.exit(app.exec())
+
     except Exception as e:
+        log_error(f"CRITICAL MAIN ERROR: {e}", exc_info=True)
         print(f"CRITICAL MAIN ERROR: {e}")
         import traceback
         traceback.print_exc()

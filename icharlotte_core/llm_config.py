@@ -670,7 +670,10 @@ class LLMCaller:
             else:
                 self.logger.info(message)
         else:
-            print(message, flush=True)
+            try:
+                print(message, flush=True)
+            except OSError:
+                pass  # stdout pipe broken
 
     def _get_gemini_client(self):
         """Get or create Gemini client."""

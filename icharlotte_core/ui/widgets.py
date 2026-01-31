@@ -14,6 +14,15 @@ from PySide6.QtCore import Qt, QProcess, QObject, Signal, QTimer
 from PySide6.QtGui import QTextCursor, QAction, QDragEnterEvent, QDropEvent
 from ..utils import log_event
 
+# Import app crash handler for logging
+try:
+    from ..app_crash_handler import checkpoint as app_checkpoint, log_info, log_error
+except ImportError:
+    # Fallback if module not available
+    def app_checkpoint(*args, **kwargs): pass
+    def log_info(msg): pass
+    def log_error(msg, exc_info=False): pass
+
 
 # =============================================================================
 # Pass Progress Tracking
@@ -526,6 +535,12 @@ class AgentRunner(QObject):
     def start(self):
         import time
         self.last_output_time = time.time()
+
+        # Log agent start
+        script_name = self.args[0] if self.args else "unknown"
+        app_checkpoint(f"Starting agent: {script_name}", file_number=self.file_number)
+        log_info(f"AgentRunner starting: {self.command} {' '.join(self.args)}")
+
         self.process.start(self.command, self.args)
         self.watchdog_timer.start()
 
@@ -588,42 +603,53 @@ class AgentRunner(QObject):
 
     def handle_finished(self, exit_code, exit_status):
         """Handle process completion with detailed exit code interpretation."""
-        # Stop the watchdog timer
-        self.watchdog_timer.stop()
+        try:
+            # Stop the watchdog timer
+            self.watchdog_timer.stop()
 
-        success = (exit_code == 0 and exit_status == QProcess.ExitStatus.NormalExit)
-        self.success = success
+            success = (exit_code == 0 and exit_status == QProcess.ExitStatus.NormalExit)
+            self.success = success
 
-        # Log detailed exit information for debugging
-        if not success:
-            exit_reason = self._interpret_exit_code(exit_code, exit_status)
-            error_msg = f"\n--- PROCESS FINISHED: {exit_reason} ---\n"
-            self.log_history.append(error_msg)
-            self.log_update.emit(error_msg)
+            # Log detailed exit information for debugging
+            if not success:
+                exit_reason = self._interpret_exit_code(exit_code, exit_status)
+                error_msg = f"\n--- PROCESS FINISHED: {exit_reason} ---\n"
+                self.log_history.append(error_msg)
+                self.log_update.emit(error_msg)
 
-            # Check crash logs directory for recent crash reports
-            crash_log_dir = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                'logs', 'crashes'
-            )
-            if os.path.exists(crash_log_dir):
-                try:
-                    recent_crashes = sorted(
-                        [f for f in os.listdir(crash_log_dir) if f.endswith('.txt')],
-                        key=lambda x: os.path.getmtime(os.path.join(crash_log_dir, x)),
-                        reverse=True
-                    )[:3]
-                    if recent_crashes:
-                        crash_msg = f"Recent crash logs available in: {crash_log_dir}\n"
-                        for cf in recent_crashes:
-                            crash_msg += f"  - {cf}\n"
-                        self.log_history.append(crash_msg)
-                        self.log_update.emit(crash_msg)
-                except Exception:
-                    pass
+                # Log to app crash log
+                script_name = self.args[0] if self.args else "unknown"
+                log_error(f"Agent failed: {script_name} - {exit_reason} (file: {self.file_number})")
 
-        self.finished.emit(success)
-        self.process.deleteLater()
+                # Check crash logs directory for recent crash reports
+                crash_log_dir = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    'logs', 'crashes'
+                )
+                if os.path.exists(crash_log_dir):
+                    try:
+                        recent_crashes = sorted(
+                            [f for f in os.listdir(crash_log_dir) if f.endswith('.txt')],
+                            key=lambda x: os.path.getmtime(os.path.join(crash_log_dir, x)),
+                            reverse=True
+                        )[:3]
+                        if recent_crashes:
+                            crash_msg = f"Recent crash logs available in: {crash_log_dir}\n"
+                            for cf in recent_crashes:
+                                crash_msg += f"  - {cf}\n"
+                            self.log_history.append(crash_msg)
+                            self.log_update.emit(crash_msg)
+                    except Exception:
+                        pass
+
+            self.finished.emit(success)
+            self.process.deleteLater()
+        except Exception as e:
+            # Log error but don't let it crash the app
+            try:
+                print(f"Error in handle_finished: {e}")
+            except OSError:
+                pass
 
     def _interpret_exit_code(self, exit_code: int, exit_status) -> str:
         """Interpret exit code to provide helpful error message."""

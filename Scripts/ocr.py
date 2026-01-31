@@ -121,7 +121,10 @@ def process_pdf(file_path):
         
         # Report progress for UI
         percentage = int(((i + 1) / total_pages) * 100)
-        print(f"PROGRESS:{percentage}:Processing page {i + 1}/{total_pages}", flush=True)
+        try:
+            print(f"PROGRESS:{percentage}:Processing page {i + 1}/{total_pages}", flush=True)
+        except OSError:
+            pass  # stdout pipe broken (common when running multiple agents)
 
     # Reassemble PDF
     agent_log("OCR INFO: Merging pages into final document...")

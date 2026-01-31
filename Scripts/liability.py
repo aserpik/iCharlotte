@@ -66,9 +66,9 @@ def log_event(message, level="info"):
         try:
              print(message.encode(sys.stdout.encoding or 'utf-8', errors='replace').decode(sys.stdout.encoding or 'utf-8'), flush=True)
         except Exception:
-             print(message.encode('ascii', errors='replace').decode('ascii'), flush=True)
-             
-    sys.stdout.flush() # Force flush
+             pass  # Silently ignore if stdout is broken
+    except OSError:
+        pass  # stdout pipe broken (common when running multiple agents)
     if level == "info":
         logging.info(message)
     elif level == "error":

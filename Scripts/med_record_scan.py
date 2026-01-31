@@ -22,8 +22,10 @@ logging.basicConfig(
 
 def log_event(message, level="info"):
     timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    print(f"[{timestamp}] {message}")
-    sys.stdout.flush()
+    try:
+        print(f"[{timestamp}] {message}")
+    except OSError:
+        pass  # stdout pipe broken (common when running multiple agents)
     if level == "info":
         logging.info(message)
     elif level == "error":

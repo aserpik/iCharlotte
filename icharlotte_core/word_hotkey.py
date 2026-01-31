@@ -1,9 +1,16 @@
 """
-Word Hotkey Integration - Global hotkey to trigger LLM processing on Word selections.
+Office Hotkey Integration - Global hotkey to trigger LLM processing on Word/Outlook selections.
 
-Press Win+V to show a popup with prompt options. The selected/entered prompt
-is sent to the LLM along with any selected text in Word, and the result
+Press Win+V to show a popup with prompt options when Word or Outlook compose window is active.
+The selected/entered prompt is sent to the LLM along with any selected text, and the result
 replaces the selection (or inserts at cursor if nothing selected).
+
+Supports:
+- Microsoft Word documents
+- Microsoft Outlook email compose windows (new email, reply, forward)
+
+The popup automatically detects which application is active and shows context-appropriate
+prompts (document prompts for Word, email prompts for Outlook).
 """
 
 import os
@@ -36,6 +43,79 @@ try:
     HAS_WIN32 = True
 except ImportError:
     HAS_WIN32 = False
+
+# Application context types
+APP_CONTEXT_UNKNOWN = "unknown"
+APP_CONTEXT_WORD = "word"
+APP_CONTEXT_OUTLOOK = "outlook"
+
+# Window class names
+WORD_WINDOW_CLASS = "OpusApp"
+OUTLOOK_INSPECTOR_CLASS = "rctrl_renwnd32"
+
+# Default email prompts
+DEFAULT_OUTLOOK_PROMPTS = [
+    {"name": "Make Professional", "prompt": "Rewrite this email in a professional, courteous tone while maintaining the original meaning and intent."},
+    {"name": "Shorten Email", "prompt": "Condense this email to be more concise while preserving all key points and action items."},
+    {"name": "Fix Grammar", "prompt": "Fix any grammar, spelling, or punctuation errors in this email."},
+    {"name": "Soften Tone", "prompt": "Rewrite this email with a softer, more diplomatic tone while keeping the message clear."},
+    {"name": "Add Clarity", "prompt": "Improve clarity and structure of this email. Ensure requests and next steps are clearly stated."},
+]
+
+# Email-specific system prompt
+EMAIL_SYSTEM_PROMPT = (
+    "You are a helpful email writing assistant. Follow the user's instructions precisely. "
+    "Output ONLY the processed body text - never include Subject lines, To/From/CC headers, "
+    "greetings, signatures, or any email metadata. Just output the revised text content directly. "
+    "Do not add any preamble or explanation."
+)
+
+
+def detect_active_app_context() -> tuple:
+    """
+    Detect whether Word or Outlook compose window is active.
+    Returns: (context_type, inspector_object_or_None)
+    """
+    if not HAS_WIN32:
+        return APP_CONTEXT_UNKNOWN, None
+
+    try:
+        # Get the foreground window
+        hwnd = win32gui.GetForegroundWindow()
+        if not hwnd:
+            return APP_CONTEXT_UNKNOWN, None
+
+        class_name = win32gui.GetClassName(hwnd)
+
+        # Check for Word
+        if class_name == WORD_WINDOW_CLASS:
+            return APP_CONTEXT_WORD, None
+
+        # Check for Outlook Inspector (compose/reply window)
+        if class_name == OUTLOOK_INSPECTOR_CLASS:
+            # Verify it's a compose window via COM
+            try:
+                pythoncom.CoInitialize()
+                outlook = win32com.client.GetActiveObject("Outlook.Application")
+                inspector = outlook.ActiveInspector()
+                if inspector:
+                    # Check if the inspector has a WordEditor (compose mode)
+                    try:
+                        word_editor = inspector.WordEditor
+                        if word_editor:
+                            return APP_CONTEXT_OUTLOOK, inspector
+                    except:
+                        pass
+            except:
+                pass
+
+        return APP_CONTEXT_UNKNOWN, None
+    except Exception as e:
+        try:
+            print(f"Error detecting app context: {e}")
+        except OSError:
+            pass
+        return APP_CONTEXT_UNKNOWN, None
 
 
 def kill_zombie_word_processes():
@@ -306,17 +386,24 @@ class HotkeySignals(QObject):
 class WordLLMPopup(QDialog):
     """Popup dialog for LLM processing of Word content."""
 
-    def __init__(self, parent=None, llm_callback: Optional[Callable] = None):
+    def __init__(self, parent=None, llm_callback: Optional[Callable] = None, cursor_pos=None):
         super().__init__(parent)
         self.llm_callback = llm_callback
+        self.cursor_pos = cursor_pos  # Position to show popup at (QPoint or None)
         self.prompts_path = os.path.join(GEMINI_DATA_DIR, "word_llm_prompts.json")
+        self.outlook_prompts_path = os.path.join(GEMINI_DATA_DIR, "outlook_llm_prompts.json")
         self.format_settings_path = os.path.join(GEMINI_DATA_DIR, "word_format_settings.json")
         self.model_settings_path = os.path.join(GEMINI_DATA_DIR, "word_model_settings.json")
-        self.prompts = []
+        self.prompts = []  # Word prompts
+        self.outlook_prompts = []  # Outlook/email prompts
         self.custom_format_settings = {}  # Custom format settings
         self.selected_model_index = DEFAULT_MODEL_INDEX  # Selected model index
         self._word_app = None  # Stored Word COM reference during execution
         self._captured_format = None  # Captured format from selection
+
+        # App context for Word vs Outlook
+        self.app_context = APP_CONTEXT_WORD  # Default context
+        self.active_inspector = None  # Outlook Inspector reference when in email mode
 
         self.setWindowTitle("AI Assistant")
         self.setWindowFlags(
@@ -414,11 +501,11 @@ class WordLLMPopup(QDialog):
         layout.setContentsMargins(15, 15, 15, 15)
         layout.setSpacing(10)
 
-        # Title
-        title = QLabel("AI Assistant for Word")
-        title.setStyleSheet("font-size: 16px; font-weight: bold; color: #6c63ff;")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(title)
+        # Title (dynamic based on context)
+        self.title_label = QLabel("AI Assistant for Word")
+        self.title_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #6c63ff;")
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.title_label)
 
         # Saved Prompts Section
         prompt_label = QLabel("Saved Prompts:")
@@ -546,7 +633,8 @@ class WordLLMPopup(QDialog):
         layout.addLayout(btn_row)
 
     def load_prompts(self):
-        """Load saved prompts from file."""
+        """Load saved prompts from file (both Word and Outlook prompts)."""
+        # Load Word prompts
         self.prompts = []
         if os.path.exists(self.prompts_path):
             try:
@@ -555,7 +643,7 @@ class WordLLMPopup(QDialog):
             except:
                 pass
 
-        # Add default prompts if none exist
+        # Add default Word prompts if none exist
         if not self.prompts:
             self.prompts = [
                 {"name": "Improve Writing", "prompt": "Improve this text for clarity and professionalism while maintaining the original meaning."},
@@ -566,23 +654,53 @@ class WordLLMPopup(QDialog):
             ]
             self.save_prompts_to_file()
 
+        # Load Outlook prompts
+        self.outlook_prompts = []
+        if os.path.exists(self.outlook_prompts_path):
+            try:
+                with open(self.outlook_prompts_path, 'r', encoding='utf-8') as f:
+                    self.outlook_prompts = json.load(f)
+            except:
+                pass
+
+        # Add default Outlook prompts if none exist
+        if not self.outlook_prompts:
+            self.outlook_prompts = list(DEFAULT_OUTLOOK_PROMPTS)
+            self._save_outlook_prompts()
+
         self.refresh_combo()
 
     def refresh_combo(self):
-        """Refresh the combo box with current prompts."""
+        """Refresh the combo box with prompts for current context."""
         self.prompt_combo.clear()
         self.prompt_combo.addItem("-- Select a saved prompt --", None)
-        for p in self.prompts:
+
+        # Get prompts for current context
+        if self.app_context == APP_CONTEXT_OUTLOOK:
+            prompts = self.outlook_prompts
+        else:
+            prompts = self.prompts
+
+        for p in prompts:
             self.prompt_combo.addItem(p["name"], p["prompt"])
 
     def save_prompts_to_file(self):
-        """Save prompts to file."""
+        """Save Word prompts to file."""
         try:
             os.makedirs(os.path.dirname(self.prompts_path), exist_ok=True)
             with open(self.prompts_path, 'w', encoding='utf-8') as f:
                 json.dump(self.prompts, f, indent=2, ensure_ascii=False)
         except Exception as e:
             print(f"Error saving prompts: {e}")
+
+    def _save_outlook_prompts(self):
+        """Save Outlook prompts to file."""
+        try:
+            os.makedirs(os.path.dirname(self.outlook_prompts_path), exist_ok=True)
+            with open(self.outlook_prompts_path, 'w', encoding='utf-8') as f:
+                json.dump(self.outlook_prompts, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print(f"Error saving Outlook prompts: {e}")
 
     def on_prompt_selected(self, index):
         """When a saved prompt is selected, populate the custom input."""
@@ -591,7 +709,7 @@ class WordLLMPopup(QDialog):
             self.custom_input.setPlainText(prompt_text)
 
     def save_prompt(self):
-        """Save the current custom prompt."""
+        """Save the current custom prompt to the appropriate list based on context."""
         name = self.save_name_input.text().strip()
         prompt = self.custom_input.toPlainText().strip()
 
@@ -602,8 +720,18 @@ class WordLLMPopup(QDialog):
             QMessageBox.warning(self, "Prompt Required", "Please enter a prompt to save.")
             return
 
+        # Get the appropriate prompts list and save function based on context
+        if self.app_context == APP_CONTEXT_OUTLOOK:
+            prompts_list = self.outlook_prompts
+            save_func = self._save_outlook_prompts
+            context_name = "email"
+        else:
+            prompts_list = self.prompts
+            save_func = self.save_prompts_to_file
+            context_name = "document"
+
         # Check for duplicate name
-        for p in self.prompts:
+        for p in prompts_list:
             if p["name"].lower() == name.lower():
                 reply = QMessageBox.question(
                     self, "Overwrite?",
@@ -612,19 +740,19 @@ class WordLLMPopup(QDialog):
                 )
                 if reply == QMessageBox.StandardButton.Yes:
                     p["prompt"] = prompt
-                    self.save_prompts_to_file()
+                    save_func()
                     self.refresh_combo()
-                    self.status_label.setText(f"Updated '{name}'")
+                    self.status_label.setText(f"Updated '{name}' ({context_name})")
                 return
 
-        self.prompts.append({"name": name, "prompt": prompt})
-        self.save_prompts_to_file()
+        prompts_list.append({"name": name, "prompt": prompt})
+        save_func()
         self.refresh_combo()
         self.save_name_input.clear()
-        self.status_label.setText(f"Saved '{name}'")
+        self.status_label.setText(f"Saved '{name}' ({context_name})")
 
     def delete_prompt(self):
-        """Delete the selected prompt."""
+        """Delete the selected prompt from the appropriate list based on context."""
         index = self.prompt_combo.currentIndex()
         if index <= 0:
             QMessageBox.warning(self, "Select Prompt", "Please select a prompt to delete.")
@@ -637,11 +765,30 @@ class WordLLMPopup(QDialog):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         if reply == QMessageBox.StandardButton.Yes:
-            self.prompts = [p for p in self.prompts if p["name"] != name]
-            self.save_prompts_to_file()
+            # Delete from appropriate list based on context
+            if self.app_context == APP_CONTEXT_OUTLOOK:
+                self.outlook_prompts = [p for p in self.outlook_prompts if p["name"] != name]
+                self._save_outlook_prompts()
+            else:
+                self.prompts = [p for p in self.prompts if p["name"] != name]
+                self.save_prompts_to_file()
             self.refresh_combo()
             self.custom_input.clear()
             self.status_label.setText(f"Deleted '{name}'")
+
+    def set_app_context(self, context: str, inspector=None):
+        """Set the application context and update UI accordingly."""
+        self.app_context = context
+        self.active_inspector = inspector
+
+        if context == APP_CONTEXT_OUTLOOK:
+            self.title_label.setText("AI Assistant for Outlook")
+            self.setWindowTitle("AI Assistant - Email")
+        else:
+            self.title_label.setText("AI Assistant for Word")
+            self.setWindowTitle("AI Assistant - Document")
+
+        self.refresh_combo()  # Refresh prompts for context
 
     def _on_format_changed(self, format_type: str):
         """Handle format dropdown change."""
@@ -788,8 +935,14 @@ class WordLLMPopup(QDialog):
         QTimer.singleShot(100, lambda: self._do_execute(prompt))
 
     def _do_execute(self, prompt: str):
-        """Actually execute the LLM call."""
+        """Actually execute the LLM call - dispatch to Word or Outlook handler."""
         try:
+            # Dispatch based on context
+            if self.app_context == APP_CONTEXT_OUTLOOK:
+                self._do_execute_outlook(prompt)
+                return
+
+            # Default: Word context
             # Check if Word is running with a document open
             word = self._get_word_app()
 
@@ -1023,8 +1176,8 @@ class WordLLMPopup(QDialog):
                 raise Exception("Could not access Word selection")
 
             if format_type == FORMAT_PLAIN:
-                # Just insert plain text
-                selection.TypeText(text)
+                # Insert text, but still handle bullet points properly
+                self._insert_with_bullets(word, selection, text)
 
             elif format_type == FORMAT_MATCH:
                 # Apply captured format
@@ -1099,18 +1252,149 @@ class WordLLMPopup(QDialog):
             # Fallback to plain text
             selection.TypeText(text)
 
+    def _insert_with_bullets(self, word, selection, text: str):
+        """Insert text with proper Word bullet formatting (no inline markdown)."""
+        # First pass: group lines into items (bullet items include their continuations)
+        items = self._parse_bullet_items(text)
+
+        in_bullet_list = False
+        for i, item in enumerate(items):
+            if item['is_bullet']:
+                if not in_bullet_list:
+                    # First bullet - apply formatting and set up list template
+                    in_bullet_list = True
+
+                    # Apply Word's bullet formatting (enables auto-continuation on Enter)
+                    selection.Range.ListFormat.ApplyBulletDefault()
+
+                    # Modify the ListTemplate level settings for correct indentation
+                    # This is what actually controls bullet/text positioning in Word lists
+                    try:
+                        list_fmt = selection.Range.ListFormat
+                        if list_fmt.ListTemplate and list_fmt.ListLevelNumber > 0:
+                            level = list_fmt.ListTemplate.ListLevels(list_fmt.ListLevelNumber)
+                            level.NumberPosition = 36  # 0.5 inch - where bullet sits
+                            level.TextPosition = 54    # 0.75 inch - where text starts
+                            level.TabPosition = 54     # 0.75 inch - tab stop
+                    except Exception as e:
+                        print(f"Could not modify list template: {e}")
+
+                # For subsequent bullets, Word's list continuation handles formatting
+                selection.TypeText(item['text'])
+
+                if i < len(items) - 1:
+                    selection.TypeParagraph()
+            else:
+                # Non-bullet item
+                if in_bullet_list:
+                    in_bullet_list = False
+                    selection.Range.ListFormat.RemoveNumbers()
+                    para = selection.ParagraphFormat
+                    para.LeftIndent = 0
+                    para.FirstLineIndent = 0
+
+                if item['text']:
+                    selection.TypeText(item['text'])
+
+                if i < len(items) - 1:
+                    selection.TypeParagraph()
+
+    def _parse_bullet_items(self, text: str) -> list:
+        """Parse text into items, combining bullet lines with their continuations."""
+        lines = text.split('\n')
+        bullet_pattern = re.compile(r'^[\s]*[-*•]\s+(.*)$')
+        numbered_pattern = re.compile(r'^[\s]*\d+[.)]\s+(.*)$')
+
+        items = []
+        current_bullet = None
+
+        for line in lines:
+            bullet_match = bullet_pattern.match(line)
+            numbered_match = numbered_pattern.match(line)
+
+            if bullet_match or numbered_match:
+                # Save previous bullet if exists
+                if current_bullet is not None:
+                    items.append({'is_bullet': True, 'text': current_bullet})
+
+                # Start new bullet
+                current_bullet = bullet_match.group(1) if bullet_match else numbered_match.group(1)
+
+            elif current_bullet is not None and line.strip():
+                # Continuation of current bullet - append with space
+                current_bullet += " " + line.strip()
+
+            else:
+                # Non-bullet line or empty line
+                if current_bullet is not None:
+                    items.append({'is_bullet': True, 'text': current_bullet})
+                    current_bullet = None
+
+                # Add non-bullet item (even if empty, to preserve paragraph breaks)
+                if line.strip() or (items and items[-1]['is_bullet']):
+                    items.append({'is_bullet': False, 'text': line.strip()})
+
+        # Don't forget the last bullet
+        if current_bullet is not None:
+            items.append({'is_bullet': True, 'text': current_bullet})
+
+        return items
+
     def _insert_with_markdown(self, word, selection, text: str):
-        """Parse markdown and insert with Word formatting."""
-        # Patterns for markdown
-        # **bold** or __bold__
-        # *italic* or _italic_ (single underscore)
-        # ~~strikethrough~~
-        # `code`
+        """Parse markdown and insert with Word formatting, including proper bullet lists."""
+        # First pass: group lines into items (bullet items include their continuations)
+        items = self._parse_bullet_items(text)
 
-        # We'll parse the text and apply formatting segment by segment
-        # This is a simplified parser - handles non-nested formatting
+        in_bullet_list = False
+        for i, item in enumerate(items):
+            if item['is_bullet']:
+                if not in_bullet_list:
+                    # First bullet - apply formatting and set up list template
+                    in_bullet_list = True
 
-        # First, split into segments with formatting markers
+                    # Apply Word's bullet formatting (enables auto-continuation on Enter)
+                    selection.Range.ListFormat.ApplyBulletDefault()
+
+                    # Modify the ListTemplate level settings for correct indentation
+                    # This is what actually controls bullet/text positioning in Word lists
+                    try:
+                        list_fmt = selection.Range.ListFormat
+                        if list_fmt.ListTemplate and list_fmt.ListLevelNumber > 0:
+                            level = list_fmt.ListTemplate.ListLevels(list_fmt.ListLevelNumber)
+                            level.NumberPosition = 36  # 0.5 inch - where bullet sits
+                            level.TextPosition = 54    # 0.75 inch - where text starts
+                            level.TabPosition = 54     # 0.75 inch - tab stop
+                    except Exception as e:
+                        print(f"Could not modify list template: {e}")
+
+                # For subsequent bullets, Word's list continuation handles formatting
+                # Insert the text (parse for inline markdown formatting)
+                self._insert_formatted_text(selection, item['text'])
+
+                if i < len(items) - 1:
+                    selection.TypeParagraph()
+            else:
+                # Non-bullet item
+                if in_bullet_list:
+                    in_bullet_list = False
+                    selection.Range.ListFormat.RemoveNumbers()
+                    para = selection.ParagraphFormat
+                    para.LeftIndent = 0
+                    para.FirstLineIndent = 0
+
+                if item['text']:
+                    self._insert_formatted_text(selection, item['text'])
+
+                if i < len(items) - 1:
+                    selection.TypeParagraph()
+
+        # End bullet list if we finished in one
+        if in_bullet_list:
+            # Move to end and remove list format for next content
+            pass  # List ends naturally
+
+    def _insert_formatted_text(self, selection, text: str):
+        """Insert text with inline markdown formatting (bold, italic, etc.)."""
         segments = self._parse_markdown_segments(text)
 
         for segment in segments:
@@ -1140,7 +1424,7 @@ class WordLLMPopup(QDialog):
 
             # Reset font name if we changed it for code
             if segment.get('code'):
-                font.Name = "Times New Roman"  # Or could capture original font
+                font.Name = "Times New Roman"
 
     def _parse_markdown_segments(self, text: str) -> list:
         """Parse markdown text into segments with formatting info."""
@@ -1292,15 +1576,236 @@ class WordLLMPopup(QDialog):
             print(f"LLM call failed: {e}")
             raise
 
+    # ========== Outlook-specific methods ==========
+
+    def _do_execute_outlook(self, prompt: str):
+        """Execute LLM processing for Outlook email context."""
+        try:
+            # Verify inspector is still valid
+            if not self.active_inspector:
+                self.status_label.setText("Outlook compose window not found")
+                self.execute_btn.setEnabled(True)
+                QMessageBox.warning(self, "Outlook Not Found",
+                    "No active Outlook compose window found.\n\nPlease open an email compose window first, then try again.")
+                return
+
+            # Capture format if "Match Selection" is chosen
+            format_type = self.format_combo.currentText()
+            if format_type == FORMAT_MATCH:
+                self._capture_outlook_selection_format()
+
+            # Get selection from Outlook
+            selected_text, has_selection = self._get_outlook_selection()
+
+            if has_selection and selected_text:
+                full_prompt = f"{prompt}\n\nEmail text to process:\n{selected_text}"
+                self.status_label.setText("Processing selected email text...")
+            else:
+                full_prompt = prompt
+                self.status_label.setText("Processing prompt...")
+
+            QApplication.processEvents()
+
+            # Call LLM with email-specific system prompt
+            result = self._call_llm_for_email(full_prompt)
+
+            if result:
+                self._set_outlook_text(result, format_type)
+                self.status_label.setText("Done!")
+                QTimer.singleShot(500, self.close)
+            else:
+                self.status_label.setText("No response from LLM")
+                self.execute_btn.setEnabled(True)
+
+        except Exception as e:
+            self.status_label.setText(f"Error: {str(e)[:50]}")
+            self.execute_btn.setEnabled(True)
+            QMessageBox.critical(self, "Error", f"Failed to process:\n{e}")
+
+    def _get_outlook_selection(self) -> tuple:
+        """Get selected text from Outlook compose window. Returns (text, has_selection)."""
+        if not self.active_inspector:
+            return "", False
+
+        try:
+            word_editor = self.active_inspector.WordEditor
+            if not word_editor:
+                print("WordEditor not available in Outlook Inspector")
+                return "", False
+
+            selection = word_editor.Application.Selection
+            if not selection:
+                return "", False
+
+            text = ""
+            try:
+                raw_text = selection.Text
+                text = raw_text.strip() if raw_text else ""
+                if text:
+                    print(f"Got Outlook selection text: '{text[:50]}...' ({len(text)} chars)")
+                else:
+                    print("No text selected in Outlook (cursor at insertion point)")
+            except Exception as e:
+                print(f"Error getting Outlook selection text: {e}")
+                return "", False
+
+            # wdSelectionIP = 1 (insertion point, no selection)
+            has_selection = False
+            try:
+                sel_type = selection.Type
+                has_selection = sel_type != 1 and len(text) > 0
+                print(f"Outlook selection type: {sel_type}, has_selection: {has_selection}")
+            except:
+                has_selection = len(text) > 0
+
+            return text, has_selection
+        except Exception as e:
+            print(f"Could not get Outlook selection: {e}")
+            return "", False
+
+    def _set_outlook_text(self, text: str, format_type: str = FORMAT_PLAIN):
+        """Insert text into Outlook compose window with formatting."""
+        if not self.active_inspector:
+            raise Exception("No active Outlook inspector")
+
+        try:
+            word_editor = self.active_inspector.WordEditor
+            if not word_editor:
+                raise Exception("Could not access Outlook WordEditor")
+
+            selection = word_editor.Application.Selection
+            if not selection:
+                raise Exception("Could not get selection in Outlook")
+
+            # Use same formatting logic as Word since WordEditor provides full Word DOM access
+            if format_type == FORMAT_PLAIN:
+                self._insert_with_bullets(word_editor.Application, selection, text)
+
+            elif format_type == FORMAT_MATCH:
+                self._insert_with_format(selection, text, self._captured_format)
+
+            elif format_type == FORMAT_MARKDOWN:
+                self._insert_with_markdown(word_editor.Application, selection, text)
+
+            elif format_type == FORMAT_DEFAULT:
+                # For email, just insert plain text
+                selection.TypeText(text)
+
+            elif format_type == FORMAT_CUSTOM:
+                self._insert_with_format(selection, text, self.custom_format_settings)
+
+            else:
+                selection.TypeText(text)
+
+            print(f"Successfully inserted {len(text)} characters into Outlook with format: {format_type}")
+
+        except Exception as e:
+            print(f"_set_outlook_text error: {e}")
+            raise
+
+    def _capture_outlook_selection_format(self):
+        """Capture the formatting of the current selection in Outlook compose window."""
+        if not self.active_inspector:
+            self._captured_format = None
+            return
+
+        try:
+            word_editor = self.active_inspector.WordEditor
+            if not word_editor:
+                self._captured_format = None
+                return
+
+            selection = word_editor.Application.Selection
+            font = selection.Font
+            para = selection.ParagraphFormat
+
+            underline_val = font.Underline
+            has_underline = underline_val != 0 and underline_val != 9999999
+
+            self._captured_format = {
+                'font_name': font.Name if font.Name != '' else None,
+                'font_size': font.Size if font.Size != 9999999 else 11,  # Default 11 for email
+                'bold': font.Bold == -1,
+                'italic': font.Italic == -1,
+                'underline': has_underline,
+                'first_indent': para.FirstLineIndent / 72 if para.FirstLineIndent != 9999999 else 0,
+                'left_indent': para.LeftIndent / 72 if para.LeftIndent != 9999999 else 0,
+            }
+            print(f"Captured Outlook format: {self._captured_format}")
+        except Exception as e:
+            print(f"Error capturing Outlook format: {e}")
+            self._captured_format = None
+
+    def _call_llm_for_email(self, prompt: str) -> str:
+        """LLM call with email-specific system prompt."""
+        try:
+            from icharlotte_core.llm import LLMHandler
+
+            provider, model_id = self._get_selected_model()
+            print(f"Using model for email: {provider} / {model_id}")
+
+            settings = {
+                'temperature': 0.7,
+                'top_p': 0.95,
+                'max_tokens': 4096,
+                'stream': False,
+                'thinking_level': 'None'
+            }
+
+            result = LLMHandler.generate(
+                provider=provider,
+                model=model_id,
+                system_prompt=EMAIL_SYSTEM_PROMPT,
+                user_prompt=prompt,
+                file_contents="",
+                settings=settings
+            )
+
+            return result.strip() if result else ""
+        except Exception as e:
+            print(f"Email LLM call failed: {e}")
+            raise
+
+    # ========== End Outlook-specific methods ==========
+
     def showEvent(self, event):
         """Position the dialog when shown."""
         super().showEvent(event)
-        # Center on screen
-        screen = QApplication.primaryScreen().geometry()
-        self.move(
-            (screen.width() - self.width()) // 2,
-            (screen.height() - self.height()) // 3  # Upper third of screen
-        )
+
+        if self.cursor_pos:
+            # Position at cursor location
+            x = self.cursor_pos.x()
+            y = self.cursor_pos.y()
+
+            # Get the screen that contains the cursor
+            screen = QApplication.screenAt(self.cursor_pos)
+            if screen:
+                screen_geo = screen.availableGeometry()
+            else:
+                screen_geo = QApplication.primaryScreen().availableGeometry()
+
+            # Ensure the popup stays within screen bounds
+            # Adjust if popup would go off the right edge
+            if x + self.width() > screen_geo.right():
+                x = screen_geo.right() - self.width()
+            # Adjust if popup would go off the bottom edge
+            if y + self.height() > screen_geo.bottom():
+                y = screen_geo.bottom() - self.height()
+            # Ensure not off left or top edge
+            if x < screen_geo.left():
+                x = screen_geo.left()
+            if y < screen_geo.top():
+                y = screen_geo.top()
+
+            self.move(x, y)
+        else:
+            # Fallback: center on screen
+            screen = QApplication.primaryScreen().geometry()
+            self.move(
+                (screen.width() - self.width()) // 2,
+                (screen.height() - self.height()) // 3
+            )
+
         # Focus the custom input
         self.custom_input.setFocus()
 
@@ -1359,13 +1864,83 @@ class WordHotkeyManager:
     def _show_popup(self):
         """Show the popup dialog (on main thread)."""
         if self.popup is None or not self.popup.isVisible():
+            # Detect active application context BEFORE creating popup
+            app_context, inspector = detect_active_app_context()
+
+            # Only show if Word or Outlook compose is active
+            if app_context == APP_CONTEXT_UNKNOWN:
+                try:
+                    print("Win+V pressed but neither Word nor Outlook compose is active")
+                except OSError:
+                    pass
+                return
+
+            # Capture cursor position on main thread
+            from PySide6.QtGui import QCursor
+            cursor_pos = QCursor.pos()
+
             self.popup = WordLLMPopup(
                 parent=None,  # No parent so it's a top-level window
-                llm_callback=self._get_llm_callback()
+                llm_callback=self._get_llm_callback(),
+                cursor_pos=cursor_pos
             )
+
+            # Set the detected context before showing
+            self.popup.set_app_context(app_context, inspector)
+
             self.popup.show()
-            self.popup.activateWindow()
-            self.popup.raise_()
+
+            # Force focus to the popup window (Windows focus stealing prevention workaround)
+            self._force_focus(self.popup)
+
+    def _force_focus(self, window):
+        """Force focus to the window using Windows API."""
+        try:
+            # First, use Qt methods
+            window.raise_()
+            window.activateWindow()
+            QApplication.setActiveWindow(window)
+
+            # Then use Windows API for guaranteed focus
+            if HAS_WIN32:
+                import ctypes
+                hwnd = int(window.winId())
+
+                # Allow our process to set foreground window
+                ctypes.windll.user32.AllowSetForegroundWindow(-1)  # ASFW_ANY
+
+                # Attach to the foreground thread to steal focus
+                foreground_hwnd = ctypes.windll.user32.GetForegroundWindow()
+                foreground_thread = ctypes.windll.user32.GetWindowThreadProcessId(foreground_hwnd, None)
+                current_thread = ctypes.windll.kernel32.GetCurrentThreadId()
+
+                if foreground_thread != current_thread:
+                    ctypes.windll.user32.AttachThreadInput(foreground_thread, current_thread, True)
+
+                ctypes.windll.user32.SetForegroundWindow(hwnd)
+                ctypes.windll.user32.BringWindowToTop(hwnd)
+                ctypes.windll.user32.SetFocus(hwnd)
+
+                if foreground_thread != current_thread:
+                    ctypes.windll.user32.AttachThreadInput(foreground_thread, current_thread, False)
+
+            # Schedule focus to the input field after a brief delay
+            QTimer.singleShot(50, lambda: self._focus_input(window))
+
+        except Exception as e:
+            print(f"Force focus error: {e}")
+            # Fallback
+            window.activateWindow()
+            window.raise_()
+
+    def _focus_input(self, window):
+        """Set focus to the custom input field."""
+        try:
+            if window and hasattr(window, 'custom_input'):
+                window.custom_input.setFocus()
+                window.custom_input.activateWindow()
+        except Exception as e:
+            print(f"Focus input error: {e}")
 
     def _get_llm_callback(self):
         """Get the LLM callback function."""

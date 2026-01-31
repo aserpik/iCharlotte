@@ -158,7 +158,7 @@ class AgentLogger:
         return f"[{self.agent_name}]"
 
     def _safe_print(self, message: str):
-        """Print to stdout with encoding safety."""
+        """Print to stdout with encoding safety and broken pipe handling."""
         if not self.log_to_stdout:
             return
 
@@ -171,10 +171,15 @@ class AgentLogger:
                     errors='replace'
                 ).decode(sys.stdout.encoding or 'utf-8')
                 print(encoded, flush=True)
+            except OSError:
+                pass  # stdout pipe broken
             except Exception:
-                print(message.encode('ascii', errors='replace').decode('ascii'), flush=True)
-
-        sys.stdout.flush()
+                try:
+                    print(message.encode('ascii', errors='replace').decode('ascii'), flush=True)
+                except OSError:
+                    pass  # stdout pipe broken
+        except OSError:
+            pass  # stdout pipe broken (common when running multiple agents)
 
     def _log(self, level: str, message: str, structured: str = None):
         """

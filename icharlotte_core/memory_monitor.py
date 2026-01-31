@@ -140,7 +140,10 @@ class MemoryMonitor:
         elif hasattr(self.logger, level):
             getattr(self.logger, level)(message)
         else:
-            print(message, flush=True)
+            try:
+                print(message, flush=True)
+            except OSError:
+                pass  # stdout pipe broken
 
     def _get_memory_mb(self) -> float:
         """Get current memory usage in MB."""

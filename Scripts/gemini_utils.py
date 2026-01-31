@@ -32,8 +32,9 @@ def log_event(message, level="info"):
             encoding = sys.stderr.encoding or 'utf-8'
             print(msg.encode(encoding, errors='replace').decode(encoding), file=sys.stderr)
         except Exception:
-            print(msg.encode('ascii', errors='replace').decode('ascii'), file=sys.stderr)
-    sys.stderr.flush()
+            pass  # Silently ignore if stderr is broken
+    except OSError:
+        pass  # stderr pipe broken (common when running multiple agents)
 
 def clean_json_string(s: str) -> str:
     """Cleans Markdown code blocks and extra text to get raw JSON."""

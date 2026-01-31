@@ -107,8 +107,10 @@ logging.basicConfig(
 )
 
 def log_event(message, level="info"):
-    print(message)
-    sys.stdout.flush()
+    try:
+        print(message)
+    except OSError:
+        pass  # stdout pipe broken (common when running multiple agents)
     if level == "info":
         logging.info(message)
     elif level == "error":

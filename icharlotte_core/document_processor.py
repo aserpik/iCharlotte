@@ -114,7 +114,10 @@ class DocumentProcessor:
             else:
                 self.logger.info(message)
         else:
-            print(message, flush=True)
+            try:
+                print(message, flush=True)
+            except OSError:
+                pass  # stdout pipe broken
 
     def extract_text(self, file_path: str) -> ExtractResult:
         """
