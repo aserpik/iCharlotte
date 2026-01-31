@@ -209,12 +209,19 @@ class ChatPersistence:
             message: Message to add
         """
         data = self.load()
+        found = False
         for conv_data in data.get('conversations', []):
             if conv_data.get('id') == conv_id:
                 conv_data['messages'].append(message.to_dict())
                 conv_data['updated_at'] = datetime.now().isoformat()
                 conv_data['total_tokens_used'] = conv_data.get('total_tokens_used', 0) + message.token_count
+                found = True
+                log_event(f"Added message to conversation {conv_id}, now has {len(conv_data['messages'])} messages")
                 break
+
+        if not found:
+            log_event(f"ERROR: Could not find conversation {conv_id} to add message. Available IDs: {[c.get('id') for c in data.get('conversations', [])]}", "error")
+
         self.save()
 
     def update_message(self, conv_id: str, msg_id: str, content: str):

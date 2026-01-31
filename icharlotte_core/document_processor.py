@@ -8,6 +8,9 @@ from summarize.py, summarize_discovery.py, and summarize_deposition.py.
 import os
 import gc
 import re
+import tempfile
+import shutil
+import uuid
 from dataclasses import dataclass, field
 from typing import List, Optional, Tuple
 from enum import Enum
@@ -316,13 +319,20 @@ class DocumentProcessor:
             self._log("OCR not available.", "warning")
             return None
 
+        # Use unique temp directory to avoid conflicts with concurrent agents
+        temp_dir = None
         try:
+            # Create unique temp directory for this OCR operation
+            temp_dir = tempfile.mkdtemp(prefix=f"icharlotte_ocr_{uuid.uuid4().hex[:8]}_")
+
             images = convert_from_path(
                 file_path,
                 first_page=page_index + 1,
                 last_page=page_index + 1,
                 poppler_path=self._poppler_path,
-                dpi=self.ocr_config.max_dpi
+                dpi=self.ocr_config.max_dpi,
+                output_folder=temp_dir,  # Use unique folder to prevent conflicts
+                thread_count=1  # Single thread to avoid subprocess conflicts
             )
 
             if images:
@@ -332,6 +342,13 @@ class DocumentProcessor:
         except Exception as e:
             self._log(f"Error OCR'ing page {page_index + 1}: {e}", "warning")
             return None
+        finally:
+            # Clean up temp directory
+            if temp_dir and os.path.exists(temp_dir):
+                try:
+                    shutil.rmtree(temp_dir)
+                except Exception:
+                    pass  # Ignore cleanup errors
 
     def _extract_from_docx(self, file_path: str) -> ExtractResult:
         """Extract text from a DOCX file."""

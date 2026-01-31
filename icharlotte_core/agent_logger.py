@@ -112,6 +112,10 @@ class AgentLogger:
         self.log_to_file = log_to_file
         self.log_to_stdout = log_to_stdout
 
+        # Broken pipe detection - once stdout fails, disable it permanently
+        # This prevents cascade failures when parent process terminates
+        self._stdout_broken = False
+
         # Pass tracking
         self.current_pass: Optional[PassInfo] = None
         self.pass_history: list = []
@@ -159,7 +163,10 @@ class AgentLogger:
 
     def _safe_print(self, message: str):
         """Print to stdout with encoding safety and broken pipe handling."""
-        if not self.log_to_stdout:
+        global _global_stdout_broken
+
+        # Skip if stdout logging is disabled or pipe is known to be broken
+        if not self.log_to_stdout or self._stdout_broken or _global_stdout_broken:
             return
 
         try:
@@ -171,15 +178,25 @@ class AgentLogger:
                     errors='replace'
                 ).decode(sys.stdout.encoding or 'utf-8')
                 print(encoded, flush=True)
-            except OSError:
-                pass  # stdout pipe broken
+            except (OSError, IOError, ValueError):
+                # Pipe is broken - disable stdout logging permanently
+                self._stdout_broken = True
+                _global_stdout_broken = True
             except Exception:
                 try:
                     print(message.encode('ascii', errors='replace').decode('ascii'), flush=True)
-                except OSError:
-                    pass  # stdout pipe broken
-        except OSError:
-            pass  # stdout pipe broken (common when running multiple agents)
+                except (OSError, IOError, ValueError):
+                    self._stdout_broken = True
+                    _global_stdout_broken = True
+        except (OSError, IOError, ValueError):
+            # [Errno 22] Invalid argument, broken pipe, or invalid stream
+            # Common when parent process closes or on Windows with multiple agents
+            # Disable stdout logging permanently to prevent cascade failures
+            self._stdout_broken = True
+            _global_stdout_broken = True
+        except Exception:
+            # Catch-all for any other unexpected errors during printing
+            pass
 
     def _log(self, level: str, message: str, structured: str = None):
         """
@@ -190,20 +207,28 @@ class AgentLogger:
             message: Human-readable message.
             structured: Optional structured protocol message.
         """
-        prefix = self._format_prefix()
-        full_message = f"{prefix} {message}"
+        try:
+            prefix = self._format_prefix()
+            full_message = f"{prefix} {message}"
 
-        # Log to file
-        if self._file_logger:
-            log_method = getattr(self._file_logger, level, self._file_logger.info)
-            log_method(message)
+            # Log to file (highest priority - always try this)
+            if self._file_logger:
+                try:
+                    log_method = getattr(self._file_logger, level, self._file_logger.info)
+                    log_method(message)
+                except Exception:
+                    pass  # File logging failed, continue to stdout
 
-        # Output structured message first (for UI parsing)
-        if structured:
-            self._safe_print(structured)
+            # Output structured message first (for UI parsing)
+            if structured:
+                self._safe_print(structured)
 
-        # Output human-readable message
-        self._safe_print(full_message)
+            # Output human-readable message
+            self._safe_print(full_message)
+        except Exception:
+            # Absolute last resort - logging should never crash the agent
+            # File logging already attempted above, just silently fail stdout
+            pass
 
     # =========================================================================
     # Standard Logging Methods
@@ -456,6 +481,10 @@ def create_legacy_log_event(agent_name: str, log_file: str = None):
 # =============================================================================
 
 _default_logger: Optional[AgentLogger] = None
+
+# Global flag for broken stdout - shared across all logger instances
+# Once stdout fails for any logger, it's broken for the whole process
+_global_stdout_broken: bool = False
 
 
 def get_logger(agent_name: str = "Default", file_number: str = None) -> AgentLogger:

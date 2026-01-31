@@ -68,7 +68,6 @@ from icharlotte_core.ui.dialogs import FileNumberDialog, VariablesDialog, Prompt
 from icharlotte_core.ui.tabs import ChatTab, IndexTab
 from icharlotte_core.ui.email_tab import EmailTab
 from icharlotte_core.ui.email_update_tab import EmailUpdateTab
-from icharlotte_core.ui.report_tab import ReportTab
 from icharlotte_core.ui.logs_tab import LogsTab
 from icharlotte_core.ui.liability_tab import LiabilityExposureTab
 from icharlotte_core.ui.master_case_tab import MasterCaseTab
@@ -789,6 +788,8 @@ class MainWindow(QMainWindow):
         checkpoint("Creating ChatTab")
         self.chat_tab = ChatTab()
         self.tabs.addTab(self.chat_tab, "Chat")
+        if self.file_number:
+            self.chat_tab.load_case(self.file_number)
 
         # --- Tab 6: Email ---
         self.email_tab = EmailTab()
@@ -804,10 +805,6 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.email_update_tab, "Email Update")
         if self.file_number:
             self.email_update_tab.on_case_changed(self.file_number)
-
-        # --- Tab 7: Report ---
-        self.report_tab = ReportTab(main_window=self)
-        self.tabs.addTab(self.report_tab, "Report")
 
         # --- Tab: Liability & Exposure ---
         self.liability_tab = LiabilityExposureTab()
@@ -1277,9 +1274,6 @@ class MainWindow(QMainWindow):
                     self.index_tab.load_data(self.file_number)
                 if hasattr(self, 'chat_tab'):
                     self.chat_tab.load_case(self.file_number)
-                if hasattr(self, 'report_tab'):
-                    self.report_tab.reset_state()
-                    self.report_tab.refresh_ai_outputs()
                 if hasattr(self, 'liability_tab'):
                     self.liability_tab.reset_state()
                 if hasattr(self, 'email_tab'):
@@ -1329,9 +1323,6 @@ class MainWindow(QMainWindow):
                 self.index_tab.load_data(self.file_number)
             if hasattr(self, 'chat_tab'):
                 self.chat_tab.load_case(self.file_number)
-            if hasattr(self, 'report_tab'):
-                self.report_tab.reset_state()
-                self.report_tab.refresh_ai_outputs()
             if hasattr(self, 'liability_tab'):
                 self.liability_tab.reset_state()
             if hasattr(self, 'email_tab'):

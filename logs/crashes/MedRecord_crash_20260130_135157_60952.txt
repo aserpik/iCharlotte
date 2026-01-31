@@ -1,0 +1,76 @@
+======================================================================
+iCharlotte Agent Crash Report
+======================================================================
+
+Agent: MedRecord
+Crash Time: 2026-01-30T13:51:57.037395
+Uptime: 64.7 seconds
+Source: main
+
+----------------------------------------------------------------------
+EXCEPTION
+----------------------------------------------------------------------
+Type: OSError
+Message: [Errno 22] Invalid argument
+
+Traceback:
+Traceback (most recent call last):
+  File "C:\geminiterminal2\Scripts\med_record.py", line 360, in call_gemini
+    log_event(f"Success with model: {model_name}")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\geminiterminal2\Scripts\med_record.py", line 108, in log_event
+    print(f"[MedRecord] {message}", flush=True)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [Errno 22] Invalid argument
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\geminiterminal2\Scripts\med_record.py", line 837, in <module>
+    main()
+    ~~~~^^
+  File "C:\geminiterminal2\Scripts\med_record.py", line 764, in main
+    final_content = call_gemini(prompt_instruction, text)
+  File "C:\geminiterminal2\Scripts\med_record.py", line 368, in call_gemini
+    log_event(f"Attempt {attempt+1}/{max_retries} failed with {model_name}: {e}", level="warning")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\geminiterminal2\Scripts\med_record.py", line 108, in log_event
+    print(f"[MedRecord] {message}", flush=True)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [Errno 22] Invalid argument
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\geminiterminal2\Scripts\med_record.py", line 850, in <module>
+    print(f"ERROR:Unhandled exception - {type(e).__name__}: {e}", flush=True)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [Errno 22] Invalid argument
+
+----------------------------------------------------------------------
+CONTEXT
+----------------------------------------------------------------------
+Input File: Z:\Shared\Current Clients\5800 - AMTRUST\016 - Medina\RECORDS\JJ Photocopy\Records Received\REVISED 61759-0009_ ELITE CARE CHIROPRACTIC CENTER (1).pdf
+Last Checkpoint: Trying model gemini-3-flash-preview
+
+Recent Progress:
+  [2026-01-30T13:50:52.593100] Starting PDF extraction
+  [2026-01-30T13:50:52.607907] PDF has 36 pages
+  [2026-01-30T13:50:53.491597] Extracted page 25/36 (30%)
+  [2026-01-30T13:50:59.597876] Extracted page 36/36 (40%)
+  [2026-01-30T13:50:59.602369] Extraction complete
+  [2026-01-30T13:50:59.625063] Provider: ELITE CARE CHIROPRACTIC CENTER
+  [2026-01-30T13:50:59.625089] Starting LLM pass
+  [2026-01-30T13:50:59.625111] Starting LLM processing
+  [2026-01-30T13:51:02.729626] LLM processing chunk 1/1 (80%)
+  [2026-01-30T13:51:02.730185] Trying model gemini-3-flash-preview
+
+Additional Context:
+  file_count: 1
+
+----------------------------------------------------------------------
+SYSTEM
+----------------------------------------------------------------------
+PID: 60952
+Platform: Windows-11-10.0.26100-SP0
+Python: 3.13.9

@@ -1,0 +1,106 @@
+======================================================================
+iCharlotte Agent Crash Report
+======================================================================
+
+Agent: MedRecord
+Crash Time: 2026-01-30T13:58:03.623000
+Uptime: 63.7 seconds
+Source: main
+
+----------------------------------------------------------------------
+EXCEPTION
+----------------------------------------------------------------------
+Type: OSError
+Message: [Errno 22] Invalid argument
+
+Traceback:
+Traceback (most recent call last):
+  File "C:\geminiterminal2\Scripts\med_record.py", line 371, in call_gemini
+    log_event(f"Success with model: {model_name}")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\geminiterminal2\Scripts\med_record.py", line 132, in log_event
+    logger.info(message)
+    ~~~~~~~~~~~^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte_core\agent_logger.py", line 223, in info
+    self._log("info", message, structured)
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte_core\agent_logger.py", line 201, in _log
+    self._safe_print(full_message)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte_core\agent_logger.py", line 166, in _safe_print
+    print(message, flush=True)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^
+OSError: [Errno 22] Invalid argument
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\geminiterminal2\Scripts\med_record.py", line 848, in <module>
+    main()
+    ~~~~^^
+  File "C:\geminiterminal2\Scripts\med_record.py", line 775, in main
+    final_content = call_gemini(prompt_instruction, text)
+  File "C:\geminiterminal2\Scripts\med_record.py", line 379, in call_gemini
+    log_event(f"Attempt {attempt+1}/{max_retries} failed with {model_name}: {e}", level="warning")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\geminiterminal2\Scripts\med_record.py", line 127, in log_event
+    logger.warning(message)
+    ~~~~~~~~~~~~~~^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte_core\agent_logger.py", line 228, in warning
+    self._log("warning", message, structured)
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte_core\agent_logger.py", line 198, in _log
+    self._safe_print(structured)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte_core\agent_logger.py", line 166, in _safe_print
+    print(message, flush=True)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^
+OSError: [Errno 22] Invalid argument
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\geminiterminal2\Scripts\med_record.py", line 863, in <module>
+    log_event(f"FATAL: Unhandled exception: {e}\n{tb}", level="error")
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\geminiterminal2\Scripts\med_record.py", line 125, in log_event
+    logger.error(message)
+    ~~~~~~~~~~~~^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte_core\agent_logger.py", line 245, in error
+    self._log("error", message, structured)
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte_core\agent_logger.py", line 198, in _log
+    self._safe_print(structured)
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte_core\agent_logger.py", line 166, in _safe_print
+    print(message, flush=True)
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^
+OSError: [Errno 22] Invalid argument
+
+----------------------------------------------------------------------
+CONTEXT
+----------------------------------------------------------------------
+Input File: Z:\Shared\Current Clients\5800 - AMTRUST\016 - Medina\RECORDS\JJ Photocopy\Records Received\REVISED 61759-0009_ ELITE CARE CHIROPRACTIC CENTER (1).pdf
+Last Checkpoint: Trying model gemini-3-flash-preview
+
+Recent Progress:
+  [2026-01-30T13:57:00.112327] Starting PDF extraction
+  [2026-01-30T13:57:00.140407] PDF has 36 pages
+  [2026-01-30T13:57:01.198340] Extracted page 25/36 (30%)
+  [2026-01-30T13:57:02.682126] Extracted page 36/36 (40%)
+  [2026-01-30T13:57:02.683988] Extraction complete
+  [2026-01-30T13:57:02.684888] Provider: ELITE CARE CHIROPRACTIC CENTER
+  [2026-01-30T13:57:02.684903] Starting LLM pass
+  [2026-01-30T13:57:02.684907] Starting LLM processing
+  [2026-01-30T13:57:04.265694] LLM processing chunk 1/1 (80%)
+  [2026-01-30T13:57:04.265993] Trying model gemini-3-flash-preview
+
+Additional Context:
+  file_count: 1
+
+----------------------------------------------------------------------
+SYSTEM
+----------------------------------------------------------------------
+PID: 7296
+Platform: Windows-11-10.0.26100-SP0
+Python: 3.13.9

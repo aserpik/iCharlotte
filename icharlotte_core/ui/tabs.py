@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QTableWidget, QHeaderView, QTableWidgetItem, QCheckBox, QFileIconProvider,
     QLineEdit, QInputDialog, QMenu, QApplication, QToolButton, QScrollArea
 )
-from PySide6.QtCore import Qt, Signal, QThread, QFileInfo, QTimer
+from PySide6.QtCore import Qt, Signal, QThread, QFileInfo, QTimer, QSettings
 from PySide6.QtGui import QTextCursor, QDragEnterEvent, QDropEvent, QAction, QPixmap
 
 from ..config import API_KEYS, SCRIPTS_DIR, GEMINI_DATA_DIR
@@ -159,7 +159,8 @@ class ChatTab(QWidget):
 
         # --- Conversation Sidebar (Left) - Collapsible ---
         self.conv_sidebar = ConversationSidebar(theme=self.theme)
-        self.conv_sidebar.setFixedWidth(200)
+        self.conv_sidebar.setMinimumWidth(150)
+        self.conv_sidebar.setMaximumWidth(400)
         self.conv_sidebar.conversation_selected.connect(self.on_conversation_selected)
         self.conv_sidebar.save_conversation_requested.connect(self.on_save_conversation)
         self.conv_sidebar.conversation_renamed.connect(self.on_conversation_renamed)
@@ -239,36 +240,43 @@ class ChatTab(QWidget):
 
         settings_layout.addStretch()
 
-        settings_panel.setFixedWidth(200)
+        settings_panel.setMinimumWidth(150)
+        settings_panel.setMaximumWidth(350)
+        self.settings_panel = settings_panel
         self.main_splitter.addWidget(settings_panel)
 
         # --- Chat Panel (Right) ---
         chat_panel = QFrame()
         chat_layout = QVBoxLayout(chat_panel)
         chat_layout.setContentsMargins(8, 8, 8, 8)
-        chat_layout.setSpacing(8)
+        chat_layout.setSpacing(0)
 
         # Search results overlay (hidden by default)
         self.search_results = SearchResultsWidget(theme=self.theme)
         self.search_results.hide()
         self.search_results.result_selected.connect(self.on_search_result_selected)
 
-        # Chat history display
+        # Vertical splitter for chat output and input
+        self.chat_splitter = QSplitter(Qt.Orientation.Vertical)
+        chat_layout.addWidget(self.chat_splitter)
+
+        # Chat history display (upper pane)
         self.chat_history = QTextBrowser()
         self.chat_history.setOpenExternalLinks(True)
         self.chat_history.setAcceptDrops(True)
-        chat_layout.addWidget(self.chat_history, 1)
+        self.chat_history.setMinimumHeight(100)
+        self.chat_splitter.addWidget(self.chat_history)
+
+        # Input area container (lower pane)
+        input_container = QWidget()
+        input_layout = QVBoxLayout(input_container)
+        input_layout.setContentsMargins(0, 4, 0, 0)
+        input_layout.setSpacing(4)
 
         # Context indicator
         self.context_indicator = ContextIndicator(theme=self.theme)
         self.context_indicator.clicked.connect(self.show_context_details)
-        chat_layout.addWidget(self.context_indicator)
-
-        # Input area with toolbar
-        input_container = QWidget()
-        input_layout = QVBoxLayout(input_container)
-        input_layout.setContentsMargins(0, 0, 0, 0)
-        input_layout.setSpacing(4)
+        input_layout.addWidget(self.context_indicator)
 
         # Toolbar row
         toolbar_layout = QHBoxLayout()
@@ -294,7 +302,6 @@ class ChatTab(QWidget):
 
         self.chat_input = QPlainTextEdit()
         self.chat_input.setMinimumHeight(60)
-        self.chat_input.setMaximumHeight(150)
         self.chat_input.setPlaceholderText("Type a message... (Enter to send, Shift+Enter for newline)")
         self.chat_input.setAcceptDrops(True)
         self.chat_input.dragEnterEvent = self.dragEnterEvent
@@ -323,11 +330,24 @@ class ChatTab(QWidget):
         input_row.addLayout(btn_layout)
         input_layout.addLayout(input_row)
 
-        chat_layout.addWidget(input_container)
+        input_container.setMinimumHeight(100)
+        self.input_container = input_container
+        self.chat_splitter.addWidget(input_container)
+
+        # Set chat splitter default sizes (output large, input smaller)
+        self.chat_splitter.setSizes([500, 150])
+
         self.main_splitter.addWidget(chat_panel)
 
-        # Set splitter sizes
+        # Set main splitter default sizes
         self.main_splitter.setSizes([200, 200, 800])
+
+        # Connect splitter signals for persistence
+        self.main_splitter.splitterMoved.connect(self._on_main_splitter_moved)
+        self.chat_splitter.splitterMoved.connect(self._on_chat_splitter_moved)
+
+        # Load saved splitter sizes
+        self._load_splitter_sizes()
 
     # --- Persistence Methods ---
 
@@ -388,15 +408,20 @@ class ChatTab(QWidget):
 
     def on_conversation_selected(self, conv_id: str):
         """Load selected conversation."""
-        print(f"[DEBUG] on_conversation_selected called with conv_id={conv_id}")
+        log_event(f"Selecting conversation: {conv_id}")
         if not self.persistence:
-            print("[DEBUG] No persistence, returning early")
+            log_event("Cannot select conversation - no persistence", "warning")
             return
 
         self.save_current_state()
         self.current_conversation_id = conv_id
         self.current_conversation = self.persistence.get_conversation(conv_id)
-        print(f"[DEBUG] Got conversation: {self.current_conversation is not None}")
+
+        if self.current_conversation:
+            log_event(f"Loaded conversation '{self.current_conversation.name}' with {len(self.current_conversation.messages)} messages")
+        else:
+            log_event(f"ERROR: Could not find conversation {conv_id}", "error")
+
         self.conv_sidebar.set_current_conversation(conv_id)
 
         if self.current_conversation:
@@ -465,6 +490,8 @@ class ChatTab(QWidget):
     def on_save_conversation(self):
         """Save the current conversation and optionally rename it."""
         if not self.persistence or not self.current_conversation_id:
+            log_event("Cannot save - no persistence or conversation ID", "warning")
+            QMessageBox.warning(self, "Cannot Save", "No active conversation to save.")
             return
 
         # Save current state
@@ -472,7 +499,14 @@ class ChatTab(QWidget):
 
         # Check if conversation has messages and might need a name
         conv = self.persistence.get_conversation(self.current_conversation_id)
-        if conv and conv.messages:
+        if not conv:
+            log_event(f"Cannot save - conversation {self.current_conversation_id} not found", "error")
+            QMessageBox.warning(self, "Error", "Conversation not found.")
+            return
+
+        log_event(f"Saving conversation '{conv.name}' with {len(conv.messages)} messages")
+
+        if conv.messages:
             # If name is still default (starts with "Chat "), offer to rename
             if conv.name.startswith("Chat "):
                 # Generate a suggested name from first message
@@ -488,32 +522,62 @@ class ChatTab(QWidget):
                 )
                 if ok and new_name.strip():
                     self.persistence.rename_conversation(self.current_conversation_id, new_name.strip())
+                    log_event(f"Renamed conversation to '{new_name.strip()}'")
+        else:
+            # Conversation has no messages - still allow naming
+            new_name, ok = QInputDialog.getText(
+                self, "Name Conversation",
+                "This conversation has no messages yet.\nEnter a name for this conversation:",
+                text=conv.name
+            )
+            if ok and new_name.strip():
+                self.persistence.rename_conversation(self.current_conversation_id, new_name.strip())
+                log_event(f"Named empty conversation '{new_name.strip()}'")
 
         # Refresh the sidebar to show the saved conversation
         self.refresh_conversation_list()
         self.conv_sidebar.set_current_conversation(self.current_conversation_id)
 
         # Show confirmation
-        QMessageBox.information(self, "Saved", "Conversation saved successfully.")
+        msg_count = len(conv.messages)
+        QMessageBox.information(self, "Saved", f"Conversation saved with {msg_count} message(s).")
 
     def clear_current_chat(self):
-        """Clear the current chat and start a new conversation."""
-        # Save current conversation first if it has messages
-        if self.persistence and self.current_conversation_id:
-            conv = self.persistence.get_conversation(self.current_conversation_id)
-            if conv and conv.messages:
-                self.save_current_state()
+        """Clear the chat display without saving or creating new conversations."""
+        # Just clear the display
+        self.clear_chat_display()
+        self.conversation_history = []
 
-        # Create a new conversation
-        self.on_new_conversation()
+        # Delete messages from current conversation in persistence (if any)
+        if self.persistence and self.current_conversation_id:
+            # Clear messages from the conversation data
+            data = self.persistence.load()
+            for conv_data in data.get('conversations', []):
+                if conv_data.get('id') == self.current_conversation_id:
+                    conv_data['messages'] = []
+                    conv_data['total_tokens_used'] = 0
+                    break
+            self.persistence.save()
+            # Reload the conversation object
+            self.current_conversation = self.persistence.get_conversation(self.current_conversation_id)
 
     def load_conversation_messages(self):
         """Load and display messages from current conversation."""
         self.clear_chat_display()
 
         if not self.current_conversation:
+            self.chat_history.append("<i style='color: #888;'>No conversation selected.</i>")
             return
 
+        if not self.current_conversation.messages:
+            # Show a helpful message for empty conversations
+            conv_name = self.current_conversation.name
+            self.chat_history.append(f"<i style='color: #888;'>Conversation '{conv_name}' loaded. Start chatting!</i>")
+            self.chat_history.append("-" * 50)
+            log_event(f"Loaded empty conversation: {self.current_conversation_id}")
+            return
+
+        log_event(f"Loading {len(self.current_conversation.messages)} messages from conversation {self.current_conversation_id}")
         for msg in self.current_conversation.messages:
             self.display_message(msg.role, msg.content, msg.attachments, msg.pinned)
 
@@ -686,15 +750,6 @@ class ChatTab(QWidget):
         else:
             self.attached_files.clear()
         self.file_list.clear()
-
-    def clear_chat(self):
-        self.chat_history.clear()
-        self.conversation_history = []
-
-    def reset_state(self):
-        self.clear_chat()
-        self.clear_files()
-        self.conversation_history = []
 
     def check_pdf_text(self, path):
         """Checks if PDF has text. If not, asks to OCR. Returns (possibly updated) path or False."""
@@ -890,6 +945,17 @@ class ChatTab(QWidget):
 
     def send_message(self):
         """Send a message with streaming support."""
+        # Warn if no case is loaded (messages won't persist)
+        if not self.persistence or not self.current_conversation_id:
+            reply = QMessageBox.warning(
+                self, "No Case Loaded",
+                "No case is loaded. Your chat will not be saved.\n\nDo you want to continue anyway?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+
         user_text = self.chat_input.toPlainText().strip()
 
         checked_count = 0
@@ -927,7 +993,10 @@ class ChatTab(QWidget):
                 attachments=attachments,
                 token_count=token_count
             )
+            log_event(f"Saving user message to conversation {self.current_conversation_id}")
             self.persistence.add_message(self.current_conversation_id, user_message)
+        else:
+            log_event(f"WARNING: Cannot save user message - persistence={self.persistence is not None}, conv_id={self.current_conversation_id}", "warning")
 
         # Update legacy history
         self.conversation_history.append({'role': 'user', 'content': full_msg})
@@ -1014,7 +1083,10 @@ class ChatTab(QWidget):
                 model_used=self.model_combo.currentText(),
                 response_time_ms=response_time
             )
+            log_event(f"Saving assistant message to conversation {self.current_conversation_id}")
             self.persistence.add_message(self.current_conversation_id, assistant_message)
+        else:
+            log_event(f"WARNING: Cannot save assistant message - persistence={self.persistence is not None}, conv_id={self.current_conversation_id}", "warning")
 
         # Update legacy history
         self.conversation_history.append({'role': 'assistant', 'content': text})
@@ -1039,6 +1111,68 @@ class ChatTab(QWidget):
             self.toggle_sidebar_btn.setText("Show Conversations")
         else:
             self.toggle_sidebar_btn.setText("Hide Conversations")
+
+        # Save sidebar visibility state
+        self._save_sidebar_state()
+
+    # --- Splitter Persistence ---
+
+    def _on_main_splitter_moved(self, pos, index):
+        """Save main splitter sizes when moved."""
+        settings = QSettings("iCharlotte", "iCharlotte")
+        sizes = self.main_splitter.sizes()
+        settings.setValue("chat_tab/main_splitter_sizes", sizes)
+
+    def _on_chat_splitter_moved(self, pos, index):
+        """Save chat splitter sizes when moved."""
+        settings = QSettings("iCharlotte", "iCharlotte")
+        sizes = self.chat_splitter.sizes()
+        settings.setValue("chat_tab/chat_splitter_sizes", sizes)
+
+    def _save_sidebar_state(self):
+        """Save sidebar collapsed state."""
+        settings = QSettings("iCharlotte", "iCharlotte")
+        settings.setValue("chat_tab/sidebar_collapsed", self.sidebar_collapsed)
+
+    def _load_splitter_sizes(self):
+        """Load saved splitter sizes from settings."""
+        settings = QSettings("iCharlotte", "iCharlotte")
+
+        # Load main splitter sizes
+        main_sizes = settings.value("chat_tab/main_splitter_sizes")
+        if main_sizes:
+            try:
+                # Convert to list of ints if needed
+                if isinstance(main_sizes, list):
+                    main_sizes = [int(s) for s in main_sizes]
+                    self.main_splitter.setSizes(main_sizes)
+            except (ValueError, TypeError):
+                pass  # Use default sizes
+
+        # Load chat splitter sizes
+        chat_sizes = settings.value("chat_tab/chat_splitter_sizes")
+        if chat_sizes:
+            try:
+                if isinstance(chat_sizes, list):
+                    chat_sizes = [int(s) for s in chat_sizes]
+                    self.chat_splitter.setSizes(chat_sizes)
+            except (ValueError, TypeError):
+                pass  # Use default sizes
+
+        # Load sidebar state
+        sidebar_collapsed = settings.value("chat_tab/sidebar_collapsed")
+        if sidebar_collapsed is not None:
+            # QSettings may return string 'true'/'false' or bool
+            if isinstance(sidebar_collapsed, str):
+                self.sidebar_collapsed = sidebar_collapsed.lower() == 'true'
+            else:
+                self.sidebar_collapsed = bool(sidebar_collapsed)
+
+            self.conv_sidebar.setVisible(not self.sidebar_collapsed)
+            if self.sidebar_collapsed:
+                self.toggle_sidebar_btn.setText("Show Conversations")
+            else:
+                self.toggle_sidebar_btn.setText("Hide Conversations")
 
     def get_attachment_info(self) -> list:
         """Get attachment information for the current message."""
@@ -1247,11 +1381,9 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
     # --- Legacy Compatibility ---
 
     def clear_chat(self):
-        """Clear chat and create new conversation."""
-        self.chat_history.clear()
-        self.conversation_history = []
-        if self.persistence:
-            self.on_new_conversation()
+        """Clear chat - only creates new conversation if current one has messages."""
+        # Delegate to clear_current_chat which has the proper logic
+        self.clear_current_chat()
 
     def reset_state(self):
         """Reset all state (called on case switch)."""

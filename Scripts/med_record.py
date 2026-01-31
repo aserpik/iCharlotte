@@ -376,19 +376,31 @@ def call_gemini(prompt, text):
                 except Exception as e:
                     last_error = e
                     error_str = str(e)
-                    log_event(f"Attempt {attempt+1}/{max_retries} failed with {model_name}: {e}", level="warning")
+
+                    # Wrap logging in try/except to prevent cascading failures
+                    # (e.g., if stdout pipe is broken, don't crash trying to log)
+                    try:
+                        log_event(f"Attempt {attempt+1}/{max_retries} failed with {model_name}: {e}", level="warning")
+                    except Exception:
+                        pass  # Logging failed, continue with error handling
 
                     # Rate limit handling
                     if "429" in error_str or "rate" in error_str.lower():
                         wait_time = 30 * (attempt + 1)  # Exponential backoff
-                        log_event(f"Rate limit hit. Waiting {wait_time} seconds...")
-                        checkpoint(f"Rate limited, waiting {wait_time}s")
+                        try:
+                            log_event(f"Rate limit hit. Waiting {wait_time} seconds...")
+                            checkpoint(f"Rate limited, waiting {wait_time}s")
+                        except Exception:
+                            pass
                         time.sleep(wait_time)
                         continue
 
                     # Quota exceeded - try next model
                     if "quota" in error_str.lower():
-                        log_event(f"Quota exceeded for {model_name}, trying next model", level="warning")
+                        try:
+                            log_event(f"Quota exceeded for {model_name}, trying next model", level="warning")
+                        except Exception:
+                            pass
                         break
 
                     # Other errors - brief pause and retry
@@ -852,15 +864,26 @@ if __name__ == '__main__':
     except MemoryError as e:
         safe_print(f"ERROR:Memory exhausted - {e}")
         safe_print("PASS_FAILED:Processing:Memory exhausted:fatal")
-        log_event(f"FATAL: Memory exhausted: {e}", level="error")
+        try:
+            log_event(f"FATAL: Memory exhausted: {e}", level="error")
+        except Exception:
+            pass  # Logging failed, still exit properly
         sys.exit(137)
     except Exception as e:
         # This catches any unhandled exception
         import traceback
         tb = traceback.format_exc()
+
+        # Use safe_print for UI communication (it handles broken pipes)
         safe_print(f"ERROR:Unhandled exception - {type(e).__name__}: {e}")
         safe_print("PASS_FAILED:Processing:Unhandled exception:fatal")
-        log_event(f"FATAL: Unhandled exception: {e}\n{tb}", level="error")
+
+        # Wrap log_event in try/except to prevent cascading failures
+        # if stdout/stderr are already broken
+        try:
+            log_event(f"FATAL: Unhandled exception: {e}\n{tb}", level="error")
+        except Exception:
+            pass  # Logging failed, but we still need to exit properly
 
         # Also write to stderr for any capture mechanisms
         safe_print(f"\n{'='*60}", file=sys.stderr)

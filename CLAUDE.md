@@ -51,7 +51,6 @@ iCharlotte/
 │       ├── pdf_viewer_widget.py   # PDF viewer using pdf.js
 │       ├── master_case_tab.py # Case list with hearings and todos
 │       ├── email_tab.py       # Email search and management
-│       ├── report_tab.py      # Report generation
 │       ├── liability_tab.py   # Liability analysis
 │       ├── dialogs.py         # Settings dialogs
 │       └── widgets.py         # Common widgets (status, file tree, agent runner)
@@ -122,9 +121,8 @@ Unified hierarchy with retry decorators:
 2. **IndexTab**: File browser and agent runner
 3. **Master Case Tab**: Case list with hearings, todos, assignments
 4. **Email Tab**: Search and preview emails
-5. **Report Tab**: Report generation
-6. **Liability Tab**: Liability analysis
-7. **Logs Tab**: Activity logging
+5. **Liability Tab**: Liability analysis
+6. **Logs Tab**: Activity logging
 
 ### Key Widgets
 - **EnhancedFileTreeWidget**: File tree with processing status, tags, filters

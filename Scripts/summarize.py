@@ -22,6 +22,18 @@ from docx.shared import Pt, Inches
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+
+def safe_print(message, file=None, flush=True):
+    """
+    Print wrapper that handles OSError when stdout/stderr becomes invalid.
+    This can happen when running multiple agents simultaneously on Windows.
+    """
+    try:
+        print(message, file=file, flush=flush)
+    except (OSError, IOError, ValueError):
+        # stdout/stderr pipe is broken - silently ignore
+        pass
+
 # Import shared infrastructure
 from icharlotte_core.document_processor import DocumentProcessor, OCRConfig
 from icharlotte_core.agent_logger import AgentLogger, create_legacy_log_event
@@ -539,7 +551,7 @@ def main():
 
     # Dispatcher mode: multiple files
     if len(file_paths) > 1:
-        print(f"Detected {len(file_paths)} files. Launching separate agents...", flush=True)
+        safe_print(f"Detected {len(file_paths)} files. Launching separate agents...")
         for path in file_paths:
             try:
                 if os.name == 'nt':
@@ -547,7 +559,7 @@ def main():
                 else:
                     subprocess.Popen([sys.executable, sys.argv[0], path])
             except Exception as e:
-                print(f"Failed to spawn agent for {path}: {e}", flush=True)
+                safe_print(f"Failed to spawn agent for {path}: {e}")
         sys.exit(0)
 
     # Single file/directory mode
@@ -555,7 +567,7 @@ def main():
     input_path = os.path.abspath(input_path)
 
     if not os.path.exists(input_path):
-        print(f"Error: File not found: {input_path}", flush=True)
+        safe_print(f"Error: File not found: {input_path}")
         sys.exit(1)
 
     # Extract file number for logger context
@@ -588,4 +600,28 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        safe_print("\nERROR:Agent cancelled by user")
+        sys.exit(130)
+    except MemoryError as e:
+        safe_print(f"ERROR:Memory exhausted - {e}")
+        safe_print("PASS_FAILED:Processing:Memory exhausted:fatal")
+        sys.exit(137)
+    except Exception as e:
+        # This catches any unhandled exception
+        import traceback
+        tb = traceback.format_exc()
+
+        safe_print(f"ERROR:Unhandled exception - {type(e).__name__}: {e}")
+        safe_print("PASS_FAILED:Processing:Unhandled exception:fatal")
+
+        # Also write to stderr for any capture mechanisms
+        safe_print(f"\n{'='*60}", file=sys.stderr)
+        safe_print("FATAL ERROR in Summarize Agent", file=sys.stderr)
+        safe_print(f"Exception: {type(e).__name__}: {e}", file=sys.stderr)
+        safe_print(f"{'='*60}", file=sys.stderr)
+        safe_print(tb, file=sys.stderr)
+
+        sys.exit(1)

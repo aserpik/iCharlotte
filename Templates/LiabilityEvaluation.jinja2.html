@@ -1,0 +1,125 @@
+{#
+    Liability Evaluation Jinja2 Template
+
+    This template renders a LiabilityEvaluation JSON object into HTML
+    formatted for Word document insertion.
+
+    Based on the EVALUATION OF LIABILITY section from Carrier001.docx.
+
+    Usage:
+        from jinja2 import Environment, FileSystemLoader
+        env = Environment(loader=FileSystemLoader('Templates'))
+        template = env.get_template('LiabilityEvaluation.jinja2.html')
+        html = template.render(data=liability_evaluation_dict)
+#}
+
+{# Macro for rendering an analysis section #}
+{% macro render_analysis_section(section, title) %}
+<p style="text-indent: 0; margin-bottom: 6pt;">
+    <b><u>{{ title }}</u></b>
+</p>
+
+{% if section.legal_standard %}
+<p style="text-indent: 0.5in; margin-bottom: 6pt; text-align: justify;">
+    {{ section.legal_standard }}
+</p>
+{% endif %}
+
+{# Main analysis narrative #}
+<p style="text-indent: 0.5in; margin-bottom: 6pt; text-align: justify;">
+    {{ section.analysis }}
+</p>
+
+{# Render citations inline if present - typically already in the analysis text #}
+{% endmacro %}
+
+{# Macro for rendering risk transfer section #}
+{% macro render_risk_transfer(risk) %}
+<p style="text-indent: 0; margin-bottom: 6pt;">
+    <b><u>Risk Transfer</u></b>
+</p>
+
+{% if risk.plaintiff_comparative_fault %}
+<p style="text-indent: 0.5in; margin-bottom: 6pt; text-align: justify;">
+    {{ risk.plaintiff_comparative_fault }}
+</p>
+{% endif %}
+
+{% if risk.co_defendants %}
+<p style="text-indent: 0.5in; margin-bottom: 6pt; text-align: justify;">
+    {{ risk.analysis }}
+</p>
+
+{% if risk.co_defendants|length > 0 %}
+{# Only show detailed breakdown if we have co-defendants #}
+{% for codef in risk.co_defendants %}
+{% if codef.basis_for_liability %}
+<p style="text-indent: 0.5in; margin-bottom: 6pt; text-align: justify;">
+    We anticipate that Co-Defendant {{ codef.name }}{% if codef.role %}, the {{ codef.role }},{% endif %} will be allocated some fault {{ codef.basis_for_liability }}{% if codef.estimated_fault_percentage %} We estimate {{ codef.name }}'s share of fault at approximately {{ codef.estimated_fault_percentage }}.{% endif %}
+</p>
+{% endif %}
+{% endfor %}
+{% endif %}
+{% else %}
+<p style="text-indent: 0.5in; margin-bottom: 6pt; text-align: justify;">
+    {{ risk.analysis }}
+</p>
+{% endif %}
+
+{% if risk.our_client_exposure %}
+<p style="text-indent: 0.5in; margin-bottom: 6pt; text-align: justify;">
+    {{ risk.our_client_exposure }}
+</p>
+{% endif %}
+{% endmacro %}
+
+
+{# ===== MAIN TEMPLATE ===== #}
+
+{# Section Header #}
+<p align="center" style="margin-bottom: 12pt;">
+    <b><u>EVALUATION OF LIABILITY</u></b>
+</p>
+
+{# Legal Standard Overview / Opening Paragraph #}
+<p style="text-indent: 0.5in; margin-bottom: 6pt; text-align: justify;">
+    {% if data.causes_of_action %}
+    Plaintiff's Complaint alleges causes of action for {{ data.causes_of_action | join(' and ') }} against {% if data.our_client %}{{ data.our_client }}{% else %}Defendant{% endif %}.
+    {% endif %}
+    {{ data.legal_standard_overview }} Below is our analysis of these elements:
+</p>
+
+{# Duty and Control Section #}
+{{ render_analysis_section(data.duty_and_control, "Duty and Control") }}
+
+{# Breach of Duty Section #}
+{{ render_analysis_section(data.breach_of_duty, "Breach of Duty") }}
+
+{# Causation Section #}
+{{ render_analysis_section(data.causation, "Causation") }}
+
+{# Comparative Fault Section (Optional) #}
+{% if data.comparative_fault %}
+{{ render_analysis_section(data.comparative_fault, "Comparative Fault and Open and Obvious Condition") }}
+{% endif %}
+
+{# Risk Transfer Section (Optional) #}
+{% if data.risk_transfer %}
+{{ render_risk_transfer(data.risk_transfer) }}
+{% endif %}
+
+{# Summary Section #}
+<p style="text-indent: 0; margin-bottom: 6pt;">
+    <b><u>Summary</u></b>
+</p>
+
+<p style="text-indent: 0.5in; margin-bottom: 6pt; text-align: justify;">
+    {{ data.summary }}
+</p>
+
+{# Optional: Overall Assessment Badge (can be styled or hidden) #}
+{% if data.overall_assessment %}
+<p style="text-indent: 0.5in; margin-bottom: 12pt; text-align: justify;">
+    <i>Overall Assessment: {{ data.overall_assessment }}</i>
+</p>
+{% endif %}
