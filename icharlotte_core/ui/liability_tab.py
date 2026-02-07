@@ -15,6 +15,7 @@ from PySide6.QtGui import QDragEnterEvent, QDropEvent, QTextCursor
 from ..config import API_KEYS, GEMINI_DATA_DIR
 from ..utils import log_event
 from ..llm import LLMWorker, ModelFetcher
+from ..liability_builder import LiabilityBuilder
 from .tabs import ChatTab
 from .dialogs import SettingsDialog, SystemPromptDialog
 
@@ -455,6 +456,17 @@ class LiabilityExposureTab(ChatTab):
         self.build_report_btn.clicked.connect(self.open_report_builder)
         left_layout.addWidget(self.build_report_btn)
 
+        self.build_liability_btn = QPushButton("Build Liability Section")
+        self.build_liability_btn.setStyleSheet("background-color: #2E7D32; color: white; font-weight: bold;")
+        self.build_liability_btn.clicked.connect(self.build_liability_section)
+        left_layout.addWidget(self.build_liability_btn)
+
+        self.stop_liability_btn = QPushButton("Stop Generation")
+        self.stop_liability_btn.setStyleSheet("background-color: #e57373; color: white; font-weight: bold;")
+        self.stop_liability_btn.setVisible(False)
+        self.stop_liability_btn.clicked.connect(self.stop_liability_generation)
+        left_layout.addWidget(self.stop_liability_btn)
+
         left_layout.addStretch()
         splitter.addWidget(left_panel)
         
@@ -863,3 +875,188 @@ class LiabilityExposureTab(ChatTab):
                     html_parts.append(f"<p>{INDENT}{para_text}</p>")
 
         return '\n'.join(html_parts)
+
+    def build_liability_section(self):
+        """
+        Build an EVALUATION OF LIABILITY section using the JSON-to-template approach.
+
+        1. Gets selected files from file_list
+        2. Uses LiabilityBuilder to generate an LLM prompt with JSON schema
+        3. Sends to LLM for structured output
+        4. Parses response and renders using Jinja2 template
+        5. Displays formatted HTML in chat_history
+        """
+        # Validate file selection
+        checked_count = 0
+        checked_files = []
+        if hasattr(self, 'file_list'):
+            for i in range(self.file_list.count()):
+                item = self.file_list.item(i)
+                if item.checkState() == Qt.CheckState.Checked:
+                    checked_count += 1
+                    checked_files.append(item.text())
+
+        if checked_count == 0:
+            QMessageBox.warning(
+                self,
+                "No Files Selected",
+                "Please select (check) at least one file to analyze for the liability evaluation."
+            )
+            return
+
+        # Get liability type from combo (or default)
+        liability_type = self.liability_type_combo.currentText() if self.liability_type_combo.isVisible() else "Premises Liability"
+
+        # Get case info
+        file_num = self.get_file_number()
+        our_client = None
+        case_name = None
+
+        # Try to get client/case info from case data
+        if file_num and CaseDataManager:
+            try:
+                data_manager = CaseDataManager()
+                our_client = data_manager.get_value(file_num, 'our_client') or data_manager.get_value(file_num, 'defendant_name')
+                case_name = data_manager.get_value(file_num, 'case_name') or data_manager.get_value(file_num, 'case_caption')
+            except Exception as e:
+                log_event(f"Could not load case data for liability builder: {e}", "warning")
+
+        # Update UI - show generating state
+        self.chat_history.append(f"<b>System:</b> Building Liability Evaluation Section...")
+        self.chat_history.append(f"<i>Analyzing {checked_count} file(s) for {liability_type}...</i>")
+        self.chat_history.append("<b>AI:</b> <i>Generating structured liability analysis...</i>")
+
+        self.build_liability_btn.setEnabled(False)
+        self.stop_liability_btn.setVisible(True)
+
+        # Read file content
+        file_content = self.read_files_content()
+
+        # Filter out existing liability sections to get independent analysis
+        try:
+            pattern = re.compile(r"(EVALUATION OF LIABILITY)(.*?)(EVALUATION OF EXPOSURE)", re.IGNORECASE | re.DOTALL)
+            if pattern.search(file_content):
+                log_event("Filtering existing 'EVALUATION OF LIABILITY' section for independent analysis.")
+                file_content = pattern.sub(r"\1\n[PREVIOUS LIABILITY EVALUATION IGNORED FOR INDEPENDENT ANALYSIS]\n\3", file_content)
+        except Exception as e:
+            log_event(f"Error filtering liability content: {e}", "error")
+
+        # Build the prompt using LiabilityBuilder
+        try:
+            self.liability_builder = LiabilityBuilder()
+            prompt = self.liability_builder.build_prompt(
+                documents_text=file_content,
+                liability_type=liability_type,
+                our_client=our_client,
+                case_name=case_name
+            )
+        except Exception as e:
+            self.chat_history.append(f"<font color='red'>Error building prompt: {e}</font>")
+            self._reset_liability_ui()
+            return
+
+        # Store context for response handling
+        self._liability_context = {
+            'liability_type': liability_type,
+            'our_client': our_client,
+            'case_name': case_name,
+            'file_count': checked_count
+        }
+
+        # Start LLM worker
+        self.liability_worker = LLMWorker(
+            self.provider_combo.currentText(),
+            self.model_combo.currentText(),
+            "You are a legal analyst. Output ONLY valid JSON matching the schema provided. No markdown, no explanation, just the JSON object.",
+            prompt,
+            "",  # File content already in prompt
+            self.settings,
+            history=[]  # Fresh context for structured output
+        )
+
+        self.liability_worker.finished.connect(self.on_liability_response)
+        self.liability_worker.error.connect(self.on_liability_error)
+        self.liability_worker.start()
+
+    def on_liability_response(self, text):
+        """Handle LLM response for liability section generation."""
+        # Remove "Generating..." message
+        cursor = self.chat_history.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        cursor.select(QTextCursor.SelectionType.BlockUnderCursor)
+        cursor.removeSelectedText()
+        cursor.deletePreviousChar()
+
+        context = getattr(self, '_liability_context', {})
+
+        try:
+            # Validate and parse JSON
+            is_valid, error, parsed_data = self.liability_builder.validate_json(text)
+
+            if not is_valid:
+                # Show error but also show raw output for debugging
+                self.chat_history.append(f"<font color='orange'><b>Warning:</b> JSON validation failed: {error}</font>")
+                self.chat_history.append("<p><i>Attempting to display raw output...</i></p>")
+
+                # Try to show formatted markdown as fallback
+                try:
+                    html_text = markdown.markdown(text, extensions=['fenced_code', 'tables'])
+                    self.chat_history.insertHtml(html_text)
+                except:
+                    self.chat_history.append(f"<pre>{text[:5000]}</pre>")
+
+                self._reset_liability_ui()
+                return
+
+            # Render using Jinja2 template
+            html_output = self.liability_builder.render_from_dict(parsed_data)
+
+            # Display the rendered HTML
+            self.chat_history.append("<hr>")
+            self.chat_history.append(f"<p><i>Generated Liability Evaluation for {context.get('liability_type', 'Unknown')} "
+                                    f"({context.get('file_count', 0)} documents analyzed)</i></p>")
+            self.chat_history.insertHtml(html_output)
+            self.chat_history.append("<hr>")
+
+            # Add copy tip
+            self.chat_history.append("<p><i>Tip: Select and copy (Ctrl+C) the text above to paste into your Word document.</i></p>")
+
+            # Log success
+            log_event(f"Generated liability evaluation section for {context.get('liability_type')} "
+                     f"with {context.get('file_count')} documents")
+
+            # Store parsed data for potential re-use
+            self._last_liability_data = parsed_data
+
+        except Exception as e:
+            self.chat_history.append(f"<font color='red'>Error rendering liability section: {e}</font>")
+            log_event(f"Error in liability section rendering: {e}", "error")
+
+            # Show raw output as fallback
+            self.chat_history.append("<p><b>Raw LLM Output:</b></p>")
+            self.chat_history.append(f"<pre>{text[:3000]}...</pre>")
+
+        finally:
+            self._reset_liability_ui()
+
+    def on_liability_error(self, err):
+        """Handle LLM error during liability generation."""
+        self.chat_history.append(f"<font color='red'>Error generating liability section: {err}</font>")
+        log_event(f"Liability generation error: {err}", "error")
+        self._reset_liability_ui()
+
+    def stop_liability_generation(self):
+        """Stop the liability generation worker."""
+        if hasattr(self, 'liability_worker') and self.liability_worker:
+            try:
+                self.liability_worker.terminate()
+                self.liability_worker.wait()
+            except:
+                pass
+        self.chat_history.append("<i>Liability generation stopped by user.</i>")
+        self._reset_liability_ui()
+
+    def _reset_liability_ui(self):
+        """Reset UI after liability generation completes or fails."""
+        self.build_liability_btn.setEnabled(True)
+        self.stop_liability_btn.setVisible(False)

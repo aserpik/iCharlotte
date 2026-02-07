@@ -49,7 +49,8 @@ class ChatPersistence:
                 'theme': 'light',
                 'default_provider': 'Gemini',
                 'default_model': 'gemini-3-flash-preview'
-            }
+            },
+            'attached_files': []  # Persisted context files for the case
         }
 
     def load(self) -> dict:
@@ -418,6 +419,43 @@ class ChatPersistence:
         settings = data.get('settings', {})
         settings.update(kwargs)
         data['settings'] = settings
+        self.save()
+
+    # --- Attached Files (Context Files) ---
+
+    def get_attached_files(self) -> List[str]:
+        """Get the list of attached file paths for this case."""
+        data = self.load()
+        return data.get('attached_files', [])
+
+    def set_attached_files(self, file_paths: List[str]):
+        """Set the list of attached file paths for this case."""
+        data = self.load()
+        data['attached_files'] = file_paths
+        self.save()
+
+    def add_attached_file(self, file_path: str):
+        """Add a file to the attached files list."""
+        data = self.load()
+        files = data.get('attached_files', [])
+        if file_path not in files:
+            files.append(file_path)
+            data['attached_files'] = files
+            self.save()
+
+    def remove_attached_file(self, file_path: str):
+        """Remove a file from the attached files list."""
+        data = self.load()
+        files = data.get('attached_files', [])
+        if file_path in files:
+            files.remove(file_path)
+            data['attached_files'] = files
+            self.save()
+
+    def clear_attached_files(self):
+        """Clear all attached files for this case."""
+        data = self.load()
+        data['attached_files'] = []
         self.save()
 
     # --- Utility ---

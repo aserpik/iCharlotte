@@ -148,150 +148,325 @@ async def solve_math_captcha(page):
 
 async def expand_all_pagination(page):
     """
-    Expands all paginated tables by collecting all data from each page.
-    Modifies the DOM to show all rows in each table before PDF generation.
-    """
-    try:
-        # Find all tables that have associated pagination
-        # We'll process each table section separately
-        tables = page.locator("table")
-        table_count = await tables.count()
+    Expands all paginated sections by collecting ALL data from ALL pages,
+    then rebuilding ALL tables at once right before returning.
 
-        if table_count == 0:
-            print("No tables found on page.")
+    Two-phase approach prevents AJAX from one section overwriting another:
+      Phase 1 (COLLECT): Navigate pages and collect row HTML for each section
+      Phase 2 (REBUILD): Replace all tables with full data (no more AJAX after this)
+    """
+
+    # JS helpers ----------------------------------------------------------
+    FIND_TABLE_ROWS_JS = """(expectedHeaders) => {
+        const tables = document.querySelectorAll('table');
+        for (const table of tables) {
+            let ths = Array.from(table.querySelectorAll('thead th'));
+            if (ths.length === 0) ths = Array.from(table.querySelectorAll('tr:first-child th'));
+            const hdr = ths.map(th => th.textContent.trim());
+            if (expectedHeaders.length > 0 &&
+                expectedHeaders.every(h => hdr.some(th => th === h))) {
+                const tbody = table.querySelector('tbody');
+                if (!tbody) continue;
+                const rows = Array.from(tbody.querySelectorAll(':scope > tr'))
+                    .filter(tr => !tr.querySelector('nav') &&
+                                  !/Results\\s*\\d/.test(tr.textContent));
+                return { rows: rows.map(tr => tr.outerHTML), headers: hdr };
+            }
+        }
+        return null;
+    }"""
+
+    FINGERPRINT_JS = """(expectedHeaders) => {
+        const tables = document.querySelectorAll('table');
+        for (const table of tables) {
+            let ths = Array.from(table.querySelectorAll('thead th'));
+            if (ths.length === 0) ths = Array.from(table.querySelectorAll('tr:first-child th'));
+            const hdr = ths.map(th => th.textContent.trim());
+            if (expectedHeaders.length > 0 &&
+                expectedHeaders.every(h => hdr.some(th => th === h))) {
+                const tbody = table.querySelector('tbody');
+                if (!tbody) continue;
+                const first = Array.from(tbody.querySelectorAll(':scope > tr'))
+                    .find(tr => !tr.querySelector('nav') &&
+                                !/Results\\s*\\d/.test(tr.textContent));
+                return first ? first.textContent.trim().substring(0, 200) : '';
+            }
+        }
+        return '';
+    }"""
+
+    WAIT_CHANGE_JS = """([expectedHeaders, oldFp]) => {
+        const tables = document.querySelectorAll('table');
+        for (const table of tables) {
+            let ths = Array.from(table.querySelectorAll('thead th'));
+            if (ths.length === 0) ths = Array.from(table.querySelectorAll('tr:first-child th'));
+            const hdr = ths.map(th => th.textContent.trim());
+            if (expectedHeaders.length > 0 &&
+                expectedHeaders.every(h => hdr.some(th => th === h))) {
+                const tbody = table.querySelector('tbody');
+                if (!tbody) return true;
+                const first = Array.from(tbody.querySelectorAll(':scope > tr'))
+                    .find(tr => !tr.querySelector('nav') &&
+                                !/Results\\s*\\d/.test(tr.textContent));
+                return (first ? first.textContent.trim().substring(0, 200) : '') !== oldFp;
+            }
+        }
+        return false;
+    }"""
+
+    REDISCOVER_FUNC_JS = """(expectedHeaders) => {
+        const tables = document.querySelectorAll('table');
+        for (const table of tables) {
+            let ths = Array.from(table.querySelectorAll('thead th'));
+            if (ths.length === 0) ths = Array.from(table.querySelectorAll('tr:first-child th'));
+            const hdr = ths.map(th => th.textContent.trim());
+            if (expectedHeaders.length > 0 &&
+                expectedHeaders.every(h => hdr.some(th => th === h))) {
+                for (const link of table.querySelectorAll('a[onclick*="_pageLoad"]')) {
+                    const m = (link.getAttribute('onclick') || '')
+                        .match(/(\\w+_pageLoad)\\(\\s*'([^']*)'/);
+                    if (m) return { funcName: m[1], viewId: m[2] };
+                }
+            }
+        }
+        return null;
+    }"""
+
+    # Full rediscovery: returns funcName, viewId, pageSize, AND maxPage for a section
+    REDISCOVER_FULL_JS = """(expectedHeaders) => {
+        const tables = document.querySelectorAll('table');
+        for (const table of tables) {
+            let ths = Array.from(table.querySelectorAll('thead th'));
+            if (ths.length === 0) ths = Array.from(table.querySelectorAll('tr:first-child th'));
+            const hdr = ths.map(th => th.textContent.trim());
+            if (expectedHeaders.length > 0 &&
+                expectedHeaders.every(h => hdr.some(th => th === h))) {
+                let maxPage = 0;
+                let funcName = null;
+                let viewId = null;
+                let pageSize = null;
+                for (const link of table.querySelectorAll('a[onclick*="_pageLoad"]')) {
+                    const onclick = link.getAttribute('onclick') || '';
+                    const m = onclick.match(/(\\w+_pageLoad)\\(\\s*'([^']*)'\\s*,\\s*(\\d+)\\s*,\\s*(\\d+)/);
+                    if (m) {
+                        funcName = m[1];
+                        viewId = m[2];
+                        pageSize = parseInt(m[4]);
+                    }
+                    const pn = parseInt(link.textContent.trim());
+                    if (!isNaN(pn) && pn > maxPage) maxPage = pn;
+                }
+                if (funcName) {
+                    return { funcName, viewId, pageSize, maxPage };
+                }
+            }
+        }
+        return null;
+    }"""
+
+    REEXPAND_SECTIONS_JS = """() => {
+        document.querySelectorAll('.collapse, .panel-collapse, [class*="collapse"]').forEach(el => {
+            el.style.display = 'block';
+            el.style.height = 'auto';
+            el.style.overflow = 'visible';
+            el.classList.add('in', 'show');
+        });
+    }"""
+
+    try:
+        # ============================================================
+        # PHASE 1: DISCOVER & COLLECT rows from all paginated sections
+        # ============================================================
+        groups = await page.evaluate("""() => {
+            const links = document.querySelectorAll('a[onclick*="_pageLoad"]');
+            const gm = {};
+            for (const link of links) {
+                const onclick = link.getAttribute('onclick') || '';
+                const fm = onclick.match(/^(\\w+_pageLoad)\\(/);
+                if (!fm) continue;
+                const fn = fm[1];
+                const pn = parseInt(link.textContent.trim());
+                if (isNaN(pn)) continue;
+                if (!gm[fn]) gm[fn] = { funcName: fn, maxPage: 1, headers: [], sampleOnclick: '' };
+                if (pn > gm[fn].maxPage) gm[fn].maxPage = pn;
+                if (pn >= 2 || !gm[fn].sampleOnclick) gm[fn].sampleOnclick = onclick;
+            }
+            for (const key of Object.keys(gm)) {
+                const g = gm[key];
+                const fl = Array.from(document.querySelectorAll('a[onclick*="_pageLoad"]'))
+                    .filter(a => (a.getAttribute('onclick') || '').includes(g.funcName));
+                if (fl.length === 0) continue;
+                const table = fl[0].closest('table');
+                if (table) {
+                    let ths = Array.from(table.querySelectorAll('thead th'));
+                    if (ths.length === 0) ths = Array.from(table.querySelectorAll('tr:first-child th'));
+                    g.headers = ths.map(th => th.textContent.trim());
+                }
+            }
+            return Object.values(gm);
+        }""")
+
+        if not groups:
+            print("No pagination found on this page.")
             return
 
-        print(f"Found {table_count} table(s). Checking for pagination...")
+        print(f"Found {len(groups)} paginated section(s)")
 
-        # Process tables in reverse order to avoid index shifting issues
-        for table_idx in range(table_count - 1, -1, -1):
-            table = tables.nth(table_idx)
+        # collected_data: list of { headers, rows_html } for rebuild phase
+        collected_data = []
 
-            # Find the section/container that holds this table
-            # Look for a parent with a pager nearby
-            section = await table.evaluate("""el => {
-                // Walk up to find a container that has both table and pager
-                let parent = el.parentElement;
-                for (let i = 0; i < 10 && parent; i++) {
-                    if (parent.querySelector('.pager') || parent.querySelector('.pagination')) {
-                        return parent.className || parent.id || 'found';
-                    }
-                    parent = parent.parentElement;
-                }
-                return null;
-            }""")
+        for group in groups:
+            headers = group.get('headers', [])
 
-            if not section:
+            if not headers:
                 continue
 
-            print(f"Processing table {table_idx + 1} with pagination...")
+            # Re-expand all accordion sections before each group.
+            # AJAX from processing the previous section may have collapsed this one.
+            await page.evaluate(REEXPAND_SECTIONS_JS)
+            await page.wait_for_timeout(500)
 
-            # Collect all rows from all pages for this table
-            all_rows_html = []
-            header_html = None
-            page_num = 1
-            max_pages = 50  # Safety limit
+            # Re-discover pagination info FRESH from the current DOM.
+            # The initial discovery funcNames are stale after any AJAX calls.
+            fresh = await page.evaluate(REDISCOVER_FULL_JS, headers)
+            if not fresh or fresh['maxPage'] <= 1:
+                non_empty = [h for h in headers if h]
+                print(f"  Section {non_empty[:3]}: single page or no pagination (skipping)")
+                continue
 
-            while page_num <= max_pages:
-                # Re-fetch table reference as DOM may have changed
-                current_table = page.locator("table").nth(table_idx)
+            func_name = fresh['funcName']
+            view_id = fresh['viewId']
+            page_size = fresh['pageSize']
+            current_max = fresh['maxPage']
 
-                if await current_table.count() == 0:
-                    break
+            print(f"  Section: {current_max} pages, pageSize={page_size}, headers: {[h for h in headers if h]}")
 
-                # Get header on first page
-                if header_html is None:
-                    thead = current_table.locator("thead")
-                    if await thead.count() > 0:
-                        header_html = await thead.evaluate("el => el.outerHTML")
-
-                # Get current table body rows
-                tbody = current_table.locator("tbody")
-                if await tbody.count() > 0:
-                    rows = tbody.locator("tr")
-                    row_count = await rows.count()
-
-                    for r in range(row_count):
-                        row = rows.nth(r)
-                        row_html = await row.evaluate("el => el.outerHTML")
-                        # Avoid duplicate rows
-                        if row_html not in all_rows_html:
-                            all_rows_html.append(row_html)
-
-                    print(f"  Page {page_num}: collected {row_count} rows (total: {len(all_rows_html)})")
-
-                # Find the pager associated with this table section
-                # Look for next page link
-                pager = page.locator(".pager").first
-                next_link = pager.locator("a[title='Go to next page'], .pager-next a").first
-
-                if await next_link.count() == 0:
-                    print(f"  No more pages (stopped at page {page_num})")
-                    break
-
-                # Check if next link is actually clickable
-                is_visible = await next_link.is_visible()
-                if not is_visible:
-                    print(f"  Next link not visible (stopped at page {page_num})")
-                    break
-
-                # Click next and wait for content to load
-                await next_link.click()
+            # Ensure on page 1
+            try:
+                await page.evaluate(
+                    f"window['{func_name}']('{view_id}', 0, {page_size}, '', '')"
+                )
                 await page.wait_for_load_state("networkidle")
-                await page.wait_for_timeout(800)  # Wait for table to update
+                await page.wait_for_timeout(2000)
+            except Exception:
+                pass
 
-                page_num += 1
+            # Collect page 1
+            result = await page.evaluate(FIND_TABLE_ROWS_JS, headers)
+            all_rows = result['rows'] if result else []
+            print(f"    Page 1: {len(all_rows)} rows")
+            if not all_rows:
+                continue
 
-            # If we collected rows from multiple pages, rebuild the table
-            if page_num > 1 and len(all_rows_html) > 0:
-                print(f"  Rebuilding table with all {len(all_rows_html)} rows...")
+            # Navigate pages 2..N
+            for pg in range(2, current_max + 1):
+                old_fp = await page.evaluate(FINGERPRINT_JS, headers)
 
-                # Join all rows into single HTML string
-                all_rows_joined = "".join(all_rows_html)
-                total_rows = len(all_rows_html)
+                # Re-discover function name (changes after each AJAX)
+                cur = await page.evaluate(REDISCOVER_FUNC_JS, headers)
+                cf = cur['funcName'] if cur else func_name
+                cv = cur['viewId'] if cur else view_id
 
-                # Inject all collected rows into the table using evaluate with arguments
-                # This safely passes the HTML without string escaping issues
-                await page.evaluate("""([tableIdx, rowsHtml, totalRows]) => {
-                    const table = document.querySelectorAll('table')[tableIdx];
-                    if (!table) return;
+                offset = (pg - 1) * page_size
+                try:
+                    await page.evaluate(
+                        f"window['{cf}']('{cv}', {offset}, {page_size}, '', '')"
+                    )
+                except Exception as e:
+                    print(f"    Error invoking _pageLoad for page {pg}: {e}")
+                    break
 
-                    let tbody = table.querySelector('tbody');
-                    if (!tbody) {
-                        tbody = document.createElement('tbody');
-                        table.appendChild(tbody);
-                    }
+                await page.wait_for_load_state("networkidle")
+                # Wait for AJAX response to fully update the DOM
+                await page.wait_for_timeout(2000)
+                try:
+                    await page.wait_for_function(WAIT_CHANGE_JS, [headers, old_fp], timeout=8000)
+                except Exception:
+                    # Extra wait if fingerprint hasn't changed yet
+                    await page.wait_for_timeout(3000)
 
-                    // Replace tbody content with all collected rows
-                    tbody.innerHTML = rowsHtml;
+                result = await page.evaluate(FIND_TABLE_ROWS_JS, headers)
+                new_rows = result['rows'] if result else []
+                added = sum(1 for r in new_rows if r not in all_rows)
+                for r in new_rows:
+                    if r not in all_rows:
+                        all_rows.append(r)
+                print(f"    Page {pg}: {len(new_rows)} rows ({added} new, total: {len(all_rows)})")
 
-                    // Hide pagination since we now show all data
-                    const pagers = document.querySelectorAll('.pager, .pagination');
-                    pagers.forEach(p => p.style.display = 'none');
-
-                    // Update any "Results X-Y of Z" text
-                    const resultTexts = document.querySelectorAll('[class*="result"], [class*="count"]');
-                    resultTexts.forEach(el => {
-                        if (el.textContent.includes('Results') || el.textContent.includes('of')) {
-                            el.textContent = 'Showing all ' + totalRows + ' results';
+                # Sliding-window: check if more pages appeared
+                um = await page.evaluate("""(eh) => {
+                    for (const t of document.querySelectorAll('table')) {
+                        let ths = Array.from(t.querySelectorAll('thead th'));
+                        if (ths.length === 0) ths = Array.from(t.querySelectorAll('tr:first-child th'));
+                        if (eh.every(h => ths.map(th=>th.textContent.trim()).some(th=>th===h))) {
+                            let mx=0;
+                            t.querySelectorAll('a[onclick*="_pageLoad"]').forEach(a => {
+                                const n=parseInt(a.textContent.trim());
+                                if(!isNaN(n)&&n>mx) mx=n;
+                            });
+                            return mx;
                         }
-                    });
-                }""", [table_idx, all_rows_joined, total_rows])
+                    }
+                    return 0;
+                }""", headers)
+                if um > current_max:
+                    current_max = um
 
-                print(f"  Table rebuilt successfully with {len(all_rows_html)} rows")
+            collected_data.append({'headers': headers, 'rows': all_rows})
+            print(f"    Collected {len(all_rows)} total rows for rebuild")
 
-        # Final cleanup: hide all pagination controls
+        # ============================================================
+        # PHASE 2: REBUILD all tables at once (no more AJAX after this)
+        # ============================================================
+        if not collected_data:
+            return
+
+        # Re-expand all accordion sections (AJAX may have collapsed some)
         await page.evaluate("""() => {
-            document.querySelectorAll('.pager, .pagination, .pager-nav').forEach(p => {
-                p.style.display = 'none';
+            document.querySelectorAll('.collapse, .panel-collapse, [class*="collapse"]').forEach(el => {
+                el.style.display = 'block';
+                el.style.height = 'auto';
+                el.style.overflow = 'visible';
+                el.classList.add('in', 'show');
             });
+        }""")
+        await page.wait_for_timeout(500)
+
+        print("Rebuilding all tables with collected data...")
+        for data in collected_data:
+            headers = data['headers']
+            rows_html = "".join(data['rows'])
+            rebuilt = await page.evaluate("""([expectedHeaders, rowsHtml]) => {
+                const tables = document.querySelectorAll('table');
+                for (const table of tables) {
+                    let ths = Array.from(table.querySelectorAll('thead th'));
+                    if (ths.length === 0) ths = Array.from(table.querySelectorAll('tr:first-child th'));
+                    const hdr = ths.map(th => th.textContent.trim());
+                    if (expectedHeaders.length > 0 &&
+                        expectedHeaders.every(h => hdr.some(th => th === h))) {
+                        let tbody = table.querySelector('tbody');
+                        if (!tbody) { tbody = document.createElement('tbody'); table.appendChild(tbody); }
+                        tbody.innerHTML = rowsHtml;
+                        return true;
+                    }
+                }
+                return false;
+            }""", [headers, rows_html])
+            non_empty = [h for h in headers if h]
+            print(f"  Rebuilt {non_empty[:3]}... with {len(data['rows'])} rows: {'OK' if rebuilt else 'FAILED'}")
+
+        # Hide any remaining pagination/results elements
+        await page.evaluate("""() => {
+            document.querySelectorAll('nav').forEach(n => {
+                if (n.closest('table')) n.closest('tr').style.display = 'none';
+            });
+            document.querySelectorAll('.pager, .pagination').forEach(p => p.style.display = 'none');
         }""")
 
     except Exception as e:
         print(f"Warning: Error expanding pagination: {e}")
         import traceback
         traceback.print_exc()
-        # Continue anyway - we'll get at least the first page
 
 async def main():
     if len(sys.argv) < 2:
@@ -340,7 +515,7 @@ async def main():
                 # Fill credentials (only if field is empty/visible)
                 if await page.locator("#edit-name").is_visible():
                     await page.fill("#edit-name", "Serpiklaw@gmail.com")
-                    await page.fill("#edit-pass", "Pikserv123!123!123!")
+                    await page.fill("#edit-pass", "Pikserv321!321!")
                 
                 print("--- AUTOMATED: Solving CAPTCHA with Gemini ---")
                 
@@ -424,12 +599,51 @@ async def main():
             # Wait for content rendering
             await page.wait_for_load_state("networkidle")
 
+            # Expand all collapsible accordion sections before looking for pagination.
+            # The Riverside court page has collapsed sections (COMPLAINTS/PETITIONS,
+            # HEARINGS, COLLECTION HISTORY, DOCUMENTS, CASE LEDGER) whose content
+            # is lazy-loaded when expanded. We must click each section header to load
+            # its content (including pagination) into the DOM.
+            print("Expanding all collapsible sections...")
+            section_names = ["COMPLAINTS/PETITIONS", "HEARINGS", "COLLECTION HISTORY", "DOCUMENTS", "CASE LEDGER"]
+            for section_name in section_names:
+                try:
+                    # Find the clickable section header by its text
+                    header = page.locator(f"text='{section_name}'").first
+                    if await header.count() > 0:
+                        await header.click(timeout=5000)
+                        print(f"  Expanded: {section_name}")
+                        # Wait for AJAX to load section content
+                        await page.wait_for_load_state("networkidle")
+                        await page.wait_for_timeout(1500)
+                    else:
+                        print(f"  Not found: {section_name}")
+                except Exception as e:
+                    print(f"  Could not expand {section_name}: {e}")
+
+            # Give all sections time to fully render
+            await page.wait_for_timeout(2000)
+
             # Expand all paginated sections (Hearings, Documents, etc.)
             print("Expanding all paginated sections...")
             await expand_all_pagination(page)
 
-            # Apply CSS fixes for clean PDF formatting
+            # Force screen media so print stylesheets don't collapse sections
+            await page.emulate_media(media="screen")
+
+            # Apply CSS fixes: force all accordion/collapse sections visible for PDF
             await page.evaluate("""() => {
+                // Force all collapse panels to be visible
+                document.querySelectorAll('.collapse, .panel-collapse, .accordion-collapse, [class*="collapse"]').forEach(el => {
+                    el.style.display = 'block';
+                    el.style.height = 'auto';
+                    el.style.overflow = 'visible';
+                    el.style.visibility = 'visible';
+                    el.style.opacity = '1';
+                    el.classList.add('in', 'show');  // Bootstrap 3 'in', Bootstrap 4/5 'show'
+                });
+
+                // Force all containers to show content
                 const mainContainer = document.querySelector('.main-container');
                 if (mainContainer) {
                     mainContainer.style.overflow = 'visible';
@@ -437,6 +651,26 @@ async def main():
                 }
                 document.body.style.overflow = 'visible';
                 document.body.style.height = 'auto';
+
+                // Override any print-specific hiding rules
+                const style = document.createElement('style');
+                style.textContent = `
+                    @media print {
+                        .collapse, .panel-collapse, [class*="collapse"] {
+                            display: block !important;
+                            height: auto !important;
+                            overflow: visible !important;
+                            visibility: visible !important;
+                        }
+                        * { overflow: visible !important; }
+                    }
+                    /* Also force for screen rendering used by PDF */
+                    .collapse:not(.navbar-collapse) {
+                        display: block !important;
+                        height: auto !important;
+                    }
+                `;
+                document.head.appendChild(style);
             }""")
 
             # Filename format matching docket.py expectation: docket_YYYY.MM.DD.pdf

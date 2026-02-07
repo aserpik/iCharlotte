@@ -2297,10 +2297,17 @@ class WordLLMPopup(QDialog):
         """Default LLM call using the app's LLM infrastructure."""
         try:
             from icharlotte_core.llm import LLMHandler
+            from icharlotte_core.config import API_KEYS
 
             # Get the selected model
             provider, model_id = self._get_selected_model()
             print(f"Using model: {provider} / {model_id}")
+
+            # Check API key is available
+            api_key = API_KEYS.get(provider)
+            if not api_key:
+                raise ValueError(f"API key for {provider} not configured. Check your .env file.")
+            print(f"API key for {provider}: {'*' * 8}...{api_key[-4:] if len(api_key) > 4 else '****'}")
 
             # Use LLMHandler.generate with proper parameters
             settings = {
@@ -2311,6 +2318,7 @@ class WordLLMPopup(QDialog):
                 'thinking_level': 'None'
             }
 
+            print(f"Calling LLMHandler.generate...")
             result = LLMHandler.generate(
                 provider=provider,
                 model=model_id,
@@ -2319,10 +2327,16 @@ class WordLLMPopup(QDialog):
                 file_contents="",
                 settings=settings
             )
+            print(f"LLM result type: {type(result)}, length: {len(result) if result else 0}")
 
-            return result.strip() if result else ""
+            if not result:
+                raise ValueError("LLM returned empty response")
+
+            return result.strip()
         except Exception as e:
+            import traceback
             print(f"LLM call failed: {e}")
+            print(f"Traceback: {traceback.format_exc()}")
             raise
 
     # ========== Outlook-specific methods ==========
@@ -2544,9 +2558,15 @@ class WordLLMPopup(QDialog):
         """LLM call with email-specific system prompt."""
         try:
             from icharlotte_core.llm import LLMHandler
+            from icharlotte_core.config import API_KEYS
 
             provider, model_id = self._get_selected_model()
             print(f"Using model for email: {provider} / {model_id}")
+
+            # Check API key is available
+            api_key = API_KEYS.get(provider)
+            if not api_key:
+                raise ValueError(f"API key for {provider} not configured. Check your .env file.")
 
             settings = {
                 'temperature': 0.7,
@@ -2556,6 +2576,7 @@ class WordLLMPopup(QDialog):
                 'thinking_level': 'None'
             }
 
+            print(f"Calling LLMHandler.generate for email...")
             result = LLMHandler.generate(
                 provider=provider,
                 model=model_id,
@@ -2564,10 +2585,16 @@ class WordLLMPopup(QDialog):
                 file_contents="",
                 settings=settings
             )
+            print(f"Email LLM result type: {type(result)}, length: {len(result) if result else 0}")
 
-            return result.strip() if result else ""
+            if not result:
+                raise ValueError("LLM returned empty response")
+
+            return result.strip()
         except Exception as e:
+            import traceback
             print(f"Email LLM call failed: {e}")
+            print(f"Traceback: {traceback.format_exc()}")
             raise
 
     # ========== End Outlook-specific methods ==========
@@ -2668,6 +2695,9 @@ class WordHotkeyManager:
         self.signals = HotkeySignals()
         self.signals.show_popup.connect(self._show_popup)
         self._hotkey_registered = False
+        self._hotkey_handle = None  # Store handle for removal
+        self._check_timer = None  # Timer for periodic hook verification
+        self._last_activity_time = 0  # Track last successful hotkey press
 
     def start(self):
         """Start listening for the global hotkey."""
@@ -2678,9 +2708,33 @@ class WordHotkeyManager:
         if self._hotkey_registered:
             return True
 
+        success = self._register_hotkey()
+
+        # Start periodic check timer to re-register if hook is lost
+        if success:
+            self._start_check_timer()
+
+        return success
+
+    def _register_hotkey(self):
+        """Register the Win+V hotkey."""
         try:
-            # Register Win+V hotkey
-            keyboard.add_hotkey('win+v', self._on_hotkey, suppress=True)
+            # Unregister first if already registered (defensive)
+            if self._hotkey_handle is not None:
+                try:
+                    keyboard.remove_hotkey(self._hotkey_handle)
+                except:
+                    pass
+                self._hotkey_handle = None
+
+            # Also try to remove by name in case handle was lost
+            try:
+                keyboard.remove_hotkey('win+v')
+            except:
+                pass
+
+            # Register Win+V hotkey and store the handle
+            self._hotkey_handle = keyboard.add_hotkey('win+v', self._on_hotkey, suppress=True)
             self._hotkey_registered = True
             print("Global hotkey Win+V registered")
             return True
@@ -2688,18 +2742,55 @@ class WordHotkeyManager:
             print(f"Failed to register hotkey: {e}")
             return False
 
+    def _start_check_timer(self):
+        """Start a timer to periodically verify the hotkey hook is working."""
+        if self._check_timer is None:
+            self._check_timer = QTimer()
+            self._check_timer.timeout.connect(self._check_and_reregister)
+            self._check_timer.start(30000)  # Check every 30 seconds
+
+    def _check_and_reregister(self):
+        """Periodically re-register the hotkey to recover from hook loss."""
+        if not HAS_KEYBOARD:
+            return
+
+        import time
+        # If no hotkey activity in last 5 minutes and user might be using the app,
+        # proactively re-register to ensure the hook is fresh
+        time_since_activity = time.time() - self._last_activity_time if self._last_activity_time else float('inf')
+
+        # Always re-register periodically - this is cheap and ensures reliability
+        try:
+            self._register_hotkey()
+        except Exception as e:
+            try:
+                print(f"Hotkey re-registration failed: {e}")
+            except OSError:
+                pass
+
     def stop(self):
         """Stop listening for the global hotkey."""
+        # Stop the check timer
+        if self._check_timer is not None:
+            self._check_timer.stop()
+            self._check_timer = None
+
         if HAS_KEYBOARD and self._hotkey_registered:
             try:
-                keyboard.remove_hotkey('win+v')
+                if self._hotkey_handle is not None:
+                    keyboard.remove_hotkey(self._hotkey_handle)
+                else:
+                    keyboard.remove_hotkey('win+v')
                 self._hotkey_registered = False
+                self._hotkey_handle = None
                 print("Global hotkey unregistered")
             except:
                 pass
 
     def _on_hotkey(self):
         """Called when the hotkey is pressed (from keyboard thread)."""
+        import time
+        self._last_activity_time = time.time()
         # Emit signal to show popup on main thread
         self.signals.show_popup.emit()
 

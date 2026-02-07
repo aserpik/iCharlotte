@@ -2246,15 +2246,19 @@ class MainWindow(QMainWindow):
         data = []
         for path, item in self.tree_item_map.items():
             if path == self.case_path: continue
-            
-            entry = {
-                'path': path,
-                'type': item.data(0, Qt.ItemDataRole.UserRole + 1),
-                'size_str': item.text(1),
-                'date_str': item.text(2),
-                'task_ids': item.data(0, Qt.ItemDataRole.UserRole + 2)
-            }
-            data.append(entry)
+
+            try:
+                entry = {
+                    'path': path,
+                    'type': item.data(0, Qt.ItemDataRole.UserRole + 1),
+                    'size_str': item.text(1),
+                    'date_str': item.text(2),
+                    'task_ids': item.data(0, Qt.ItemDataRole.UserRole + 2)
+                }
+                data.append(entry)
+            except RuntimeError:
+                # Item's C++ object was already deleted (e.g., parent removed)
+                continue
             
         if not os.path.exists(GEMINI_DATA_DIR):
             os.makedirs(GEMINI_DATA_DIR)

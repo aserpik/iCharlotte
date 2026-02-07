@@ -258,6 +258,18 @@ class ChatTab(QWidget):
 
         # Vertical splitter for chat output and input
         self.chat_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.chat_splitter.setHandleWidth(6)  # Make handle easier to grab
+        self.chat_splitter.setStyleSheet("""
+            QSplitter::handle:vertical {
+                background-color: #d0d0d0;
+                height: 6px;
+                margin: 2px 40px;
+                border-radius: 3px;
+            }
+            QSplitter::handle:vertical:hover {
+                background-color: #4CAF50;
+            }
+        """)
         chat_layout.addWidget(self.chat_splitter)
 
         # Chat history display (upper pane)
@@ -361,11 +373,14 @@ class ChatTab(QWidget):
         if self.fetcher is not None and self.fetcher.isRunning():
             self.fetcher.wait(1000)
 
-        # Clear attached files from previous case
-        self.clear_files()
+        # Clear attached files from previous case (without persisting)
+        self._clear_files_no_persist()
 
         self.file_number = file_number
         self.persistence = ChatPersistence(file_number)
+
+        # Restore persisted attached files for this case
+        self._restore_attached_files()
 
         # Refresh conversation list
         self.refresh_conversation_list()
@@ -744,12 +759,68 @@ class ChatTab(QWidget):
             item.setData(Qt.ItemDataRole.UserRole, final_path)
             self.file_list.addItem(item)
 
+            # Persist the added file
+            if self.persistence:
+                self.persistence.add_attached_file(final_path)
+
     def clear_files(self):
+        """Clear all attached files and persist the change."""
         if self.attached_files is None:
             self.attached_files = []
         else:
             self.attached_files.clear()
         self.file_list.clear()
+        # Persist the cleared state
+        if self.persistence:
+            self.persistence.clear_attached_files()
+
+    def _clear_files_no_persist(self):
+        """Clear attached files from UI without persisting (used when switching cases)."""
+        if self.attached_files is None:
+            self.attached_files = []
+        else:
+            self.attached_files.clear()
+        self.file_list.clear()
+
+    def _restore_attached_files(self):
+        """Restore attached files from persistence."""
+        if not self.persistence:
+            return
+        persisted_files = self.persistence.get_attached_files()
+        for file_path in persisted_files:
+            # Only add files that still exist
+            if os.path.exists(file_path):
+                self._add_file_to_ui(file_path)
+            else:
+                # Remove non-existent files from persistence
+                self.persistence.remove_attached_file(file_path)
+
+    def _add_file_to_ui(self, final_path):
+        """Add a file to the UI without OCR checks (for restoring persisted files)."""
+        if final_path not in self.attached_files:
+            self.attached_files.append(final_path)
+            item = QListWidgetItem(os.path.basename(final_path))
+
+            ext = os.path.splitext(final_path)[1].lower()
+            # Use custom icon for images, system icon for others
+            if ext in ['.png', '.jpg', '.jpeg', '.gif', '.webp']:
+                try:
+                    pixmap = QPixmap(final_path)
+                    if not pixmap.isNull():
+                        pixmap = pixmap.scaled(32, 32, Qt.AspectRatioMode.KeepAspectRatio)
+                        item.setIcon(pixmap)
+                    else:
+                        item.setIcon(self.icon_provider.icon(QFileInfo(final_path)))
+                except:
+                    item.setIcon(self.icon_provider.icon(QFileInfo(final_path)))
+            else:
+                item.setIcon(self.icon_provider.icon(QFileInfo(final_path)))
+
+            item.setToolTip(final_path)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Checked)
+            item.setData(Qt.ItemDataRole.UserRole, final_path)
+            self.file_list.addItem(item)
 
     def check_pdf_text(self, path):
         """Checks if PDF has text. If not, asks to OCR. Returns (possibly updated) path or False."""
@@ -1194,6 +1265,10 @@ class ChatTab(QWidget):
 
     def update_context_indicator(self):
         """Update the context usage indicator."""
+        # Skip if indicator not present (e.g., LiabilityExposureTab overrides setup_ui)
+        if not hasattr(self, 'context_indicator'):
+            return
+
         provider = self.provider_combo.currentText()
         model = self.model_combo.currentText()
 
@@ -1353,12 +1428,15 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
         menu.exec(self.file_list.mapToGlobal(pos))
 
     def remove_file(self, item):
-        """Remove a file from the list."""
+        """Remove a file from the list and persist the change."""
         path = item.data(Qt.ItemDataRole.UserRole)
         if path in self.attached_files:
             self.attached_files.remove(path)
         row = self.file_list.row(item)
         self.file_list.takeItem(row)
+        # Persist the removal
+        if self.persistence:
+            self.persistence.remove_attached_file(path)
 
     def on_search_result_selected(self, conv_id: str, msg_id: str):
         """Handle search result selection."""
