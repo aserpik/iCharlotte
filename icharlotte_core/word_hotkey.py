@@ -271,6 +271,7 @@ def kill_zombie_word_processes():
         print(f"Error killing zombie processes: {e}")
 
 from icharlotte_core.config import GEMINI_DATA_DIR
+from icharlotte_core.redline_config import load_redline_settings, save_redline_settings
 
 
 # Format options
@@ -530,6 +531,9 @@ class WordLLMPopup(QDialog):
         self._word_app = None  # Stored Word COM reference during execution
         self._captured_format = None  # Captured format from selection
 
+        # Load redline settings
+        self.redline_settings = load_redline_settings(GEMINI_DATA_DIR)
+
         # App context for Word vs Outlook
         self.app_context = APP_CONTEXT_WORD  # Default context
         self.active_inspector = None  # Outlook Inspector reference when in email mode
@@ -630,6 +634,7 @@ class WordLLMPopup(QDialog):
         self._load_format_settings()
         self._load_model_settings()
         self._update_format_preview()
+        self._update_redline_checkbox_visibility()  # Set initial visibility based on context
 
         # Close on Escape
         self.shortcut_escape = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
@@ -843,6 +848,16 @@ class WordLLMPopup(QDialog):
             "but only replaces the selected text with the output."
         )
         ai_layout.addWidget(self.use_all_text_check)
+
+        # Redline mode checkbox (only visible for Word context)
+        self.redline_checkbox = QCheckBox("✏️ Use Redline Mode (Track Changes)")
+        self.redline_checkbox.setStyleSheet("color: #cdd6f4; font-size: 11px;")
+        self.redline_checkbox.setToolTip(
+            "Instead of replacing text, insert AI suggestions as Track Changes "
+            "that you can accept/reject in Word"
+        )
+        self.redline_checkbox.setChecked(self.redline_settings.get("redline_mode_default", False))
+        ai_layout.addWidget(self.redline_checkbox)
 
         ai_layout.addStretch()
         self.tab_widget.addTab(ai_tab, "AI Prompt")
@@ -1184,6 +1199,11 @@ class WordLLMPopup(QDialog):
             self.custom_input.clear()
             self.status_label.setText(f"Deleted '{name}'")
 
+    def _update_redline_checkbox_visibility(self):
+        """Show/hide redline checkbox based on app context."""
+        is_word = self.app_context == APP_CONTEXT_WORD
+        self.redline_checkbox.setVisible(is_word)
+
     def set_app_context(self, context: str, inspector=None):
         """Set the application context and update UI accordingly."""
         self.app_context = context
@@ -1201,6 +1221,9 @@ class WordLLMPopup(QDialog):
             self.tab_widget.setTabVisible(1, True)
             # Detect case from document path
             self._detect_and_update_case()
+
+        # Update redline checkbox visibility based on context
+        self._update_redline_checkbox_visibility()
 
         self.refresh_combo()  # Refresh prompts for context
 
