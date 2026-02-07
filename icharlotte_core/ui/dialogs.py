@@ -2244,7 +2244,7 @@ AGENT_CATEGORIES = [
     ]),
     ("Case Agents", [
         "agent_docket", "agent_complaint",
-        "agent_subpoena", "agent_liability", "agent_exposure"
+        "agent_liability", "agent_exposure"
     ]),
     ("UI Functions", [
         "func_chat", "func_email_intelligence", "func_email_compose",

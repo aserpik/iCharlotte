@@ -65,6 +65,7 @@ from icharlotte_core.ui.case_view_enhanced import (
     ProcessingLogWidget, ProcessingLogDB, FileTagsDB, EnhancedFileTreeWidget
 )
 from icharlotte_core.ui.dialogs import FileNumberDialog, VariablesDialog, PromptsDialog, LLMSettingsDialog
+from icharlotte_core.subpoena_tracker import SubpoenaTrackerWorker
 from icharlotte_core.ui.tabs import ChatTab, IndexTab
 from icharlotte_core.ui.email_tab import EmailTab
 from icharlotte_core.ui.email_update_tab import EmailUpdateTab
@@ -384,6 +385,7 @@ class MainWindow(QMainWindow):
             pass
 
         self.agent_runners = [] # Keep references to prevent GC
+        self._tree_generation = 0  # Incremented on each populate_tree to ignore stale worker callbacks
         self.cached_models = {} # Cache for models: {provider: [list]}
         self.fetcher = None
 
@@ -619,7 +621,11 @@ class MainWindow(QMainWindow):
         self.create_enhanced_agent_button("Docket Agent", "docket.py", left_layout, arg_type="file_number")
         self.create_enhanced_agent_button("Complaint Agent", "complaint.py", left_layout, arg_type="file_number")
         self.create_enhanced_agent_button("Report Agent", "report.py", left_layout, arg_type="file_number")
-        self.create_enhanced_agent_button("Subpoena Tracker", "subpoena_tracker.py", left_layout, arg_type="file_number")
+        # Subpoena Tracker — in-process QThread worker (not a subprocess agent)
+        self._subpoena_btn = EnhancedAgentButton("Subpoena Tracker", "subpoena_tracker")
+        self._subpoena_btn.clicked.connect(self._run_subpoena_tracker)
+        self.agent_buttons["subpoena_tracker"] = self._subpoena_btn
+        left_layout.addWidget(self._subpoena_btn)
 
         # Document Agents
         left_layout.addSpacing(8)
@@ -1268,7 +1274,14 @@ class MainWindow(QMainWindow):
                 # Clear status list to reset state
                 self.clear_all_status()
                 self.load_status_history()
-                
+
+                # Reset agent buttons, then restore running state for agents on this case
+                for btn in self.agent_buttons.values():
+                    btn.set_running(False)
+                for script, case_num in self.running_agents.items():
+                    if case_num == new_file_num and script in self.agent_buttons:
+                        self.agent_buttons[script].set_running(True)
+
                 # Reset Tabs for new case isolation
                 if hasattr(self, 'index_tab'):
                     self.index_tab.load_data(self.file_number)
@@ -1289,6 +1302,9 @@ class MainWindow(QMainWindow):
                 QMessageBox.critical(self, "Error", f"Could not find case directory for {new_file_num}")
 
     def open_root_folder(self):
+        if not self.case_path:
+            QMessageBox.information(self, "Info", "No case loaded.")
+            return
         if os.path.exists(self.case_path):
             try:
                 os.startfile(self.case_path)
@@ -1309,9 +1325,12 @@ class MainWindow(QMainWindow):
             self.populate_tree()
             self.clear_all_status()
 
-            # Reset all agent button running states when switching cases
+            # Reset agent buttons, then restore running state for agents on this case
             for btn in self.agent_buttons.values():
                 btn.set_running(False)
+            for script, case_num in self.running_agents.items():
+                if case_num == file_number and script in self.agent_buttons:
+                    self.agent_buttons[script].set_running(True)
 
             self.load_status_history()
 
@@ -1399,6 +1418,9 @@ class MainWindow(QMainWindow):
             log_event(f"Error checking docket expiry: {e}", "error")
 
     def view_docket(self):
+        if not self.case_path:
+            QMessageBox.information(self, "Info", "No case loaded.")
+            return
         # Look in NOTES/AI OUTPUT for Docket_*.pdf
         ai_output_dir = os.path.join(self.case_path, "NOTES", "AI OUTPUT")
         if not os.path.exists(ai_output_dir):
@@ -1618,6 +1640,53 @@ class MainWindow(QMainWindow):
                     btn_widget.set_last_run(today)
         except Exception as e:
             log_event(f"Error in on_agent_finished: {e}", "error")
+
+    def _run_subpoena_tracker(self):
+        """Launch the in-process subpoena tracker worker."""
+        if "subpoena_tracker" in self.running_agents:
+            return  # Already running
+
+        if not self.case_path:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "No Case", "No case is currently loaded.")
+            return
+
+        btn = self._subpoena_btn
+        btn.set_running(True)
+        started_for_case = self.file_number
+        self.running_agents["subpoena_tracker"] = started_for_case
+
+        worker = SubpoenaTrackerWorker(self.case_path, file_number=self.file_number)
+        worker.progress.connect(lambda msg: log_event(f"Subpoena Tracker: {msg}"))
+        worker.warning.connect(lambda msg: log_event(f"Subpoena Tracker warning: {msg}", "warning"))
+        worker.finished_result.connect(
+            lambda success, result: self._on_subpoena_tracker_finished(
+                worker, btn, started_for_case, success, result
+            )
+        )
+        self.agent_runners.append(worker)
+        worker.start()
+
+    def _on_subpoena_tracker_finished(self, worker, btn_widget, started_for_case, success, result):
+        """Handle subpoena tracker completion."""
+        try:
+            if "subpoena_tracker" in self.running_agents:
+                del self.running_agents["subpoena_tracker"]
+
+            # Clean up the worker reference
+            if worker in self.agent_runners:
+                self.agent_runners.remove(worker)
+
+            if self.file_number == started_for_case:
+                btn_widget.set_running(False)
+                if success:
+                    btn_widget.set_status("Last: Just now")
+                    log_event(f"Subpoena Tracker complete: {result}")
+                else:
+                    btn_widget.set_status("Last: Failed")
+                    log_event(f"Subpoena Tracker failed: {result}", "error")
+        except Exception as e:
+            log_event(f"Error in _on_subpoena_tracker_finished: {e}", "error")
 
     def update_docket_agent_status(self):
         """Update the docket agent button with last download date."""
@@ -2348,6 +2417,10 @@ class MainWindow(QMainWindow):
             return ""
 
     def populate_tree(self):
+        # Increment generation so stale worker callbacks are ignored
+        self._tree_generation += 1
+        current_gen = self._tree_generation
+
         self.tree.clear()
         self.status_label.setText("Scanning directory structure... Please wait.")
         self.tree.setEnabled(False)
@@ -2391,9 +2464,22 @@ class MainWindow(QMainWindow):
                 pass
 
         self.worker = DirectoryTreeWorker(self.case_path)
-        self.worker.data_ready.connect(self.add_tree_batch)
-        self.worker.finished.connect(self.on_scan_complete)
+        # Use lambdas that capture generation to ignore stale callbacks after file switch
+        self.worker.data_ready.connect(lambda batch, gen=current_gen: self._on_tree_batch(gen, batch))
+        self.worker.finished.connect(lambda gen=current_gen: self._on_scan_complete(gen))
         self.worker.start()
+
+    def _on_tree_batch(self, generation, batch):
+        """Wrapper that ignores stale worker callbacks from a previous file."""
+        if generation != self._tree_generation:
+            return
+        self.add_tree_batch(batch)
+
+    def _on_scan_complete(self, generation):
+        """Wrapper that ignores stale worker callbacks from a previous file."""
+        if generation != self._tree_generation:
+            return
+        self.on_scan_complete()
 
     def add_tree_batch(self, batch):
         for root, dirs, files in batch:

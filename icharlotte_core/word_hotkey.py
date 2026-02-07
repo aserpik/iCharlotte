@@ -2736,7 +2736,7 @@ class WordHotkeyManager:
             # Register Win+V hotkey and store the handle
             self._hotkey_handle = keyboard.add_hotkey('win+v', self._on_hotkey, suppress=True)
             self._hotkey_registered = True
-            print("Global hotkey Win+V registered")
+            pass  # Hotkey registered
             return True
         except Exception as e:
             print(f"Failed to register hotkey: {e}")

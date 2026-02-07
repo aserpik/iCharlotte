@@ -1024,24 +1024,35 @@ def main():
                     docket_text = extract_text_from_file(target_path)
                     
                     if docket_text:
-                        prompt = """
-                        Analyze this docket text.
-                        1. Identify the 'Trial Date' if explicitly scheduled. Format: YYYY-MM-DD (or "None" if not found).
-                        2. Identify 'Other Hearings' (any future scheduled hearings other than the trial). Summarize them briefly (e.g., "CMC on 2025-01-15, Motion on 2025-02-20"). If none, return "None".
-                        
-                        Return JSON:
-                        {
-                            "trial_date": "string",
-                            "other_hearings": "string"
-                        }
-                        """
+                        from datetime import date
+                        today_str = date.today().strftime("%Y-%m-%d")
+                        prompt = f"""Analyze this court docket text to extract hearing information.
+
+The docket text is extracted from a PDF and may have dates, hearing types, judges, departments, and statuses on separate lines. A typical hearing entry looks like:
+
+  MM/DD/YYYY
+  HH:MM AM/PM
+  Hearing Type  Judge Name
+  Department X  Status (e.g. Continued, Vacated, Held)
+
+INSTRUCTIONS:
+1. Find the 'Trial Date': Look for a future "Jury Trial" or "Court Trial" entry that is NOT marked as "Continued", "Vacated", or "Hearing Not Held". Today is {today_str}. Return the date in YYYY-MM-DD format, or empty string "" if no upcoming trial is scheduled.
+2. Find 'Other Hearings': Any other future scheduled hearings (not the trial) that are NOT continued/vacated. Summarize briefly (e.g., "Trial Readiness Conference on 2025-05-27"). Return "" if none.
+
+Return ONLY valid JSON (no markdown):
+{{"trial_date": "string", "other_hearings": "string"}}
+"""
                         
                         json_str = call_gemini_api(prompt, docket_text)
                         if json_str:
                             try:
                                 extracted = json.loads(clean_json_string(json_str))
-                                trial_date = extracted.get("trial_date", "None")
-                                other_hearings = extracted.get("other_hearings", "None")
+                                trial_date = extracted.get("trial_date", "") or ""
+                                other_hearings = extracted.get("other_hearings", "") or ""
+                                if trial_date.lower() == "none":
+                                    trial_date = ""
+                                if other_hearings.lower() == "none":
+                                    other_hearings = ""
                                 
                                 log_event(f"Extracted Trial Date: {trial_date}")
                                 log_event(f"Extracted Other Hearings: {other_hearings}")

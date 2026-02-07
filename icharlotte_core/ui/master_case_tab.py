@@ -926,18 +926,24 @@ class MasterCaseTab(QWidget):
             hearing_date = case['next_hearing_date']
             trial_date = case['trial_date']
 
+            # Sanitize string "None" values that may have been saved by older docket scripts
+            if hearing_date and hearing_date.lower() == "none":
+                hearing_date = ""
+            if trial_date and trial_date.lower() == "none":
+                trial_date = ""
+
             updated = False
 
             if vars_data and (not hearing_date or not trial_date):
                 if not hearing_date:
                     found_hearing = get_val("next_hearing_date") or get_val("next_hearing")
-                    if found_hearing:
+                    if found_hearing and found_hearing.lower() != "none":
                         hearing_date = found_hearing
                         updated = True
 
                 if not trial_date:
                     found_trial = get_val("trial_date")
-                    if found_trial:
+                    if found_trial and found_trial.lower() != "none":
                         trial_date = found_trial
                         updated = True
 
@@ -1532,10 +1538,6 @@ class MasterCaseTab(QWidget):
         self.restore_selection()
 
     def on_case_double_clicked(self, row, col):
-        # Only load case and switch to Case View when double-clicking the Tasks column (index 6)
-        if col != 6:
-            return
-
         item = self.table.item(row, 0)
         if not item:
             return
