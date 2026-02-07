@@ -46,6 +46,9 @@ dist/
 # Screenshots (auto-generated)
 screenshot*.png
 
+# Git worktrees
+.worktrees/
+
 # OS
 .DS_Store
 Thumbs.db
