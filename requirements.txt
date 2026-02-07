@@ -1,0 +1,33 @@
+# iCharlotte Dependencies
+
+# Core UI Framework
+PySide6>=6.6.0
+
+# LLM Providers
+google-generativeai>=0.3.0
+anthropic>=0.7.0
+openai>=1.0.0
+
+# Document Processing
+pypdf>=3.0.0
+python-docx>=1.0.0
+PyMuPDF>=1.23.0
+pytesseract>=0.3.10
+
+# External Integrations
+pywin32>=306  # Outlook integration
+google-auth>=2.0.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.1.0
+google-api-python-client>=2.0.0
+
+# Template and Validation
+jinja2>=3.0.0
+pydantic>=2.0.0
+
+# Utilities
+python-dotenv>=1.0.0
+requests>=2.28.0
+
+# Redlining Engine
+adeu>=0.1.0  # Agentic DOCX Redlining Engine
