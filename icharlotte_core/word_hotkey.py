@@ -554,6 +554,7 @@ class WordLLMPopup(QDialog):
 
         # Redline state
         self._original_text = None  # Original text before LLM processing
+        self._original_document = None  # Document object where selection was made
         self._original_range_start = None  # Range start position
         self._original_range_end = None  # Range end position
         self._redline_mode_active = False  # Whether current operation uses redline
@@ -1799,6 +1800,14 @@ class WordLLMPopup(QDialog):
                 print("Selection object is None")
                 return "", False
 
+            # Always capture the document for later use (regardless of redline mode)
+            try:
+                self._original_document = word.ActiveDocument
+                print(f"Captured document: {self._original_document.Name if self._original_document else 'None'}")
+            except Exception as e:
+                print(f"Could not capture document: {e}")
+                self._original_document = None
+
             text = ""
             try:
                 raw_text = selection.Text
@@ -1831,10 +1840,12 @@ class WordLLMPopup(QDialog):
                     )
                     self._original_text = text
                     try:
+                        # Store the document and range for later use
+                        self._original_document = word.ActiveDocument
                         self._original_range_start = selection.Range.Start
                         self._original_range_end = selection.Range.End
                         self._redline_mode_active = True
-                        print(f"Captured range for redlining: Start={self._original_range_start}, End={self._original_range_end}")
+                        print(f"Captured document and range for redlining: Start={self._original_range_start}, End={self._original_range_end}")
                     except Exception as e:
                         print(f"Could not capture range coordinates: {e}")
                         self._redline_mode_active = False
@@ -1912,9 +1923,12 @@ class WordLLMPopup(QDialog):
         try:
             from diff_match_patch import diff_match_patch
 
-            # Get document object
+            # Get document object - use stored document if available
             try:
-                doc = word_app.ActiveDocument
+                doc = self._original_document if self._original_document else word_app.ActiveDocument
+                if not doc:
+                    print("No document available")
+                    return False
             except Exception as e:
                 print(f"Could not access Word document: {e}")
                 return False
@@ -2015,7 +2029,8 @@ class WordLLMPopup(QDialog):
             if not selection:
                 raise Exception("Could not access Word selection")
 
-            doc = word.ActiveDocument
+            # Use stored document if available, otherwise fall back to ActiveDocument
+            doc = self._original_document if self._original_document else word.ActiveDocument
 
             # Check if Track Changes is enabled and preserve it for all format modes
             track_changes_active = False
