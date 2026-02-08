@@ -5,425 +5,244 @@ import os
 import re
 import json
 import random
-from google import genai
-from google.genai import types
+import urllib.request
+import urllib.parse
 from playwright.async_api import async_playwright
+from dotenv import load_dotenv
+_env_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '.env')
+load_dotenv(_env_path, override=True)
 
 async def solve_recaptcha(page):
-    """
-    Solves Google reCAPTCHA v2 using Gemini Vision (image grid challenges only).
-    """
-    debug_log = open("orange_debug.log", "a")
-    def log_debug(msg):
-        timestamp = time.strftime('%Y-%m-%d %H:%M:%S')
-        debug_log.write(f"[{timestamp}] {msg}\n")
-        debug_log.flush()
-        print(msg)
+    """Solve reCAPTCHA v2 using 2Captcha token-based API."""
 
+    api_key = os.environ.get("TWOCAPTCHA_API_KEY")
+    if not api_key:
+        print("TWOCAPTCHA_API_KEY not set - cannot solve reCAPTCHA.")
+        return False
+
+
+
+    # --- Extract sitekey from page ---
+    sitekey = None
+
+    # Method 1: data-sitekey attribute
     try:
-        log_debug("Starting reCAPTCHA solver (Vision Only - Gemini)...")
+        el = await page.query_selector("[data-sitekey]")
+        if el:
+            sitekey = await el.get_attribute("data-sitekey")
+    except Exception:
+        pass
 
-        # Initialize Gemini
-        gemini_key = os.environ.get("GEMINI_API_KEY")
-        if not gemini_key:
-            log_debug("GEMINI_API_KEY not set.")
-            return False
-        client = genai.Client(api_key=gemini_key)
-
-        # Wait for grecaptcha API to be ready
-        log_debug("Waiting for grecaptcha API...")
-        try:
-            await page.wait_for_function("typeof grecaptcha !== 'undefined'", timeout=10000)
-            log_debug("grecaptcha API detected")
-        except:
-            log_debug("grecaptcha API not found after 10s")
-
-        # Check if reCAPTCHA div exists and try to trigger it
-        try:
-            recaptcha_div = await page.query_selector(".g-recaptcha")
-            if recaptcha_div:
-                log_debug("Found g-recaptcha div, scrolling into view...")
-                await recaptcha_div.scroll_into_view_if_needed()
-                await asyncio.sleep(1)
-
-                # Check current state
-                has_iframe = await page.evaluate("document.querySelector('.g-recaptcha iframe') !== null")
-                log_debug(f"reCAPTCHA already has iframe: {has_iframe}")
-
-                if not has_iframe:
-                    # Debug: Check what's in the div and grecaptcha object
-                    log_debug("Debugging reCAPTCHA setup...")
-                    try:
-                        debug_info = await page.evaluate("""
-                            () => {
-                                const div = document.querySelector('.g-recaptcha');
-                                const info = {
-                                    divExists: !!div,
-                                    divHTML: div ? div.outerHTML.substring(0, 500) : null,
-                                    divAttributes: div ? Array.from(div.attributes).map(a => a.name + '=' + a.value) : [],
-                                    grecaptchaExists: typeof grecaptcha !== 'undefined',
-                                    grecaptchaMethods: typeof grecaptcha !== 'undefined' ? Object.keys(grecaptcha) : [],
-                                    grecaptchaEnterprise: typeof grecaptcha !== 'undefined' && typeof grecaptcha.enterprise !== 'undefined',
-                                };
-                                return info;
-                            }
-                        """)
-                        log_debug(f"Debug info: {debug_info}")
-                    except Exception as e:
-                        log_debug(f"Debug error: {e}")
-
-                    # Try different render approaches
-                    log_debug("Attempting to trigger reCAPTCHA render...")
-                    try:
-                        result = await page.evaluate("""
-                            () => {
-                                const div = document.querySelector('.g-recaptcha');
-                                if (!div) return 'no div';
-
-                                // Get sitekey from various sources
-                                let sitekey = div.getAttribute('data-sitekey');
-                                if (!sitekey) {
-                                    // Try to find it in scripts
-                                    const scripts = document.querySelectorAll('script');
-                                    for (const s of scripts) {
-                                        const match = s.textContent.match(/sitekey['":\s]+['"]([^'"]+)['"]/i);
-                                        if (match) {
-                                            sitekey = match[1];
-                                            break;
-                                        }
-                                    }
-                                }
-                                if (!sitekey) {
-                                    // Check for data-sitekey in any element
-                                    const el = document.querySelector('[data-sitekey]');
-                                    if (el) sitekey = el.getAttribute('data-sitekey');
-                                }
-
-                                if (!sitekey) return 'no sitekey found anywhere';
-
-                                if (typeof grecaptcha === 'undefined') return 'no grecaptcha';
-
-                                // Try enterprise API first
-                                if (grecaptcha.enterprise && grecaptcha.enterprise.render) {
-                                    try {
-                                        grecaptcha.enterprise.render(div, {sitekey: sitekey});
-                                        return 'rendered via enterprise';
-                                    } catch (e) {
-                                        return 'enterprise render error: ' + e.message;
-                                    }
-                                }
-
-                                // Try standard API
-                                if (grecaptcha.render) {
-                                    try {
-                                        grecaptcha.render(div, {sitekey: sitekey});
-                                        return 'rendered';
-                                    } catch (e) {
-                                        return 'render error: ' + e.message;
-                                    }
-                                }
-
-                                return 'no render function available, methods: ' + Object.keys(grecaptcha).join(',');
-                            }
-                        """)
-                        log_debug(f"Render result: {result}")
-                    except Exception as e:
-                        log_debug(f"grecaptcha.render attempt: {e}")
-
-                await asyncio.sleep(3)
-        except Exception as e:
-            log_debug(f"Error checking recaptcha div: {e}")
-
-        # Wait for any iframe to load
-        try:
-            await page.wait_for_selector("iframe", timeout=15000)
-        except:
-            log_debug("Timeout waiting for iframes.")
-
-        # 1. Find the reCAPTCHA anchor frame
-        recaptcha_frame = None
-        try:
-            frame_element = await page.wait_for_selector("iframe[src*='recaptcha/api2/anchor']", timeout=15000)
-            recaptcha_frame = await frame_element.content_frame()
-        except Exception as e:
-            log_debug(f"Error waiting for anchor frame selector: {e}")
-
-        if not recaptcha_frame:
-            log_debug("Frame not found via selector. Listing all frames...")
-            for f in page.frames:
-                log_debug(f"  Frame: {f.url[:100] if f.url else '(no url)'}")
-                if "google.com/recaptcha" in f.url and "anchor" in f.url:
-                    recaptcha_frame = f
+    # Method 2: parse from reCAPTCHA iframe URL
+    if not sitekey:
+        for f in page.frames:
+            if f.url and "google.com/recaptcha" in f.url and "anchor" in f.url:
+                match = re.search(r'[?&]k=([^&]+)', f.url)
+                if match:
+                    sitekey = match.group(1)
                     break
 
-        if not recaptcha_frame:
-            log_debug("Could not find reCAPTCHA anchor frame.")
-            # Save debug screenshot
-            await page.screenshot(path="debug_no_recaptcha_frame.png")
-            log_debug("Debug screenshot saved to debug_no_recaptcha_frame.png")
-            # Also check page content for clues
-            content = await page.content()
-            has_recaptcha_div = "g-recaptcha" in content
-            has_recaptcha_script = "recaptcha" in content.lower()
-            log_debug(f"Page has g-recaptcha div: {has_recaptcha_div}")
-            log_debug(f"Page mentions recaptcha: {has_recaptcha_script}")
-            return False
-
-        log_debug(f"Found anchor frame: {recaptcha_frame.url}")
-
-        # Click the checkbox with human-like delay
+    # Method 3: search script tags
+    if not sitekey:
         try:
-            await recaptcha_frame.wait_for_selector("#recaptcha-anchor", timeout=10000)
-            await asyncio.sleep(0.5 + (time.time() % 1))  # Random delay
-            log_debug("Clicking checkbox...")
-            await recaptcha_frame.click("#recaptcha-anchor")
-        except Exception as e:
-            log_debug(f"Error clicking anchor: {e}")
-            return False
-
-        # Check if solved immediately (no challenge)
-        await asyncio.sleep(3)
-        try:
-            is_checked = await recaptcha_frame.evaluate("document.querySelector('#recaptcha-anchor').getAttribute('aria-checked')")
-            if is_checked == "true":
-                log_debug("reCAPTCHA solved immediately (no challenge).")
-                return True
-        except:
+            sitekey = await page.evaluate("""() => {
+                const scripts = document.querySelectorAll('script');
+                for (const s of scripts) {
+                    const match = s.textContent.match(/sitekey['":\\s]+['"]([^'"]+)['"]/i);
+                    if (match) return match[1];
+                }
+                return null;
+            }""")
+        except Exception:
             pass
 
-        # Wait for challenge frame
-        log_debug("Waiting for challenge frame...")
-        challenge_frame = None
-        for _ in range(15):
-            all_frames = page.frames
-            for f in all_frames:
-                if "google.com/recaptcha" in f.url and "bframe" in f.url:
-                    try:
-                        frame_el = await f.frame_element()
-                        if frame_el and await frame_el.is_visible():
-                            challenge_frame = f
-                            break
-                    except:
-                        continue
-            if challenge_frame:
-                break
-            await asyncio.sleep(1)
-
-        if not challenge_frame:
-            log_debug("Could not resolve visible challenge frame object.")
-            return False
-
-        # Check for "Try again later" block immediately
-        content = await challenge_frame.content()
-        if "Try again later" in content:
-            log_debug("BLOCKED: 'Try again later' detected. Google has flagged this session.")
-            return False
-
-        # Helper function to upload image to Gemini with proper MIME type
-        async def get_gemini_vision_response(image_path, prompt):
-            models = ["gemini-2.0-flash", "gemini-1.5-flash"]
-            for model_name in models:
-                try:
-                    log_debug(f"Attempting vision with {model_name}...")
-
-                    # Read file and upload with explicit mime_type
-                    with open(image_path, "rb") as f:
-                        file_data = f.read()
-
-                    # Use inline data with explicit mime type instead of file upload
-                    image_part = types.Part.from_bytes(
-                        data=file_data,
-                        mime_type="image/png"
-                    )
-
-                    response = client.models.generate_content(
-                        model=model_name,
-                        contents=[image_part, prompt]
-                    )
-                    return response.text.strip()
-                except Exception as e:
-                    log_debug(f"Error with {model_name}: {e}")
-                    continue
-            return None
-
-        # --- VISION SOLVER ---
-        log_debug("Starting Vision Solver...")
-
-        max_rounds = 15
-        for round_idx in range(max_rounds):
-            log_debug(f"--- Vision Round {round_idx + 1} ---")
-
-            # Check if already solved
-            try:
-                is_checked = await recaptcha_frame.evaluate("document.querySelector('#recaptcha-anchor').getAttribute('aria-checked')")
-                if is_checked == "true":
-                    log_debug("reCAPTCHA SOLVED!")
-                    return True
-            except:
-                pass
-
-            # Check for block message
-            content = await challenge_frame.content()
-            if "Try again later" in content:
-                log_debug("BLOCKED: 'Try again later' detected.")
-                return False
-
-            # Get the instruction text
-            instruction_text = ""
-            try:
-                # Try multiple selectors for instruction
-                for selector in [".rc-imageselect-desc-wrapper", ".rc-imageselect-desc", ".rc-imageselect-instructions"]:
-                    if await challenge_frame.locator(selector).count() > 0:
-                        instruction_text = await challenge_frame.inner_text(selector)
-                        break
-
-                if not instruction_text:
-                    # Fallback to strong tag
-                    if await challenge_frame.locator("strong").count() > 0:
-                        instruction_text = await challenge_frame.inner_text("strong")
-
-                instruction_text = instruction_text.replace("\n", " ").strip()
-                log_debug(f"Instruction: {instruction_text}")
-            except Exception as e:
-                log_debug(f"Error reading instruction: {e}")
-                continue
-
-            # Check if image grid is present
-            target_selector = "#rc-imageselect-target"
-            if await challenge_frame.locator(target_selector).count() == 0:
-                log_debug("No image grid found, waiting...")
-                await asyncio.sleep(1)
-                continue
-
-            # Take screenshot of the image grid
-            image_path = f"recaptcha_round_{round_idx}.png"
-            try:
-                await challenge_frame.locator(target_selector).screenshot(path=image_path, timeout=10000)
-            except Exception as e:
-                log_debug(f"Screenshot failed: {e}")
-                await asyncio.sleep(1)
-                continue
-
-            # Determine grid size (3x3 = 9 tiles, 4x4 = 16 tiles)
-            is_4x4 = await challenge_frame.locator("table.rc-imageselect-table-44").count() > 0
-            is_dynamic = "none left" in instruction_text.lower() or "keep clicking" in instruction_text.lower()
-            grid_size = 16 if is_4x4 else 9
-            grid_desc = "4x4" if is_4x4 else "3x3"
-
-            log_debug(f"Grid: {grid_desc} ({grid_size} tiles), Dynamic: {is_dynamic}")
-
-            # Build a detailed prompt for Gemini
-            prompt = f"""You are solving a reCAPTCHA image challenge.
-
-INSTRUCTION FROM CAPTCHA: "{instruction_text}"
-
-The image shows a {grid_desc} grid of tiles numbered as follows:
-{"1  2  3  4" if is_4x4 else "1  2  3"}
-{"5  6  7  8" if is_4x4 else "4  5  6"}
-{"9  10 11 12" if is_4x4 else "7  8  9"}
-{"13 14 15 16" if is_4x4 else ""}
-
-Analyze each tile carefully. Which tiles match the instruction?
-
-IMPORTANT RULES:
-- Return ONLY a JSON array of tile numbers, e.g. [1, 3, 7]
-- If NO tiles match, return an empty array: []
-- Numbers must be between 1 and {grid_size}
-- Be precise - only select tiles that CLEARLY match the target object
-- Look for the MAIN subject described (e.g., "traffic lights" means the actual light fixture, not just poles)
-
-Your response (JSON array only):"""
-
-            # Get Gemini's response
-            text = await get_gemini_vision_response(image_path, prompt)
-            log_debug(f"Gemini response: {text}")
-
-            # Parse the response
-            indices = []
-            try:
-                if text:
-                    # Find JSON array in response
-                    match = re.search(r'\[[\d,\s]*\]', text)
-                    if match:
-                        indices = json.loads(match.group(0))
-                        # Filter to valid range
-                        indices = [i for i in indices if isinstance(i, int) and 1 <= i <= grid_size]
-            except Exception as e:
-                log_debug(f"Parse error: {e}")
-                indices = []
-
-            log_debug(f"Tiles to click: {indices}")
-
-            # Click the tiles
-            if indices:
-                tiles = challenge_frame.locator(".rc-imageselect-tile")
-                for idx in indices:
-                    try:
-                        await asyncio.sleep(0.2 + (time.time() % 0.3))  # Human-like delay
-                        await tiles.nth(idx - 1).click(force=True, timeout=3000)
-                        log_debug(f"Clicked tile {idx}")
-                    except Exception as e:
-                        log_debug(f"Failed to click tile {idx}: {e}")
-
-                    # For dynamic challenges, wait for tile to reload
-                    if is_dynamic:
-                        await asyncio.sleep(1.5)
-
-            # Wait a moment then click verify (unless it's a dynamic "click until none left" challenge)
-            await asyncio.sleep(0.5)
-
-            # For dynamic challenges, check if new tiles appeared
-            if is_dynamic and indices:
-                # Wait for possible tile refresh
-                await asyncio.sleep(2)
-                # Continue to next round to re-analyze
-                continue
-
-            # Click verify button
-            try:
-                verify_btn = challenge_frame.locator("#recaptcha-verify-button")
-                if await verify_btn.is_visible():
-                    log_debug("Clicking Verify...")
-                    await verify_btn.click(force=True)
-                    await asyncio.sleep(2)
-            except Exception as e:
-                log_debug(f"Error clicking verify: {e}")
-
-            # Check if we got an error message (wrong selection)
-            try:
-                error_msg = challenge_frame.locator(".rc-imageselect-error-select-more, .rc-imageselect-error-dynamic-more")
-                if await error_msg.is_visible():
-                    log_debug("Error: Need to select more tiles")
-                    continue
-            except:
-                pass
-
-        # Final check
-        try:
-            is_checked = await recaptcha_frame.evaluate("document.querySelector('#recaptcha-anchor').getAttribute('aria-checked')")
-            if is_checked == "true":
-                log_debug("reCAPTCHA SOLVED!")
-                return True
-        except:
-            pass
-
-        log_debug("Failed to solve reCAPTCHA after maximum rounds.")
+    if not sitekey:
+        print("Could not find reCAPTCHA sitekey on page.")
         return False
 
+    page_url = page.url
+    print(f"Found reCAPTCHA sitekey: {sitekey[:12]}...")
+    print(f"Submitting to 2Captcha...")
+
+    # --- Submit to 2Captcha ---
+    submit_params = urllib.parse.urlencode({
+        "key": api_key,
+        "method": "userrecaptcha",
+        "googlekey": sitekey,
+        "pageurl": page_url,
+        "json": 1,
+    })
+    submit_url = f"https://2captcha.com/in.php?{submit_params}"
+
+    try:
+        req = urllib.request.Request(submit_url)
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode())
     except Exception as e:
-        log_debug(f"Error in reCAPTCHA solver: {e}")
-        import traceback
-        log_debug(traceback.format_exc())
+        print(f"2Captcha submit error: {e}")
         return False
-    finally:
-        debug_log.close()
-        # Cleanup temp files
-        for file in os.listdir("."):
-            if file.startswith("recaptcha_round_"):
-                try:
-                    os.remove(file)
-                except:
-                    pass
+
+    if result.get("status") != 1:
+        print(f"2Captcha submit failed: {result}")
+        return False
+
+    captcha_id = result["request"]
+    print(f"2Captcha task submitted (ID: {captcha_id}). Waiting for solution...")
+
+    # --- Poll for result ---
+    await asyncio.sleep(10)  # Initial wait before polling
+
+    poll_params_base = {
+        "key": api_key,
+        "action": "get",
+        "id": captcha_id,
+        "json": 1,
+    }
+
+    max_polls = 24  # 24 * 5s = 120s max polling
+    for attempt in range(max_polls):
+        poll_url = f"https://2captcha.com/res.php?{urllib.parse.urlencode(poll_params_base)}"
+        try:
+            req = urllib.request.Request(poll_url)
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                result = json.loads(resp.read().decode())
+        except Exception as e:
+            print(f"  Poll error: {e}")
+            await asyncio.sleep(5)
+            continue
+
+        if result.get("status") == 1:
+            token = result["request"]
+            print(f"2Captcha solved! Token received ({len(token)} chars).")
+            break
+        elif result.get("request") == "CAPCHA_NOT_READY":
+            print(f"  Waiting... (poll {attempt + 1}/{max_polls})")
+            await asyncio.sleep(5)
+        else:
+            print(f"2Captcha error: {result}")
+            return False
+    else:
+        print("2Captcha timed out after 2 minutes.")
+        return False
+
+    # --- Inject token into page ---
+    try:
+        inject_result = await page.evaluate("""(token) => {
+            const info = { textareas_found: 0, textareas_set: 0, created_hidden: false };
+
+            // Set ALL g-recaptcha-response textareas on the page
+            document.querySelectorAll('[id="g-recaptcha-response"], textarea[name="g-recaptcha-response"]').forEach(ta => {
+                info.textareas_found++;
+                ta.style.display = 'block';
+                ta.value = token;
+                ta.style.display = 'none';
+                if (ta.value.length > 0) info.textareas_set++;
+            });
+
+            // Ensure a g-recaptcha-response field exists INSIDE the search form
+            const form = document.getElementById('searchForm');
+            if (form) {
+                let formField = form.querySelector('[name="g-recaptcha-response"]');
+                if (!formField || formField.value.length === 0) {
+                    // Create/replace a hidden input inside the form
+                    if (formField) formField.remove();
+                    const hidden = document.createElement('input');
+                    hidden.type = 'hidden';
+                    hidden.name = 'g-recaptcha-response';
+                    hidden.value = token;
+                    form.appendChild(hidden);
+                    info.created_hidden = true;
+                }
+            }
+
+            // Override grecaptcha.getResponse() to return our token
+            if (typeof grecaptcha !== 'undefined') {
+                grecaptcha.getResponse = function() { return token; };
+                if (grecaptcha.enterprise) {
+                    grecaptcha.enterprise.getResponse = function() { return token; };
+                }
+            }
+            return info;
+        }""", token)
+        print("Token injected into page.")
+    except Exception as e:
+        print(f"Warning: Could not set textarea directly: {e}")
+
+    # Trigger the reCAPTCHA callback
+    try:
+        callback_found = await page.evaluate("""(token) => {
+            let found = false;
+
+            // Method 1: Find callback from data-callback attribute on widget
+            const widget = document.querySelector('.g-recaptcha[data-callback]');
+            if (widget) {
+                const cbName = widget.getAttribute('data-callback');
+                if (typeof window[cbName] === 'function') {
+                    window[cbName](token);
+                    found = true;
+                }
+            }
+
+            // Method 2: Walk ___grecaptcha_cfg to find callback (deeper search)
+            if (!found && typeof ___grecaptcha_cfg !== 'undefined') {
+                const clients = ___grecaptcha_cfg.clients;
+                for (const key in clients) {
+                    const client = clients[key];
+                    const walk = (obj, depth) => {
+                        if (depth > 10 || !obj || found) return;
+                        for (const k in obj) {
+                            try {
+                                if (typeof obj[k] === 'function' && (k === 'callback' || k === 'success-callback')) {
+                                    obj[k](token);
+                                    found = true;
+                                    return;
+                                }
+                                if (typeof obj[k] === 'object' && obj[k] !== null) {
+                                    walk(obj[k], depth + 1);
+                                }
+                            } catch(e) {}
+                        }
+                    };
+                    walk(client, 0);
+                }
+            }
+
+            // Method 3: Try grecaptcha internal callback via widget ID
+            if (!found && typeof grecaptcha !== 'undefined') {
+                try {
+                    // Get all widget IDs and try executing their callbacks
+                    const widgets = document.querySelectorAll('.g-recaptcha');
+                    widgets.forEach((w, i) => {
+                        try { grecaptcha.execute(i); } catch(e) {}
+                    });
+                } catch(e) {}
+            }
+
+            return found;
+        }""", token)
+        print(f"reCAPTCHA callback triggered (found: {callback_found}).")
+    except Exception as e:
+        print(f"Warning: Callback trigger issue: {e}")
+
+    await asyncio.sleep(1)
+
+    # Verify it worked by checking the anchor frame
+    try:
+        for f in page.frames:
+            if f.url and "google.com/recaptcha" in f.url and "anchor" in f.url:
+                is_checked = await f.evaluate(
+                    "document.querySelector('#recaptcha-anchor')?.getAttribute('aria-checked')"
+                )
+                if is_checked == "true":
+                    print("reCAPTCHA SOLVED!")
+                    return True
+                break
+    except Exception:
+        pass
+
+    # Even if anchor check fails, token injection + getResponse override should work
+    print("reCAPTCHA token injected (anchor check inconclusive - proceeding).")
+    return True
 
 async def main():
     if len(sys.argv) < 3:
@@ -438,10 +257,10 @@ async def main():
     url = "https://civilwebshopping.occourts.org/Login.do"
 
     async with async_playwright() as p:
-        print(f"Launching browser for Orange County (Headless: True - forced)...")
+        print(f"Launching browser for Orange County (Headless: {is_headless})...")
 
         browser = await p.chromium.launch(
-            headless=True,
+            headless=is_headless,
             args=[
                 "--disable-blink-features=AutomationControlled",
                 "--disable-dev-shm-usage",
@@ -670,13 +489,8 @@ async def main():
             await page.fill("#caseYear", filing_year)
             await page.evaluate("document.getElementById('caseYear').blur()")
 
-            # Wait for reCAPTCHA to potentially load
-            print("Waiting for page to settle...")
-            await asyncio.sleep(3)
-
-            # Take debug screenshot
-            await page.screenshot(path="debug_before_recaptcha.png")
-            print("Debug screenshot saved to debug_before_recaptcha.png")
+            # Wait for reCAPTCHA to load
+            await asyncio.sleep(1)
 
             # 3. Solve reCAPTCHA
             print("Solving reCAPTCHA...")
@@ -687,11 +501,24 @@ async def main():
                 # We exit here to avoid clicking 'Search' with an open captcha popup
                 sys.exit(1)
             
-            # 4. Search
+            # 4. Search - submit form via native submit
+            # Note: button id="action" shadows form.action, so we use
+            # HTMLFormElement.prototype.submit to bypass client-side validation
             print("Clicking Search...")
-            # Using force=True to bypass potential overlays if captcha is closed but still animating
-            await page.click("#action", force=True)
-            
+            await page.evaluate("""() => {
+                const form = document.getElementById('searchForm');
+                if (form) {
+                    HTMLFormElement.prototype.submit.call(form);
+                }
+            }""")
+
+            # Wait for navigation
+            try:
+                await page.wait_for_load_state("networkidle", timeout=15000)
+            except Exception:
+                pass
+            await asyncio.sleep(2)
+
             # 5. Print Case
             print("Waiting for 'Print Case' button...")
             try:

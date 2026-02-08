@@ -921,8 +921,8 @@ class MasterCaseTab(QWidget):
                     return v["value"]
                 return v or ""
 
-            # --- Auto-Populate Logic ---
-            # If dates are missing in DB, try to load from case variables JSON
+            # --- Auto-Populate / Sync Logic ---
+            # Sync dates from JSON variable files to DB, overwriting stale values
             hearing_date = case['next_hearing_date']
             trial_date = case['trial_date']
 
@@ -934,18 +934,31 @@ class MasterCaseTab(QWidget):
 
             updated = False
 
-            if vars_data and (not hearing_date or not trial_date):
-                if not hearing_date:
-                    found_hearing = get_val("next_hearing_date") or get_val("next_hearing")
-                    if found_hearing and found_hearing.lower() != "none":
-                        hearing_date = found_hearing
-                        updated = True
+            if vars_data:
+                # Only populate from JSON if the DB field is empty.
+                # docket.py already writes to both JSON and DB simultaneously,
+                # so JSON->DB sync is only needed for initial population.
+                # Never let stale JSON overwrite a DB value that may have been
+                # manually corrected or updated by a newer docket run.
+                found_hearing = get_val("next_hearing_date") or get_val("next_hearing")
+                if found_hearing and found_hearing.lower() != "none" and not hearing_date:
+                    try:
+                        h_date = QDate.fromString(found_hearing, "yyyy-MM-dd")
+                        if h_date.isValid() and h_date >= today:
+                            hearing_date = found_hearing
+                            updated = True
+                    except Exception:
+                        pass
 
-                if not trial_date:
-                    found_trial = get_val("trial_date")
-                    if found_trial and found_trial.lower() != "none":
-                        trial_date = found_trial
-                        updated = True
+                found_trial = get_val("trial_date")
+                if found_trial and found_trial.lower() != "none" and not trial_date:
+                    try:
+                        t_date = QDate.fromString(found_trial, "yyyy-MM-dd")
+                        if t_date.isValid() and t_date >= today:
+                            trial_date = found_trial
+                            updated = True
+                    except Exception:
+                        pass
 
                 if updated:
                     self.db.upsert_case(

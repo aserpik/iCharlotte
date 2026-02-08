@@ -562,8 +562,7 @@ class WordLLMPopup(QDialog):
         self.setWindowTitle("AI Assistant")
         self.setWindowFlags(
             Qt.WindowType.Dialog |
-            Qt.WindowType.FramelessWindowHint |
-            Qt.WindowType.WindowStaysOnTopHint
+            Qt.WindowType.FramelessWindowHint
         )
         self.setMinimumWidth(450)
         self.setStyleSheet("""

@@ -11,6 +11,9 @@ import time
 import gc
 from typing import Optional, Dict, Any
 
+from dotenv import load_dotenv
+load_dotenv()
+
 try:
     from google import genai
     from docx import Document
@@ -48,6 +51,7 @@ SACRAMENTO_SCRAPER_SCRIPT = os.path.join(SCRIPTS_DIR, "sacramento_docket_scraper
 SC_SCRAPER_SCRIPT = os.path.join(SCRIPTS_DIR, "santa_clara_docket_scraper.py")
 ALAMEDA_SCRAPER_SCRIPT = os.path.join(SCRIPTS_DIR, "alameda_docket_scraper.py")
 MARIPOSA_SCRAPER_SCRIPT = os.path.join(SCRIPTS_DIR, "mariposa_docket_scraper.py")
+YOLO_SCRAPER_SCRIPT = os.path.join(SCRIPTS_DIR, "yolo_docket_scraper.py")
 COMPLAINT_SCRIPT = os.path.join(SCRIPTS_DIR, "complaint.py")
 PROCEDURAL_HIST_PROMPT_FILE = os.path.join(SCRIPTS_DIR, "Procedural_History.txt")
 MASTER_STATUS_PATH = r"C:\Users\ASerpik.DESKTOP-MRIMK0D\OneDrive - Bordin Semmer LLP\Desktop\MASTER_CASE_STATUS.docx"
@@ -366,7 +370,7 @@ def update_variables_docx(case_dir: str, data: Dict):
     doc.save(docx_path)
     log_event(f"Saved variables to {docx_path}")
 
-def call_gemini_api(prompt: str, context_text: str, models: list = ["gemini-2.0-flash", "gemini-1.5-flash"]) -> Optional[str]:
+def call_gemini_api(prompt: str, context_text: str, models: list = ["gemini-3-flash-preview", "gemini-2.5-flash"]) -> Optional[str]:
     """Calls Gemini with fallback models."""
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
@@ -873,10 +877,13 @@ def main():
     elif venue_county == "mariposa":
         log_event("Venue is Mariposa. Using Mariposa Scraper.")
         selected_scraper = MARIPOSA_SCRAPER_SCRIPT
+    elif venue_county == "yolo":
+        log_event("Venue is Yolo. Using Yolo Scraper.")
+        selected_scraper = YOLO_SCRAPER_SCRIPT
     else:
         # Prompt: "I want the agent to do this only if the venue_county variable is Los Angeles. 
         # However, if the venue_county variable is riverside..."
-        log_event(f"Venue '{venue_county}' is not supported (LA, SB, Riverside, SD, OC, Sacramento, Santa Clara, Alameda, or Mariposa only). Skipping download.", level="warning")
+        log_event(f"Venue '{venue_county}' is not supported (LA, SB, Riverside, SD, OC, Sacramento, Santa Clara, Alameda, Mariposa, or Yolo only). Skipping download.", level="warning")
         # Do not exit; proceed to Phase 4
         selected_scraper = None
 
@@ -895,15 +902,11 @@ def main():
                     # Prepare scraper arguments
                     scraper_args = [sys.executable, selected_scraper, case_number] + extra_args
                     
-                    # Logic: Orange County always headful. 
-                    # Others: Headless by default unless --headful is passed to docket.py
-                    if venue_county == "orange":
+                    # Headless by default unless --headful is passed to docket.py
+                    if is_headful:
                         scraper_args.append("--headful")
                     else:
-                        if is_headful:
-                            scraper_args.append("--headful")
-                        else:
-                            scraper_args.append("--headless")
+                        scraper_args.append("--headless")
 
                     # Run Scraper
                     if use_interactive_mode:
@@ -937,9 +940,7 @@ def main():
                 # Find the candidate file locally before moving it
                 file_pattern = f"docket_{case_number}_*.pdf"
                 candidates = glob.glob(file_pattern)
-                if not candidates:
-                    candidates = glob.glob("docket_*.pdf")
-                
+
                 if candidates:
                     candidates.sort(key=os.path.getmtime, reverse=True)
                     check_file = candidates[0]
@@ -991,10 +992,7 @@ def main():
         date_str = datetime.datetime.now().strftime("%Y.%m.%d")
         file_pattern = f"docket_{case_number}_*.pdf"
         candidates = glob.glob(file_pattern)
-        
-        if not candidates:
-            candidates = glob.glob("docket_*.pdf")
-            
+
         if candidates:
             candidates.sort(key=os.path.getmtime, reverse=True)
             source_file = candidates[0]
@@ -1054,12 +1052,48 @@ Return ONLY valid JSON (no markdown):
                                 if other_hearings.lower() == "none":
                                     other_hearings = ""
                                 
+                                # Validate: reject trial dates in the past
+                                if trial_date:
+                                    try:
+                                        from datetime import datetime as _dt
+                                        trial_dt = _dt.strptime(trial_date, "%Y-%m-%d").date()
+                                        if trial_dt < date.today():
+                                            log_event(f"Rejected past trial date: {trial_date} (today is {today_str})")
+                                            trial_date = ""
+                                    except ValueError:
+                                        log_event(f"Invalid trial date format: {trial_date}, clearing")
+                                        trial_date = ""
+
+                                # Filter out past dates from other_hearings
+                                if other_hearings:
+                                    import re as _re
+                                    date_pattern = _re.compile(r'\d{4}-\d{2}-\d{2}')
+                                    parts = [p.strip() for p in other_hearings.split(',')]
+                                    future_parts = []
+                                    for part in parts:
+                                        dates_found = date_pattern.findall(part)
+                                        if dates_found:
+                                            latest = max(dates_found)
+                                            if latest >= today_str:
+                                                future_parts.append(part)
+                                        else:
+                                            future_parts.append(part)
+                                    other_hearings = ', '.join(future_parts) if future_parts else ""
+
                                 log_event(f"Extracted Trial Date: {trial_date}")
                                 log_event(f"Extracted Other Hearings: {other_hearings}")
-                                
+
                                 data_manager.save_variable(file_num, "trial_date", trial_date)
                                 data_manager.save_variable(file_num, "other_hearings", other_hearings)
-                                
+
+                                # Persist trial_date to Master Database
+                                try:
+                                    db = MasterCaseDatabase()
+                                    db.update_trial_date(file_num, trial_date)
+                                    log_event(f"Updated trial_date in Master Database: {trial_date}")
+                                except Exception as db_e:
+                                    log_event(f"Failed to update trial_date in Master Database: {db_e}", level="warning")
+
                                 # Prepare data for Master Status
                                 master_data = {
                                     "file_number": file_num,
