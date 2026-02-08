@@ -1949,21 +1949,37 @@ class WordLLMPopup(QDialog):
                 diffs = dmp.diff_main(original_text, revised_text)
                 dmp.diff_cleanupSemantic(diffs)  # Optimize for human readability
 
-                # Apply diffs to Word range using Track Changes
-                current_pos = range_obj.Start
+                # Build position map for each diff operation
+                operations = []
+                current_pos = 0
 
                 for op, text in diffs:
-                    if op == 0:  # Equal - no change, just advance position
+                    if op == 0:  # Equal - no change
                         current_pos += len(text)
-                    elif op == -1:  # Delete - mark as deleted with Track Changes
-                        delete_range = doc.Range(current_pos, current_pos + len(text))
-                        delete_range.Delete()  # This creates tracked deletion
-                    elif op == 1:  # Insert - insert as tracked insertion
-                        insert_range = doc.Range(current_pos, current_pos)
-                        insert_range.InsertAfter(text)  # This creates tracked insertion
+                    elif op == -1:  # Delete
+                        operations.append(('delete', current_pos, current_pos + len(text)))
                         current_pos += len(text)
+                    elif op == 1:  # Insert
+                        operations.append(('insert', current_pos, text))
 
-                print(f"Successfully applied redlines: {len(diffs)} changes")
+                # Apply operations in REVERSE order to avoid position drift
+                for operation in reversed(operations):
+                    if operation[0] == 'delete':
+                        _, start_offset, end_offset = operation
+                        delete_range = doc.Range(
+                            range_obj.Start + start_offset,
+                            range_obj.Start + end_offset
+                        )
+                        delete_range.Delete()  # Creates tracked deletion
+                    elif operation[0] == 'insert':
+                        _, offset, text = operation
+                        insert_range = doc.Range(
+                            range_obj.Start + offset,
+                            range_obj.Start + offset
+                        )
+                        insert_range.InsertAfter(text)  # Creates tracked insertion
+
+                print(f"Successfully applied {len(operations)} redline changes")
                 return True
 
             except Exception as e:
