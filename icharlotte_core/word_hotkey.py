@@ -857,6 +857,7 @@ class WordLLMPopup(QDialog):
             "that you can accept/reject in Word"
         )
         self.redline_checkbox.setChecked(self.redline_settings.get("redline_mode_default", False))
+        self.redline_checkbox.stateChanged.connect(self._save_redline_preference)
         ai_layout.addWidget(self.redline_checkbox)
 
         ai_layout.addStretch()
@@ -1203,6 +1204,11 @@ class WordLLMPopup(QDialog):
         """Show/hide redline checkbox based on app context."""
         is_word = self.app_context == APP_CONTEXT_WORD
         self.redline_checkbox.setVisible(is_word)
+
+    def _save_redline_preference(self):
+        """Save the current redline checkbox state to settings."""
+        self.redline_settings["redline_mode_default"] = self.redline_checkbox.isChecked()
+        save_redline_settings(GEMINI_DATA_DIR, self.redline_settings)
 
     def set_app_context(self, context: str, inspector=None):
         """Set the application context and update UI accordingly."""
