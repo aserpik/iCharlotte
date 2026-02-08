@@ -1655,7 +1655,46 @@ class WordLLMPopup(QDialog):
             if self._is_outlook_task:
                 self._set_outlook_text(result, self._pending_format_type)
             else:
-                self._set_word_text_internal(result, self._pending_format_type)
+                # Check if redline mode is active
+                if self._redline_mode_active:
+                    # Redline mode - use adeu to apply changes as Track Changes
+                    try:
+                        word = self._get_word_app()
+                        if not word:
+                            raise Exception("Could not connect to Word")
+
+                        selection = word.Selection
+                        if not selection:
+                            raise Exception("Could not access Word selection")
+
+                        # Apply redlines using adeu
+                        success = self._apply_redlines(
+                            word,
+                            selection,
+                            self._original_text,
+                            result
+                        )
+
+                        if success:
+                            self.status_label.setText("✓ Redlines applied!")
+                            self.status_label.setStyleSheet("color: #a6e3a1; font-style: italic;")
+                        else:
+                            # Fallback to replace mode
+                            if self.redline_settings.get("redline_fallback_notify", True):
+                                self.status_label.setText("⚠ Applied as replacement (redline unavailable)")
+                                self.status_label.setStyleSheet("color: #f9e2af; font-style: italic;")
+                            self._set_word_text_internal(result, self._pending_format_type)
+
+                    except Exception as redline_error:
+                        print(f"Redline application failed: {redline_error}")
+                        # Fallback to replace mode on error
+                        if self.redline_settings.get("redline_fallback_notify", True):
+                            self.status_label.setText("⚠ Applied as replacement (redline error)")
+                            self.status_label.setStyleSheet("color: #f9e2af; font-style: italic;")
+                        self._set_word_text_internal(result, self._pending_format_type)
+                else:
+                    # Replace mode (existing behavior)
+                    self._set_word_text_internal(result, self._pending_format_type)
 
             self.status_label.setText("Done!")
             QTimer.singleShot(500, self.close)
