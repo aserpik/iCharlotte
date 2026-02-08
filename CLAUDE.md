@@ -210,4 +210,10 @@ powershell -ExecutionPolicy Bypass -File "C:\geminiterminal2\screenshot_util.ps1
 
 ## Recent Features
 
+### Word Redline Mode (2026-02-07)
+- AI Assistant now supports Track Changes mode for surgical editing
+- Uses adeu RedlineEngine for native Word redlining
+- Configuration in `icharlotte_core/redline_config.py`
+- Checkbox state persists across sessions
+
 See `DEVELOPMENT_LOG.md` for detailed changelog of features added during development.

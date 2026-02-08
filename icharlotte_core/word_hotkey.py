@@ -271,6 +271,7 @@ def kill_zombie_word_processes():
         print(f"Error killing zombie processes: {e}")
 
 from icharlotte_core.config import GEMINI_DATA_DIR
+from icharlotte_core.redline_config import load_redline_settings, save_redline_settings
 
 
 # Format options
@@ -530,6 +531,9 @@ class WordLLMPopup(QDialog):
         self._word_app = None  # Stored Word COM reference during execution
         self._captured_format = None  # Captured format from selection
 
+        # Load redline settings
+        self.redline_settings = load_redline_settings(GEMINI_DATA_DIR)
+
         # App context for Word vs Outlook
         self.app_context = APP_CONTEXT_WORD  # Default context
         self.active_inspector = None  # Outlook Inspector reference when in email mode
@@ -547,6 +551,12 @@ class WordLLMPopup(QDialog):
         # Drag/move support for independent positioning
         self._drag_pos = None  # Starting position for drag
         self._is_dragging = False
+
+        # Redline state
+        self._original_text = None  # Original text before LLM processing
+        self._original_range_start = None  # Range start position
+        self._original_range_end = None  # Range end position
+        self._redline_mode_active = False  # Whether current operation uses redline
 
         self.setWindowTitle("AI Assistant")
         self.setWindowFlags(
@@ -630,6 +640,7 @@ class WordLLMPopup(QDialog):
         self._load_format_settings()
         self._load_model_settings()
         self._update_format_preview()
+        self._update_redline_checkbox_visibility()  # Set initial visibility based on context
 
         # Close on Escape
         self.shortcut_escape = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
@@ -843,6 +854,17 @@ class WordLLMPopup(QDialog):
             "but only replaces the selected text with the output."
         )
         ai_layout.addWidget(self.use_all_text_check)
+
+        # Redline mode checkbox (only visible for Word context)
+        self.redline_checkbox = QCheckBox("✏️ Use Redline Mode (Track Changes)")
+        self.redline_checkbox.setStyleSheet("color: #cdd6f4; font-size: 11px;")
+        self.redline_checkbox.setToolTip(
+            "Instead of replacing text, insert AI suggestions as Track Changes "
+            "that you can accept/reject in Word"
+        )
+        self.redline_checkbox.setChecked(self.redline_settings.get("redline_mode_default", False))
+        self.redline_checkbox.stateChanged.connect(self._save_redline_preference)
+        ai_layout.addWidget(self.redline_checkbox)
 
         ai_layout.addStretch()
         self.tab_widget.addTab(ai_tab, "AI Prompt")
@@ -1184,6 +1206,16 @@ class WordLLMPopup(QDialog):
             self.custom_input.clear()
             self.status_label.setText(f"Deleted '{name}'")
 
+    def _update_redline_checkbox_visibility(self):
+        """Show/hide redline checkbox based on app context."""
+        is_word = self.app_context == APP_CONTEXT_WORD
+        self.redline_checkbox.setVisible(is_word)
+
+    def _save_redline_preference(self):
+        """Save the current redline checkbox state to settings."""
+        self.redline_settings["redline_mode_default"] = self.redline_checkbox.isChecked()
+        save_redline_settings(GEMINI_DATA_DIR, self.redline_settings)
+
     def set_app_context(self, context: str, inspector=None):
         """Set the application context and update UI accordingly."""
         self.app_context = context
@@ -1201,6 +1233,9 @@ class WordLLMPopup(QDialog):
             self.tab_widget.setTabVisible(1, True)
             # Detect case from document path
             self._detect_and_update_case()
+
+        # Update redline checkbox visibility based on context
+        self._update_redline_checkbox_visibility()
 
         self.refresh_combo()  # Refresh prompts for context
 
@@ -1575,6 +1610,8 @@ class WordLLMPopup(QDialog):
             # Start worker thread for LLM call
             llm_func = self.llm_callback if self.llm_callback else self._default_llm_call
             self._worker_thread = LLMWorkerThread(llm_func, full_prompt, self)
+            # Store redline state on thread for result handler
+            self._worker_thread.redline_mode = self._redline_mode_active
             self._worker_thread.finished.connect(self._on_llm_result)
             self._worker_thread.start()
 
@@ -1618,7 +1655,46 @@ class WordLLMPopup(QDialog):
             if self._is_outlook_task:
                 self._set_outlook_text(result, self._pending_format_type)
             else:
-                self._set_word_text_internal(result, self._pending_format_type)
+                # Check if redline mode is active
+                if self._redline_mode_active:
+                    # Redline mode - use adeu to apply changes as Track Changes
+                    try:
+                        word = self._get_word_app()
+                        if not word:
+                            raise Exception("Could not connect to Word")
+
+                        selection = word.Selection
+                        if not selection:
+                            raise Exception("Could not access Word selection")
+
+                        # Apply redlines using adeu
+                        success = self._apply_redlines(
+                            word,
+                            selection,
+                            self._original_text,
+                            result
+                        )
+
+                        if success:
+                            self.status_label.setText("✓ Redlines applied!")
+                            self.status_label.setStyleSheet("color: #a6e3a1; font-style: italic;")
+                        else:
+                            # Fallback to replace mode
+                            if self.redline_settings.get("redline_fallback_notify", True):
+                                self.status_label.setText("⚠ Applied as replacement (redline unavailable)")
+                                self.status_label.setStyleSheet("color: #f9e2af; font-style: italic;")
+                            self._set_word_text_internal(result, self._pending_format_type)
+
+                    except Exception as redline_error:
+                        print(f"Redline application failed: {redline_error}")
+                        # Fallback to replace mode on error
+                        if self.redline_settings.get("redline_fallback_notify", True):
+                            self.status_label.setText("⚠ Applied as replacement (redline error)")
+                            self.status_label.setStyleSheet("color: #f9e2af; font-style: italic;")
+                        self._set_word_text_internal(result, self._pending_format_type)
+                else:
+                    # Replace mode (existing behavior)
+                    self._set_word_text_internal(result, self._pending_format_type)
 
             self.status_label.setText("Done!")
             QTimer.singleShot(500, self.close)
@@ -1735,6 +1811,36 @@ class WordLLMPopup(QDialog):
                 print(f"Error getting selection text: {e}")
                 return "", False
 
+            # Store original text and range for potential redlining
+            if self.redline_checkbox.isChecked():
+                # Validate redline prerequisites
+                is_valid, error_msg = self._validate_redline_prerequisites(text)
+                if not is_valid:
+                    # Disable checkbox and show error in tooltip
+                    self.redline_checkbox.setEnabled(False)
+                    self.redline_checkbox.setToolTip(error_msg)
+                    self._redline_mode_active = False
+                    print(f"Redline validation failed: {error_msg}")
+                else:
+                    # Validation passed - proceed with redline setup
+                    # Re-enable checkbox if it was disabled and restore tooltip
+                    self.redline_checkbox.setEnabled(True)
+                    self.redline_checkbox.setToolTip(
+                        "Instead of replacing text, insert AI suggestions as Track Changes "
+                        "that you can accept/reject in Word"
+                    )
+                    self._original_text = text
+                    try:
+                        self._original_range_start = selection.Range.Start
+                        self._original_range_end = selection.Range.End
+                        self._redline_mode_active = True
+                        print(f"Captured range for redlining: Start={self._original_range_start}, End={self._original_range_end}")
+                    except Exception as e:
+                        print(f"Could not capture range coordinates: {e}")
+                        self._redline_mode_active = False
+            else:
+                self._redline_mode_active = False
+
             # wdSelectionIP = 1 (insertion point, no selection)
             has_selection = False
             try:
@@ -1770,6 +1876,97 @@ class WordLLMPopup(QDialog):
         except Exception as e:
             print(f"Could not get all document text: {e}")
             return ""
+
+    def _validate_redline_prerequisites(self, selection_text: str) -> tuple[bool, str]:
+        """Check if redline mode can be used.
+
+        Args:
+            selection_text: Currently selected text
+
+        Returns:
+            (is_valid, error_message) tuple
+        """
+        # Check if text is selected
+        if not selection_text or len(selection_text.strip()) == 0:
+            return False, "Select text first to use redline mode"
+
+        # Check text length limit
+        max_length = self.redline_settings.get("max_redline_text_length", 50000)
+        if len(selection_text) > max_length:
+            return False, f"Selection too large for redline ({len(selection_text)} > {max_length} chars)"
+
+        return True, ""
+
+    def _apply_redlines(self, word_app, selection, original_text: str, revised_text: str) -> bool:
+        """Apply redlines using adeu RedlineEngine.
+
+        Args:
+            word_app: Word COM application object
+            selection: Word Selection object
+            original_text: Original text before LLM processing
+            revised_text: LLM-revised text
+
+        Returns:
+            True if redlines applied successfully, False if fallback needed
+        """
+        try:
+            from adeu import RedlineEngine
+
+            # Get document object
+            try:
+                doc = word_app.ActiveDocument
+            except Exception as e:
+                print(f"Could not access Word document: {e}")
+                return False
+
+            # Auto-enable Track Changes if needed
+            if self.redline_settings.get("auto_enable_track_changes", True):
+                try:
+                    if not doc.TrackRevisions:
+                        print("Auto-enabling Track Changes for redlining")
+                        doc.TrackRevisions = True
+                except Exception as e:
+                    print(f"Could not enable Track Changes: {e}")
+                    # Continue anyway - may still work
+
+            # Reconstruct range from stored coordinates
+            try:
+                range_obj = doc.Range(
+                    self._original_range_start,
+                    self._original_range_end
+                )
+            except Exception as e:
+                print(f"Could not reconstruct range: {e}, using current selection")
+                try:
+                    range_obj = selection.Range
+                except Exception as e2:
+                    print(f"Could not get selection range: {e2}")
+                    return False
+
+            # Apply redlines using adeu
+            try:
+                engine = RedlineEngine()
+                engine.apply_redlines(
+                    doc=doc,
+                    range_obj=range_obj,
+                    original=original_text,
+                    revised=revised_text
+                )
+            except Exception as e:
+                print(f"RedlineEngine.apply_redlines failed: {e}")
+                return False
+
+            print(f"Successfully applied redlines ({len(original_text)} -> {len(revised_text)} chars)")
+            return True
+
+        except ImportError as e:
+            print(f"adeu not available: {e}")
+            return False
+        except Exception as e:
+            print(f"Unexpected error in _apply_redlines: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
 
     def _set_word_text_internal(self, text: str, format_type: str = FORMAT_PLAIN):
         """Set text in Word with formatting - re-establish connection to ensure it's fresh.
@@ -2376,6 +2573,8 @@ class WordLLMPopup(QDialog):
 
             # Start worker thread for LLM call (using email-specific function)
             self._worker_thread = LLMWorkerThread(self._call_llm_for_email, full_prompt, self)
+            # Store redline state on thread for result handler (not used for Outlook)
+            self._worker_thread.redline_mode = False  # Redline not supported for Outlook
             self._worker_thread.finished.connect(self._on_llm_result)
             self._worker_thread.start()
 
