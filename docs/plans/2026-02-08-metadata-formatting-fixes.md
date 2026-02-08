@@ -4,6 +4,31 @@
 **File:** `Scripts/report_generator/assemble.py`
 **Objective:** Match Report Agent metadata section formatting exactly
 
+## Session Metrics
+
+- **Total iterations:** ~27-29 versions generated
+- **Total time:** ~3-4 hours
+- **Average iteration time:** 5-10 minutes per cycle
+- **Feedback loop:** Manual (user describes issue → I fix → regenerate → user checks)
+- **Root cause of slowness:** Debugging blind - no XML inspection tools
+
+### Why It Was So Difficult
+
+1. **No visual feedback** - I couldn't see the documents I was generating
+2. **No XML inspection** - Had to guess what the XML structure looked like
+3. **Fragile OXML manipulation** - Small mistakes broke everything
+4. **Fighting cleanup function** - `_clean_empty_paragraphs()` was removing my insertions
+5. **Multiple approaches tried:** Empty paragraphs (5+ attempts), spacing properties, different XML structures
+6. **Long feedback loop:** Each iteration required full report generation, user opening file, describing issues
+
+### Iteration Breakdown
+
+- **Iterations 1-10:** Table structure (2-column vs 1-column, width, indentation)
+- **Iterations 11-15:** "Re:" line formatting (leading spaces, alignment)
+- **Iterations 16-20:** Case conversion (all caps to proper case)
+- **Iterations 21-27:** Blank line insertion (empty paragraphs failing, tried 5+ approaches)
+- **Iteration 28-29:** Final solution with space_after properties
+
 ---
 
 ## Problems Encountered
@@ -189,6 +214,42 @@ But still couldn't inspect XML structure directly - this is why we're adding Off
    - Updated Discovery section instructions to exclude "Related Litigation Documents"
 
 ---
+
+## Expected Improvements with Office-Word-MCP-Server
+
+### Current State (Before MCP Tools)
+- **Iteration time:** 5-10 minutes per fix
+- **Debugging method:** User describes issue, I guess solution
+- **Verification:** Manual - user opens file and checks
+- **Iterations needed:** 5-10 tries per issue
+
+### Target State (With MCP Tools)
+- **Iteration time:** 30-60 seconds per fix
+- **Debugging method:** Direct XML inspection and comparison
+- **Verification:** Automated - programmatic structure checks
+- **Iterations needed:** 1-2 tries per issue (see problem immediately)
+
+### How MCP Tools Change the Workflow
+
+**Before:**
+1. Make code change (blind guess)
+2. Generate report (2 min)
+3. User opens file (manual)
+4. User describes what's wrong (imprecise)
+5. I guess what the XML might look like
+6. Repeat
+
+**After:**
+1. Inspect current XML structure (5 sec)
+2. Make targeted code change
+3. Generate report (2 min)
+4. Compare XML to reference (10 sec)
+5. Verify fix automatically
+6. Done (or iterate with clear feedback)
+
+### Estimated Time Savings
+- **This session:** 3-4 hours → **Target:** 30-45 minutes
+- **Improvement factor:** ~5x faster
 
 ## Next Steps (With MCP Tools)
 
