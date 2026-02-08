@@ -1822,6 +1822,59 @@ class WordLLMPopup(QDialog):
             print(f"Could not get all document text: {e}")
             return ""
 
+    def _apply_redlines(self, word_app, selection, original_text: str, revised_text: str) -> bool:
+        """Apply redlines using adeu RedlineEngine.
+
+        Args:
+            word_app: Word COM application object
+            selection: Word Selection object
+            original_text: Original text before LLM processing
+            revised_text: LLM-revised text
+
+        Returns:
+            True if redlines applied successfully, False if fallback needed
+        """
+        try:
+            from adeu import RedlineEngine
+
+            # Get document object
+            doc = word_app.ActiveDocument
+
+            # Auto-enable Track Changes if needed
+            if self.redline_settings.get("auto_enable_track_changes", True):
+                if not doc.TrackRevisions:
+                    print("Auto-enabling Track Changes for redlining")
+                    doc.TrackRevisions = True
+
+            # Reconstruct range from stored coordinates
+            try:
+                range_obj = doc.Range(
+                    self._original_range_start,
+                    self._original_range_end
+                )
+            except Exception as e:
+                print(f"Could not reconstruct range: {e}, using current selection")
+                range_obj = selection.Range
+
+            # Apply redlines using adeu
+            engine = RedlineEngine()
+            engine.apply_redlines(
+                doc=doc,
+                range_obj=range_obj,
+                original=original_text,
+                revised=revised_text
+            )
+
+            print(f"Successfully applied redlines ({len(original_text)} -> {len(revised_text)} chars)")
+            return True
+
+        except ImportError as e:
+            print(f"adeu not available: {e}")
+            return False
+        except Exception as e:
+            print(f"Redline failed: {e}")
+            return False
+
     def _set_word_text_internal(self, text: str, format_type: str = FORMAT_PLAIN):
         """Set text in Word with formatting - re-establish connection to ensure it's fresh.
 
