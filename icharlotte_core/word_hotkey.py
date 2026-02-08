@@ -1898,7 +1898,7 @@ class WordLLMPopup(QDialog):
         return True, ""
 
     def _apply_redlines(self, word_app, selection, original_text: str, revised_text: str) -> bool:
-        """Apply redlines using adeu RedlineEngine.
+        """Apply word-level redlines using diff-match-patch and Word Track Changes.
 
         Args:
             word_app: Word COM application object
@@ -1910,7 +1910,7 @@ class WordLLMPopup(QDialog):
             True if redlines applied successfully, False if fallback needed
         """
         try:
-            from adeu import RedlineEngine
+            from diff_match_patch import diff_match_patch
 
             # Get document object
             try:
@@ -1943,24 +1943,37 @@ class WordLLMPopup(QDialog):
                     print(f"Could not get selection range: {e2}")
                     return False
 
-            # Apply redlines using adeu
+            # Compute word-level diff
             try:
-                engine = RedlineEngine()
-                engine.apply_redlines(
-                    doc=doc,
-                    range_obj=range_obj,
-                    original=original_text,
-                    revised=revised_text
-                )
+                dmp = diff_match_patch()
+                diffs = dmp.diff_main(original_text, revised_text)
+                dmp.diff_cleanupSemantic(diffs)  # Optimize for human readability
+
+                # Apply diffs to Word range using Track Changes
+                current_pos = range_obj.Start
+
+                for op, text in diffs:
+                    if op == 0:  # Equal - no change, just advance position
+                        current_pos += len(text)
+                    elif op == -1:  # Delete - mark as deleted with Track Changes
+                        delete_range = doc.Range(current_pos, current_pos + len(text))
+                        delete_range.Delete()  # This creates tracked deletion
+                    elif op == 1:  # Insert - insert as tracked insertion
+                        insert_range = doc.Range(current_pos, current_pos)
+                        insert_range.InsertAfter(text)  # This creates tracked insertion
+                        current_pos += len(text)
+
+                print(f"Successfully applied redlines: {len(diffs)} changes")
+                return True
+
             except Exception as e:
-                print(f"RedlineEngine.apply_redlines failed: {e}")
+                print(f"Diff application failed: {e}")
+                import traceback
+                traceback.print_exc()
                 return False
 
-            print(f"Successfully applied redlines ({len(original_text)} -> {len(revised_text)} chars)")
-            return True
-
         except ImportError as e:
-            print(f"adeu not available: {e}")
+            print(f"diff-match-patch not available: {e}")
             return False
         except Exception as e:
             print(f"Unexpected error in _apply_redlines: {e}")
