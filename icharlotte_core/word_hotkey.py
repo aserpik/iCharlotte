@@ -552,6 +552,12 @@ class WordLLMPopup(QDialog):
         self._drag_pos = None  # Starting position for drag
         self._is_dragging = False
 
+        # Redline state
+        self._original_text = None  # Original text before LLM processing
+        self._original_range_start = None  # Range start position
+        self._original_range_end = None  # Range end position
+        self._redline_mode_active = False  # Whether current operation uses redline
+
         self.setWindowTitle("AI Assistant")
         self.setWindowFlags(
             Qt.WindowType.Dialog |
@@ -1604,6 +1610,8 @@ class WordLLMPopup(QDialog):
             # Start worker thread for LLM call
             llm_func = self.llm_callback if self.llm_callback else self._default_llm_call
             self._worker_thread = LLMWorkerThread(llm_func, full_prompt, self)
+            # Store redline state on thread for result handler
+            self._worker_thread.redline_mode = self._redline_mode_active
             self._worker_thread.finished.connect(self._on_llm_result)
             self._worker_thread.start()
 
@@ -1763,6 +1771,20 @@ class WordLLMPopup(QDialog):
             except Exception as e:
                 print(f"Error getting selection text: {e}")
                 return "", False
+
+            # Store original text and range for potential redlining
+            if self.redline_checkbox.isChecked():
+                self._original_text = text
+                try:
+                    self._original_range_start = selection.Range.Start
+                    self._original_range_end = selection.Range.End
+                    self._redline_mode_active = True
+                    print(f"Captured range for redlining: Start={self._original_range_start}, End={self._original_range_end}")
+                except Exception as e:
+                    print(f"Could not capture range coordinates: {e}")
+                    self._redline_mode_active = False
+            else:
+                self._redline_mode_active = False
 
             # wdSelectionIP = 1 (insertion point, no selection)
             has_selection = False
@@ -2405,6 +2427,8 @@ class WordLLMPopup(QDialog):
 
             # Start worker thread for LLM call (using email-specific function)
             self._worker_thread = LLMWorkerThread(self._call_llm_for_email, full_prompt, self)
+            # Store redline state on thread for result handler (not used for Outlook)
+            self._worker_thread.redline_mode = False  # Redline not supported for Outlook
             self._worker_thread.finished.connect(self._on_llm_result)
             self._worker_thread.start()
 
