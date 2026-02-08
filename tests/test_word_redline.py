@@ -201,5 +201,49 @@ class TestWordRedlineMethod(unittest.TestCase):
         self.assertFalse(result)
 
 
+class TestRedlineValidation(unittest.TestCase):
+    """Test the redline validation logic."""
+
+    def test_validate_no_selection(self):
+        """Test validation fails with no text selected."""
+        from icharlotte_core.word_hotkey import WordLLMPopup
+
+        # Create mock popup with minimal setup
+        mock_popup = Mock()
+        mock_popup.redline_settings = {}
+
+        # Call validation method directly
+        is_valid, msg = WordLLMPopup._validate_redline_prerequisites(mock_popup, "")
+
+        self.assertFalse(is_valid)
+        self.assertIn("Select text first", msg)
+
+    def test_validate_text_too_large(self):
+        """Test validation fails with oversized text."""
+        from icharlotte_core.word_hotkey import WordLLMPopup
+
+        mock_popup = Mock()
+        mock_popup.redline_settings = {"max_redline_text_length": 50000}
+
+        # Create text larger than limit
+        large_text = "x" * 100000
+        is_valid, msg = WordLLMPopup._validate_redline_prerequisites(mock_popup, large_text)
+
+        self.assertFalse(is_valid)
+        self.assertIn("too large", msg)
+
+    def test_validate_success(self):
+        """Test validation succeeds with normal text."""
+        from icharlotte_core.word_hotkey import WordLLMPopup
+
+        mock_popup = Mock()
+        mock_popup.redline_settings = {}
+
+        is_valid, msg = WordLLMPopup._validate_redline_prerequisites(mock_popup, "normal text")
+
+        self.assertTrue(is_valid)
+        self.assertEqual(msg, "")
+
+
 if __name__ == '__main__':
     unittest.main()

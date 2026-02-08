@@ -1813,15 +1813,31 @@ class WordLLMPopup(QDialog):
 
             # Store original text and range for potential redlining
             if self.redline_checkbox.isChecked():
-                self._original_text = text
-                try:
-                    self._original_range_start = selection.Range.Start
-                    self._original_range_end = selection.Range.End
-                    self._redline_mode_active = True
-                    print(f"Captured range for redlining: Start={self._original_range_start}, End={self._original_range_end}")
-                except Exception as e:
-                    print(f"Could not capture range coordinates: {e}")
+                # Validate redline prerequisites
+                is_valid, error_msg = self._validate_redline_prerequisites(text)
+                if not is_valid:
+                    # Disable checkbox and show error in tooltip
+                    self.redline_checkbox.setEnabled(False)
+                    self.redline_checkbox.setToolTip(error_msg)
                     self._redline_mode_active = False
+                    print(f"Redline validation failed: {error_msg}")
+                else:
+                    # Validation passed - proceed with redline setup
+                    # Re-enable checkbox if it was disabled and restore tooltip
+                    self.redline_checkbox.setEnabled(True)
+                    self.redline_checkbox.setToolTip(
+                        "Instead of replacing text, insert AI suggestions as Track Changes "
+                        "that you can accept/reject in Word"
+                    )
+                    self._original_text = text
+                    try:
+                        self._original_range_start = selection.Range.Start
+                        self._original_range_end = selection.Range.End
+                        self._redline_mode_active = True
+                        print(f"Captured range for redlining: Start={self._original_range_start}, End={self._original_range_end}")
+                    except Exception as e:
+                        print(f"Could not capture range coordinates: {e}")
+                        self._redline_mode_active = False
             else:
                 self._redline_mode_active = False
 
@@ -1860,6 +1876,26 @@ class WordLLMPopup(QDialog):
         except Exception as e:
             print(f"Could not get all document text: {e}")
             return ""
+
+    def _validate_redline_prerequisites(self, selection_text: str) -> tuple[bool, str]:
+        """Check if redline mode can be used.
+
+        Args:
+            selection_text: Currently selected text
+
+        Returns:
+            (is_valid, error_message) tuple
+        """
+        # Check if text is selected
+        if not selection_text or len(selection_text.strip()) == 0:
+            return False, "Select text first to use redline mode"
+
+        # Check text length limit
+        max_length = self.redline_settings.get("max_redline_text_length", 50000)
+        if len(selection_text) > max_length:
+            return False, f"Selection too large for redline ({len(selection_text)} > {max_length} chars)"
+
+        return True, ""
 
     def _apply_redlines(self, word_app, selection, original_text: str, revised_text: str) -> bool:
         """Apply redlines using adeu RedlineEngine.
