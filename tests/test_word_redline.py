@@ -200,6 +200,41 @@ class TestWordRedlineMethod(unittest.TestCase):
         # Should return False to indicate failure
         self.assertFalse(result)
 
+    @patch('adeu.RedlineEngine')
+    def test_apply_redlines_engine_failure(self, mock_engine_class):
+        """Test graceful failure when engine throws exception."""
+        from icharlotte_core.word_hotkey import WordLLMPopup
+
+        # Setup mocks
+        mock_popup = Mock()
+        mock_popup.redline_settings = {"auto_enable_track_changes": True}
+        mock_popup._original_range_start = 0
+        mock_popup._original_range_end = 100
+
+        mock_word_app = Mock()
+        mock_doc = Mock()
+        mock_doc.TrackRevisions = True
+        mock_doc.Range = Mock(return_value=Mock())
+        mock_word_app.ActiveDocument = mock_doc
+
+        mock_selection = Mock()
+
+        # Make engine fail
+        mock_engine = mock_engine_class.return_value
+        mock_engine.apply_redlines = Mock(side_effect=Exception("Engine error"))
+
+        # Apply redlines
+        result = WordLLMPopup._apply_redlines(
+            mock_popup,
+            mock_word_app,
+            mock_selection,
+            "original",
+            "revised"
+        )
+
+        # Should return False for fallback
+        self.assertFalse(result)
+
 
 class TestRedlineValidation(unittest.TestCase):
     """Test the redline validation logic."""

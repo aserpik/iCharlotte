@@ -1913,13 +1913,21 @@ class WordLLMPopup(QDialog):
             from adeu import RedlineEngine
 
             # Get document object
-            doc = word_app.ActiveDocument
+            try:
+                doc = word_app.ActiveDocument
+            except Exception as e:
+                print(f"Could not access Word document: {e}")
+                return False
 
             # Auto-enable Track Changes if needed
             if self.redline_settings.get("auto_enable_track_changes", True):
-                if not doc.TrackRevisions:
-                    print("Auto-enabling Track Changes for redlining")
-                    doc.TrackRevisions = True
+                try:
+                    if not doc.TrackRevisions:
+                        print("Auto-enabling Track Changes for redlining")
+                        doc.TrackRevisions = True
+                except Exception as e:
+                    print(f"Could not enable Track Changes: {e}")
+                    # Continue anyway - may still work
 
             # Reconstruct range from stored coordinates
             try:
@@ -1929,16 +1937,24 @@ class WordLLMPopup(QDialog):
                 )
             except Exception as e:
                 print(f"Could not reconstruct range: {e}, using current selection")
-                range_obj = selection.Range
+                try:
+                    range_obj = selection.Range
+                except Exception as e2:
+                    print(f"Could not get selection range: {e2}")
+                    return False
 
             # Apply redlines using adeu
-            engine = RedlineEngine()
-            engine.apply_redlines(
-                doc=doc,
-                range_obj=range_obj,
-                original=original_text,
-                revised=revised_text
-            )
+            try:
+                engine = RedlineEngine()
+                engine.apply_redlines(
+                    doc=doc,
+                    range_obj=range_obj,
+                    original=original_text,
+                    revised=revised_text
+                )
+            except Exception as e:
+                print(f"RedlineEngine.apply_redlines failed: {e}")
+                return False
 
             print(f"Successfully applied redlines ({len(original_text)} -> {len(revised_text)} chars)")
             return True
@@ -1947,7 +1963,9 @@ class WordLLMPopup(QDialog):
             print(f"adeu not available: {e}")
             return False
         except Exception as e:
-            print(f"Redline failed: {e}")
+            print(f"Unexpected error in _apply_redlines: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def _set_word_text_internal(self, text: str, format_type: str = FORMAT_PLAIN):
