@@ -146,7 +146,20 @@ Unified hierarchy with retry decorators:
 - `liability.py`, `exposure.py`, `subpoena_tracker.py`
 
 **Docket Scrapers** (county-specific):
-- Orange, Riverside, San Bernardino, San Diego, Sacramento, Kern, Alameda, Mariposa, Santa Clara
+- Orange, Riverside, San Bernardino, San Diego, Sacramento, Kern, Alameda, Mariposa, Santa Clara, Lake, Yolo
+
+**Report Generator** (`Scripts/report_generator/`):
+- 5-stage pipeline: gather → refine (LLM) → assemble (OXML) → validate → polish
+- `gather.py` - Collects case metadata and raw agent outputs from case folder
+- `refine.py` - Per-section LLM synthesis with style guide and example matching
+- `assemble.py` - Renders into Word template using python-docx + direct OXML
+- `validate.py` - Checks formatting against reference profile (10 rules)
+- `polish.py` - Final LLM pass for transitions and consistency
+- `pipeline.py` - Main orchestrator, CLI entry point
+- `style_library.py` - Style guide and section examples from gold standards
+- Template: `Templates/litigation_report.docx`
+- Reference profile: `config/report_reference_profile.json`
+- Run: `python -m Scripts.report_generator.pipeline -f <file_number> [--skip-refine] [--skip-polish] [--skip-validate]`
 
 ---
 
@@ -215,5 +228,11 @@ powershell -ExecutionPolicy Bypass -File "C:\geminiterminal2\screenshot_util.ps1
 - Uses adeu RedlineEngine for native Word redlining
 - Configuration in `icharlotte_core/redline_config.py`
 - Checkbox state persists across sessions
+
+### Report Generator Pipeline (2026-02-08)
+- Full 5-stage pipeline for generating litigation reports from agent outputs
+- Validator with 10 formatting rules profiled from 3 gold-standard reports
+- Template cleaned of Angular CSS pollution (ng-star-inserted style)
+- Paragraph classifier handles L1/L2 subheading hierarchy for Discovery, Liability, Exposure sections
 
 See `DEVELOPMENT_LOG.md` for detailed changelog of features added during development.

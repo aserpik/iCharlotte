@@ -180,6 +180,11 @@ def _expand_section_markers(doc: Document, refined_sections: Dict[str, str]):
             _clear_paragraph(marker_para)
             continue
 
+        # Ensure the section heading (paragraph before the marker) has space_after
+        # so there's always a visual gap between heading and content, regardless
+        # of whether empty paragraphs survive cleanup.
+        _ensure_heading_spacing(doc, idx)
+
         # Parse the content into structured paragraphs (pass section name for context)
         parsed = _parse_section_content(content, section_name=section_name)
 
@@ -260,13 +265,18 @@ def _classify_paragraph(text: str, section_name: str = None) -> str:
 
     # Liability section: Element headings should be nested/numbered
     liability_element_patterns = [
-        r'^(?:Ownership and Control|Unreasonable Conduct|Creation of (?:Condition|the Condition)|'
+        r'^(?:Ownership and Control|Ownership and Creation of Condition|'
+        r'Unreasonable Conduct|Creation of (?:Condition|the Condition)|'
         r'Causation|Consent|Duty|Breach|Damages|Scope of Employment|'
         r'Ratification|Statute of Limitations|Comparative (?:Fault|Negligence)|'
         r'Intentional (?:Conduct|Act)|Knowledge|Actual Malice|'
         r'Publication|Defamatory Statement|Identification|'
         r'Trespass|Interference|Tortious Conduct|'
-        r'Proximate Cause|Foreseeability)$',
+        r'Proximate Cause|Foreseeability|'
+        r'Intent and .*Defense|.*Defense$|'
+        r'Standing|Substantial (?:Factor|Interference)|'
+        r'Unreasonable (?:Interference|Conduct)|'
+        r'Assumption of Risk|Contributory Negligence)$',
     ]
     if section_name and "LIABILITY" in section_name:
         for pattern in liability_element_patterns:
@@ -274,15 +284,18 @@ def _classify_paragraph(text: str, section_name: str = None) -> str:
                 return "subheading_plain_nested"
 
     # Known sub-heading patterns from real reports (top-level sections)
+    # These are causes of action and major section headings — always L1.
+    # Must be checked BEFORE the broad LIABILITY fallback so that cause-of-action
+    # names like "Continuing Nuisance" aren't misclassified as L2 elements.
     subheading_patterns = [
         r'^(?:Government Tort Claim|Complaint|Pleadings|Responsive Pleading|'
         r'Venue|Representation|Upcoming Hearings?|Future Hearings?|'
         r'Written Discovery|Depositions?|Outstanding Discovery|'
         r'Physical Injuries|Emotional.*Damages|General Damages|'
         r'Economic Damages|Non-Economic Damages|Punitive Damages|'
-        r'Property Damage|Lost (?:Wages|Earnings|Rental|Rental Income)|'
-        r'Related Litigation|Summary|Assessment of Exposure|'
-        r'Continuing (?:Nuisance|Trespass)|Negligence|Strict Liability|'
+        r'Property Damage|Lost (?:Wages|Earnings|Rental|Rental Income)(?:\s+and\s+.+)?|'
+        r'Related Litigation|Summary(?:\s+of\s+\w+)?|Assessment of Exposure|'
+        r'Continuing (?:Nuisance|Trespass(?:\s+to\s+Land)?)|Negligence|Strict Liability|'
         r'Premises Liability|Dangerous Condition|'
         r'Intentional Infliction|Negligent Infliction|'
         r'Battery|Assault|False Imprisonment|Defamation|'
@@ -293,17 +306,30 @@ def _classify_paragraph(text: str, section_name: str = None) -> str:
         if re.match(pattern, text, re.IGNORECASE):
             return "subheading_plain"
 
+    # Broader fallback for LIABILITY: any short, title-case line that
+    # doesn't end with a period is likely an element subheading.
+    # Runs AFTER subheading_patterns to avoid catching causes of action.
+    if section_name and "LIABILITY" in section_name:
+        words = text.split()
+        if (2 <= len(words) <= 8 and len(text) < 80
+                and not text.endswith('.')
+                and not text.endswith(':')
+                and sum(1 for w in words if w[0].isupper()) >= len(words) * 0.5):
+            return "subheading_plain_nested"
+
+    # Lines with "Plaintiff X's Responses" or "Defendant Y's Responses" pattern
+    # These should be numbered (nested under discovery section), not lettered
+    # Must be checked BEFORE the generic short-title-case check to avoid
+    # misclassifying party names as top-level subheadings
+    if re.match(r"^(?:Plaintiff|Defendant)\s+.+(?:'s\s+)?(?:Response|Deposition|Interrogator|Request)", text, re.IGNORECASE):
+        return "subheading_plain_nested"
+
     # Short title-case lines (1-6 words, capitalized, not ending in period)
     words = text.split()
     if 1 <= len(words) <= 6 and not text.endswith('.'):
         cap_words = sum(1 for w in words if w[0].isupper())
         if cap_words >= len(words) * 0.7:
             return "subheading_plain"
-
-    # Lines with "Plaintiff X's Responses" or "Defendant Y's Responses" pattern
-    # These should be numbered (nested under discovery section), not lettered
-    if re.match(r"^(?:Plaintiff|Defendant)\s+.+(?:'s\s+)?(?:Response|Deposition|Interrogator|Request)", text, re.IGNORECASE):
-        return "subheading_plain_nested"
 
     return "body"
 
@@ -360,6 +386,31 @@ def _get_paragraph_format(para) -> Dict:
         fmt["font_size"] = Pt(12)
 
     return fmt
+
+
+def _ensure_heading_spacing(doc: Document, marker_idx: int):
+    """
+    Find the section heading paragraph before the marker and ensure it has
+    space_after=240 (12pt) so there's a visual gap before the content.
+    """
+    # Walk backwards from marker to find the heading (all-caps, short paragraph)
+    for i in range(marker_idx - 1, max(marker_idx - 5, -1), -1):
+        if i < 0:
+            break
+        para = doc.paragraphs[i]
+        text = para.text.strip()
+        if text and text.isupper() and len(text) < 60:
+            # Found the heading — set space_after via OXML
+            pPr = para._element.find(qn('w:pPr'))
+            if pPr is None:
+                pPr = OxmlElement('w:pPr')
+                para._element.insert(0, pPr)
+            spacing = pPr.find(qn('w:spacing'))
+            if spacing is None:
+                spacing = OxmlElement('w:spacing')
+                pPr.append(spacing)
+            spacing.set(qn('w:after'), '240')  # 12pt = one line gap
+            break
 
 
 def _emu_to_twips(emu):
@@ -443,8 +494,12 @@ def _insert_paragraphs_after(
                 _add_run(new_para, text, ref_format, bold=True, underline=True)
         else:
             # Body paragraph: check for topic heading (e.g., "Background. The plaintiff...")
-            # Topic headings are 1-3 words followed by a period, at the start of the paragraph
-            topic_match = re.match(r'^([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\.)\s+(.+)', text)
+            # Topic headings are 1-6 words (allowing lowercase connectors like "and", "of")
+            # followed by a period, at the start of the paragraph
+            topic_match = re.match(
+                r'^([A-Z][a-zA-Z]+(?:\s+(?:and|of|to|for|the|in|on|at|by|with|[A-Z][a-zA-Z]+)){0,5}\.)\s+(.+)',
+                text
+            )
             if topic_match:
                 # Bold the topic heading, normal text for the rest
                 topic = topic_match.group(1)
@@ -527,6 +582,15 @@ def _clean_empty_paragraphs(doc: Document):
 
     for element in elements:
         if element.tag.endswith('}p'):
+            # Preserve closing block paragraphs (zClosing style) — they
+            # provide signature space and must never be removed
+            pPr = element.find(qn('w:pPr'))
+            if pPr is not None:
+                pStyle = pPr.find(qn('w:pStyle'))
+                if pStyle is not None and pStyle.get(qn('w:val')) == 'zClosing':
+                    consecutive_empty = 0
+                    continue
+
             text = ""
             for child in element.iter():
                 if child.text:
@@ -551,11 +615,9 @@ def _clean_empty_paragraphs(doc: Document):
                     # In header area: keep at most one empty para in a row
                     if consecutive_empty > 1:
                         to_remove.append(element)
-                elif after_section_heading and consecutive_empty == 1:
-                    # Keep EXACTLY one empty para right after a section heading
-                    pass
-                elif after_section_heading and consecutive_empty > 1:
-                    # Remove additional empty paragraphs after the first one
+                elif after_section_heading:
+                    # Remove ALL empty paragraphs after section headings —
+                    # space_after on the heading provides the visual gap
                     to_remove.append(element)
                 else:
                     # Not after section heading - remove all empty paragraphs
