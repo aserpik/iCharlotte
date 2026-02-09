@@ -25,8 +25,8 @@ PLACEHOLDER_TEMPLATES = {
         "A detailed factual background will be provided upon receipt and review "
         "of the relevant pleadings and documents."
     ),
-    "PROCEDURAL HISTORY": (
-        "The procedural history will be updated as the case progresses through "
+    "PROCEDURAL STATUS": (
+        "The procedural status will be updated as the case progresses through "
         "the court system."
     ),
     "INVESTIGATION": (
@@ -285,7 +285,7 @@ def _get_section_specific_instructions(section_name: str) -> str:
             "- End with a statement of the damages sought.\n"
             "- Use past tense throughout."
         ),
-        "PROCEDURAL HISTORY": (
+        "PROCEDURAL STATUS": (
             "=== SECTION STRUCTURE ===\n"
             "- Use these sub-headings in order (include only those applicable):\n"
             "  Government Tort Claim, Complaint (or Pleadings), Responsive Pleading,\n"

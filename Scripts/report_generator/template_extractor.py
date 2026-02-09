@@ -21,7 +21,7 @@ from docx.oxml import OxmlElement
 # Section headings found in the reports (ALL CAPS, bold+underline)
 REPORT_SECTIONS = [
     "FACTUAL BACKGROUND",
-    "PROCEDURAL HISTORY",
+    "PROCEDURAL STATUS",
     "INVESTIGATION",
     "DISCOVERY",
     "MEDICAL RECORD REVIEW",
@@ -35,7 +35,7 @@ REPORT_SECTIONS = [
 # Template variable names for each section
 SECTION_VARS = {
     "FACTUAL BACKGROUND": "factual_background",
-    "PROCEDURAL HISTORY": "procedural_history",
+    "PROCEDURAL STATUS": "procedural_history",
     "INVESTIGATION": "investigation",
     "DISCOVERY": "discovery",
     "MEDICAL RECORD REVIEW": "medical_record_review",

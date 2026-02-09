@@ -34,7 +34,7 @@ DEFAULT_TEMPLATE_PATH = os.path.join(PROJECT_ROOT, "templates", "litigation_repo
 
 SECTION_TO_TEMPLATE_VAR = {
     "FACTUAL BACKGROUND": "factual_background",
-    "PROCEDURAL HISTORY": "procedural_history",
+    "PROCEDURAL STATUS": "procedural_history",
     "INVESTIGATION": "investigation",
     "DISCOVERY": "discovery",
     "MEDICAL RECORD REVIEW": "medical_record_review",

@@ -29,7 +29,7 @@ STYLE_EXAMPLES_DIR = os.path.join(PROJECT_ROOT, "config", "report_style_examples
 # Section headings to look for (must match template_extractor.py)
 REPORT_SECTIONS = [
     "FACTUAL BACKGROUND",
-    "PROCEDURAL HISTORY",
+    "PROCEDURAL STATUS",
     "INVESTIGATION",
     "DISCOVERY",
     "MEDICAL RECORD REVIEW",

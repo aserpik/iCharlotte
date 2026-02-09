@@ -31,7 +31,7 @@ AGENT_OUTPUT_MAP = [
     ("Med_Record_", "MEDICAL RECORD REVIEW", "med_record.py"),
     ("med_chron", "MEDICAL RECORD REVIEW", "med_chron.py"),
     ("Discovery_Responses_", "DISCOVERY", "summarize_discovery.py"),
-    ("Docket_", "PROCEDURAL HISTORY", "docket.py"),
+    ("Docket_", "PROCEDURAL STATUS", "docket.py"),
     ("variables", "_VARIABLES", "complaint.py"),
     ("caption_template", "_CAPTION", "complaint.py"),
 ]
@@ -39,7 +39,7 @@ AGENT_OUTPUT_MAP = [
 # Report section ordering (canonical order in the report)
 SECTION_ORDER = [
     "FACTUAL BACKGROUND",
-    "PROCEDURAL HISTORY",
+    "PROCEDURAL STATUS",
     "INVESTIGATION",
     "DISCOVERY",
     "MEDICAL RECORD REVIEW",
@@ -52,7 +52,7 @@ SECTION_ORDER = [
 # Sections always included in status reports
 STATUS_REPORT_ALWAYS_INCLUDE = {
     "FACTUAL BACKGROUND",
-    "PROCEDURAL HISTORY",
+    "PROCEDURAL STATUS",
     "EVALUATION OF LIABILITY",
     "EVALUATION OF EXPOSURE",
     "SETTLEMENT STATUS",
@@ -61,7 +61,7 @@ STATUS_REPORT_ALWAYS_INCLUDE = {
 
 # Sections where multiple source files are date-versioned snapshots (use latest only)
 # Other sections (med records, discovery) legitimately have multiple distinct sources
-USE_LATEST_ONLY = {"PROCEDURAL HISTORY"}
+USE_LATEST_ONLY = {"PROCEDURAL STATUS"}
 
 
 def gather_case_data(file_number: str, report_type: str = "FSR",
@@ -165,7 +165,7 @@ def _process_variables_file(
     # Extract section content from variables
     section_var_map = {
         "factual_background": "FACTUAL BACKGROUND",
-        "procedural_history": "PROCEDURAL HISTORY",
+        "procedural_history": "PROCEDURAL STATUS",
     }
 
     for var_key, section_name in section_var_map.items():

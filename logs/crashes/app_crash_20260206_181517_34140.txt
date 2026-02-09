@@ -1,0 +1,60 @@
+======================================================================
+iCharlotte Application Crash Report
+======================================================================
+
+Crash Time: 2026-02-06T18:15:17.189984
+Uptime: 25.5 seconds
+Source: main_thread
+
+----------------------------------------------------------------------
+EXCEPTION
+----------------------------------------------------------------------
+Type: TypeError
+Message: expected str, bytes or os.PathLike object, not NoneType
+
+Traceback:
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte.py", line 1403, in view_docket
+    ai_output_dir = os.path.join(self.case_path, "NOTES", "AI OUTPUT")
+  File "<frozen ntpath>", line 100, in join
+TypeError: expected str, bytes or os.PathLike object, not NoneType
+
+----------------------------------------------------------------------
+RECENT CHECKPOINTS
+----------------------------------------------------------------------
+  [2026-02-06T18:14:54.484555] Application starting
+  [2026-02-06T18:14:54.484735] Parsing command-line arguments
+  [2026-02-06T18:14:54.490593] Configuring Qt WebEngine
+  [2026-02-06T18:14:54.490667] Creating QApplication
+  [2026-02-06T18:14:54.567141] Creating MainWindow
+  [2026-02-06T18:14:54.567366] MainWindow.__init__ starting
+  [2026-02-06T18:14:54.709745] setup_ui starting - creating tabs
+  [2026-02-06T18:14:54.711750] Creating MasterCaseTab
+  [2026-02-06T18:14:55.886752] Creating ChatTab
+  [2026-02-06T18:14:56.249235] setup_ui complete - all tabs created
+  [2026-02-06T18:14:56.386233] Showing MainWindow
+  [2026-02-06T18:14:56.482377] Entering Qt event loop
+
+----------------------------------------------------------------------
+ADDITIONAL CONTEXT
+----------------------------------------------------------------------
+  startup_file_number: None
+  startup_case_path: None
+  startup_tab: 0
+  current_file_number: None
+  current_case_path: None
+
+----------------------------------------------------------------------
+SYSTEM INFORMATION
+----------------------------------------------------------------------
+Python: 3.13.12
+Platform: Windows-11-10.0.26100-SP0
+PID: 34140
+
+----------------------------------------------------------------------
+QT STATE
+----------------------------------------------------------------------
+  app_name: python3
+  window_visible: True
+  window_size: 1262x800
+  file_number: None
