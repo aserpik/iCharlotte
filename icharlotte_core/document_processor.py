@@ -40,6 +40,16 @@ try:
 except ImportError:
     pass
 
+# Outlook .msg extraction
+try:
+    import pythoncom
+    import win32com.client as win32com_client
+    MSG_AVAILABLE = True
+except ImportError:
+    MSG_AVAILABLE = False
+    pythoncom = None
+    win32com_client = None
+
 
 class ExtractionMethod(Enum):
     """How the text was extracted from the document."""
@@ -150,6 +160,8 @@ class DocumentProcessor:
                 return self._extract_from_pdf(file_path)
             elif ext == ".docx":
                 return self._extract_from_docx(file_path)
+            elif ext == ".msg":
+                return self._extract_from_msg(file_path)
             else:
                 return self._extract_from_text(file_path)
         except Exception as e:
@@ -388,6 +400,60 @@ class DocumentProcessor:
             char_density=len(text) / estimated_pages,
             file_path=file_path
         )
+
+    def _extract_from_msg(self, file_path: str) -> ExtractResult:
+        """Extract text from an Outlook .msg file using COM automation."""
+        if not MSG_AVAILABLE:
+            return ExtractResult(
+                text="", page_count=0,
+                extraction_method=ExtractionMethod.FAILED,
+                file_path=file_path,
+                error="pywin32 not installed — cannot read .msg files"
+            )
+
+        try:
+            pythoncom.CoInitialize()
+            outlook = win32com_client.Dispatch("Outlook.Application")
+            namespace = outlook.GetNamespace("MAPI")
+            abs_path = os.path.abspath(file_path)
+            item = namespace.OpenSharedItem(abs_path)
+
+            subject = item.Subject or ""
+            sender = item.SenderName or ""
+            sent_on = str(item.SentOn) if item.SentOn else ""
+            body = item.Body or ""
+
+            # Fallback: strip HTML tags if plain body is empty
+            if not body.strip() and item.HTMLBody:
+                import re
+                body = re.sub(r'<[^>]+>', '', item.HTMLBody)
+                body = body.strip()
+
+            item.Close(0)  # 0 = olDiscard
+
+            full_text = f"From: {sender}\nDate: {sent_on}\nSubject: {subject}\n\n{body}"
+
+            return ExtractResult(
+                text=full_text,
+                page_count=1,
+                extraction_method=ExtractionMethod.NATIVE,
+                char_count=len(full_text),
+                char_density=len(full_text),
+                file_path=file_path
+            )
+        except Exception as e:
+            self._log(f"Error extracting .msg file: {e}", "error")
+            return ExtractResult(
+                text="", page_count=0,
+                extraction_method=ExtractionMethod.FAILED,
+                file_path=file_path,
+                error=str(e)
+            )
+        finally:
+            try:
+                pythoncom.CoUninitialize()
+            except Exception:
+                pass
 
     @staticmethod
     def get_page_count(file_path: str) -> int:

@@ -512,7 +512,7 @@ def process_directory(dir_path: str, logger: AgentLogger):
 
     for root, _, files in os.walk(dir_path):
         for file in files:
-            if file.lower().endswith(('.pdf', '.docx')):
+            if file.lower().endswith(('.pdf', '.docx', '.msg')):
                 if "AI_OUTPUT" in file:
                     continue
                 files_to_process.append(os.path.join(root, file))

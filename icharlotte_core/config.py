@@ -11,7 +11,7 @@ TEMP_DIR = os.path.join(os.getcwd(), ".gemini", "tmp")
 TEMPLATES_DIR = os.path.join(os.getcwd(), "Templates")
 RESOURCES_DIR = r"C:\geminiterminal2\LLM Resources"
 TEMPLATE_EXTENSIONS = ['.docx', '.txt', '.html', '.rtf']
-RESOURCE_EXTENSIONS = ['.pdf', '.docx', '.doc', '.txt', '.html', '.png', '.jpg', '.jpeg']
+RESOURCE_EXTENSIONS = ['.pdf', '.docx', '.doc', '.txt', '.msg', '.html', '.png', '.jpg', '.jpeg']
 
 # Normalize Gemini API key environment variables
 # The google-genai SDK checks both GOOGLE_API_KEY and GEMINI_API_KEY, causing warnings if both are set

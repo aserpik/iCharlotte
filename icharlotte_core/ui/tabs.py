@@ -13,7 +13,8 @@ from PySide6.QtWidgets import (
     QComboBox, QPushButton, QListWidget, QListWidgetItem, QTextBrowser, QPlainTextEdit,
     QFileDialog, QMessageBox, QDialog, QProgressBar, QTabWidget,
     QTableWidget, QHeaderView, QTableWidgetItem, QCheckBox, QFileIconProvider,
-    QLineEdit, QInputDialog, QMenu, QApplication, QToolButton, QScrollArea
+    QLineEdit, QInputDialog, QMenu, QApplication, QToolButton, QScrollArea,
+    QSizePolicy
 )
 from PySide6.QtCore import Qt, Signal, QThread, QFileInfo, QTimer, QSettings
 from PySide6.QtGui import QTextCursor, QDragEnterEvent, QDropEvent, QAction, QPixmap
@@ -313,7 +314,8 @@ class ChatTab(QWidget):
         input_row = QHBoxLayout()
 
         self.chat_input = QPlainTextEdit()
-        self.chat_input.setMinimumHeight(60)
+        self.chat_input.setMinimumHeight(40)
+        self.chat_input.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.chat_input.setPlaceholderText("Type a message... (Enter to send, Shift+Enter for newline)")
         self.chat_input.setAcceptDrops(True)
         self.chat_input.dragEnterEvent = self.dragEnterEvent
@@ -340,7 +342,7 @@ class ChatTab(QWidget):
         btn_layout.addWidget(self.stop_btn)
 
         input_row.addLayout(btn_layout)
-        input_layout.addLayout(input_row)
+        input_layout.addLayout(input_row, 1)  # stretch=1 so input fills available space
 
         input_container.setMinimumHeight(100)
         self.input_container = input_container
@@ -717,7 +719,7 @@ class ChatTab(QWidget):
     def select_files(self):
         files, _ = QFileDialog.getOpenFileNames(
             self, "Select Files", "",
-            "All Supported (*.pdf *.docx *.txt *.png *.jpg *.jpeg *.gif *.webp);;Documents (*.pdf *.docx *.txt);;Images (*.png *.jpg *.jpeg *.gif *.webp)"
+            "All Supported (*.pdf *.docx *.txt *.msg *.png *.jpg *.jpeg *.gif *.webp);;Documents (*.pdf *.docx *.txt *.msg);;Images (*.png *.jpg *.jpeg *.gif *.webp)"
         )
         for f in files:
             self.add_file(f)
@@ -927,7 +929,7 @@ class ChatTab(QWidget):
         Files are collected immediately but processed asynchronously to avoid
         blocking Windows Explorer during OCR or other heavy operations.
         """
-        supported_extensions = (".pdf", ".docx", ".txt", ".png", ".jpg", ".jpeg", ".gif", ".webp")
+        supported_extensions = (".pdf", ".docx", ".txt", ".msg", ".png", ".jpg", ".jpeg", ".gif", ".webp")
         files_to_add = []
         for url in event.mimeData().urls():
             path = url.toLocalFile()
@@ -990,6 +992,25 @@ class ChatTab(QWidget):
                             for page in doc:
                                 content += page.get_text() + "\n"
                             doc.close()
+                    elif ext == ".msg":
+                        try:
+                            import pythoncom
+                            import win32com.client
+                            pythoncom.CoInitialize()
+                            outlook = win32com.client.Dispatch("Outlook.Application")
+                            namespace = outlook.GetNamespace("MAPI")
+                            item = namespace.OpenSharedItem(os.path.abspath(path))
+                            subject = item.Subject or ""
+                            sender = item.SenderName or ""
+                            body = item.Body or ""
+                            if not body.strip() and item.HTMLBody:
+                                import re
+                                body = re.sub(r'<[^>]+>', '', item.HTMLBody).strip()
+                            item.Close(0)
+                            pythoncom.CoUninitialize()
+                            content += f"From: {sender}\nSubject: {subject}\n\n{body}\n"
+                        except Exception as msg_err:
+                            content += f"[Error reading .msg file: {msg_err}]\n"
                 except Exception as e:
                     content += f"[Error reading file: {e}]\n"
         return content
@@ -1310,12 +1331,7 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
         QMessageBox.information(self, "Context Usage", details)
 
     def on_input_changed(self):
-        """Handle input text changes for auto-resize."""
-        doc = self.chat_input.document()
-        height = int(doc.size().height()) + 20
-        height = max(60, min(150, height))
-        self.chat_input.setFixedHeight(height)
-
+        """Handle input text changes."""
         # Update attachment indicator
         checked_count = sum(1 for i in range(self.file_list.count())
                           if self.file_list.item(i).checkState() == Qt.CheckState.Checked)

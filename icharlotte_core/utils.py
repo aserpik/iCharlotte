@@ -16,6 +16,16 @@ try:
 except ImportError:
     Document = None
 
+# Outlook .msg extraction
+try:
+    import pythoncom
+    import win32com.client as win32com_client
+    MSG_AVAILABLE = True
+except ImportError:
+    MSG_AVAILABLE = False
+    pythoncom = None
+    win32com_client = None
+
 # Try to import CaseDataManager
 try:
     from Scripts.case_data_manager import CaseDataManager
@@ -397,10 +407,32 @@ def extract_text_from_file(file_path):
             text = "\n".join([p.text for p in doc.paragraphs])
             return text
             
-        elif ext in ['.txt', '.md', '.py', '.json', '.xml', '.html', '.htm', '.msg']:
-             # For .msg, we really should use Outlook or extract-msg, but here we'll stick to text-based or rely on the user to convert.
-             # Wait, the prompt implies "drag and drop files (including PDFs, word documents, txt files, etc.)".
-             # For .msg specifically, if we are in this app context, we might use win32com if needed, but for now treat as text/fail.
+        elif ext == '.msg':
+            if not MSG_AVAILABLE:
+                return "[Error: pywin32 not installed — cannot read .msg files]"
+            try:
+                pythoncom.CoInitialize()
+                outlook = win32com_client.Dispatch("Outlook.Application")
+                namespace = outlook.GetNamespace("MAPI")
+                item = namespace.OpenSharedItem(os.path.abspath(file_path))
+                subject = item.Subject or ""
+                sender = item.SenderName or ""
+                sent_on = str(item.SentOn) if item.SentOn else ""
+                body = item.Body or ""
+                if not body.strip() and item.HTMLBody:
+                    body = re.sub(r'<[^>]+>', '', item.HTMLBody).strip()
+                item.Close(0)
+                return f"From: {sender}\nDate: {sent_on}\nSubject: {subject}\n\n{body}"
+            except Exception as e:
+                log_event(f"Error reading .msg file: {e}", "error")
+                return f"[Error reading .msg file: {e}]"
+            finally:
+                try:
+                    pythoncom.CoUninitialize()
+                except Exception:
+                    pass
+
+        elif ext in ['.txt', '.md', '.py', '.json', '.xml', '.html', '.htm']:
              with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                  return f.read()
         

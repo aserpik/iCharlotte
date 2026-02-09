@@ -2352,7 +2352,7 @@ class MainWindow(QMainWindow):
         # For first occurrence of each extension, get icon from a local temp file
         # This avoids accessing network files while still getting proper icons
         if ext in ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-                   '.txt', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff',
+                   '.txt', '.msg', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.tiff',
                    '.mp3', '.mp4', '.avi', '.mov', '.zip', '.rar', '.7z']:
             # Use the icon provider with just the extension info
             icon = self.icon_provider.icon(QFileInfo(f"dummy{ext}"))
