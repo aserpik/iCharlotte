@@ -17,7 +17,7 @@ except ImportError:
 
 # --- Configuration ---
 # Match complaint.py base path structure
-BASE_PATH_WIN = r"Z:\\Shared\\Current Clients" 
+BASE_PATH_WIN = r"Z:\Shared\Current Clients"
 PROJECT_ROOT = os.getcwd()
 LOG_FILE = os.path.join(PROJECT_ROOT, "report_activity.log")
 TEMPLATE_FILENAME = "Template Report.docx"
@@ -42,7 +42,10 @@ except ImportError:
             pass  # stdout pipe broken
     def get_case_path(file_num):
         return None
-$', file_num):
+
+def get_case_path(file_num: str) -> Optional[str]:
+    """Locates the physical directory for a file number (####.###)."""
+    if not re.match(r'^\d{4}\.\d{3}$', file_num):
         log_event(f"Invalid file number format: {file_num}. Expected ####.###", level="error")
         return None
 
@@ -54,18 +57,30 @@ $', file_num):
         return None
 
     # Find Carrier Folder
-    carrier_folders = glob.glob(os.path.join(base_path, f"{carrier_num} - *"))
-    if not carrier_folders:
+    carrier_path = None
+    if carrier_num == "3850":
+        # 3850 is nested under 3800- NATIONWIDE
+        parent_candidates = glob.glob(os.path.join(base_path, "3800*"))
+        for p in parent_candidates:
+            possible_path = os.path.join(p, "3850")
+            if os.path.exists(possible_path):
+                carrier_path = possible_path
+                break
+    else:
+        carrier_folders = glob.glob(os.path.join(base_path, f"{carrier_num} - *"))
+        if carrier_folders:
+            carrier_path = carrier_folders[0]
+
+    if not carrier_path:
         log_event(f"Carrier folder starting with {carrier_num} not found in {base_path}", level="error")
         return None
-    carrier_path = carrier_folders[0]
 
     # Find Case Folder
     case_folders = glob.glob(os.path.join(carrier_path, f"{case_num} - *"))
     if not case_folders:
         log_event(f"Case folder starting with {case_num} not found in {carrier_path}", level="error")
         return None
-    
+
     return os.path.abspath(case_folders[0])
 
 def load_case_data(file_num: str) -> Dict[str, Any]:

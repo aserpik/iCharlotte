@@ -21,7 +21,9 @@ NoteTaker/dist/
 .gemini/case_data/
 *.pdf
 *.docx
+!Templates/litigation_report.docx
 *.json
+!config/report_reference_profile.json
 !NoteTaker/package.json
 !NoteTaker/tsconfig.json
 !NoteTaker/electron.vite.config.ts

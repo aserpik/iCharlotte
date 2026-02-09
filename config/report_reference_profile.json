@@ -1,0 +1,180 @@
+{
+  "meta": {
+    "gold_standard_files": [
+      "gold_1_Haydel.docx",
+      "Gold_2_Espinoza.docx",
+      "Gold_3_Butchler.docx"
+    ],
+    "profiled_date": "2026-02-08",
+    "report_type": "lit_plan",
+    "notes": "All values in twips unless noted. 1 inch = 1440 twips, 1 pt = 20 twips."
+  },
+
+  "page": {
+    "width_twips": 12240,
+    "height_twips": 15840,
+    "margin_top_twips": 2880,
+    "margin_bottom_twips": 1440,
+    "margin_left_twips": 1800,
+    "margin_right_twips": 1800,
+    "content_width_twips": 8640
+  },
+
+  "font": {
+    "name": "Times New Roman",
+    "size_pt": 12,
+    "size_half_points": 24
+  },
+
+  "styles": {
+    "normal": {
+      "font_name": "Times New Roman",
+      "font_size_pt": 12,
+      "first_line_indent_twips": 0,
+      "space_before_twips": 0,
+      "space_after_twips": 0
+    },
+    "body": {
+      "based_on": "Normal",
+      "first_line_indent_twips": 720,
+      "space_before_twips": 240,
+      "space_before_override_twips": 0,
+      "notes": "Body style defines space_before=240 but nearly every instance overrides it to 0"
+    },
+    "zClosing": {
+      "based_on": "Normal",
+      "left_indent_twips": 4320,
+      "keep_next": true
+    },
+    "zDelivery": {
+      "based_on": "Normal",
+      "space_before_twips": 240,
+      "bold": true,
+      "underline": "single"
+    },
+    "zRe": {
+      "based_on": "Normal",
+      "space_after_twips": 240,
+      "left_indent_twips": 1440,
+      "hanging_indent_twips": 720
+    },
+    "ListParagraph": {
+      "based_on": "Normal",
+      "left_indent_twips": 720,
+      "contextual_spacing": true
+    }
+  },
+
+  "section_heading": {
+    "text_case": "ALL_CAPS",
+    "bold": true,
+    "underline": "single",
+    "first_line_indent_twips": 0,
+    "style": "Body",
+    "style_notes": "Some headings use Body, some use Normal. Bold+underline+flush left is consistent."
+  },
+
+  "body_paragraph": {
+    "first_line_indent_twips": 720,
+    "space_before_twips": 0,
+    "space_after_twips": 0,
+    "font_name": "Times New Roman",
+    "font_size_pt": 12,
+    "notes": "Body paragraphs inherit first_line_indent from Body style. No explicit space_after in gold standards."
+  },
+
+  "subheading_l1": {
+    "bold": true,
+    "underline": "single",
+    "text_case": "title_case",
+    "left_indent_twips": 1440,
+    "hanging_indent_twips": 720,
+    "space_before_twips": 75,
+    "space_after_twips": 75,
+    "numbered": true,
+    "prefix_pattern": "A., B., C.",
+    "notes": "Lettered subheadings. Tab at 1440 for text alignment. Some use ListParagraph style, some use no style."
+  },
+
+  "subheading_l2": {
+    "bold": true,
+    "underline": "single",
+    "text_case": "title_case",
+    "left_indent_twips": 2160,
+    "hanging_indent_twips": 720,
+    "numbered": true,
+    "prefix_pattern": "1., 2., 3.",
+    "notes": "Numbered sub-subheadings, nested under L1."
+  },
+
+  "bullet_list": {
+    "left_indent_twips": 720,
+    "hanging_indent_twips": 360,
+    "style": "ListParagraph"
+  },
+
+  "metadata_table": {
+    "columns": 2,
+    "col1_width_twips": 8640,
+    "col2_width_twips": 1939,
+    "total_width_twips": 10579,
+    "layout": "fixed",
+    "table_indent_twips": 0,
+    "borders": "none",
+    "notes": "Borderless 2-column table. Col1 has addressee info with Re: line. Col2 is narrow/empty."
+  },
+
+  "salutation": {
+    "style": "Normal",
+    "contextual_spacing": true,
+    "space_before_twips": 0,
+    "space_after_twips": 0,
+    "indent": 0,
+    "format": "Dear {first_name},"
+  },
+
+  "intro_paragraph": {
+    "style": "Body",
+    "first_line_indent_twips": 720,
+    "space_before_twips": 0,
+    "contextual_spacing": true,
+    "template": "As you recall, Bordin Semmer LLP has been retained to represent the interests of {client_name} (\u201cDefendant\u201d) in the above-referenced matter. Please allow the following to serve as our Litigation Plan in this matter."
+  },
+
+  "closing": {
+    "style": "zClosing",
+    "left_indent_twips": 4320,
+    "valediction": ["Sincerely,", "Very truly yours,"],
+    "firm_name": "BORDIN SEMMER LLP",
+    "attorney_names": ["Joshua Bordin-Wosk", "Andrei Serpik"],
+    "email_style": "Body"
+  },
+
+  "delivery_line": {
+    "style": "zDelivery",
+    "text": "VIA EMAIL"
+  },
+
+  "section_order": [
+    "FACTUAL BACKGROUND",
+    "PROCEDURAL HISTORY",
+    "INVESTIGATION",
+    "DISCOVERY",
+    "MEDICAL RECORD REVIEW",
+    "EVALUATION OF LIABILITY",
+    "EVALUATION OF EXPOSURE",
+    "EXPERTS",
+    "SETTLEMENT",
+    "SETTLEMENT STATUS",
+    "LITIGATION BUDGET",
+    "FURTHER CASE HANDLING"
+  ],
+
+  "procedural_history_subheadings": [
+    "Pleadings",
+    "Responsive Pleading",
+    "Venue",
+    "Representation",
+    "Future Hearings"
+  ]
+}

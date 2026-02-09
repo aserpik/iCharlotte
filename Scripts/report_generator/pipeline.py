@@ -35,6 +35,7 @@ def run_pipeline(
     output_path: str = None,
     skip_refine: bool = False,
     skip_polish: bool = False,
+    skip_validate: bool = False,
     llm_caller=None,
 ) -> str:
     """
@@ -101,6 +102,18 @@ def run_pipeline(
         output_path=output_path,
     )
     print(f"  Assembled: {assembled_path}")
+
+    # ── Stage 3.5: VALIDATE ─────────────────────────────────────
+    if skip_validate:
+        print("[3.5/5] VALIDATE - SKIPPED (--skip-validate)")
+    else:
+        print("[3.5/5] VALIDATE - Checking formatting against reference profile...")
+        from Scripts.report_generator.validate import validate_report
+
+        validation = validate_report(assembled_path)
+        validation.print_summary()
+        if validation.fail_count > 0:
+            print(f"  WARNING: {validation.fail_count} validation failures detected")
 
     # ── Stage 4: POLISH ──────────────────────────────────────────
     if skip_polish:
@@ -227,6 +240,10 @@ Examples:
         help="Skip the final LLM polish pass"
     )
     parser.add_argument(
+        "--skip-validate", action="store_true",
+        help="Skip formatting validation after assembly"
+    )
+    parser.add_argument(
         "--verbose", "-v", action="store_true",
         help="Enable verbose logging"
     )
@@ -250,6 +267,7 @@ Examples:
             output_path=args.output,
             skip_refine=args.skip_refine,
             skip_polish=args.skip_polish,
+            skip_validate=args.skip_validate,
         )
         sys.exit(0)
     except FileNotFoundError as e:

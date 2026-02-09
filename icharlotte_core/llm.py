@@ -254,11 +254,12 @@ class LLMHandler:
             if file_contents: full_user_content += "\n\n[ATTACHED FILES]:\n" + file_contents
             messages.append({"role": "user", "content": full_user_content})
 
-            claude_max = max_tokens if max_tokens > 0 else 8192
             payload = {
-                "model": model, "max_tokens": claude_max, "temperature": temp, "top_p": top_p,
+                "model": model, "temperature": temp, "top_p": top_p,
                 "system": system_prompt, "messages": messages
             }
+            if max_tokens > 0:
+                payload["max_tokens"] = max_tokens
 
             if do_stream:
                 # Streaming mode

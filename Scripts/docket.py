@@ -52,6 +52,7 @@ SC_SCRAPER_SCRIPT = os.path.join(SCRIPTS_DIR, "santa_clara_docket_scraper.py")
 ALAMEDA_SCRAPER_SCRIPT = os.path.join(SCRIPTS_DIR, "alameda_docket_scraper.py")
 MARIPOSA_SCRAPER_SCRIPT = os.path.join(SCRIPTS_DIR, "mariposa_docket_scraper.py")
 YOLO_SCRAPER_SCRIPT = os.path.join(SCRIPTS_DIR, "yolo_docket_scraper.py")
+LAKE_SCRAPER_SCRIPT = os.path.join(SCRIPTS_DIR, "lake_docket_scraper.py")
 COMPLAINT_SCRIPT = os.path.join(SCRIPTS_DIR, "complaint.py")
 PROCEDURAL_HIST_PROMPT_FILE = os.path.join(SCRIPTS_DIR, "Procedural_History.txt")
 MASTER_STATUS_PATH = r"C:\Users\ASerpik.DESKTOP-MRIMK0D\OneDrive - Bordin Semmer LLP\Desktop\MASTER_CASE_STATUS.docx"
@@ -880,10 +881,13 @@ def main():
     elif venue_county == "yolo":
         log_event("Venue is Yolo. Using Yolo Scraper.")
         selected_scraper = YOLO_SCRAPER_SCRIPT
+    elif venue_county == "lake":
+        log_event("Venue is Lake. Using Lake County Scraper.")
+        selected_scraper = LAKE_SCRAPER_SCRIPT
     else:
         # Prompt: "I want the agent to do this only if the venue_county variable is Los Angeles. 
         # However, if the venue_county variable is riverside..."
-        log_event(f"Venue '{venue_county}' is not supported (LA, SB, Riverside, SD, OC, Sacramento, Santa Clara, Alameda, Mariposa, or Yolo only). Skipping download.", level="warning")
+        log_event(f"Venue '{venue_county}' is not supported (LA, SB, Riverside, SD, OC, Sacramento, Santa Clara, Alameda, Mariposa, Yolo, or Lake only). Skipping download.", level="warning")
         # Do not exit; proceed to Phase 4
         selected_scraper = None
 
