@@ -1566,6 +1566,25 @@ class WordLLMPopup(QDialog):
             # Check if we should use all document text as context
             use_all_text = self.use_all_text_check.isChecked()
 
+            # When redline mode is active, prepend instruction to preserve unchanged text
+            redline_prefix = ""
+            if self._redline_mode_active:
+                redline_prefix = (
+                    "IMPORTANT — REDLINE MODE IS ACTIVE: Your output will be compared "
+                    "word-by-word against the original text to generate Track Changes. "
+                    "You MUST follow these rules:\n"
+                    "1. Preserve any text that does not need to change EXACTLY as-is — "
+                    "same wording, same sentence structure, same word order.\n"
+                    "2. PRESERVE THE EXACT PARAGRAPH STRUCTURE — keep the same number of "
+                    "paragraphs and blank lines between them. Each paragraph must start "
+                    "and end at the same boundaries as the original. Do NOT merge paragraphs, "
+                    "split paragraphs, or remove blank lines.\n"
+                    "3. Do NOT rephrase, reorganize, or rewrite portions that are already correct.\n"
+                    "4. Only modify the specific words or sentences that need to change.\n"
+                    "5. If a sentence is fine as-is, copy it verbatim.\n\n"
+                )
+                prompt = redline_prefix + prompt
+
             if use_all_text and has_selection and selected_text:
                 # Get all document text for context
                 all_text = self._get_all_document_text()
@@ -1667,11 +1686,13 @@ class WordLLMPopup(QDialog):
                         if not selection:
                             raise Exception("Could not access Word selection")
 
-                        # Apply redlines using adeu
+                        # Apply redlines using diff-match-patch
+                        # Use raw (un-stripped) text so positions match Word range
+                        original_for_diff = getattr(self, '_original_text_raw', self._original_text)
                         success = self._apply_redlines(
                             word,
                             selection,
-                            self._original_text,
+                            original_for_diff,
                             result
                         )
 
@@ -1808,11 +1829,14 @@ class WordLLMPopup(QDialog):
                 self._original_document = None
 
             text = ""
+            raw_text_for_redline = ""
             try:
                 raw_text = selection.Text
+                raw_text_for_redline = raw_text if raw_text else ""
                 text = raw_text.strip() if raw_text else ""
                 if text:
                     print(f"Got selection text: '{text[:50]}...' ({len(text)} chars)")
+                    print(f"Raw text repr (first 100): {repr(raw_text_for_redline[:100])}")
                 else:
                     print("No text selected (cursor at insertion point)")
             except Exception as e:
@@ -1837,6 +1861,9 @@ class WordLLMPopup(QDialog):
                         "Instead of replacing text, insert AI suggestions as Track Changes "
                         "that you can accept/reject in Word"
                     )
+                    # Store RAW text (not stripped) for redline diffing —
+                    # positions must match the Word range exactly
+                    self._original_text_raw = raw_text_for_redline
                     self._original_text = text
                     try:
                         # Store the document and range for later use
@@ -1908,7 +1935,12 @@ class WordLLMPopup(QDialog):
         return True, ""
 
     def _apply_redlines(self, word_app, selection, original_text: str, revised_text: str) -> bool:
-        """Apply word-level redlines using diff-match-patch and Word Track Changes.
+        """Apply redlines using flat diff mapped back to Word paragraphs.
+
+        Strategy: flatten both texts (strip paragraph breaks), diff them
+        character-by-character, then map each change back to the correct
+        Word paragraph. This never touches paragraph marks (\\r), so
+        formatting is always preserved regardless of LLM paragraph behavior.
 
         Args:
             word_app: Word COM application object
@@ -1921,8 +1953,10 @@ class WordLLMPopup(QDialog):
         """
         try:
             from diff_match_patch import diff_match_patch
+            import bisect
+            import re
 
-            # Get document object - use stored document if available
+            # Get document object
             try:
                 doc = self._original_document if self._original_document else word_app.ActiveDocument
                 if not doc:
@@ -1940,7 +1974,6 @@ class WordLLMPopup(QDialog):
                         doc.TrackRevisions = True
                 except Exception as e:
                     print(f"Could not enable Track Changes: {e}")
-                    # Continue anyway - may still work
 
             # Reconstruct range from stored coordinates
             try:
@@ -1956,47 +1989,194 @@ class WordLLMPopup(QDialog):
                     print(f"Could not get selection range: {e2}")
                     return False
 
-            # Compute word-level diff
             try:
+                # --- 1. Build Word paragraph map ---
+                word_paras = []
+                try:
+                    para_collection = range_obj.Paragraphs
+                    para_count = para_collection.Count
+                    for i in range(1, para_count + 1):
+                        wp = para_collection(i)
+                        text = wp.Range.Text
+                        content = text[:-1] if text.endswith('\r') else text
+                        word_paras.append({
+                            'start': wp.Range.Start,
+                            'end': wp.Range.End,
+                            'text': text,
+                            'content': content,
+                        })
+                except Exception as e:
+                    print(f"Could not enumerate Word paragraphs: {e}")
+                    return False
+
+                print(f"Word paragraphs: {len(word_paras)}")
+
+                # --- 2. Build flat original text with boundary spaces ---
+                # Join paragraph contents with a space separator so boundaries
+                # match how LLMs return text (spaces where line breaks were).
+                orig_flat = ''
+                flat_para_starts = []
+                boundary_positions = set()
+
+                for i, wp in enumerate(word_paras):
+                    if i > 0 and wp['content']:
+                        prev_had_content = any(word_paras[j]['content'] for j in range(i))
+                        if prev_had_content:
+                            boundary_positions.add(len(orig_flat))
+                            orig_flat += ' '
+                    flat_para_starts.append(len(orig_flat))
+                    orig_flat += wp['content']
+                flat_para_starts.append(len(orig_flat))  # sentinel
+
+                print(f"Original flat: {len(orig_flat)} chars, "
+                      f"{len(boundary_positions)} boundary spaces")
+
+                # --- 3. Flatten revised text ---
+                rev_flat = revised_text.replace('\r\n', ' ').replace('\r', ' ').replace('\n', ' ')
+                rev_flat = re.sub(r'  +', ' ', rev_flat).strip()
+
+                print(f"Revised flat: {len(rev_flat)} chars")
+
+                # --- 4. Diff the flat texts ---
                 dmp = diff_match_patch()
-                diffs = dmp.diff_main(original_text, revised_text)
-                dmp.diff_cleanupSemantic(diffs)  # Optimize for human readability
+                diffs = dmp.diff_main(orig_flat, rev_flat)
+                dmp.diff_cleanupSemantic(diffs)
 
-                # Build position map for each diff operation
+                eq = sum(len(t) for op, t in diffs if op == 0)
+                de = sum(len(t) for op, t in diffs if op == -1)
+                ins = sum(len(t) for op, t in diffs if op == 1)
+                pct = eq / len(orig_flat) * 100 if orig_flat else 0
+                print(f"Flat diff: {eq} equal, {de} del, {ins} ins ({pct:.1f}% preserved)")
+
+                # --- 5. Build operations, filtering boundary artifacts ---
                 operations = []
-                current_pos = 0
-
+                pos = 0
                 for op, text in diffs:
-                    if op == 0:  # Equal - no change
-                        current_pos += len(text)
-                    elif op == -1:  # Delete
-                        operations.append(('delete', current_pos, current_pos + len(text)))
-                        current_pos += len(text)
-                    elif op == 1:  # Insert
-                        operations.append(('insert', current_pos, text))
+                    if op == 0:
+                        pos += len(text)
+                    elif op == -1:
+                        all_boundary = all(
+                            pos + i in boundary_positions for i in range(len(text))
+                        )
+                        if not all_boundary:
+                            i = pos
+                            real_end = pos + len(text)
+                            while i < real_end:
+                                if i in boundary_positions:
+                                    i += 1
+                                    continue
+                                seg_start = i
+                                while i < real_end and i not in boundary_positions:
+                                    i += 1
+                                operations.append((
+                                    'delete', seg_start, i, orig_flat[seg_start:i]
+                                ))
+                        pos += len(text)
+                    elif op == 1:
+                        if text == ' ' and pos in boundary_positions:
+                            pass  # skip boundary space insert
+                        else:
+                            operations.append(('insert', pos, text))
 
-                # Apply operations in REVERSE order to avoid position drift
+                print(f"Operations to apply: {len(operations)}")
+
+                # --- 6. Map flat positions to Word and apply in reverse ---
+                import time as _time
+                _time.sleep(0.2)
+
+                total_changes = 0
+
+                def flat_to_word_pos(flat_pos):
+                    para_idx = bisect.bisect_right(flat_para_starts, flat_pos) - 1
+                    para_idx = max(0, min(para_idx, len(word_paras) - 1))
+                    offset = flat_pos - flat_para_starts[para_idx]
+                    return word_paras[para_idx]['start'] + offset
+
                 for operation in reversed(operations):
                     if operation[0] == 'delete':
-                        _, start_offset, end_offset = operation
-                        delete_range = doc.Range(
-                            range_obj.Start + start_offset,
-                            range_obj.Start + end_offset
-                        )
-                        delete_range.Delete()  # Creates tracked deletion
-                    elif operation[0] == 'insert':
-                        _, offset, text = operation
-                        insert_range = doc.Range(
-                            range_obj.Start + offset,
-                            range_obj.Start + offset
-                        )
-                        insert_range.InsertAfter(text)  # Creates tracked insertion
+                        _, flat_start, flat_end, del_text = operation
+                        start_para = bisect.bisect_right(
+                            flat_para_starts, flat_start) - 1
+                        end_para = bisect.bisect_right(
+                            flat_para_starts, flat_end - 1) - 1
 
-                print(f"Successfully applied {len(operations)} redline changes")
+                        if start_para == end_para:
+                            word_start = flat_to_word_pos(flat_start)
+                            word_end = flat_to_word_pos(flat_end)
+                            # Never delete past the paragraph mark
+                            para_content_end = word_paras[start_para]['end'] - 1
+                            if word_end > para_content_end:
+                                word_end = para_content_end
+                            if word_start >= word_end:
+                                continue
+                            # Skip trailing whitespace at paragraph end
+                            # (deleting adjacent to \r risks capturing it)
+                            if word_end == para_content_end and del_text.strip() == '':
+                                continue
+                            dr = doc.Range(word_start, word_end)
+                            print(f"  DEL in para [{start_para}]: "
+                                  f"{repr(dr.Text[:50])}")
+                            dr.Delete()
+                            total_changes += 1
+                        else:
+                            for pidx in reversed(range(start_para, end_para + 1)):
+                                p_start = flat_para_starts[pidx]
+                                p_end = flat_para_starts[pidx + 1]
+                                clip_start = max(flat_start, p_start)
+                                clip_end = min(flat_end, p_end)
+                                if clip_start >= clip_end:
+                                    continue
+                                ws = word_paras[pidx]['start'] + (clip_start - p_start)
+                                we = word_paras[pidx]['start'] + (clip_end - p_start)
+                                para_content_end = word_paras[pidx]['end'] - 1
+                                if we > para_content_end:
+                                    we = para_content_end
+                                if ws >= we:
+                                    continue
+                                dr = doc.Range(ws, we)
+                                print(f"  DEL in para [{pidx}]: "
+                                      f"{repr(dr.Text[:50])}")
+                                dr.Delete()
+                                total_changes += 1
+
+                    elif operation[0] == 'insert':
+                        _, flat_pos, ins_text = operation
+                        word_pos = flat_to_word_pos(flat_pos)
+                        ir = doc.Range(word_pos, word_pos)
+                        ir.InsertAfter(ins_text)
+                        para_idx = bisect.bisect_right(
+                            flat_para_starts, flat_pos) - 1
+                        print(f"  INS in para [{para_idx}]: "
+                              f"{repr(ins_text[:50])}")
+                        total_changes += 1
+
+                print(f"Applied {total_changes} redline changes")
+
+                # --- 7. Post-application validation ---
+                _time.sleep(0.5)
+                pre_content_paras = sum(
+                    1 for wp in word_paras if wp['content'].strip()
+                )
+
+                try:
+                    from icharlotte_core.word_validator import validate_redline
+                    val_result = validate_redline(
+                        doc_com=doc,
+                        range_start=self._original_range_start,
+                        range_end=self._original_range_end,
+                        pre_content_para_count=pre_content_paras,
+                        orig_flat_length=len(orig_flat),
+                        deleted_chars=de,
+                        inserted_chars=ins,
+                    )
+                    val_result.print_summary()
+                except Exception as ve:
+                    print(f"Validation error: {ve}")
+
                 return True
 
             except Exception as e:
-                print(f"Diff application failed: {e}")
+                print(f"Flat diff redline failed: {e}")
                 import traceback
                 traceback.print_exc()
                 return False
@@ -2558,11 +2738,29 @@ class WordLLMPopup(QDialog):
                 'thinking_level': 'None'
             }
 
+            # Use redline-aware system prompt when redline mode is active
+            if self._redline_mode_active:
+                system_prompt = (
+                    "You are a helpful writing assistant operating in REDLINE MODE. "
+                    "Your output will be diffed against the original text to produce "
+                    "Track Changes in Microsoft Word. You MUST preserve unchanged text "
+                    "EXACTLY as written — same words, same order, same punctuation. "
+                    "Only modify the specific parts that need changing per the user's "
+                    "instructions. Output only the requested text without any preamble, "
+                    "explanation, or markdown formatting unless specifically asked."
+                )
+            else:
+                system_prompt = (
+                    "You are a helpful writing assistant. Follow the user's instructions "
+                    "precisely. Output only the requested text without any preamble, "
+                    "explanation, or markdown formatting unless specifically asked."
+                )
+
             print(f"Calling LLMHandler.generate...")
             result = LLMHandler.generate(
                 provider=provider,
                 model=model_id,
-                system_prompt="You are a helpful writing assistant. Follow the user's instructions precisely. Output only the requested text without any preamble, explanation, or markdown formatting unless specifically asked.",
+                system_prompt=system_prompt,
                 user_prompt=prompt,
                 file_contents="",
                 settings=settings

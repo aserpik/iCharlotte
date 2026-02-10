@@ -179,6 +179,43 @@ Unified hierarchy with retry decorators:
 - SQLite with context managers
 - Upsert pattern for case data
 
+### Word Document Validation (MANDATORY)
+Any code that **produces, modifies, or saves a .docx file** MUST validate the output using `icharlotte_core/word_validator.py`. This is not optional.
+
+**Redline / Track Changes operations** (COM-based, live Word):
+```python
+from icharlotte_core.word_validator import validate_redline
+# After applying tracked changes:
+result = validate_redline(
+    doc_com=doc,
+    range_start=range_start,
+    range_end=range_end,
+    pre_content_para_count=pre_content_count,
+    orig_flat_length=len(orig_flat),
+    deleted_chars=del_count,
+    inserted_chars=ins_count,
+)
+result.print_summary()
+if result.has_errors:
+    print("VALIDATION FAILED — check output before proceeding")
+```
+
+**Report generation** (python-docx, offline):
+```python
+from icharlotte_core.word_validator import validate_report
+result = validate_report(output_path)  # auto-loads reference profile
+result.print_summary()
+```
+
+**Any other Word edit** (lightweight check):
+```python
+from icharlotte_core.word_validator import validate_after_edit
+result = validate_after_edit(doc_com, range_start, range_end)
+result.print_summary()
+```
+
+**When writing new check rules**: Add a function to `word_validator.py` following the pattern `def check_xxx(...) -> List[Finding]`, then add it to the appropriate convenience wrapper or `REPORT_RULES` list.
+
 ### Testing
 - Use unittest framework
 - Tests in `tests/` directory

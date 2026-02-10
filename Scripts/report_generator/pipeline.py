@@ -128,6 +128,16 @@ def run_pipeline(
         )
         print(f"  Polished: {final_path}")
 
+    # ── Stage 4.5: POST-POLISH VALIDATE ─────────────────────────
+    if not skip_polish and not skip_validate:
+        print("[4.5/5] VALIDATE - Post-polish formatting check...")
+        from Scripts.report_generator.validate import validate_report as validate_final
+
+        post_polish = validate_final(final_path)
+        post_polish.print_summary()
+        if post_polish.fail_count > 0:
+            print(f"  WARNING: {post_polish.fail_count} post-polish validation failures")
+
     # ── Stage 5: OUTPUT ──────────────────────────────────────────
     elapsed = time.time() - start_time
     print(f"[5/5] OUTPUT - Done!")
