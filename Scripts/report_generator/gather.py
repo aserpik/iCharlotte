@@ -42,6 +42,7 @@ SECTION_ORDER = [
     "PROCEDURAL STATUS",
     "INVESTIGATION",
     "DISCOVERY",
+    "EXPERTS",
     "MEDICAL RECORD REVIEW",
     "EVALUATION OF LIABILITY",
     "EVALUATION OF EXPOSURE",
@@ -62,6 +63,12 @@ STATUS_REPORT_ALWAYS_INCLUDE = {
 # Sections where multiple source files are date-versioned snapshots (use latest only)
 # Other sections (med records, discovery) legitimately have multiple distinct sources
 USE_LATEST_ONLY = {"PROCEDURAL STATUS"}
+
+# Keywords that route AI_OUTPUT summaries to EXPERTS instead of INVESTIGATION
+EXPERTS_KEYWORDS = re.compile(
+    r'(?:\bIME\b|independent\s+medical\s+exam(?:ination)?|preliminary\s+opinions?\b)',
+    re.IGNORECASE
+)
 
 
 def gather_case_data(file_number: str, report_type: str = "FSR",
@@ -101,6 +108,9 @@ def gather_case_data(file_number: str, report_type: str = "FSR",
 
     # Parse variables.docx specially — it contains structured data from complaint.py
     _process_variables_file(output_dir, sections, section_files, metadata)
+
+    # Ingest AI_OUTPUT.docx summaries into INVESTIGATION / EXPERTS
+    _ingest_ai_output(output_dir, sections, section_files)
 
     # For status reports, parse the prior report for delta comparison
     prior_sections = {}
@@ -473,6 +483,93 @@ def _is_new_content(section_name: str, section_files: Dict[str, str],
                 return True
 
     return False
+
+
+def _ingest_ai_output(output_dir: str, sections: Dict[str, str],
+                      section_files: Dict[str, str]):
+    """
+    Parse AI_OUTPUT.docx (summarize.py output) and route summaries to
+    INVESTIGATION or EXPERTS based on content keywords.
+
+    Each block starts with a filename header, followed by "Generated on:" timestamp,
+    then the summary text. Summaries mentioning IME, independent medical examination,
+    or preliminary opinion(s) go to EXPERTS; all others go to INVESTIGATION.
+    """
+    filepath = os.path.join(output_dir, "AI_OUTPUT.docx")
+    if not os.path.exists(filepath):
+        return
+
+    try:
+        doc = Document(filepath)
+    except Exception as e:
+        logger.warning(f"Could not open AI_OUTPUT.docx: {e}")
+        return
+
+    blocks = _parse_ai_output_blocks(doc)
+    if not blocks:
+        return
+
+    for title, text in blocks:
+        # Route based on keywords in title or first 200 chars of text
+        search_text = title + " " + text[:200]
+        if EXPERTS_KEYWORDS.search(search_text):
+            target = "EXPERTS"
+        else:
+            target = "INVESTIGATION"
+
+        block_text = f"{title}\n\n{text}"
+        if target in sections:
+            sections[target] += f"\n\n--- Source: {title} ---\n\n{block_text}"
+        else:
+            sections[target] = block_text
+            section_files[target] = filepath
+
+    logger.info(f"Ingested {len(blocks)} summaries from AI_OUTPUT.docx")
+
+
+def _parse_ai_output_blocks(doc) -> List[Tuple[str, str]]:
+    """Parse AI_OUTPUT.docx into (title, text) blocks."""
+    blocks = []
+    current_title = None
+    current_lines = []
+
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if not text:
+            if current_title:
+                current_lines.append("")
+            continue
+
+        # Detect filename headers (has file extension or is all-bold)
+        is_header = False
+        if re.search(r'\.\w{2,4}$', text):  # Ends with .pdf, .docx, etc.
+            is_header = True
+        elif para.runs and all(r.bold for r in para.runs if r.text.strip()):
+            is_header = True
+
+        if is_header and text != current_title:
+            # Save previous block
+            if current_title and current_lines:
+                content = "\n".join(current_lines).strip()
+                # Remove "Generated on:" timestamp line
+                content = re.sub(r'^Generated on:.*\n?', '', content,
+                                 flags=re.MULTILINE).strip()
+                if content:
+                    blocks.append((current_title, content))
+            current_title = text
+            current_lines = []
+        elif current_title:
+            current_lines.append(text)
+
+    # Save last block
+    if current_title and current_lines:
+        content = "\n".join(current_lines).strip()
+        content = re.sub(r'^Generated on:.*\n?', '', content,
+                         flags=re.MULTILINE).strip()
+        if content:
+            blocks.append((current_title, content))
+
+    return blocks
 
 
 if __name__ == "__main__":

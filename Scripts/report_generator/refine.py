@@ -37,6 +37,10 @@ PLACEHOLDER_TEMPLATES = {
         "Discovery responses have not yet been received. This section will be "
         "updated in a subsequent status report once responses are obtained."
     ),
+    "EXPERTS": (
+        "No expert opinions have been obtained at this time. This section will be "
+        "updated in a subsequent status report once expert evaluations are completed."
+    ),
     "MEDICAL RECORD REVIEW": (
         "Medical records have not yet been obtained and reviewed. This section "
         "will be updated in a subsequent status report once records are received "
@@ -325,6 +329,16 @@ def _get_section_specific_instructions(section_name: str) -> str:
             "  the Investigation section.\n"
             "- End with Outstanding Discovery sub-heading if applicable."
         ),
+        "EXPERTS": (
+            "=== SECTION STRUCTURE ===\n"
+            "- Use expert name or examination type as sub-headings.\n"
+            "- Under each sub-heading, summarize the expert's findings,\n"
+            "  opinions, and conclusions.\n"
+            "- Include dates of examination, expert credentials if available.\n"
+            "- Note any preliminary opinions and their basis.\n"
+            "- If IME reports, include diagnoses, causation opinions, and\n"
+            "  future treatment recommendations."
+        ),
         "MEDICAL RECORD REVIEW": (
             "=== SECTION STRUCTURE ===\n"
             "- Use treatment provider names as sub-headings.\n"
@@ -363,10 +377,17 @@ def _get_section_specific_instructions(section_name: str) -> str:
         ),
         "FURTHER CASE HANDLING": (
             "=== SECTION STRUCTURE ===\n"
-            "- Narrative paragraphs outlining recommended next steps.\n"
-            "- Reference specific outstanding items from earlier sections.\n"
-            "- Note upcoming deadlines and hearings.\n"
-            "- End with a forward-looking recommendation."
+            "- Use a numbered list format for recommended next steps.\n"
+            "- Each item should be a specific, actionable recommendation.\n"
+            "- Reference specific outstanding items from earlier sections\n"
+            "  (e.g., 'propound supplemental discovery', 'depose the Plaintiff',\n"
+            "  'retain an expert', 'file a motion for summary judgment').\n"
+            "- Note upcoming deadlines and hearings with specific dates.\n"
+            "- Include budgetary considerations where relevant.\n"
+            "- End with a forward-looking recommendation or strategic note.\n"
+            "- Typical items include: obtain/review discovery responses,\n"
+            "  take/defend depositions, retain experts, file dispositive motions,\n"
+            "  attend mediation, prepare for trial."
         ),
     }
     return instructions.get(section_name, "")

@@ -58,6 +58,7 @@ AGENT_DEFINITIONS = [
     ("agent_summarize", "Summarize", "Document summarization with verification", "summary"),
     ("agent_sum_disc", "Summarize Discovery", "Discovery response extraction and summarization", "extraction"),
     ("agent_sum_depo", "Summarize Deposition", "Deposition transcript analysis", "extraction"),
+    ("agent_depo_extract", "Depo Extract", "Deposition testimony extraction by topic", "extraction"),
     ("agent_med_rec", "Medical Records", "Medical record processing", "extraction"),
     ("agent_med_chron", "Medical Chronology", "Medical chronology generation", "extraction"),
     ("agent_organize", "Organize", "Document organization and categorization", "quick"),
@@ -100,7 +101,7 @@ class ModelSpec:
     """Specification for a single LLM model."""
     provider: str
     model: str
-    max_tokens: int = 8192
+    max_tokens: int = -1
     supports_thinking: bool = False
     supports_streaming: bool = True
     cost_tier: str = "standard"  # "low", "standard", "high"
@@ -187,28 +188,28 @@ DEFAULT_MODEL_SEQUENCE = [
     ModelSpec(
         provider="Gemini",
         model="gemini-2.5-pro",
-        max_tokens=8192,
+        max_tokens=-1,
         supports_thinking=True,
         cost_tier="high"
     ),
     ModelSpec(
         provider="Gemini",
         model="gemini-2.5-flash",
-        max_tokens=8192,
+        max_tokens=-1,
         supports_thinking=True,
         cost_tier="standard"
     ),
     ModelSpec(
         provider="Claude",
         model="claude-sonnet-4-20250514",
-        max_tokens=8192,
+        max_tokens=-1,
         supports_thinking=False,
         cost_tier="high"
     ),
     ModelSpec(
         provider="OpenAI",
         model="gpt-4o",
-        max_tokens=8192,
+        max_tokens=-1,
         supports_thinking=False,
         cost_tier="high"
     ),
@@ -219,21 +220,21 @@ FAST_MODEL_SEQUENCE = [
     ModelSpec(
         provider="Gemini",
         model="gemini-2.5-flash",
-        max_tokens=4096,
+        max_tokens=-1,
         supports_thinking=False,
         cost_tier="low"
     ),
     ModelSpec(
         provider="Claude",
         model="claude-haiku-4-20250514",
-        max_tokens=4096,
+        max_tokens=-1,
         supports_thinking=False,
         cost_tier="low"
     ),
     ModelSpec(
         provider="OpenAI",
         model="gpt-4o-mini",
-        max_tokens=4096,
+        max_tokens=-1,
         supports_thinking=False,
         cost_tier="low"
     ),
@@ -244,21 +245,21 @@ GEMINI3_MODEL_SEQUENCE = [
     ModelSpec(
         provider="Gemini",
         model="gemini-3-pro-preview",
-        max_tokens=8192,
+        max_tokens=-1,
         supports_thinking=True,
         cost_tier="high"
     ),
     ModelSpec(
         provider="Gemini",
         model="gemini-3-flash-preview",
-        max_tokens=8192,
+        max_tokens=-1,
         supports_thinking=True,
         cost_tier="standard"
     ),
     ModelSpec(
         provider="Claude",
         model="claude-sonnet-4-20250514",
-        max_tokens=8192,
+        max_tokens=-1,
         supports_thinking=False,
         cost_tier="high"
     ),
@@ -733,7 +734,7 @@ class LLMCaller:
             },
             json={
                 "model": model,
-                "max_tokens": 8192,
+                "max_tokens": 65536,
                 "messages": [{"role": "user", "content": full_content}]
             },
             timeout=120
@@ -765,8 +766,7 @@ class LLMCaller:
             },
             json={
                 "model": model,
-                "messages": [{"role": "user", "content": full_content}],
-                "max_tokens": 8192
+                "messages": [{"role": "user", "content": full_content}]
             },
             timeout=120
         )

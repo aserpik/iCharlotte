@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QPushButton, QMessageBox, QApplication,
     QTextEdit, QFrame, QSizePolicy, QCheckBox, QSpinBox,
     QGroupBox, QGridLayout, QFontComboBox, QDoubleSpinBox,
-    QTabWidget, QWidget, QScrollArea
+    QTabWidget, QWidget, QScrollArea, QFileDialog
 )
 from PySide6.QtCore import Qt, Signal, QObject, QTimer, QThread
 from PySide6.QtGui import QFont, QKeySequence, QShortcut
@@ -42,6 +42,16 @@ try:
 except ImportError:
     HAS_KEYBOARD = False
 
+# Windows RegisterHotKey API - more reliable than keyboard library hooks
+import ctypes
+import ctypes.wintypes as wintypes
+import threading
+_WM_HOTKEY = 0x0312
+_MOD_WIN = 0x0008
+_MOD_NOREPEAT = 0x4000
+_VK_V = 0x56
+_HOTKEY_ID = 0xBFFF  # Arbitrary ID in valid range
+
 try:
     import win32com.client
     import pythoncom
@@ -51,6 +61,12 @@ try:
     HAS_WIN32 = True
 except ImportError:
     HAS_WIN32 = False
+
+try:
+    from .document_processor import DocumentProcessor
+    HAS_DOC_PROCESSOR = True
+except ImportError:
+    HAS_DOC_PROCESSOR = False
 
 # Application context types
 APP_CONTEXT_UNKNOWN = "unknown"
@@ -477,6 +493,246 @@ class CustomFormatDialog(QDialog):
         }
 
 
+def apply_flat_diff_redline(doc_com, range_start, range_end, original_text,
+                            revised_text, auto_enable_track_changes=True):
+    """Apply tracked changes using flat diff mapped to Word paragraphs.
+
+    Standalone reusable function extracted from the AI Assistant's redline engine.
+    Can be called from both the AI Assistant and the ReportReviewer.
+
+    Strategy: flatten both texts (strip paragraph breaks), diff them
+    character-by-character, then map each change back to the correct
+    Word paragraph. This never touches paragraph marks (\\r), so
+    formatting is always preserved regardless of LLM paragraph behavior.
+
+    Args:
+        doc_com: win32com Word Document object
+        range_start: Start character position of the target range
+        range_end: End character position of the target range
+        original_text: Original text before LLM processing
+        revised_text: LLM-revised text
+        auto_enable_track_changes: Whether to auto-enable Track Changes
+
+    Returns:
+        dict with keys: success (bool), total_changes (int),
+        equal_chars (int), deleted_chars (int), inserted_chars (int),
+        pre_content_para_count (int), orig_flat_length (int)
+    """
+    result = {
+        'success': False, 'total_changes': 0,
+        'equal_chars': 0, 'deleted_chars': 0, 'inserted_chars': 0,
+        'pre_content_para_count': 0, 'orig_flat_length': 0,
+    }
+
+    try:
+        from diff_match_patch import diff_match_patch
+        import bisect
+        import re
+        import time as _time
+
+        if not doc_com:
+            print("No document available")
+            return result
+
+        # Auto-enable Track Changes if needed
+        if auto_enable_track_changes:
+            try:
+                if not doc_com.TrackRevisions:
+                    print("Auto-enabling Track Changes for redlining")
+                    doc_com.TrackRevisions = True
+            except Exception as e:
+                print(f"Could not enable Track Changes: {e}")
+
+        # Reconstruct range
+        try:
+            range_obj = doc_com.Range(range_start, range_end)
+        except Exception as e:
+            print(f"Could not reconstruct range: {e}")
+            return result
+
+        # --- 1. Build Word paragraph map ---
+        word_paras = []
+        try:
+            para_collection = range_obj.Paragraphs
+            para_count = para_collection.Count
+            for i in range(1, para_count + 1):
+                wp = para_collection(i)
+                text = wp.Range.Text
+                content = text[:-1] if text.endswith('\r') else text
+                word_paras.append({
+                    'start': wp.Range.Start,
+                    'end': wp.Range.End,
+                    'text': text,
+                    'content': content,
+                })
+        except Exception as e:
+            print(f"Could not enumerate Word paragraphs: {e}")
+            return result
+
+        print(f"Word paragraphs: {len(word_paras)}")
+
+        # --- 2. Build flat original text with boundary spaces ---
+        orig_flat = ''
+        flat_para_starts = []
+        boundary_positions = set()
+
+        for i, wp in enumerate(word_paras):
+            if i > 0 and wp['content']:
+                prev_had_content = any(word_paras[j]['content'] for j in range(i))
+                if prev_had_content:
+                    boundary_positions.add(len(orig_flat))
+                    orig_flat += ' '
+            flat_para_starts.append(len(orig_flat))
+            orig_flat += wp['content']
+        flat_para_starts.append(len(orig_flat))  # sentinel
+
+        print(f"Original flat: {len(orig_flat)} chars, "
+              f"{len(boundary_positions)} boundary spaces")
+
+        # --- 3. Flatten revised text ---
+        rev_flat = revised_text.replace('\r\n', ' ').replace('\r', ' ').replace('\n', ' ')
+        rev_flat = re.sub(r'  +', ' ', rev_flat).strip()
+
+        print(f"Revised flat: {len(rev_flat)} chars")
+
+        # --- 4. Diff the flat texts ---
+        dmp = diff_match_patch()
+        diffs = dmp.diff_main(orig_flat, rev_flat)
+        dmp.diff_cleanupSemantic(diffs)
+
+        eq = sum(len(t) for op, t in diffs if op == 0)
+        de = sum(len(t) for op, t in diffs if op == -1)
+        ins = sum(len(t) for op, t in diffs if op == 1)
+        pct = eq / len(orig_flat) * 100 if orig_flat else 0
+        print(f"Flat diff: {eq} equal, {de} del, {ins} ins ({pct:.1f}% preserved)")
+
+        # --- 5. Build operations, filtering boundary artifacts ---
+        operations = []
+        pos = 0
+        for op, text in diffs:
+            if op == 0:
+                pos += len(text)
+            elif op == -1:
+                all_boundary = all(
+                    pos + i in boundary_positions for i in range(len(text))
+                )
+                if not all_boundary:
+                    i = pos
+                    real_end = pos + len(text)
+                    while i < real_end:
+                        if i in boundary_positions:
+                            i += 1
+                            continue
+                        seg_start = i
+                        while i < real_end and i not in boundary_positions:
+                            i += 1
+                        operations.append((
+                            'delete', seg_start, i, orig_flat[seg_start:i]
+                        ))
+                pos += len(text)
+            elif op == 1:
+                if text == ' ' and pos in boundary_positions:
+                    pass  # skip boundary space insert
+                else:
+                    operations.append(('insert', pos, text))
+
+        print(f"Operations to apply: {len(operations)}")
+
+        # --- 6. Map flat positions to Word and apply in reverse ---
+        _time.sleep(0.2)
+
+        total_changes = 0
+
+        def flat_to_word_pos(flat_pos):
+            para_idx = bisect.bisect_right(flat_para_starts, flat_pos) - 1
+            para_idx = max(0, min(para_idx, len(word_paras) - 1))
+            offset = flat_pos - flat_para_starts[para_idx]
+            return word_paras[para_idx]['start'] + offset
+
+        for operation in reversed(operations):
+            if operation[0] == 'delete':
+                _, flat_start, flat_end, del_text = operation
+                start_para = bisect.bisect_right(
+                    flat_para_starts, flat_start) - 1
+                end_para = bisect.bisect_right(
+                    flat_para_starts, flat_end - 1) - 1
+
+                if start_para == end_para:
+                    word_start = flat_to_word_pos(flat_start)
+                    word_end = flat_to_word_pos(flat_end)
+                    # Never delete past the paragraph mark
+                    para_content_end = word_paras[start_para]['end'] - 1
+                    if word_end > para_content_end:
+                        word_end = para_content_end
+                    if word_start >= word_end:
+                        continue
+                    # Skip trailing whitespace at paragraph end
+                    if word_end == para_content_end and del_text.strip() == '':
+                        continue
+                    dr = doc_com.Range(word_start, word_end)
+                    print(f"  DEL in para [{start_para}]: "
+                          f"{repr(dr.Text[:50])}")
+                    dr.Delete()
+                    total_changes += 1
+                else:
+                    for pidx in reversed(range(start_para, end_para + 1)):
+                        p_start = flat_para_starts[pidx]
+                        p_end = flat_para_starts[pidx + 1]
+                        clip_start = max(flat_start, p_start)
+                        clip_end = min(flat_end, p_end)
+                        if clip_start >= clip_end:
+                            continue
+                        ws = word_paras[pidx]['start'] + (clip_start - p_start)
+                        we = word_paras[pidx]['start'] + (clip_end - p_start)
+                        para_content_end = word_paras[pidx]['end'] - 1
+                        if we > para_content_end:
+                            we = para_content_end
+                        if ws >= we:
+                            continue
+                        dr = doc_com.Range(ws, we)
+                        print(f"  DEL in para [{pidx}]: "
+                              f"{repr(dr.Text[:50])}")
+                        dr.Delete()
+                        total_changes += 1
+
+            elif operation[0] == 'insert':
+                _, flat_pos, ins_text = operation
+                word_pos = flat_to_word_pos(flat_pos)
+                ir = doc_com.Range(word_pos, word_pos)
+                ir.InsertAfter(ins_text)
+                para_idx = bisect.bisect_right(
+                    flat_para_starts, flat_pos) - 1
+                print(f"  INS in para [{para_idx}]: "
+                      f"{repr(ins_text[:50])}")
+                total_changes += 1
+
+        print(f"Applied {total_changes} redline changes")
+
+        pre_content_paras = sum(
+            1 for wp in word_paras if wp['content'].strip()
+        )
+
+        result.update({
+            'success': True,
+            'total_changes': total_changes,
+            'equal_chars': eq,
+            'deleted_chars': de,
+            'inserted_chars': ins,
+            'pre_content_para_count': pre_content_paras,
+            'orig_flat_length': len(orig_flat),
+        })
+        return result
+
+    except ImportError as e:
+        print(f"diff-match-patch not available: {e}")
+        return result
+    except Exception as e:
+        print(f"Unexpected error in apply_flat_diff_redline: {e}")
+        import traceback
+        traceback.print_exc()
+        return result
+
+
 class HotkeySignals(QObject):
     """Signals for cross-thread communication."""
     show_popup = Signal()
@@ -513,6 +769,311 @@ class LLMWorkerThread(QThread):
         self._cancelled = True
 
 
+class ReviewWorkerThread(QThread):
+    """Worker thread for running the report review without blocking the UI."""
+    progress = Signal(str)  # progress message
+    finished = Signal(object, int, str)  # (structural_result, total_changes, error)
+
+    def __init__(self, reviewer, selection_range=None, include_case_data=False,
+                 extra_doc_paths=None, parent=None):
+        super().__init__(parent)
+        self.reviewer = reviewer
+        self.selection_range = selection_range
+        self.include_case_data = include_case_data
+        self.extra_doc_paths = extra_doc_paths
+        self._cancelled = False
+
+    def run(self):
+        """Execute the review in a separate thread."""
+        import pythoncom
+        pythoncom.CoInitialize()
+        try:
+            if self._cancelled:
+                self.finished.emit(None, 0, "cancelled")
+                return
+
+            structural, total_changes = self.reviewer.run(
+                selection_range=self.selection_range,
+                include_case_data=self.include_case_data,
+                extra_doc_paths=self.extra_doc_paths,
+                progress_callback=self._on_progress,
+            )
+            if self._cancelled:
+                self.finished.emit(None, 0, "cancelled")
+            else:
+                self.finished.emit(structural, total_changes, "")
+        except Exception as e:
+            if not self._cancelled:
+                self.finished.emit(None, 0, str(e))
+        finally:
+            pythoncom.CoUninitialize()
+
+    def _on_progress(self, msg):
+        if not self._cancelled:
+            self.progress.emit(msg)
+
+    def cancel(self):
+        self._cancelled = True
+
+
+# Accepted file extensions for attachments
+ATTACHMENT_EXTENSIONS = (".doc", ".docx", ".pdf", ".msg")
+
+
+class FileExtractorThread(QThread):
+    """Worker thread for extracting text from attached files."""
+    extracted = Signal(str, str, int)  # (file_path, text, char_count)
+    error = Signal(str, str)  # (file_path, error_message)
+
+    def __init__(self, file_path: str, parent=None):
+        super().__init__(parent)
+        self.file_path = file_path
+
+    def run(self):
+        try:
+            ext = os.path.splitext(self.file_path)[1].lower()
+
+            if ext == ".doc" and HAS_WIN32:
+                # Legacy .doc format — use Word COM
+                pythoncom.CoInitialize()
+                try:
+                    word = win32com.client.Dispatch("Word.Application")
+                    doc = word.Documents.Open(self.file_path, ReadOnly=True, Visible=False)
+                    text = doc.Content.Text or ""
+                    doc.Close(False)
+                    self.extracted.emit(self.file_path, text, len(text))
+                finally:
+                    pythoncom.CoUninitialize()
+            elif HAS_DOC_PROCESSOR:
+                processor = DocumentProcessor()
+                result = processor.extract_text(self.file_path)
+                if result.success:
+                    self.extracted.emit(self.file_path, result.text, len(result.text))
+                else:
+                    self.error.emit(self.file_path, result.error or "Extraction failed")
+            else:
+                self.error.emit(self.file_path, "DocumentProcessor not available")
+        except Exception as e:
+            self.error.emit(self.file_path, str(e))
+
+
+class AttachmentArea(QFrame):
+    """Drop zone and file chip area for attaching context files."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._attachments = {}  # file_path -> extracted_text
+        self._chips = {}  # file_path -> chip QFrame
+        self._extractors = []  # keep refs to running threads
+        self._setup_ui()
+        self.setAcceptDrops(True)
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 4, 0, 0)
+        layout.setSpacing(4)
+
+        # Drop zone / browse row
+        drop_row = QHBoxLayout()
+        drop_row.setSpacing(6)
+
+        self._drop_label = QLabel("Drop files here or click to attach")
+        self._drop_label.setStyleSheet(
+            "color: #a6adc8; font-size: 10px; font-style: italic; padding: 4px;"
+        )
+        drop_row.addWidget(self._drop_label, 1)
+
+        browse_btn = QPushButton("\U0001f4ce")  # 📎
+        browse_btn.setFixedSize(28, 28)
+        browse_btn.setToolTip("Attach files (.doc, .docx, .pdf, .msg)")
+        browse_btn.setStyleSheet(
+            "QPushButton { background: #313244; border: 1px solid #45475a; "
+            "border-radius: 4px; font-size: 14px; }"
+            "QPushButton:hover { background: #45475a; border-color: #6c63ff; }"
+        )
+        browse_btn.clicked.connect(self._browse_files)
+        drop_row.addWidget(browse_btn)
+
+        layout.addLayout(drop_row)
+
+        # Chips container
+        self._chips_widget = QWidget()
+        self._chips_layout = QHBoxLayout(self._chips_widget)
+        self._chips_layout.setContentsMargins(0, 0, 0, 0)
+        self._chips_layout.setSpacing(4)
+        self._chips_layout.addStretch()
+        self._chips_widget.setVisible(False)
+        layout.addWidget(self._chips_widget)
+
+        # Summary label
+        self._summary_label = QLabel("")
+        self._summary_label.setStyleSheet("color: #a6adc8; font-size: 10px; font-style: italic;")
+        self._summary_label.setVisible(False)
+        layout.addWidget(self._summary_label)
+
+        # Style the frame itself with dashed border
+        self.setStyleSheet(
+            "AttachmentArea { border: 1px dashed #45475a; border-radius: 4px; padding: 2px; }"
+        )
+
+    def _browse_files(self):
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Attach Files",
+            "",
+            "Documents (*.doc *.docx *.pdf *.msg);;All Files (*)"
+        )
+        if paths:
+            self.add_files(paths)
+
+    def add_files(self, paths):
+        for path in paths:
+            if path in self._attachments or path in self._chips:
+                continue  # already added
+            ext = os.path.splitext(path)[1].lower()
+            if ext not in ATTACHMENT_EXTENSIONS:
+                continue
+            self._add_chip(path)
+            self._start_extraction(path)
+
+    def _add_chip(self, file_path):
+        chip = QFrame()
+        chip.setStyleSheet(
+            "QFrame { background: #313244; border: 1px solid #45475a; "
+            "border-radius: 4px; padding: 2px 6px; }"
+        )
+        chip_layout = QHBoxLayout(chip)
+        chip_layout.setContentsMargins(4, 2, 4, 2)
+        chip_layout.setSpacing(4)
+
+        name = os.path.basename(file_path)
+        name_label = QLabel(name if len(name) <= 30 else name[:27] + "...")
+        name_label.setToolTip(file_path)
+        name_label.setStyleSheet("color: #cdd6f4; font-size: 10px; border: none;")
+        chip_layout.addWidget(name_label)
+
+        status_label = QLabel("...")
+        status_label.setStyleSheet("color: #a6adc8; font-size: 10px; border: none;")
+        status_label.setObjectName("status")
+        chip_layout.addWidget(status_label)
+
+        remove_btn = QPushButton("\u00d7")  # ×
+        remove_btn.setFixedSize(16, 16)
+        remove_btn.setStyleSheet(
+            "QPushButton { background: transparent; color: #a6adc8; border: none; "
+            "font-size: 12px; font-weight: bold; }"
+            "QPushButton:hover { color: #f38ba8; }"
+        )
+        remove_btn.clicked.connect(lambda checked, p=file_path: self._remove_file(p))
+        chip_layout.addWidget(remove_btn)
+
+        self._chips[file_path] = chip
+        # Insert before the stretch
+        self._chips_layout.insertWidget(self._chips_layout.count() - 1, chip)
+        self._chips_widget.setVisible(True)
+
+    def _start_extraction(self, file_path):
+        thread = FileExtractorThread(file_path, self)
+        thread.extracted.connect(self._on_extracted)
+        thread.error.connect(self._on_extract_error)
+        thread.finished.connect(lambda t=thread: self._extractors.remove(t) if t in self._extractors else None)
+        self._extractors.append(thread)
+        thread.start()
+
+    def _on_extracted(self, file_path, text, char_count):
+        self._attachments[file_path] = text
+        chip = self._chips.get(file_path)
+        if chip:
+            status = chip.findChild(QLabel, "status")
+            if status:
+                if char_count > 1000:
+                    status.setText(f"{char_count // 1000}k chars")
+                else:
+                    status.setText(f"{char_count} chars")
+                status.setStyleSheet("color: #a6e3a1; font-size: 10px; border: none;")
+        self._update_summary()
+
+    def _on_extract_error(self, file_path, error_msg):
+        self._attachments[file_path] = ""
+        chip = self._chips.get(file_path)
+        if chip:
+            status = chip.findChild(QLabel, "status")
+            if status:
+                status.setText("error")
+                status.setToolTip(error_msg)
+                status.setStyleSheet("color: #f38ba8; font-size: 10px; border: none;")
+        self._update_summary()
+
+    def _remove_file(self, file_path):
+        self._attachments.pop(file_path, None)
+        chip = self._chips.pop(file_path, None)
+        if chip:
+            self._chips_layout.removeWidget(chip)
+            chip.deleteLater()
+        if not self._chips:
+            self._chips_widget.setVisible(False)
+        self._update_summary()
+
+    def _update_summary(self):
+        files_with_text = {p: t for p, t in self._attachments.items() if t}
+        if not files_with_text:
+            self._summary_label.setVisible(False)
+            return
+        total_chars = sum(len(t) for t in files_with_text.values())
+        n = len(files_with_text)
+        if total_chars > 1000:
+            self._summary_label.setText(f"{n} file{'s' if n != 1 else ''}, ~{total_chars // 1000}k chars")
+        else:
+            self._summary_label.setText(f"{n} file{'s' if n != 1 else ''}, {total_chars} chars")
+        self._summary_label.setVisible(True)
+
+    def get_attachment_context(self):
+        """Return formatted context blocks for all extracted attachments."""
+        blocks = []
+        for file_path, text in self._attachments.items():
+            if text:
+                name = os.path.basename(file_path)
+                blocks.append(f"\n\n=== ATTACHED FILE: {name} ===\n{text}")
+        return "".join(blocks)
+
+    def clear(self):
+        for path in list(self._chips.keys()):
+            self._remove_file(path)
+
+    # Drag and drop support
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            for url in event.mimeData().urls():
+                path = url.toLocalFile()
+                if path and os.path.splitext(path)[1].lower() in ATTACHMENT_EXTENSIONS:
+                    event.acceptProposedAction()
+                    self.setStyleSheet(
+                        "AttachmentArea { border: 2px dashed #6c63ff; border-radius: 4px; "
+                        "padding: 2px; background: rgba(108, 99, 255, 0.05); }"
+                    )
+                    return
+        event.ignore()
+
+    def dragLeaveEvent(self, event):
+        self.setStyleSheet(
+            "AttachmentArea { border: 1px dashed #45475a; border-radius: 4px; padding: 2px; }"
+        )
+
+    def dropEvent(self, event):
+        self.setStyleSheet(
+            "AttachmentArea { border: 1px dashed #45475a; border-radius: 4px; padding: 2px; }"
+        )
+        paths = []
+        for url in event.mimeData().urls():
+            path = url.toLocalFile()
+            if path and os.path.isfile(path) and os.path.splitext(path)[1].lower() in ATTACHMENT_EXTENSIONS:
+                paths.append(path)
+        if paths:
+            event.acceptProposedAction()
+            self.add_files(paths)
+        else:
+            event.ignore()
+
+
 class WordLLMPopup(QDialog):
     """Popup dialog for LLM processing of Word content."""
 
@@ -540,6 +1101,7 @@ class WordLLMPopup(QDialog):
 
         # Worker thread for LLM calls
         self._worker_thread = None
+        self._review_thread = None  # Worker thread for report review
         self._pending_format_type = None  # Format type for pending task
         self._is_outlook_task = False  # Whether pending task is for Outlook
 
@@ -555,8 +1117,10 @@ class WordLLMPopup(QDialog):
         # Redline state
         self._original_text = None  # Original text before LLM processing
         self._original_document = None  # Document object where selection was made
+        self._original_document_name = None  # Document name for fallback lookup
         self._original_range_start = None  # Range start position
         self._original_range_end = None  # Range end position
+        self._original_has_selection = False  # Whether original capture had a selection
         self._redline_mode_active = False  # Whether current operation uses redline
 
         self.setWindowTitle("AI Assistant")
@@ -632,6 +1196,14 @@ class WordLLMPopup(QDialog):
             }
             QPushButton#deleteBtn:hover {
                 background-color: #f5a0b8;
+            }
+            QPushButton#reviewBtn {
+                background-color: #89b4fa;
+                color: #1e1e2e;
+                font-weight: bold;
+            }
+            QPushButton#reviewBtn:hover {
+                background-color: #a6c8ff;
             }
         """)
 
@@ -741,6 +1313,17 @@ class WordLLMPopup(QDialog):
         self.execute_btn.clicked.connect(self.execute)
         btn_row.addWidget(self.execute_btn)
 
+        self.review_btn = QPushButton("Review Report")
+        self.review_btn.setObjectName("reviewBtn")
+        self.review_btn.setToolTip(
+            "Review a junior associate's draft report against\n"
+            "your voice, style, and formatting standards.\n"
+            "Applies corrections as Track Changes."
+        )
+        self.review_btn.clicked.connect(self._on_review_report_clicked)
+        self.review_btn.setVisible(False)  # shown only in Word context
+        btn_row.addWidget(self.review_btn)
+
         layout.addLayout(btn_row)
 
     def _setup_ai_prompt_tab(self):
@@ -846,6 +1429,10 @@ class WordLLMPopup(QDialog):
         self.model_combo.currentIndexChanged.connect(self._on_model_changed)
         ai_layout.addWidget(self.model_combo)
 
+        # File attachments area
+        self.attachment_area = AttachmentArea(self)
+        ai_layout.addWidget(self.attachment_area)
+
         # Use All Text checkbox
         self.use_all_text_check = QCheckBox("Use all document text as context (still replaces only selection)")
         self.use_all_text_check.setStyleSheet("color: #cdd6f4; font-size: 11px;")
@@ -853,6 +1440,8 @@ class WordLLMPopup(QDialog):
             "When checked, sends the entire document to the LLM for context,\n"
             "but only replaces the selected text with the output."
         )
+        self.use_all_text_check.setChecked(self.redline_settings.get("use_all_text_default", False))
+        self.use_all_text_check.stateChanged.connect(self._save_use_all_text_preference)
         ai_layout.addWidget(self.use_all_text_check)
 
         # Redline mode checkbox (only visible for Word context)
@@ -1207,13 +1796,19 @@ class WordLLMPopup(QDialog):
             self.status_label.setText(f"Deleted '{name}'")
 
     def _update_redline_checkbox_visibility(self):
-        """Show/hide redline checkbox based on app context."""
+        """Show/hide redline checkbox and review button based on app context."""
         is_word = self.app_context == APP_CONTEXT_WORD
         self.redline_checkbox.setVisible(is_word)
+        self.review_btn.setVisible(is_word)
 
     def _save_redline_preference(self):
         """Save the current redline checkbox state to settings."""
         self.redline_settings["redline_mode_default"] = self.redline_checkbox.isChecked()
+        save_redline_settings(GEMINI_DATA_DIR, self.redline_settings)
+
+    def _save_use_all_text_preference(self):
+        """Save the use-all-text checkbox state to settings."""
+        self.redline_settings["use_all_text_default"] = self.use_all_text_check.isChecked()
         save_redline_settings(GEMINI_DATA_DIR, self.redline_settings)
 
     def set_app_context(self, context: str, inspector=None):
@@ -1502,23 +2097,33 @@ class WordLLMPopup(QDialog):
     def _on_cancel_clicked(self):
         """Handle cancel button click - either close dialog or cancel running task."""
         if self._worker_thread and self._worker_thread.isRunning():
-            # Cancel the running task
+            # Cancel the running LLM task
             self._worker_thread.cancel()
             self.status_label.setText("Cancelling...")
             self.cancel_btn.setEnabled(False)
-            # Wait briefly for thread to finish, then close
             QTimer.singleShot(200, self._cleanup_and_close)
+        elif self._review_thread and self._review_thread.isRunning():
+            # Cancel the running review task
+            self._review_thread.cancel()
+            self.status_label.setText("Cancelling review...")
+            self.cancel_btn.setEnabled(False)
+            QTimer.singleShot(500, self._cleanup_and_close)
         else:
             # No task running, just close
             self.close()
 
     def _cleanup_and_close(self):
-        """Clean up worker thread and close dialog."""
+        """Clean up worker threads and close dialog."""
         if self._worker_thread:
             if self._worker_thread.isRunning():
                 self._worker_thread.terminate()
                 self._worker_thread.wait(500)
             self._worker_thread = None
+        if self._review_thread:
+            if self._review_thread.isRunning():
+                self._review_thread.terminate()
+                self._review_thread.wait(500)
+            self._review_thread = None
         self.close()
 
     def execute(self):
@@ -1620,6 +2225,11 @@ class WordLLMPopup(QDialog):
                 full_prompt = prompt
                 self.status_label.setText("Processing prompt...")
 
+            # Append any attached file context
+            attachment_context = self.attachment_area.get_attachment_context()
+            if attachment_context:
+                full_prompt += attachment_context
+
             QApplication.processEvents()
 
             # Store format type for callback
@@ -1674,18 +2284,26 @@ class WordLLMPopup(QDialog):
             if self._is_outlook_task:
                 self._set_outlook_text(result, self._pending_format_type)
             else:
+                # Restore original document context before applying
+                # (handles case where user switched documents while LLM ran)
+                try:
+                    word, selection = self._restore_original_context()
+                except Exception as ctx_err:
+                    print(f"Could not restore original context: {ctx_err}")
+                    QApplication.clipboard().setText(result)
+                    QMessageBox.warning(
+                        self, "Document Changed",
+                        f"Could not return to original document:\n{ctx_err}\n\n"
+                        "The result has been copied to your clipboard instead."
+                    )
+                    self.status_label.setText("Result copied to clipboard")
+                    QTimer.singleShot(1500, self.close)
+                    return
+
                 # Check if redline mode is active
                 if self._redline_mode_active:
-                    # Redline mode - use adeu to apply changes as Track Changes
+                    # Redline mode - apply changes as Track Changes
                     try:
-                        word = self._get_word_app()
-                        if not word:
-                            raise Exception("Could not connect to Word")
-
-                        selection = word.Selection
-                        if not selection:
-                            raise Exception("Could not access Word selection")
-
                         # Apply redlines using diff-match-patch
                         # Use raw (un-stripped) text so positions match Word range
                         original_for_diff = getattr(self, '_original_text_raw', self._original_text)
@@ -1704,7 +2322,8 @@ class WordLLMPopup(QDialog):
                             if self.redline_settings.get("redline_fallback_notify", True):
                                 self.status_label.setText("⚠ Applied as replacement (redline unavailable)")
                                 self.status_label.setStyleSheet("color: #f9e2af; font-style: italic;")
-                            self._set_word_text_internal(result, self._pending_format_type)
+                            self._set_word_text_internal(result, self._pending_format_type,
+                                                        word=word, selection=selection)
 
                     except Exception as redline_error:
                         print(f"Redline application failed: {redline_error}")
@@ -1712,10 +2331,12 @@ class WordLLMPopup(QDialog):
                         if self.redline_settings.get("redline_fallback_notify", True):
                             self.status_label.setText("⚠ Applied as replacement (redline error)")
                             self.status_label.setStyleSheet("color: #f9e2af; font-style: italic;")
-                        self._set_word_text_internal(result, self._pending_format_type)
+                        self._set_word_text_internal(result, self._pending_format_type,
+                                                    word=word, selection=selection)
                 else:
-                    # Replace mode (existing behavior)
-                    self._set_word_text_internal(result, self._pending_format_type)
+                    # Replace mode
+                    self._set_word_text_internal(result, self._pending_format_type,
+                                                word=word, selection=selection)
 
             self.status_label.setText("Done!")
             QTimer.singleShot(500, self.close)
@@ -1725,6 +2346,149 @@ class WordLLMPopup(QDialog):
             self.cancel_btn.setText("Cancel")
             self.cancel_btn.setEnabled(True)
             QMessageBox.critical(self, "Error", f"Failed to insert result:\n{e}")
+
+    # ────── Report Review ──────
+
+    def _on_review_report_clicked(self):
+        """Handle the Review Report button click."""
+        try:
+            word = self._get_word_app()
+            if not word:
+                QMessageBox.warning(self, "Word Not Found",
+                    "Microsoft Word is not running or no document is open.\n"
+                    "Please open a Word document first, then try again.")
+                return
+
+            doc = word.ActiveDocument
+            if not doc:
+                QMessageBox.warning(self, "No Document",
+                    "No Word document is open.")
+                return
+
+            # Detect case from document path
+            case_detected = False
+            case_path = None
+            file_number = None
+            try:
+                case_info, file_num, error = detect_case_from_document()
+                if file_num:
+                    file_number = file_num
+                    case_detected = True
+                    # Resolve case folder path from doc path
+                    try:
+                        doc_path = doc.FullName
+                        # Walk up to find the case folder (contains file number pattern)
+                        parts = doc_path.replace('/', '\\').split('\\')
+                        for i, part in enumerate(parts):
+                            if re.search(r'\d{4}\.\d{3}', part) or re.search(r'^\d{1,3}\s*-', part):
+                                case_path = '\\'.join(parts[:i+1])
+                                break
+                        if not case_path:
+                            # Try parent of NOTES folder
+                            for i, part in enumerate(parts):
+                                if part.upper() in ('NOTES', 'AI OUTPUT'):
+                                    case_path = '\\'.join(parts[:i])
+                                    break
+                    except:
+                        pass
+            except:
+                pass
+
+            # Check for selection
+            has_selection = False
+            selection_range = None
+            try:
+                sel = word.Selection
+                if sel and sel.Type != 1:  # wdSelectionIP = 1
+                    sel_text = sel.Text
+                    if sel_text and len(sel_text.strip()) > 50:
+                        has_selection = True
+                        selection_range = (sel.Range.Start, sel.Range.End)
+            except:
+                pass
+
+            # Show the review dialog
+            from icharlotte_core.ui.report_review_dialog import ReportReviewDialog
+            dialog = ReportReviewDialog(
+                has_selection=has_selection,
+                case_detected=case_detected,
+                parent=self,
+            )
+            if dialog.exec() != dialog.DialogCode.Accepted:
+                return
+
+            options = dialog.get_options()
+
+            # Determine selection range
+            sel_range = None
+            if options["scope"] == "selection" and selection_range:
+                sel_range = selection_range
+
+            # Create reviewer
+            from icharlotte_core.report_reviewer import ReportReviewer
+            reviewer = ReportReviewer(doc_com=doc, case_path=case_path)
+
+            # Disable buttons, show progress
+            self.execute_btn.setEnabled(False)
+            self.review_btn.setEnabled(False)
+            self.cancel_btn.setText("Cancel Review")
+            self.status_label.setText("Starting report review...")
+            self.status_label.setStyleSheet("color: #a6adc8; font-style: italic;")
+            QApplication.processEvents()
+
+            # Start worker thread
+            self._review_thread = ReviewWorkerThread(
+                reviewer=reviewer,
+                selection_range=sel_range,
+                include_case_data=options["include_case_data"],
+                extra_doc_paths=options["extra_doc_paths"] or None,
+                parent=self,
+            )
+            self._review_thread.progress.connect(self._on_review_progress)
+            self._review_thread.finished.connect(self._on_review_finished)
+            self._review_thread.start()
+
+        except Exception as e:
+            self.status_label.setText(f"Error: {str(e)[:60]}")
+            self.status_label.setStyleSheet("color: #f38ba8; font-style: italic;")
+            self.execute_btn.setEnabled(True)
+            self.review_btn.setEnabled(True)
+            self.cancel_btn.setText("Cancel")
+            import traceback
+            traceback.print_exc()
+
+    def _on_review_progress(self, msg: str):
+        """Update status label with review progress."""
+        self.status_label.setText(msg)
+        QApplication.processEvents()
+
+    def _on_review_finished(self, structural_result, total_changes: int, error: str):
+        """Handle review completion."""
+        self._review_thread = None
+        self.execute_btn.setEnabled(True)
+        self.review_btn.setEnabled(True)
+        self.cancel_btn.setText("Cancel")
+
+        if error == "cancelled":
+            self.status_label.setText("Review cancelled")
+            self.status_label.setStyleSheet("color: #f9e2af; font-style: italic;")
+            return
+
+        if error:
+            self.status_label.setText(f"Review error: {error[:60]}")
+            self.status_label.setStyleSheet("color: #f38ba8; font-style: italic;")
+            QMessageBox.critical(self, "Review Error", f"Report review failed:\n{error}")
+            return
+
+        # Success
+        if total_changes > 0:
+            self.status_label.setText(
+                f"Review complete — {total_changes} tracked changes applied"
+            )
+            self.status_label.setStyleSheet("color: #a6e3a1; font-style: italic;")
+        else:
+            self.status_label.setText("Review complete — no changes needed")
+            self.status_label.setStyleSheet("color: #a6e3a1; font-style: italic;")
 
     def _get_word_app(self):
         """Get a connection to the running Word application with active document."""
@@ -1800,6 +2564,82 @@ class WordLLMPopup(QDialog):
         print("Word running but no accessible documents")
         return None
 
+    def _restore_original_context(self) -> tuple:
+        """Activate the original document and restore the selection.
+
+        Call this before applying LLM results to ensure changes go to the
+        correct document and location, even if the user switched documents
+        while the LLM was running.
+
+        Returns:
+            (word_app, selection) tuple
+
+        Raises:
+            Exception if the original document is no longer open
+        """
+        word = self._get_word_app()
+        if not word:
+            raise Exception("Could not connect to Word")
+
+        doc = None
+
+        # Step 1: Try to activate the stored document COM object
+        if self._original_document:
+            try:
+                _ = self._original_document.Name  # test if COM ref is alive
+                self._original_document.Activate()
+                doc = self._original_document
+                print(f"Activated original document via COM reference: {doc.Name}")
+            except Exception as e:
+                print(f"Stored document COM reference stale: {e}")
+                self._original_document = None
+
+        # Step 2: Fallback — find document by name
+        if doc is None and self._original_document_name:
+            try:
+                for i in range(1, word.Documents.Count + 1):
+                    candidate = word.Documents(i)
+                    if candidate.Name == self._original_document_name:
+                        candidate.Activate()
+                        doc = candidate
+                        self._original_document = doc
+                        print(f"Found and activated document by name: {doc.Name}")
+                        break
+            except Exception as e:
+                print(f"Could not find document by name '{self._original_document_name}': {e}")
+
+        # Step 3: Document not found — it was closed
+        if doc is None:
+            raise Exception(
+                f"Original document '{self._original_document_name or 'unknown'}' "
+                f"is no longer open"
+            )
+
+        # Step 4: Restore the selection to the original range
+        if self._original_range_start is not None and self._original_range_end is not None:
+            try:
+                if self._original_has_selection:
+                    target_range = doc.Range(
+                        self._original_range_start,
+                        self._original_range_end
+                    )
+                else:
+                    # Insertion point — place cursor at original position
+                    target_range = doc.Range(
+                        self._original_range_start,
+                        self._original_range_start
+                    )
+                target_range.Select()
+                print(f"Restored selection: {self._original_range_start}-{self._original_range_end}")
+            except Exception as e:
+                print(f"Could not restore original range (document may have been edited): {e}")
+
+        selection = word.Selection
+        if not selection:
+            raise Exception("Could not access Word selection after restoring context")
+
+        return word, selection
+
     def _get_word_selection_internal(self) -> tuple:
         """Get selected text from Word. Returns (text, has_selection)."""
         try:
@@ -1823,10 +2663,12 @@ class WordLLMPopup(QDialog):
             # Always capture the document for later use (regardless of redline mode)
             try:
                 self._original_document = word.ActiveDocument
-                print(f"Captured document: {self._original_document.Name if self._original_document else 'None'}")
+                self._original_document_name = self._original_document.Name if self._original_document else None
+                print(f"Captured document: {self._original_document_name or 'None'}")
             except Exception as e:
                 print(f"Could not capture document: {e}")
                 self._original_document = None
+                self._original_document_name = None
 
             text = ""
             raw_text_for_redline = ""
@@ -1842,6 +2684,17 @@ class WordLLMPopup(QDialog):
             except Exception as e:
                 print(f"Error getting selection text: {e}")
                 return "", False
+
+            # Always capture range coordinates so we can restore context later
+            # (even if user switches documents while LLM is running)
+            try:
+                self._original_range_start = selection.Range.Start
+                self._original_range_end = selection.Range.End
+                print(f"Captured range: Start={self._original_range_start}, End={self._original_range_end}")
+            except Exception as e:
+                print(f"Could not capture range coordinates: {e}")
+                self._original_range_start = None
+                self._original_range_end = None
 
             # Store original text and range for potential redlining
             if self.redline_checkbox.isChecked():
@@ -1887,6 +2740,7 @@ class WordLLMPopup(QDialog):
             except:
                 has_selection = len(text) > 0
 
+            self._original_has_selection = has_selection
             return text, has_selection
         except Exception as e:
             print(f"Could not get Word selection: {e}")
@@ -1937,10 +2791,8 @@ class WordLLMPopup(QDialog):
     def _apply_redlines(self, word_app, selection, original_text: str, revised_text: str) -> bool:
         """Apply redlines using flat diff mapped back to Word paragraphs.
 
-        Strategy: flatten both texts (strip paragraph breaks), diff them
-        character-by-character, then map each change back to the correct
-        Word paragraph. This never touches paragraph marks (\\r), so
-        formatting is always preserved regardless of LLM paragraph behavior.
+        Delegates to the standalone apply_flat_diff_redline() function,
+        then runs validation.
 
         Args:
             word_app: Word COM application object
@@ -1952,10 +2804,6 @@ class WordLLMPopup(QDialog):
             True if redlines applied successfully, False if fallback needed
         """
         try:
-            from diff_match_patch import diff_match_patch
-            import bisect
-            import re
-
             # Get document object
             try:
                 doc = self._original_document if self._original_document else word_app.ActiveDocument
@@ -1966,245 +2814,65 @@ class WordLLMPopup(QDialog):
                 print(f"Could not access Word document: {e}")
                 return False
 
-            # Auto-enable Track Changes if needed
-            if self.redline_settings.get("auto_enable_track_changes", True):
-                try:
-                    if not doc.TrackRevisions:
-                        print("Auto-enabling Track Changes for redlining")
-                        doc.TrackRevisions = True
-                except Exception as e:
-                    print(f"Could not enable Track Changes: {e}")
+            auto_tc = self.redline_settings.get("auto_enable_track_changes", True)
 
-            # Reconstruct range from stored coordinates
-            try:
-                range_obj = doc.Range(
-                    self._original_range_start,
-                    self._original_range_end
-                )
-            except Exception as e:
-                print(f"Could not reconstruct range: {e}, using current selection")
-                try:
-                    range_obj = selection.Range
-                except Exception as e2:
-                    print(f"Could not get selection range: {e2}")
-                    return False
+            # Delegate to standalone function
+            r = apply_flat_diff_redline(
+                doc_com=doc,
+                range_start=self._original_range_start,
+                range_end=self._original_range_end,
+                original_text=original_text,
+                revised_text=revised_text,
+                auto_enable_track_changes=auto_tc,
+            )
 
-            try:
-                # --- 1. Build Word paragraph map ---
-                word_paras = []
-                try:
-                    para_collection = range_obj.Paragraphs
-                    para_count = para_collection.Count
-                    for i in range(1, para_count + 1):
-                        wp = para_collection(i)
-                        text = wp.Range.Text
-                        content = text[:-1] if text.endswith('\r') else text
-                        word_paras.append({
-                            'start': wp.Range.Start,
-                            'end': wp.Range.End,
-                            'text': text,
-                            'content': content,
-                        })
-                except Exception as e:
-                    print(f"Could not enumerate Word paragraphs: {e}")
-                    return False
-
-                print(f"Word paragraphs: {len(word_paras)}")
-
-                # --- 2. Build flat original text with boundary spaces ---
-                # Join paragraph contents with a space separator so boundaries
-                # match how LLMs return text (spaces where line breaks were).
-                orig_flat = ''
-                flat_para_starts = []
-                boundary_positions = set()
-
-                for i, wp in enumerate(word_paras):
-                    if i > 0 and wp['content']:
-                        prev_had_content = any(word_paras[j]['content'] for j in range(i))
-                        if prev_had_content:
-                            boundary_positions.add(len(orig_flat))
-                            orig_flat += ' '
-                    flat_para_starts.append(len(orig_flat))
-                    orig_flat += wp['content']
-                flat_para_starts.append(len(orig_flat))  # sentinel
-
-                print(f"Original flat: {len(orig_flat)} chars, "
-                      f"{len(boundary_positions)} boundary spaces")
-
-                # --- 3. Flatten revised text ---
-                rev_flat = revised_text.replace('\r\n', ' ').replace('\r', ' ').replace('\n', ' ')
-                rev_flat = re.sub(r'  +', ' ', rev_flat).strip()
-
-                print(f"Revised flat: {len(rev_flat)} chars")
-
-                # --- 4. Diff the flat texts ---
-                dmp = diff_match_patch()
-                diffs = dmp.diff_main(orig_flat, rev_flat)
-                dmp.diff_cleanupSemantic(diffs)
-
-                eq = sum(len(t) for op, t in diffs if op == 0)
-                de = sum(len(t) for op, t in diffs if op == -1)
-                ins = sum(len(t) for op, t in diffs if op == 1)
-                pct = eq / len(orig_flat) * 100 if orig_flat else 0
-                print(f"Flat diff: {eq} equal, {de} del, {ins} ins ({pct:.1f}% preserved)")
-
-                # --- 5. Build operations, filtering boundary artifacts ---
-                operations = []
-                pos = 0
-                for op, text in diffs:
-                    if op == 0:
-                        pos += len(text)
-                    elif op == -1:
-                        all_boundary = all(
-                            pos + i in boundary_positions for i in range(len(text))
-                        )
-                        if not all_boundary:
-                            i = pos
-                            real_end = pos + len(text)
-                            while i < real_end:
-                                if i in boundary_positions:
-                                    i += 1
-                                    continue
-                                seg_start = i
-                                while i < real_end and i not in boundary_positions:
-                                    i += 1
-                                operations.append((
-                                    'delete', seg_start, i, orig_flat[seg_start:i]
-                                ))
-                        pos += len(text)
-                    elif op == 1:
-                        if text == ' ' and pos in boundary_positions:
-                            pass  # skip boundary space insert
-                        else:
-                            operations.append(('insert', pos, text))
-
-                print(f"Operations to apply: {len(operations)}")
-
-                # --- 6. Map flat positions to Word and apply in reverse ---
-                import time as _time
-                _time.sleep(0.2)
-
-                total_changes = 0
-
-                def flat_to_word_pos(flat_pos):
-                    para_idx = bisect.bisect_right(flat_para_starts, flat_pos) - 1
-                    para_idx = max(0, min(para_idx, len(word_paras) - 1))
-                    offset = flat_pos - flat_para_starts[para_idx]
-                    return word_paras[para_idx]['start'] + offset
-
-                for operation in reversed(operations):
-                    if operation[0] == 'delete':
-                        _, flat_start, flat_end, del_text = operation
-                        start_para = bisect.bisect_right(
-                            flat_para_starts, flat_start) - 1
-                        end_para = bisect.bisect_right(
-                            flat_para_starts, flat_end - 1) - 1
-
-                        if start_para == end_para:
-                            word_start = flat_to_word_pos(flat_start)
-                            word_end = flat_to_word_pos(flat_end)
-                            # Never delete past the paragraph mark
-                            para_content_end = word_paras[start_para]['end'] - 1
-                            if word_end > para_content_end:
-                                word_end = para_content_end
-                            if word_start >= word_end:
-                                continue
-                            # Skip trailing whitespace at paragraph end
-                            # (deleting adjacent to \r risks capturing it)
-                            if word_end == para_content_end and del_text.strip() == '':
-                                continue
-                            dr = doc.Range(word_start, word_end)
-                            print(f"  DEL in para [{start_para}]: "
-                                  f"{repr(dr.Text[:50])}")
-                            dr.Delete()
-                            total_changes += 1
-                        else:
-                            for pidx in reversed(range(start_para, end_para + 1)):
-                                p_start = flat_para_starts[pidx]
-                                p_end = flat_para_starts[pidx + 1]
-                                clip_start = max(flat_start, p_start)
-                                clip_end = min(flat_end, p_end)
-                                if clip_start >= clip_end:
-                                    continue
-                                ws = word_paras[pidx]['start'] + (clip_start - p_start)
-                                we = word_paras[pidx]['start'] + (clip_end - p_start)
-                                para_content_end = word_paras[pidx]['end'] - 1
-                                if we > para_content_end:
-                                    we = para_content_end
-                                if ws >= we:
-                                    continue
-                                dr = doc.Range(ws, we)
-                                print(f"  DEL in para [{pidx}]: "
-                                      f"{repr(dr.Text[:50])}")
-                                dr.Delete()
-                                total_changes += 1
-
-                    elif operation[0] == 'insert':
-                        _, flat_pos, ins_text = operation
-                        word_pos = flat_to_word_pos(flat_pos)
-                        ir = doc.Range(word_pos, word_pos)
-                        ir.InsertAfter(ins_text)
-                        para_idx = bisect.bisect_right(
-                            flat_para_starts, flat_pos) - 1
-                        print(f"  INS in para [{para_idx}]: "
-                              f"{repr(ins_text[:50])}")
-                        total_changes += 1
-
-                print(f"Applied {total_changes} redline changes")
-
-                # --- 7. Post-application validation ---
-                _time.sleep(0.5)
-                pre_content_paras = sum(
-                    1 for wp in word_paras if wp['content'].strip()
-                )
-
-                try:
-                    from icharlotte_core.word_validator import validate_redline
-                    val_result = validate_redline(
-                        doc_com=doc,
-                        range_start=self._original_range_start,
-                        range_end=self._original_range_end,
-                        pre_content_para_count=pre_content_paras,
-                        orig_flat_length=len(orig_flat),
-                        deleted_chars=de,
-                        inserted_chars=ins,
-                    )
-                    val_result.print_summary()
-                except Exception as ve:
-                    print(f"Validation error: {ve}")
-
-                return True
-
-            except Exception as e:
-                print(f"Flat diff redline failed: {e}")
-                import traceback
-                traceback.print_exc()
+            if not r['success']:
                 return False
 
-        except ImportError as e:
-            print(f"diff-match-patch not available: {e}")
-            return False
+            # Post-application validation
+            import time as _time
+            _time.sleep(0.5)
+            try:
+                from icharlotte_core.word_validator import validate_redline
+                val_result = validate_redline(
+                    doc_com=doc,
+                    range_start=self._original_range_start,
+                    range_end=self._original_range_end,
+                    pre_content_para_count=r['pre_content_para_count'],
+                    orig_flat_length=r['orig_flat_length'],
+                    deleted_chars=r['deleted_chars'],
+                    inserted_chars=r['inserted_chars'],
+                )
+                val_result.print_summary()
+            except Exception as ve:
+                print(f"Validation error: {ve}")
+
+            return True
+
         except Exception as e:
             print(f"Unexpected error in _apply_redlines: {e}")
             import traceback
             traceback.print_exc()
             return False
 
-    def _set_word_text_internal(self, text: str, format_type: str = FORMAT_PLAIN):
-        """Set text in Word with formatting - re-establish connection to ensure it's fresh.
+    def _set_word_text_internal(self, text: str, format_type: str = FORMAT_PLAIN,
+                               word=None, selection=None):
+        """Set text in Word with formatting.
 
-        Enhanced to:
-        - Support Track Changes for all format modes
-        - Handle table cell context properly
-        - Preserve paragraph styles
+        Args:
+            text: Text to insert
+            format_type: Formatting mode constant
+            word: Pre-resolved Word COM app (optional, reconnects if None)
+            selection: Pre-resolved Selection (optional, gets from word if None)
         """
         try:
-            word = self._get_word_app()
-
+            if not word:
+                word = self._get_word_app()
             if not word:
                 raise Exception("Could not connect to Word")
 
-            selection = word.Selection
+            if not selection:
+                selection = word.Selection
             if not selection:
                 raise Exception("Could not access Word selection")
 
@@ -2268,7 +2936,7 @@ class WordLLMPopup(QDialog):
 
         try:
             word = selection.Application
-            doc = word.ActiveDocument
+            doc = self._original_document if self._original_document else word.ActiveDocument
 
             # Handle Track Changes - ensure revisions are tracked if originally enabled
             track_changes_was_enabled = format_settings.get('track_changes_enabled', False)
@@ -2733,7 +3401,7 @@ class WordLLMPopup(QDialog):
             settings = {
                 'temperature': 0.7,
                 'top_p': 0.95,
-                'max_tokens': 4096,
+                'max_tokens': -1,
                 'stream': False,
                 'thinking_level': 'None'
             }
@@ -2805,6 +3473,11 @@ class WordLLMPopup(QDialog):
             else:
                 full_prompt = prompt
                 self.status_label.setText("Processing prompt...")
+
+            # Append any attached file context
+            attachment_context = self.attachment_area.get_attachment_context()
+            if attachment_context:
+                full_prompt += attachment_context
 
             QApplication.processEvents()
 
@@ -3011,7 +3684,7 @@ class WordLLMPopup(QDialog):
             settings = {
                 'temperature': 0.7,
                 'top_p': 0.95,
-                'max_tokens': 4096,
+                'max_tokens': -1,
                 'stream': False,
                 'thinking_level': 'None'
             }
@@ -3135,104 +3808,93 @@ class WordHotkeyManager:
         self.signals = HotkeySignals()
         self.signals.show_popup.connect(self._show_popup)
         self._hotkey_registered = False
-        self._hotkey_handle = None  # Store handle for removal
-        self._check_timer = None  # Timer for periodic hook verification
-        self._last_activity_time = 0  # Track last successful hotkey press
+        self._hotkey_thread = None
+        self._hotkey_thread_id = None  # Win32 thread ID for posting quit message
+        self._stop_event = threading.Event()
 
     def start(self):
-        """Start listening for the global hotkey."""
-        if not HAS_KEYBOARD:
-            print("keyboard module not available - hotkey disabled")
-            return False
-
+        """Start listening for the global hotkey using Windows RegisterHotKey API."""
         if self._hotkey_registered:
             return True
 
-        success = self._register_hotkey()
+        self._stop_event.clear()
+        self._hotkey_thread = threading.Thread(target=self._hotkey_message_loop, daemon=True)
+        self._hotkey_thread.start()
 
-        # Start periodic check timer to re-register if hook is lost
-        if success:
-            self._start_check_timer()
+        # Wait briefly for registration to complete
+        import time
+        time.sleep(0.1)
+        return self._hotkey_registered
 
-        return success
+    def _hotkey_message_loop(self):
+        """Dedicated thread running a Windows message pump for RegisterHotKey."""
+        # Store this thread's ID so we can post WM_QUIT to it later
+        self._hotkey_thread_id = ctypes.windll.kernel32.GetCurrentThreadId()
 
-    def _register_hotkey(self):
-        """Register the Win+V hotkey."""
-        try:
-            # Unregister first if already registered (defensive)
-            if self._hotkey_handle is not None:
-                try:
-                    keyboard.remove_hotkey(self._hotkey_handle)
-                except:
-                    pass
-                self._hotkey_handle = None
-
-            # Also try to remove by name in case handle was lost
-            try:
-                keyboard.remove_hotkey('win+v')
-            except:
-                pass
-
-            # Register Win+V hotkey and store the handle
-            self._hotkey_handle = keyboard.add_hotkey('win+v', self._on_hotkey, suppress=True)
-            self._hotkey_registered = True
-            pass  # Hotkey registered
-            return True
-        except Exception as e:
-            print(f"Failed to register hotkey: {e}")
-            return False
-
-    def _start_check_timer(self):
-        """Start a timer to periodically verify the hotkey hook is working."""
-        if self._check_timer is None:
-            self._check_timer = QTimer()
-            self._check_timer.timeout.connect(self._check_and_reregister)
-            self._check_timer.start(30000)  # Check every 30 seconds
-
-    def _check_and_reregister(self):
-        """Periodically re-register the hotkey to recover from hook loss."""
-        if not HAS_KEYBOARD:
+        # Register the hotkey on THIS thread
+        result = ctypes.windll.user32.RegisterHotKey(
+            None, _HOTKEY_ID, _MOD_WIN | _MOD_NOREPEAT, _VK_V
+        )
+        if not result:
+            err = ctypes.GetLastError()
+            print(f"RegisterHotKey failed (error {err}) - Win+V may be in use by another app")
+            # Fall back to keyboard library
+            self._fallback_to_keyboard_lib()
             return
 
-        import time
-        # If no hotkey activity in last 5 minutes and user might be using the app,
-        # proactively re-register to ensure the hook is fresh
-        time_since_activity = time.time() - self._last_activity_time if self._last_activity_time else float('inf')
+        self._hotkey_registered = True
+        print("Win+V hotkey registered via RegisterHotKey API")
 
-        # Always re-register periodically - this is cheap and ensures reliability
+        # Message pump - blocks until WM_QUIT or stop event
+        msg = wintypes.MSG()
+        while not self._stop_event.is_set():
+            # Use GetMessage (blocks until a message arrives)
+            ret = ctypes.windll.user32.GetMessageW(ctypes.byref(msg), None, 0, 0)
+            if ret <= 0:  # WM_QUIT or error
+                break
+            if msg.message == _WM_HOTKEY and msg.wParam == _HOTKEY_ID:
+                self.signals.show_popup.emit()
+
+        # Cleanup
+        ctypes.windll.user32.UnregisterHotKey(None, _HOTKEY_ID)
+        self._hotkey_registered = False
+        print("Win+V hotkey unregistered")
+
+    def _fallback_to_keyboard_lib(self):
+        """Fall back to keyboard library if RegisterHotKey fails."""
+        if not HAS_KEYBOARD:
+            print("keyboard module not available - hotkey disabled")
+            return
         try:
-            self._register_hotkey()
+            self._keyboard_handle = keyboard.add_hotkey('win+v', lambda: self.signals.show_popup.emit(), suppress=True)
+            self._hotkey_registered = True
+            print("Win+V hotkey registered via keyboard library (fallback)")
         except Exception as e:
-            try:
-                print(f"Hotkey re-registration failed: {e}")
-            except OSError:
-                pass
+            print(f"Keyboard library fallback also failed: {e}")
 
     def stop(self):
         """Stop listening for the global hotkey."""
-        # Stop the check timer
-        if self._check_timer is not None:
-            self._check_timer.stop()
-            self._check_timer = None
+        self._stop_event.set()
 
-        if HAS_KEYBOARD and self._hotkey_registered:
+        # Post WM_QUIT to the hotkey thread to unblock GetMessage
+        if self._hotkey_thread_id is not None:
+            ctypes.windll.user32.PostThreadMessageW(
+                self._hotkey_thread_id, 0x0012, 0, 0  # WM_QUIT
+            )
+            self._hotkey_thread_id = None
+
+        # Clean up keyboard library fallback if used
+        if hasattr(self, '_keyboard_handle') and HAS_KEYBOARD:
             try:
-                if self._hotkey_handle is not None:
-                    keyboard.remove_hotkey(self._hotkey_handle)
-                else:
-                    keyboard.remove_hotkey('win+v')
-                self._hotkey_registered = False
-                self._hotkey_handle = None
-                print("Global hotkey unregistered")
+                keyboard.remove_hotkey(self._keyboard_handle)
             except:
                 pass
 
-    def _on_hotkey(self):
-        """Called when the hotkey is pressed (from keyboard thread)."""
-        import time
-        self._last_activity_time = time.time()
-        # Emit signal to show popup on main thread
-        self.signals.show_popup.emit()
+        if self._hotkey_thread is not None:
+            self._hotkey_thread.join(timeout=2)
+            self._hotkey_thread = None
+
+        self._hotkey_registered = False
 
     def _show_popup(self):
         """Show the popup dialog (on main thread)."""

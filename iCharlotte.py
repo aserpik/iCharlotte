@@ -74,6 +74,7 @@ from icharlotte_core.ui.liability_tab import LiabilityExposureTab
 from icharlotte_core.ui.master_case_tab import MasterCaseTab
 from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.ui.templates_resources_tab import TemplatesResourcesTab
+from icharlotte_core.ui.deposition_tab import DepositionTab
 from icharlotte_core.word_hotkey import init_word_hotkey, stop_word_hotkey
 from icharlotte_core.app_crash_handler import (
     install_crash_handler, checkpoint, add_context,
@@ -304,35 +305,51 @@ class DirectoryTreeWorker(QThread):
         self.running = True
         
     def run(self):
-        batch = []
-        for root, dirs, files in os.walk(self.root_path):
-            if not self.running:
-                break
-            # Skip hidden files/dirs
-            dirs[:] = [d for d in dirs if not d.startswith('.') and not d.startswith('~$')]
-            
-            file_data = []
-            for f in files:
-                if f.startswith('.') or f.startswith('~$'):
-                    continue
-                path = os.path.join(root, f)
-                try:
-                    stat = os.stat(path)
-                    size = stat.st_size
-                    mtime = stat.st_mtime
-                    file_data.append((f, size, mtime))
-                except:
-                    file_data.append((f, 0, 0))
-            
-            batch.append((root, dirs, file_data))
-            if len(batch) >= 10:
+        import time as _time
+        _start = _time.monotonic()
+        _batch_count = 0
+        _total_dirs = 0
+        _total_files = 0
+        log_debug(f"DirectoryTreeWorker: scanning {self.root_path}")
+        try:
+            batch = []
+            for root, dirs, files in os.walk(self.root_path):
+                if not self.running:
+                    log_debug(f"DirectoryTreeWorker: stopped early after {_time.monotonic()-_start:.1f}s")
+                    break
+                # Skip hidden files/dirs
+                dirs[:] = [d for d in dirs if not d.startswith('.') and not d.startswith('~$')]
+
+                file_data = []
+                for f in files:
+                    if f.startswith('.') or f.startswith('~$'):
+                        continue
+                    path = os.path.join(root, f)
+                    try:
+                        stat = os.stat(path)
+                        size = stat.st_size
+                        mtime = stat.st_mtime
+                        file_data.append((f, size, mtime))
+                    except:
+                        file_data.append((f, 0, 0))
+
+                _total_dirs += len(dirs)
+                _total_files += len(file_data)
+                batch.append((root, dirs, file_data))
+                if len(batch) >= 10:
+                    _batch_count += 1
+                    self.data_ready.emit(batch)
+                    batch = []
+                    self.msleep(10) # Yield to UI
+
+            if batch:
+                _batch_count += 1
                 self.data_ready.emit(batch)
-                batch = []
-                self.msleep(10) # Yield to UI
-                
-        if batch:
-            self.data_ready.emit(batch)
-        self.finished.emit()
+            log_debug(f"DirectoryTreeWorker: done in {_time.monotonic()-_start:.1f}s, {_batch_count} batches, {_total_dirs} dirs, {_total_files} files")
+            self.finished.emit()
+        except Exception as e:
+            log_error(f"DirectoryTreeWorker CRASHED after {_time.monotonic()-_start:.1f}s: {e}", exc_info=True)
+            self.finished.emit()
 
     def stop(self):
         self.running = False
@@ -811,6 +828,10 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.email_update_tab, "Email Update")
         if self.file_number:
             self.email_update_tab.on_case_changed(self.file_number)
+
+        # --- Tab: Depositions ---
+        self.deposition_tab = DepositionTab()
+        self.tabs.addTab(self.deposition_tab, "Depositions")
 
         # --- Tab: Liability & Exposure ---
         self.liability_tab = LiabilityExposureTab()
@@ -1312,9 +1333,11 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Error", f"Could not open directory: {e}")
 
     def load_case_by_number(self, file_number):
+        log_debug(f"load_case_by_number: switching to {file_number}")
         new_path = get_case_path(file_number)
 
         if new_path:
+            log_debug(f"load_case_by_number: path={new_path}")
             self.save_status_history()
             # Save chat conversation before switching cases
             if hasattr(self, 'chat_tab') and self.chat_tab:
@@ -1350,6 +1373,8 @@ class MainWindow(QMainWindow):
                 self.email_tab.perform_search()
             if hasattr(self, 'email_update_tab'):
                 self.email_update_tab.on_case_changed(file_number)
+            if hasattr(self, 'deposition_tab'):
+                self.deposition_tab.load_case(file_number)
 
             log_event(f"Switched to case {self.file_number}")
             self.check_docket_expiry(file_number)
@@ -1358,12 +1383,14 @@ class MainWindow(QMainWindow):
 
     def check_docket_expiry(self, file_number):
         """Checks if the last docket download was more than 30 days ago and runs the agent if so."""
+        log_debug(f"check_docket_expiry: starting for {file_number}")
         try:
             from icharlotte_core.master_db import MasterCaseDatabase
             db = MasterCaseDatabase()
             case = db.get_case(file_number)
-            
+
             if not case:
+                log_debug(f"check_docket_expiry: no case found for {file_number}")
                 return
 
             last_download = case.get('last_docket_download')
@@ -1412,8 +1439,11 @@ class MainWindow(QMainWindow):
             
             if run_agent:
                 # Run docket.py using run_agent
+                log_debug(f"check_docket_expiry: auto-running Docket Agent for {file_number}")
                 self.run_agent("Docket Agent (Auto)", "docket.py", "file_number", None)
-                
+            else:
+                log_debug(f"check_docket_expiry: docket is current for {file_number}")
+
         except Exception as e:
             log_event(f"Error checking docket expiry: {e}", "error")
 
@@ -2312,7 +2342,9 @@ class MainWindow(QMainWindow):
             return False
 
     def save_cache(self):
+        log_debug(f"save_cache: starting, map_size={len(self.tree_item_map)}, case={self.file_number}")
         data = []
+        _deleted_count = 0
         for path, item in self.tree_item_map.items():
             if path == self.case_path: continue
 
@@ -2327,8 +2359,12 @@ class MainWindow(QMainWindow):
                 data.append(entry)
             except RuntimeError:
                 # Item's C++ object was already deleted (e.g., parent removed)
+                _deleted_count += 1
                 continue
-            
+
+        if _deleted_count:
+            log_warning(f"save_cache: {_deleted_count} deleted C++ items skipped")
+
         if not os.path.exists(GEMINI_DATA_DIR):
             os.makedirs(GEMINI_DATA_DIR)
 
@@ -2336,6 +2372,7 @@ class MainWindow(QMainWindow):
         try:
             with open(cache_path, 'w') as f:
                 json.dump(data, f)
+            log_debug(f"save_cache: wrote {len(data)} items to {cache_path}")
         except Exception as e:
             log_event(f"Error saving cache: {e}", "error")
 
@@ -2420,6 +2457,7 @@ class MainWindow(QMainWindow):
         # Increment generation so stale worker callbacks are ignored
         self._tree_generation += 1
         current_gen = self._tree_generation
+        log_debug(f"populate_tree: gen={current_gen}, case={self.file_number}, path={self.case_path}")
 
         self.tree.clear()
         self.status_label.setText("Scanning directory structure... Please wait.")
@@ -2468,102 +2506,133 @@ class MainWindow(QMainWindow):
         self.worker.data_ready.connect(lambda batch, gen=current_gen: self._on_tree_batch(gen, batch))
         self.worker.finished.connect(lambda gen=current_gen: self._on_scan_complete(gen))
         self.worker.start()
+        log_debug(f"populate_tree: worker started for gen={current_gen}")
 
     def _on_tree_batch(self, generation, batch):
         """Wrapper that ignores stale worker callbacks from a previous file."""
         if generation != self._tree_generation:
+            log_debug(f"_on_tree_batch: STALE gen={generation}, current={self._tree_generation} — ignoring")
             return
         self.add_tree_batch(batch)
 
     def _on_scan_complete(self, generation):
         """Wrapper that ignores stale worker callbacks from a previous file."""
         if generation != self._tree_generation:
+            log_debug(f"_on_scan_complete: STALE gen={generation}, current={self._tree_generation} — ignoring")
             return
         self.on_scan_complete()
 
     def add_tree_batch(self, batch):
-        for root, dirs, files in batch:
-            self.visited_paths.add(root)
-            parent_item = self.tree_item_map.get(root)
-            if not parent_item:
-                continue
-                
-            dirs.sort(key=str.lower)
-            files.sort(key=lambda x: x[0].lower())
-            
-            for d in dirs:
-                dir_path = os.path.join(root, d)
-                if dir_path not in self.tree_item_map:
-                    d_item = QTreeWidgetItem(parent_item)
-                    d_item.setText(0, d)
-                    d_item.setIcon(0, self._get_cached_icon(dir_path, is_dir=True))
-                    d_item.setData(0, Qt.ItemDataRole.UserRole, dir_path)
-                    d_item.setData(0, Qt.ItemDataRole.UserRole + 1, "dir")
-                    d_item.setExpanded(False)
-                    self.tree_item_map[dir_path] = d_item
+        _batch_gen = self._tree_generation
+        _batch_dirs = 0
+        _batch_files = 0
+        try:
+            for root, dirs, files in batch:
+                self.visited_paths.add(root)
+                parent_item = self.tree_item_map.get(root)
+                if not parent_item:
+                    continue
 
-            for f, size, mtime in files:
-                file_path = os.path.join(root, f)
-                self.visited_paths.add(file_path)
+                dirs.sort(key=str.lower)
+                files.sort(key=lambda x: x[0].lower())
 
-                size_str = f"{size / 1024:.1f} KB" if size < 1024 * 1024 else f"{size / (1024 * 1024):.1f} MB"
-                date_str = format_date_to_mm_dd_yyyy(mtime)
+                for d in dirs:
+                    dir_path = os.path.join(root, d)
+                    if dir_path not in self.tree_item_map:
+                        d_item = QTreeWidgetItem(parent_item)
+                        d_item.setText(0, d)
+                        d_item.setIcon(0, self._get_cached_icon(dir_path, is_dir=True))
+                        d_item.setData(0, Qt.ItemDataRole.UserRole, dir_path)
+                        d_item.setData(0, Qt.ItemDataRole.UserRole + 1, "dir")
+                        d_item.setExpanded(False)
+                        self.tree_item_map[dir_path] = d_item
+                        _batch_dirs += 1
 
-                # Get processing status (uses cached DB)
-                proc_status = self._get_file_processing_status(file_path) if self.file_number else ""
+                for f, size, mtime in files:
+                    file_path = os.path.join(root, f)
+                    self.visited_paths.add(file_path)
 
-                if file_path not in self.tree_item_map:
-                    f_item = QTreeWidgetItem(parent_item)
-                    f_item.setText(0, f)
+                    size_str = f"{size / 1024:.1f} KB" if size < 1024 * 1024 else f"{size / (1024 * 1024):.1f} MB"
+                    date_str = format_date_to_mm_dd_yyyy(mtime)
 
-                    # Use cached extension-based icons to avoid network access
-                    f_item.setIcon(0, self._get_cached_icon(file_path))
+                    # Get processing status (uses cached DB)
+                    proc_status = self._get_file_processing_status(file_path) if self.file_number else ""
 
-                    f_item.setData(0, Qt.ItemDataRole.UserRole, file_path)
-                    f_item.setData(0, Qt.ItemDataRole.UserRole + 1, "file")
-                    f_item.setText(1, size_str)
-                    f_item.setText(2, date_str)
-                    f_item.setText(4, proc_status)
+                    if file_path not in self.tree_item_map:
+                        f_item = QTreeWidgetItem(parent_item)
+                        f_item.setText(0, f)
 
-                    self.tree_item_map[file_path] = f_item
-                else:
-                    f_item = self.tree_item_map[file_path]
-                    try:
+                        # Use cached extension-based icons to avoid network access
+                        f_item.setIcon(0, self._get_cached_icon(file_path))
+
+                        f_item.setData(0, Qt.ItemDataRole.UserRole, file_path)
+                        f_item.setData(0, Qt.ItemDataRole.UserRole + 1, "file")
                         f_item.setText(1, size_str)
                         f_item.setText(2, date_str)
                         f_item.setText(4, proc_status)
-                    except RuntimeError:
-                        continue
-        
+
+                        self.tree_item_map[file_path] = f_item
+                        _batch_files += 1
+                    else:
+                        f_item = self.tree_item_map[file_path]
+                        try:
+                            f_item.setText(1, size_str)
+                            f_item.setText(2, date_str)
+                            f_item.setText(4, proc_status)
+                        except RuntimeError:
+                            log_warning(f"add_tree_batch: RuntimeError on existing item {file_path}")
+                            continue
+
+            log_debug(f"add_tree_batch: gen={_batch_gen}, +{_batch_dirs} dirs, +{_batch_files} files, map_size={len(self.tree_item_map)}")
+        except Exception as e:
+            log_error(f"add_tree_batch CRASHED: gen={_batch_gen}, +{_batch_dirs}d/+{_batch_files}f, map_size={len(self.tree_item_map)}, error={e}", exc_info=True)
+            raise
+
         QApplication.processEvents()
 
     def on_scan_complete(self):
-        # Prune items not visited (deleted files/folders)
-        to_remove = []
-        for path, item in self.tree_item_map.items():
-            if path != self.case_path and path not in self.visited_paths:
-                to_remove.append(path)
-                
-        for path in to_remove:
-            item = self.tree_item_map.pop(path)
-            try:
-                parent = item.parent()
-                if parent:
-                    parent.removeChild(item)
-            except RuntimeError:
-                pass
-                
-        self.save_cache()
-        self.tree.setEnabled(True)
-        self.process_btn.setEnabled(True)
-        self.status_label.setText(f"Scan Complete. Case: {self.file_number}")
-        self.tree.setSortingEnabled(True)
+        log_debug(f"on_scan_complete: gen={self._tree_generation}, case={self.file_number}, map_size={len(self.tree_item_map)}, visited={len(self.visited_paths)}")
+        try:
+            # Prune items not visited (deleted files/folders)
+            to_remove = []
+            for path, item in self.tree_item_map.items():
+                if path != self.case_path and path not in self.visited_paths:
+                    to_remove.append(path)
+
+            log_debug(f"on_scan_complete: pruning {len(to_remove)} stale items")
+            for path in to_remove:
+                item = self.tree_item_map.pop(path)
+                try:
+                    parent = item.parent()
+                    if parent:
+                        parent.removeChild(item)
+                except RuntimeError:
+                    log_warning(f"on_scan_complete: RuntimeError removing {path}")
+
+            self.save_cache()
+            self.tree.setEnabled(True)
+            self.process_btn.setEnabled(True)
+            self.status_label.setText(f"Scan Complete. Case: {self.file_number}")
+            self.tree.setSortingEnabled(True)
+            log_debug(f"on_scan_complete: DONE, final map_size={len(self.tree_item_map)}")
+        except Exception as e:
+            log_error(f"on_scan_complete CRASHED: gen={self._tree_generation}, case={self.file_number}, error={e}", exc_info=True)
+            raise
 
 # Note: Exception handling is now managed by app_crash_handler module
 # The install_crash_handler() function sets up sys.excepthook automatically
 # Legacy exception_hook removed - see icharlotte_core/app_crash_handler.py
 
 if __name__ == "__main__":
+    # Enable faulthandler to catch C-level segfaults that bypass Python exceptions
+    import faulthandler
+    _faulthandler_log = os.path.join(os.path.dirname(__file__), "logs", "crashes", "faulthandler.log")
+    os.makedirs(os.path.dirname(_faulthandler_log), exist_ok=True)
+    _faulthandler_file = open(_faulthandler_log, "a")
+    _faulthandler_file.write(f"\n{'='*60}\nSession start: {__import__('datetime').datetime.now().isoformat()}\n{'='*60}\n")
+    _faulthandler_file.flush()
+    faulthandler.enable(file=_faulthandler_file, all_threads=True)
+
     # Install crash handler FIRST before anything else
     crash_handler = install_crash_handler()
     checkpoint("Application starting")

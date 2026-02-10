@@ -37,6 +37,7 @@ SECTION_TO_TEMPLATE_VAR = {
     "PROCEDURAL STATUS": "procedural_history",
     "INVESTIGATION": "investigation",
     "DISCOVERY": "discovery",
+    "EXPERTS": "experts",
     "MEDICAL RECORD REVIEW": "medical_record_review",
     "EVALUATION OF LIABILITY": "evaluation_of_liability",
     "EVALUATION OF EXPOSURE": "evaluation_of_exposure",
@@ -717,7 +718,7 @@ def _build_metadata_table(doc: Document, metadata: Dict):
         text = para.text.strip().upper()
         if "VIA EMAIL" in text:
             via_email_idx = i
-        elif text in ["FACTUAL BACKGROUND", "PROCEDURAL HISTORY", "INVESTIGATION"]:
+        elif text in ["FACTUAL BACKGROUND", "PROCEDURAL STATUS", "INVESTIGATION"]:
             first_section_idx = i
             break
 

@@ -64,7 +64,7 @@ def call_gemini(prompt: str, text: str) -> str:
     settings = {
         'temperature': 0.7,
         'top_p': 0.95,
-        'max_tokens': 16384,
+        'max_tokens': -1,
         'stream': False,
         'thinking_level': 'None'
     }

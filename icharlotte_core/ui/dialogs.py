@@ -2652,7 +2652,7 @@ class LLMSettingsDialog(QDialog):
                         model_sequence = [ModelSpec(
                             provider=provider,
                             model=model_id,
-                            max_tokens=8192
+                            max_tokens=-1
                         )]
                         self.config.update_agent_config(
                             agent_id,

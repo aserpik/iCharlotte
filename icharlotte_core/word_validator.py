@@ -561,6 +561,65 @@ def _is_section_heading(text: str) -> bool:
     return text.strip().rstrip(":") in SECTION_HEADINGS
 
 
+# Public alias
+is_section_heading = _is_section_heading
+
+
+# Preferred canonical names (when a heading has multiple valid forms)
+_CANONICAL_SECTION_NAMES = {
+    "PROCEDURAL HISTORY": "PROCEDURAL STATUS",
+    "SETTLEMENT": "SETTLEMENT STATUS",
+}
+
+
+def fuzzy_match_section_heading(text: str) -> Optional[str]:
+    """Match text to a canonical section heading name, or None.
+
+    Handles variations associates might use:
+      - Exact match: "FACTUAL BACKGROUND" -> "FACTUAL BACKGROUND"
+      - Known alias: "SETTLEMENT" -> "SETTLEMENT STATUS"
+      - Extra words: "FACTUAL BACKGROUND AND SUMMARY" -> "FACTUAL BACKGROUND"
+      - Containment: "EVALUATION OF LIABILITY AND DAMAGES" -> "EVALUATION OF LIABILITY"
+      - Close match via difflib for typos/minor differences
+    """
+    import difflib
+
+    cleaned = text.strip().rstrip(":").upper()
+    if not cleaned:
+        return None
+
+    # 1. Exact match
+    if cleaned in SECTION_HEADINGS:
+        return _CANONICAL_SECTION_NAMES.get(cleaned, cleaned)
+
+    # 2. Check if a known heading is a prefix of the input (extra words appended)
+    #    e.g., "FACTUAL BACKGROUND AND SUMMARY" -> "FACTUAL BACKGROUND"
+    best_prefix = None
+    best_prefix_len = 0
+    for heading in SECTION_HEADINGS:
+        if cleaned.startswith(heading) and len(heading) > best_prefix_len:
+            # Ensure the match is at a word boundary
+            rest = cleaned[len(heading):]
+            if not rest or rest[0] in (' ', ',', ':'):
+                best_prefix = heading
+                best_prefix_len = len(heading)
+    if best_prefix:
+        return _CANONICAL_SECTION_NAMES.get(best_prefix, best_prefix)
+
+    # 3. Check if any known heading contains the input or vice versa
+    for heading in SECTION_HEADINGS:
+        if heading in cleaned or cleaned in heading:
+            return _CANONICAL_SECTION_NAMES.get(heading, heading)
+
+    # 4. Fuzzy match via difflib (for typos)
+    matches = difflib.get_close_matches(cleaned, SECTION_HEADINGS, n=1, cutoff=0.7)
+    if matches:
+        heading = matches[0]
+        return _CANONICAL_SECTION_NAMES.get(heading, heading)
+
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Report check functions
 # ---------------------------------------------------------------------------
