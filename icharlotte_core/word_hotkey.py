@@ -641,6 +641,21 @@ def apply_flat_diff_redline(doc_com, range_start, range_end, original_text,
         # --- 6. Map flat positions to Word and apply in reverse ---
         _time.sleep(0.2)
 
+        import pywintypes as _pywintypes
+
+        def _com_op(func, retries=3, delay=2.0):
+            """Retry a COM operation on RPC_E_CALL_REJECTED."""
+            for attempt in range(retries):
+                try:
+                    return func()
+                except _pywintypes.com_error as e:
+                    if e.hresult == -2147418111 and attempt < retries - 1:
+                        print(f"    COM busy, retrying in {delay}s "
+                              f"(attempt {attempt + 1})...")
+                        _time.sleep(delay)
+                    else:
+                        raise
+
         total_changes = 0
 
         def flat_to_word_pos(flat_pos):
@@ -669,10 +684,11 @@ def apply_flat_diff_redline(doc_com, range_start, range_end, original_text,
                     # Skip trailing whitespace at paragraph end
                     if word_end == para_content_end and del_text.strip() == '':
                         continue
-                    dr = doc_com.Range(word_start, word_end)
+                    dr = _com_op(lambda ws=word_start, we=word_end: doc_com.Range(ws, we))
+                    dr_text = _com_op(lambda: dr.Text[:50])
                     print(f"  DEL in para [{start_para}]: "
-                          f"{repr(dr.Text[:50])}")
-                    dr.Delete()
+                          f"{repr(dr_text)}")
+                    _com_op(lambda: dr.Delete())
                     total_changes += 1
                 else:
                     for pidx in reversed(range(start_para, end_para + 1)):
@@ -689,17 +705,18 @@ def apply_flat_diff_redline(doc_com, range_start, range_end, original_text,
                             we = para_content_end
                         if ws >= we:
                             continue
-                        dr = doc_com.Range(ws, we)
+                        dr = _com_op(lambda _ws=ws, _we=we: doc_com.Range(_ws, _we))
+                        dr_text = _com_op(lambda: dr.Text[:50])
                         print(f"  DEL in para [{pidx}]: "
-                              f"{repr(dr.Text[:50])}")
-                        dr.Delete()
+                              f"{repr(dr_text)}")
+                        _com_op(lambda: dr.Delete())
                         total_changes += 1
 
             elif operation[0] == 'insert':
                 _, flat_pos, ins_text = operation
                 word_pos = flat_to_word_pos(flat_pos)
-                ir = doc_com.Range(word_pos, word_pos)
-                ir.InsertAfter(ins_text)
+                ir = _com_op(lambda wp=word_pos: doc_com.Range(wp, wp))
+                _com_op(lambda: ir.InsertAfter(ins_text))
                 para_idx = bisect.bisect_right(
                     flat_para_starts, flat_pos) - 1
                 print(f"  INS in para [{para_idx}]: "

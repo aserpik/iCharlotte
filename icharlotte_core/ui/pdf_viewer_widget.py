@@ -74,7 +74,7 @@ class PdfViewerWidget(QWidget):
                 self._pending_pdf = None
 
     def _get_viewer_html(self):
-        """Return inline pdf.js viewer HTML."""
+        """Return inline pdf.js viewer HTML with lazy page rendering."""
         return '''<!DOCTYPE html>
 <html>
 <head>
@@ -90,236 +90,286 @@ class PdfViewerWidget(QWidget):
         }
         .page {
             margin: 10px auto;
-            background: white;
+            background: #e0e0e0;
             box-shadow: 0 2px 5px rgba(0,0,0,0.3);
             position: relative;
         }
-        canvas { display: block; }
-
-        /* Text layer for selection */
-        .textLayer {
-            position: absolute;
-            left: 0;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            overflow: hidden;
-            opacity: 0.2;
-            line-height: 1.0;
-            user-select: text;
-            -webkit-user-select: text;
-            -moz-user-select: text;
-            -ms-user-select: text;
-        }
-
-        .textLayer > span {
-            color: transparent;
-            position: absolute;
-            white-space: pre;
-            cursor: text;
-            transform-origin: 0% 0%;
-        }
-
-        .textLayer ::selection {
-            background: rgba(0, 0, 255, 0.3);
-        }
-
-        .textLayer ::-moz-selection {
-            background: rgba(0, 0, 255, 0.3);
-        }
-
-        #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
+        .page.rendered { background: white; }
+        .page-num-label {
+            position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            color: white;
-            font-family: Arial, sans-serif;
-            font-size: 16px;
+            color: #999; font: 14px Arial; pointer-events: none;
+        }
+        .page.rendered .page-num-label { display: none; }
+        canvas { display: block; }
+        .textLayer {
+            position: absolute; left: 0; top: 0; right: 0; bottom: 0;
+            overflow: hidden; opacity: 0.2; line-height: 1.0;
+            user-select: text;
+        }
+        .textLayer > span {
+            color: transparent; position: absolute; white-space: pre;
+            cursor: text; transform-origin: 0% 0%;
+        }
+        .textLayer ::selection { background: rgba(0,0,255,0.3); }
+        #loading {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%,-50%);
+            color: white; font: 16px Arial;
         }
         #error {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #ff6b6b;
-            font-family: Arial, sans-serif;
-            font-size: 14px;
-            text-align: center;
-            max-width: 80%;
-            display: none;
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%,-50%);
+            color: #ff6b6b; font: 14px Arial; text-align: center;
+            max-width: 80%; display: none;
         }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
-    <div id="loading">Loading PDF viewer...</div>
+    <div id="loading">Ready to load PDF</div>
     <div id="error"></div>
     <div id="viewerContainer"></div>
     <script>
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        pdfjsLib.GlobalWorkerOptions.workerSrc =
+            'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-        let pdfDoc = null;
-        let currentPage = 1;
-        let totalPages = 0;
-        let scale = 1.5;
-        let renderedPages = new Set();
-        let isLoading = false;
-
-        document.getElementById('loading').textContent = 'Ready to load PDF';
+        let pdfDoc = null, currentPage = 1, totalPages = 0, scale = 1.5;
+        let renderedPages = new Set(), renderingPages = new Set();
+        let isLoading = false, pageHeights = [];
+        const BUFFER = 2; // render this many pages above/below viewport
 
         async function loadPdf(url) {
-            if (isLoading) {
-                console.log('Already loading a PDF, please wait...');
-                return { success: false, error: 'Already loading' };
-            }
-
+            if (isLoading) return { success: false, error: 'Already loading' };
             isLoading = true;
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('loading').textContent = 'Loading PDF...';
-            document.getElementById('error').style.display = 'none';
+
+            const loadEl = document.getElementById('loading');
+            const errEl = document.getElementById('error');
+            loadEl.style.display = 'block';
+            loadEl.textContent = 'Loading PDF...';
+            errEl.style.display = 'none';
 
             try {
-                console.log('Loading PDF from:', url);
-                const loadingTask = pdfjsLib.getDocument(url);
-                pdfDoc = await loadingTask.promise;
+                // Clean up previous document
+                if (pdfDoc) { pdfDoc.destroy(); pdfDoc = null; }
+                renderedPages.clear();
+                renderingPages.clear();
+                pageHeights = [];
+
+                pdfDoc = await pdfjsLib.getDocument(url).promise;
                 totalPages = pdfDoc.numPages;
                 currentPage = 1;
-                renderedPages.clear();
 
                 const container = document.getElementById('viewerContainer');
                 container.innerHTML = '';
 
-                document.getElementById('loading').textContent = 'Rendering pages...';
+                // Create placeholder divs for all pages (measure first page for size)
+                const firstPage = await pdfDoc.getPage(1);
+                const vp = firstPage.getViewport({ scale });
+                const pw = vp.width, ph = vp.height;
 
-                // Render all pages
                 for (let i = 1; i <= totalPages; i++) {
-                    await renderPage(i);
-                    document.getElementById('loading').textContent = 'Rendering page ' + i + ' of ' + totalPages + '...';
+                    const div = document.createElement('div');
+                    div.className = 'page';
+                    div.id = 'page-' + i;
+                    div.dataset.pageNumber = i;
+                    div.style.width = pw + 'px';
+                    div.style.height = ph + 'px';
+                    const lbl = document.createElement('div');
+                    lbl.className = 'page-num-label';
+                    lbl.textContent = 'Page ' + i;
+                    div.appendChild(lbl);
+                    container.appendChild(div);
+                    pageHeights.push(ph);
                 }
 
-                // Setup scroll listener for page tracking
-                setupScrollListener();
-
-                document.getElementById('loading').style.display = 'none';
+                container.addEventListener('scroll', onScroll);
+                loadEl.style.display = 'none';
                 isLoading = false;
 
-                console.log('PDF loaded successfully:', totalPages, 'pages');
-                return { success: true, totalPages: totalPages };
+                // Render initial visible pages
+                await renderVisible();
+                return { success: true, totalPages };
             } catch (err) {
-                console.error('Error loading PDF:', err);
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('error').textContent = 'Error loading PDF: ' + err.message;
-                document.getElementById('error').style.display = 'block';
+                loadEl.style.display = 'none';
+                errEl.textContent = 'Error: ' + err.message;
+                errEl.style.display = 'block';
                 isLoading = false;
                 return { success: false, error: err.message };
             }
         }
 
-        async function renderPage(pageNum) {
-            const page = await pdfDoc.getPage(pageNum);
-            const viewport = page.getViewport({ scale: scale });
-
-            const pageDiv = document.createElement('div');
-            pageDiv.className = 'page';
-            pageDiv.id = 'page-' + pageNum;
-            pageDiv.dataset.pageNumber = pageNum;
-            pageDiv.style.width = viewport.width + 'px';
-            pageDiv.style.height = viewport.height + 'px';
-
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = viewport.width;
-            canvas.height = viewport.height;
-
-            pageDiv.appendChild(canvas);
-            document.getElementById('viewerContainer').appendChild(pageDiv);
-
-            // Render canvas
-            await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-
-            // Add text layer for selection
-            const textContent = await page.getTextContent();
-            const textLayerDiv = document.createElement('div');
-            textLayerDiv.className = 'textLayer';
-            textLayerDiv.style.width = viewport.width + 'px';
-            textLayerDiv.style.height = viewport.height + 'px';
-            pageDiv.appendChild(textLayerDiv);
-
-            // Render text layer
-            pdfjsLib.renderTextLayer({
-                textContentSource: textContent,
-                container: textLayerDiv,
-                viewport: viewport,
-                textDivs: []
-            });
-
-            renderedPages.add(pageNum);
+        let scrollTimer = null;
+        function onScroll() {
+            // Track current page
+            updateCurrentPage();
+            // Debounced lazy render
+            if (scrollTimer) clearTimeout(scrollTimer);
+            scrollTimer = setTimeout(renderVisible, 100);
         }
 
-        function setupScrollListener() {
+        function updateCurrentPage() {
             const container = document.getElementById('viewerContainer');
-            container.addEventListener('scroll', () => {
-                const pages = document.querySelectorAll('.page');
-                const containerRect = container.getBoundingClientRect();
-                const containerCenter = containerRect.top + containerRect.height / 2;
+            const ct = container.scrollTop + container.clientHeight / 2;
+            const pages = container.children;
+            for (let i = 0; i < pages.length; i++) {
+                const top = pages[i].offsetTop;
+                const bot = top + pages[i].offsetHeight;
+                if (ct >= top && ct < bot) {
+                    currentPage = i + 1;
+                    return;
+                }
+            }
+        }
 
-                let closestPage = 1;
-                let closestDist = Infinity;
+        async function renderVisible() {
+            if (!pdfDoc) return;
+            const container = document.getElementById('viewerContainer');
+            const scrollTop = container.scrollTop;
+            const viewH = container.clientHeight;
 
-                pages.forEach(page => {
-                    const rect = page.getBoundingClientRect();
-                    const pageCenter = rect.top + rect.height / 2;
-                    const dist = Math.abs(pageCenter - containerCenter);
-                    if (dist < closestDist) {
-                        closestDist = dist;
-                        closestPage = parseInt(page.dataset.pageNumber);
+            // Find visible page range
+            let firstVisible = 1, lastVisible = totalPages;
+            const pages = container.children;
+            for (let i = 0; i < pages.length; i++) {
+                const top = pages[i].offsetTop;
+                const bot = top + pages[i].offsetHeight;
+                if (bot >= scrollTop) { firstVisible = i + 1; break; }
+            }
+            for (let i = pages.length - 1; i >= 0; i--) {
+                const top = pages[i].offsetTop;
+                if (top <= scrollTop + viewH) { lastVisible = i + 1; break; }
+            }
+
+            const lo = Math.max(1, firstVisible - BUFFER);
+            const hi = Math.min(totalPages, lastVisible + BUFFER);
+
+            // Unload pages far from viewport to free memory
+            for (const pn of renderedPages) {
+                if (pn < lo - BUFFER || pn > hi + BUFFER) {
+                    unloadPage(pn);
+                }
+            }
+
+            // Render pages in range
+            for (let i = lo; i <= hi; i++) {
+                if (!renderedPages.has(i) && !renderingPages.has(i)) {
+                    await renderPage(i);
+                }
+            }
+        }
+
+        function unloadPage(pageNum) {
+            const div = document.getElementById('page-' + pageNum);
+            if (!div) return;
+            // Keep the placeholder div but remove rendered content
+            const w = div.style.width, h = div.style.height;
+            div.innerHTML = '';
+            div.className = 'page';
+            div.style.width = w;
+            div.style.height = h;
+            const lbl = document.createElement('div');
+            lbl.className = 'page-num-label';
+            lbl.textContent = 'Page ' + pageNum;
+            div.appendChild(lbl);
+            renderedPages.delete(pageNum);
+        }
+
+        async function renderPage(pageNum) {
+            if (renderedPages.has(pageNum) || renderingPages.has(pageNum)) return;
+            renderingPages.add(pageNum);
+
+            try {
+                const page = await pdfDoc.getPage(pageNum);
+                const viewport = page.getViewport({ scale });
+                const pageDiv = document.getElementById('page-' + pageNum);
+                if (!pageDiv) { renderingPages.delete(pageNum); return; }
+
+                pageDiv.style.width = viewport.width + 'px';
+                pageDiv.style.height = viewport.height + 'px';
+                pageDiv.innerHTML = '';
+                pageDiv.classList.add('rendered');
+
+                // Canvas
+                const canvas = document.createElement('canvas');
+                canvas.width = viewport.width;
+                canvas.height = viewport.height;
+                pageDiv.appendChild(canvas);
+                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+
+                // Highlight annotations (drawn directly on the main canvas)
+                try {
+                    const annots = await page.getAnnotations();
+                    const highlights = annots.filter(a => a.subtype === 'Highlight');
+                    if (highlights.length > 0) {
+                        const ctx = canvas.getContext('2d');
+                        for (const a of highlights) {
+                            const c = a.color || {0:255, 1:255, 2:0};
+                            ctx.fillStyle = 'rgba(' + (c[0]||255) + ',' + (c[1]||255) + ',' + (c[2]||0) + ',0.3)';
+                            // quadPoints gives precise highlight quads; fall back to rect
+                            if (a.quadPoints && a.quadPoints.length) {
+                                for (let q = 0; q < a.quadPoints.length; q += 8) {
+                                    const pts = a.quadPoints.slice(q, q + 8);
+                                    // quadPoints: [x1,y1, x2,y2, x3,y3, x4,y4]
+                                    const xs = [pts[0], pts[2], pts[4], pts[6]];
+                                    const ys = [pts[1], pts[3], pts[5], pts[7]];
+                                    const minX = Math.min(...xs), maxX = Math.max(...xs);
+                                    const minY = Math.min(...ys), maxY = Math.max(...ys);
+                                    const [vx1, vy1] = viewport.convertToViewportPoint(minX, maxY);
+                                    const [vx2, vy2] = viewport.convertToViewportPoint(maxX, minY);
+                                    ctx.fillRect(vx1, vy1, vx2 - vx1, vy2 - vy1);
+                                }
+                            } else {
+                                const r = a.rect;
+                                const [x1, y1] = viewport.convertToViewportPoint(r[0], r[3]);
+                                const [x2, y2] = viewport.convertToViewportPoint(r[2], r[1]);
+                                ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+                            }
+                        }
                     }
+                } catch(e) {
+                    console.log('Highlight error page ' + pageNum + ': ' + e.message);
+                }
+
+                // Text layer
+                const tc = await page.getTextContent();
+                const tDiv = document.createElement('div');
+                tDiv.className = 'textLayer';
+                tDiv.style.width = viewport.width + 'px';
+                tDiv.style.height = viewport.height + 'px';
+                tDiv.style.setProperty('--scale-factor', scale);
+                pageDiv.appendChild(tDiv);
+                pdfjsLib.renderTextLayer({
+                    textContentSource: tc, container: tDiv,
+                    viewport: viewport, textDivs: []
                 });
 
-                currentPage = closestPage;
-            });
+                renderedPages.add(pageNum);
+            } finally {
+                renderingPages.delete(pageNum);
+            }
         }
 
         function goToPage(pageNum) {
             if (pageNum < 1 || pageNum > totalPages) return false;
-            const pageEl = document.getElementById('page-' + pageNum);
-            if (pageEl) {
-                pageEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const el = document.getElementById('page-' + pageNum);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 currentPage = pageNum;
+                // Immediately render that area
+                setTimeout(renderVisible, 50);
                 return true;
             }
             return false;
         }
 
-        function getCurrentPage() {
-            return currentPage;
-        }
+        function getCurrentPage() { return currentPage; }
+        function getTotalPages() { return totalPages; }
+        function isReady() { return true; }
 
-        function getTotalPages() {
-            return totalPages;
-        }
-
-        function setZoom(newScale) {
-            scale = newScale;
-            // Re-render would be needed for zoom changes
-        }
-
-        function isReady() {
-            return true;
-        }
-
-        // Expose API
         window.pdfViewer = {
-            loadPdf: loadPdf,
-            goToPage: goToPage,
-            getCurrentPage: getCurrentPage,
-            getTotalPages: getTotalPages,
-            setZoom: setZoom,
-            isReady: isReady
+            loadPdf, goToPage, getCurrentPage, getTotalPages, isReady
         };
-
-        console.log('PDF viewer initialized');
     </script>
 </body>
 </html>'''

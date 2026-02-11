@@ -16,15 +16,17 @@ import logging
 
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QLabel,
-    QPushButton, QTextEdit, QPlainTextEdit, QCheckBox,
+    QPushButton, QTextEdit, QPlainTextEdit,
     QFileDialog, QMessageBox, QProgressBar, QApplication,
     QToolBar, QSizePolicy, QComboBox
 )
 from PySide6.QtCore import Qt, Signal, QThread, QTimer, QSettings
 from PySide6.QtGui import (
-    QTextCursor, QFont, QTextCharFormat, QColor,
-    QDragEnterEvent, QDropEvent, QKeyEvent
+    QTextCursor, QFont, QTextCharFormat, QTextBlockFormat,
+    QColor, QDragEnterEvent, QDropEvent, QKeyEvent
 )
+
+from icharlotte_core.ui.pdf_viewer_widget import PdfViewerWidget
 
 from icharlotte_core.config import GEMINI_DATA_DIR
 
@@ -62,7 +64,8 @@ class SelectWorker(QThread):
     """Background thread for LLM testimony selection."""
     finished = Signal(object)   # ExtractionResult or None
     error = Signal(str)
-    progress = Signal(str)
+    progress = Signal(str)      # Phase description
+    chunk_progress = Signal(int, int)  # (current_chunk, total_chunks)
 
     def __init__(self, index, prompt: str):
         super().__init__()
@@ -72,9 +75,21 @@ class SelectWorker(QThread):
     def run(self):
         try:
             from icharlotte_core.deposition.testimony_selector import TestimonySelector
-            self.progress.emit("Selecting relevant testimony...")
             selector = TestimonySelector()
-            result = selector.select(self.index, self.prompt)
+
+            # Calculate chunks to report progress
+            exchanges = self.index.exchanges
+            max_per_chunk = 500
+            import math
+            num_chunks = max(1, math.ceil(len(exchanges) / max_per_chunk))
+
+            self.progress.emit(f"Analyzing {len(exchanges)} exchanges...")
+            self.chunk_progress.emit(0, num_chunks)
+
+            result = selector.select(
+                self.index, self.prompt,
+                on_chunk_done=lambda cur, total: self.chunk_progress.emit(cur, total)
+            )
             self.finished.emit(result)
         except Exception as e:
             logger.exception("Selection error")
@@ -119,6 +134,10 @@ class DepositionTab(QWidget):
         # Path of the transcript being parsed (to add to list on completion)
         self._pending_parse_path = None
 
+        # Map cursor positions in results viewer to transcript page numbers
+        # List of (start_pos, end_pos, transcript_page) tuples
+        self._result_page_anchors = []
+
         self.setup_ui()
 
     def setup_ui(self):
@@ -151,11 +170,11 @@ class DepositionTab(QWidget):
         self.export_btn.setEnabled(False)
         toolbar.addWidget(self.export_btn)
 
-        self.highlight_cb = QCheckBox("Highlight text")
-        self.highlight_cb.setToolTip(
-            "When enabled, creates a highlighted PDF copy with extracted testimony marked in yellow"
-        )
-        toolbar.addWidget(self.highlight_cb)
+        self.clear_results_btn = QPushButton("Clear Results")
+        self.clear_results_btn.setToolTip("Clear all extraction results")
+        self.clear_results_btn.clicked.connect(self._on_clear_results)
+        self.clear_results_btn.setEnabled(False)
+        toolbar.addWidget(self.clear_results_btn)
 
         toolbar.addStretch()
 
@@ -172,25 +191,11 @@ class DepositionTab(QWidget):
         # --- Split Panel ---
         self.splitter = QSplitter(Qt.Horizontal)
 
-        # Left: Transcript viewer
-        left_container = QWidget()
-        left_layout = QVBoxLayout(left_container)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-
-        left_header = QLabel("Transcript")
-        left_header.setStyleSheet("font-weight: bold; padding: 2px;")
-        left_layout.addWidget(left_header)
-
-        self.transcript_viewer = QTextEdit()
-        self.transcript_viewer.setReadOnly(True)
-        self.transcript_viewer.setFont(QFont("Consolas", 9))
-        self.transcript_viewer.setPlaceholderText(
-            "Load a deposition transcript PDF to begin.\n\n"
-            "Click 'Load Transcript' or drag-and-drop a PDF file."
-        )
-        left_layout.addWidget(self.transcript_viewer)
-
-        self.splitter.addWidget(left_container)
+        # Left: PDF transcript viewer
+        self.transcript_viewer = PdfViewerWidget()
+        self.transcript_viewer.setAcceptDrops(False)
+        self.transcript_viewer.web_view.setAcceptDrops(False)
+        self.splitter.addWidget(self.transcript_viewer)
 
         # Right: Extraction results
         right_container = QWidget()
@@ -202,8 +207,9 @@ class DepositionTab(QWidget):
         right_layout.addWidget(right_header)
 
         self.results_viewer = QTextEdit()
-        self.results_viewer.setReadOnly(True)
+        self.results_viewer.setReadOnly(False)
         self.results_viewer.setFont(QFont("Times New Roman", 11))
+        self.results_viewer.setTabStopDistance(40)  # Tab aligns with left margin indent
         self.results_viewer.setPlaceholderText(
             "Enter a prompt below and click 'Extract' to find relevant testimony.\n\n"
             "Examples:\n"
@@ -211,6 +217,7 @@ class DepositionTab(QWidget):
             "  - \"employment history and job duties\"\n"
             "  - \"prior medical treatment for back and neck\""
         )
+        self.results_viewer.cursorPositionChanged.connect(self._on_results_clicked)
         right_layout.addWidget(self.results_viewer)
 
         self.splitter.addWidget(right_container)
@@ -218,11 +225,26 @@ class DepositionTab(QWidget):
         # Set initial splitter proportions (40/60)
         self.splitter.setSizes([400, 600])
 
-        # --- Progress Bar ---
+        # --- Progress / Status Bar (between panes and prompt) ---
+        progress_container = QWidget()
+        progress_layout = QHBoxLayout(progress_container)
+        progress_layout.setContentsMargins(0, 2, 0, 2)
+        progress_layout.setSpacing(6)
+
+        self.progress_label = QLabel("")
+        self.progress_label.setStyleSheet("font-size: 11px; color: #555;")
+        self.progress_label.setVisible(False)
+        progress_layout.addWidget(self.progress_label)
+
         self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 0)  # Indeterminate
+        self.progress_bar.setRange(0, 100)
         self.progress_bar.setVisible(False)
-        self.progress_bar.setMaximumHeight(4)
+        self.progress_bar.setMaximumHeight(12)
+        self.progress_bar.setMinimumWidth(150)
+        self.progress_bar.setTextVisible(False)
+        progress_layout.addWidget(self.progress_bar)
+
+        progress_layout.addStretch()
 
         # --- Top container (content splitter + progress bar) ---
         top_container = QWidget()
@@ -230,7 +252,7 @@ class DepositionTab(QWidget):
         top_layout.setContentsMargins(0, 0, 0, 0)
         top_layout.setSpacing(0)
         top_layout.addWidget(self.splitter, stretch=1)
-        top_layout.addWidget(self.progress_bar)
+        top_layout.addWidget(progress_container)
 
         # --- Prompt Input Bar (bottom of vertical splitter) ---
         prompt_container = QWidget()
@@ -302,13 +324,17 @@ class DepositionTab(QWidget):
 
     def dragEnterEvent(self, event: QDragEnterEvent):
         if event.mimeData().hasUrls():
-            # Accept if any URL is a PDF file
             for url in event.mimeData().urls():
                 path = url.toLocalFile()
                 if path.lower().endswith('.pdf'):
-                    event.accept()
+                    event.acceptProposedAction()
                     return
         event.ignore()
+
+    def dragMoveEvent(self, event):
+        """Accept drag move so the drop indicator stays active everywhere."""
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
 
     def dropEvent(self, event: QDropEvent):
         pdf_paths = []
@@ -317,7 +343,7 @@ class DepositionTab(QWidget):
             if os.path.isfile(path) and path.lower().endswith('.pdf'):
                 pdf_paths.append(path)
 
-        event.accept()
+        event.acceptProposedAction()
 
         # Defer processing to avoid blocking Explorer
         if pdf_paths:
@@ -565,7 +591,7 @@ class DepositionTab(QWidget):
             return
 
         self.status_label.setText("Parsing...")
-        self.progress_bar.setVisible(True)
+        self._show_progress("Parsing transcript...")
         self.load_btn.setEnabled(False)
 
         self._pending_parse_path = pdf_path
@@ -577,7 +603,7 @@ class DepositionTab(QWidget):
 
     def _on_parse_finished(self, index):
         """Handle successful transcript parsing."""
-        self.progress_bar.setVisible(False)
+        self._hide_progress()
         self.load_btn.setEnabled(True)
 
         pdf_path = self._pending_parse_path
@@ -624,7 +650,7 @@ class DepositionTab(QWidget):
 
     def _on_parse_error(self, error_msg: str):
         """Handle transcript parsing failure."""
-        self.progress_bar.setVisible(False)
+        self._hide_progress()
         self.load_btn.setEnabled(True)
         self._pending_parse_path = None
         self.status_label.setText("Parse failed")
@@ -658,20 +684,9 @@ class DepositionTab(QWidget):
         self._save_state()
 
     def _populate_transcript_viewer(self, index):
-        """Fill the left panel with parsed transcript text."""
-        self.transcript_viewer.clear()
-
-        if index.raw_text:
-            self.transcript_viewer.setPlainText(index.raw_text)
-        else:
-            # Build from exchanges
-            lines = []
-            for ex in index.exchanges:
-                lines.append(f"p.{ex.page_start}:{ex.line_start}")
-                lines.append(f"  Q.  {ex.question}")
-                lines.append(f"  A.  {ex.answer}")
-                lines.append("")
-            self.transcript_viewer.setPlainText("\n".join(lines))
+        """Load the transcript PDF into the left panel viewer."""
+        if index and index.source_pdf and os.path.isfile(index.source_pdf):
+            self.transcript_viewer.load_pdf(index.source_pdf)
 
     def on_extract(self):
         """Start LLM extraction with the current prompt."""
@@ -694,18 +709,20 @@ class DepositionTab(QWidget):
             return
 
         self.status_label.setText("Extracting...")
-        self.progress_bar.setVisible(True)
+        self._show_progress("Starting extraction...")
         self.extract_btn.setEnabled(False)
         self.prompt_input.setEnabled(False)
 
         self._select_worker = SelectWorker(index, prompt)
         self._select_worker.finished.connect(self._on_select_finished)
         self._select_worker.error.connect(self._on_select_error)
+        self._select_worker.progress.connect(self._on_extract_progress)
+        self._select_worker.chunk_progress.connect(self._on_chunk_progress)
         self._select_worker.start()
 
     def _on_select_finished(self, result):
         """Handle successful testimony selection."""
-        self.progress_bar.setVisible(False)
+        self._hide_progress()
         self.extract_btn.setEnabled(True)
         self.prompt_input.setEnabled(True)
 
@@ -724,27 +741,23 @@ class DepositionTab(QWidget):
             index = active["index"]
             active["extractions"].append((index, result))
             self.export_btn.setEnabled(True)
+            self.clear_results_btn.setEnabled(True)
 
             # Display results
             self._append_results(index, result)
 
-            # Highlight transcript viewer
-            self._highlight_viewer(index, result)
-
-            # PDF highlighting if enabled
-            if self.highlight_cb.isChecked():
-                try:
-                    from icharlotte_core.deposition.testimony_formatter import TestimonyFormatter
-                    formatter = TestimonyFormatter()
-                    highlight_path = formatter.highlight_pdf(index, result)
-                    if highlight_path:
-                        self.status_label.setText(
-                            f"Extracted {len(result.selected_ids)} exchanges | "
-                            f"Highlighted: {os.path.basename(highlight_path)}"
-                        )
-                        return
-                except Exception as e:
-                    logger.exception("PDF highlighting failed")
+            # PDF highlighting — create [H.AI] copy and load in viewer
+            try:
+                from icharlotte_core.deposition.testimony_formatter import TestimonyFormatter
+                formatter = TestimonyFormatter()
+                ai_dir = self._get_ai_output_dir()
+                highlight_path = formatter.highlight_pdf(
+                    index, result, output_dir=ai_dir
+                )
+                if highlight_path:
+                    self._load_highlighted_pdf(highlight_path)
+            except Exception as e:
+                logger.exception("PDF highlighting failed")
 
             self.status_label.setText(
                 f"Extracted {len(result.selected_ids)} exchanges in "
@@ -753,11 +766,59 @@ class DepositionTab(QWidget):
 
     def _on_select_error(self, error_msg: str):
         """Handle extraction failure."""
-        self.progress_bar.setVisible(False)
+        self._hide_progress()
         self.extract_btn.setEnabled(True)
         self.prompt_input.setEnabled(True)
         self.status_label.setText("Extraction failed")
         QMessageBox.critical(self, "Extraction Error", f"LLM extraction failed:\n\n{error_msg}")
+
+    def _show_progress(self, message: str, value: int = -1, maximum: int = 100):
+        """Show progress bar with label. value=-1 for indeterminate."""
+        self.progress_label.setText(message)
+        self.progress_label.setVisible(True)
+        self.progress_bar.setVisible(True)
+        if value < 0:
+            self.progress_bar.setRange(0, 0)  # Indeterminate animation
+        else:
+            self.progress_bar.setRange(0, maximum)
+            self.progress_bar.setValue(value)
+
+    def _hide_progress(self):
+        """Hide progress bar and label."""
+        self.progress_bar.setVisible(False)
+        self.progress_label.setVisible(False)
+
+    def _on_extract_progress(self, message: str):
+        """Update progress label during extraction."""
+        self.progress_label.setText(message)
+
+    def _on_chunk_progress(self, current: int, total: int):
+        """Update progress bar with chunk completion."""
+        if total > 1:
+            pct = int((current / total) * 100)
+            self._show_progress(f"Processing chunk {current}/{total}...", pct, 100)
+        else:
+            self._show_progress("Analyzing testimony with LLM...")
+
+    def _on_clear_results(self):
+        """Clear all extraction results."""
+        self.results_viewer.clear()
+        self._result_page_anchors.clear()
+        self.clear_results_btn.setEnabled(False)
+        # Clear stored extractions on all transcripts
+        for t in self._transcripts:
+            t["extractions"].clear()
+        self.export_btn.setEnabled(False)
+        self.status_label.setText("Results cleared")
+
+    def _on_results_clicked(self):
+        """Navigate PDF viewer to the page corresponding to clicked results text."""
+        cursor = self.results_viewer.textCursor()
+        pos = cursor.position()
+        for start, end, page_num in self._result_page_anchors:
+            if start <= pos <= end:
+                self.transcript_viewer.go_to_page(page_num)
+                break
 
     def _append_results(self, index, result):
         """Append extraction results to the right panel."""
@@ -784,6 +845,11 @@ class DepositionTab(QWidget):
         marker_fmt.setFontFamily("Times New Roman")
         marker_fmt.setFontWeight(QFont.Bold)
 
+        # Block format for Q/A paragraphs — hanging indent so continuation lines align
+        qa_block_fmt = QTextBlockFormat()
+        qa_block_fmt.setLeftMargin(40)      # Text body indent
+        qa_block_fmt.setTextIndent(-40)     # Marker hangs left
+
         cite_fmt = QTextCharFormat()
         cite_fmt.setFontPointSize(10)
         cite_fmt.setFontFamily("Times New Roman")
@@ -799,43 +865,62 @@ class DepositionTab(QWidget):
             if group_idx > 0:
                 cursor.insertText("\n")
 
+            # Record position anchor for click-to-navigate
+            group_start_pos = cursor.position()
+            first_page = group_exchanges[0].page_start
+
             for ex in group_exchanges:
+                cursor.setBlockFormat(qa_block_fmt)
                 cursor.insertText("Q.\t", marker_fmt)
                 cursor.insertText(f"{ex.question}\n", normal_fmt)
+                cursor.setBlockFormat(qa_block_fmt)
                 cursor.insertText("A.\t", marker_fmt)
                 cursor.insertText(f"{ex.answer}\n", normal_fmt)
 
-            # Citation
-            ranges = [ex.citation_range() for ex in group_exchanges]
-            range_str = "; ".join(ranges)
-            last_name = index.deponent.last_name or "___"
+            # Reset block format for citation
+            cursor.setBlockFormat(QTextBlockFormat())
+
+            # Citation — merge consecutive exchanges into single range
+            first = group_exchanges[0]
+            last = group_exchanges[-1]
+            if first.page_start == last.page_end:
+                range_str = f"{first.page_start}:{first.line_start}-{last.line_end}"
+            else:
+                range_str = f"{first.page_start}:{first.line_start}-{last.page_end}:{last.line_end}"
+            raw_name = index.deponent.last_name or "___"
+            last_name = raw_name.title() if raw_name.isupper() else raw_name
             citation = f"\n(Exh. __ ({last_name} Depo. Trns.) at p. {range_str}.)\n\n"
             cursor.insertText(citation, cite_fmt)
+
+            group_end_pos = cursor.position()
+            self._result_page_anchors.append((group_start_pos, group_end_pos, first_page))
 
         self.results_viewer.setTextCursor(cursor)
         self.results_viewer.ensureCursorVisible()
 
-    def _highlight_viewer(self, index, result):
-        """Highlight extracted exchanges in the transcript viewer."""
-        if not index:
+    def _load_highlighted_pdf(self, highlight_path: str):
+        """Reload the viewer with the highlighted PDF copy."""
+        if not os.path.isfile(highlight_path):
             return
+        current_page = self.transcript_viewer.get_current_page()
+        self.transcript_viewer.load_pdf(highlight_path)
+        if current_page > 0:
+            page = current_page
+            QTimer.singleShot(2000, lambda: self.transcript_viewer.go_to_page(page))
 
-        exchange_map = {ex.id: ex for ex in index.exchanges}
-        cursor = self.transcript_viewer.textCursor()
-
-        highlight_fmt = QTextCharFormat()
-        highlight_fmt.setBackground(QColor("#FFFF99"))
-
-        for eid in result.selected_ids:
-            ex = exchange_map.get(eid)
-            if not ex:
-                continue
-
-            # Search for the Q text in the viewer
-            for search_text in [ex.question[:80], ex.answer[:80]]:
-                cursor = self.transcript_viewer.document().find(search_text)
-                if not cursor.isNull():
-                    cursor.mergeCharFormat(highlight_fmt)
+    def _get_ai_output_dir(self) -> str:
+        """Get the NOTES/AI OUTPUT directory for the current case."""
+        if self.file_number:
+            from icharlotte_core.utils import get_case_path
+            case_path = get_case_path(self.file_number)
+            if case_path:
+                ai_dir = os.path.join(case_path, "NOTES", "AI OUTPUT")
+                os.makedirs(ai_dir, exist_ok=True)
+                return ai_dir
+        # Fallback to transcript directory
+        if self._transcripts and self._active_idx >= 0:
+            return os.path.dirname(self._transcripts[self._active_idx]["path"])
+        return os.getcwd()
 
     def on_export_word(self):
         """Export all extractions to a Word document."""
@@ -853,9 +938,9 @@ class DepositionTab(QWidget):
         for index, result in all_extractions:
             formatter.add_extraction(index, result)
 
-        # Determine default path
+        # Determine default path — save in NOTES/AI OUTPUT within case folder
         first_index = all_extractions[0][0]
-        default_dir = os.path.dirname(first_index.source_pdf)
+        default_dir = self._get_ai_output_dir()
         deponent = first_index.deponent.last_name or "Unknown"
         default_name = f"[Extracted] {deponent} Depo Trns.docx"
         default_path = os.path.join(default_dir, default_name)

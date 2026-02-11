@@ -643,6 +643,11 @@ class MainWindow(QMainWindow):
         self._subpoena_btn.clicked.connect(self._run_subpoena_tracker)
         self.agent_buttons["subpoena_tracker"] = self._subpoena_btn
         left_layout.addWidget(self._subpoena_btn)
+        # Med Record Extractor — in-process QThread worker
+        self._med_extract_btn = EnhancedAgentButton("Med Record Extractor", "med_record_extractor")
+        self._med_extract_btn.clicked.connect(self._run_med_record_extractor)
+        self.agent_buttons["med_record_extractor"] = self._med_extract_btn
+        left_layout.addWidget(self._med_extract_btn)
 
         # Document Agents
         left_layout.addSpacing(8)
@@ -1717,6 +1722,82 @@ class MainWindow(QMainWindow):
                     log_event(f"Subpoena Tracker failed: {result}", "error")
         except Exception as e:
             log_event(f"Error in _on_subpoena_tracker_finished: {e}", "error")
+
+    def _run_med_record_extractor(self):
+        """Open dialog and launch med record extraction worker."""
+        if "med_record_extractor" in self.running_agents:
+            return
+        if not self.case_path:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "No Case", "No case is currently loaded.")
+            return
+
+        from icharlotte_core.ui.med_record_extractor_dialog import MedRecordExtractorDialog
+        dialog = MedRecordExtractorDialog(parent=self)
+        if not dialog.exec():
+            return
+
+        user_text = dialog.get_text()
+        if not user_text:
+            return
+
+        btn = self._med_extract_btn
+        btn.set_running(True)
+        started_for_case = self.file_number
+        self.running_agents["med_record_extractor"] = started_for_case
+
+        # Add status widget to Status tab
+        from icharlotte_core.ui.widgets import StatusWidget
+        status_widget = StatusWidget("Med Record Extractor", f"Case {self.file_number}")
+        self.status_list_layout.insertWidget(0, status_widget)
+
+        from icharlotte_core.med_record_extractor import MedRecordExtractorWorker
+        worker = MedRecordExtractorWorker(self.case_path, self.file_number, user_text)
+        worker.progress.connect(lambda msg: (
+            log_event(f"Med Record Extractor: {msg}"),
+            status_widget.append_log(msg + "\n"),
+            status_widget.status_text_label.setText(msg),
+        ))
+        worker.warning.connect(lambda msg: (
+            log_event(f"Med Record Extractor warning: {msg}", "warning"),
+            status_widget.append_log(f"WARNING: {msg}\n"),
+        ))
+        worker.finished_result.connect(
+            lambda success, result: self._on_med_extract_finished(
+                worker, btn, started_for_case, success, result, status_widget
+            )
+        )
+        self.agent_runners.append(worker)
+        worker.start()
+
+    def _on_med_extract_finished(self, worker, btn_widget, started_for_case, success, result, status_widget=None):
+        """Handle med record extractor completion."""
+        try:
+            if "med_record_extractor" in self.running_agents:
+                del self.running_agents["med_record_extractor"]
+            if worker in self.agent_runners:
+                self.agent_runners.remove(worker)
+            if self.file_number == started_for_case:
+                btn_widget.set_running(False)
+                if success:
+                    btn_widget.set_status("Last: Just now")
+                    log_event(f"Med Record Extractor complete: {result}")
+                    if status_widget:
+                        status_widget.append_log(f"\n{result}\n")
+                        status_widget.set_finished(True)
+                        # Set output to the extracts folder
+                        import os
+                        out_dir = os.path.join(self.case_path, "NOTES", "AI OUTPUT", "Med Record Extracts")
+                        if os.path.isdir(out_dir):
+                            status_widget.set_output_file(out_dir)
+                else:
+                    btn_widget.set_status("Last: Failed")
+                    log_event(f"Med Record Extractor failed: {result}", "error")
+                    if status_widget:
+                        status_widget.append_log(f"\nFAILED: {result}\n")
+                        status_widget.set_finished(False)
+        except Exception as e:
+            log_event(f"Error in _on_med_extract_finished: {e}", "error")
 
     def update_docket_agent_status(self):
         """Update the docket agent button with last download date."""

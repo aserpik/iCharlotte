@@ -375,11 +375,12 @@ class TranscriptParser:
             if match:
                 name = match.group(1).strip()
                 name = re.sub(r'\s+', ' ', name).rstrip('.,;:')
-                info.full_name = name
+                info.full_name = name.title() if name.isupper() else name
                 # Extract last name (last word, ignoring suffixes like M.D.)
                 name_parts = name.split()
                 if name_parts:
-                    info.last_name = name_parts[-1]
+                    raw_last = name_parts[-1]
+                    info.last_name = raw_last.title() if raw_last.isupper() else raw_last
                 break
 
         # Extract date

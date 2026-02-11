@@ -25,6 +25,23 @@ from typing import Callable, Dict, List, Optional, Tuple
 logger = logging.getLogger(__name__)
 
 
+def _com_retry(func, retries=3, delay=2.0):
+    """Retry a callable on COM RPC_E_CALL_REJECTED (-2147418111)."""
+    import pywintypes
+    for attempt in range(retries):
+        try:
+            return func()
+        except pywintypes.com_error as e:
+            if e.hresult == -2147418111 and attempt < retries - 1:
+                logger.warning(f"COM busy (attempt {attempt + 1}), "
+                               f"retrying in {delay}s...")
+                time.sleep(delay)
+            else:
+                raise
+
+# COM retry settings — Word sometimes rejects calls when busy processing
+
+
 # ──────────────────────────────────────────────────────────────────────
 # Data classes
 # ──────────────────────────────────────────────────────────────────────
@@ -62,6 +79,12 @@ EXPECTED_SECTIONS = [
 # Minimum chars before a section is flagged as "thin"
 MIN_SECTION_LENGTH = 200
 
+# Sections containing tabular data — skip LLM review, tables get mangled
+TABULAR_SECTIONS = {"LITIGATION BUDGET"}
+
+# Minimum preservation ratio — if the LLM rewrites more than this, reject it
+MIN_PRESERVATION_RATIO = 0.25
+
 
 # ──────────────────────────────────────────────────────────────────────
 # ReportReviewer class
@@ -88,6 +111,8 @@ class ReportReviewer:
             include_case_data: bool = False,
             extra_doc_paths: Optional[List[str]] = None,
             progress_callback: Optional[Callable[[str], None]] = None,
+            only_sections: Optional[List[str]] = None,
+            skip_structural: bool = False,
             ) -> Tuple[Optional['ValidationResult'], int]:
         """Main entry point for the report review.
 
@@ -97,6 +122,9 @@ class ReportReviewer:
             include_case_data: Whether to load case data from AI OUTPUT folder
             extra_doc_paths: Additional document paths to extract text from
             progress_callback: Called with progress messages for UI display
+            only_sections: If set, only review sections whose names contain
+                           one of these strings (case-insensitive partial match)
+            skip_structural: Skip Pass 1 structural scan
 
         Returns:
             (structural_findings, total_changes_applied)
@@ -140,7 +168,7 @@ class ReportReviewer:
                     progress("Applying redlines to selection...")
                     changes = self._apply_redline(
                         selection_range[0], selection_range[1],
-                        sel_text, revised
+                        sel_text, revised, "SELECTED TEXT"
                     )
                     total_changes += changes
             progress(f"Review complete — {total_changes} tracked changes applied.")
@@ -148,45 +176,115 @@ class ReportReviewer:
 
         # Full document mode
         # Pass 1: Structural scan
-        progress("Pass 1: Scanning document structure...")
+        structural = None
         sections = self.detect_sections()
-        progress(f"Pass 1: Found {len(sections)} sections, checking formatting...")
-        structural = self.run_structural_scan(sections)
-        structural.print_summary()
-
-        error_count = structural.error_count
-        warn_count = structural.warn_count
-        if error_count or warn_count:
-            progress(f"STRUCTURAL SCAN — {error_count} errors, {warn_count} warnings")
+        if skip_structural:
+            progress(f"Pass 1: Skipped (found {len(sections)} sections)")
         else:
-            progress("STRUCTURAL SCAN — no issues found")
+            progress("Pass 1: Scanning document structure...")
+            progress(f"Pass 1: Found {len(sections)} sections, checking formatting...")
+            structural = self.run_structural_scan(sections)
+            structural.print_summary()
+
+            error_count = structural.error_count
+            warn_count = structural.warn_count
+            if error_count or warn_count:
+                progress(f"STRUCTURAL SCAN — {error_count} errors, {warn_count} warnings")
+            else:
+                progress("STRUCTURAL SCAN — no issues found")
 
         # Pass 2: Section-by-section LLM review with redlines
-        reviewable = [s for s in sections if s.text.strip()]
-        for i, section in enumerate(reviewable, 1):
-            progress(f"Pass 2: Reviewing {section.name} ({i}/{len(reviewable)})...")
+        # CRITICAL: After each redline application, character positions shift.
+        # We re-detect sections after each edit to get fresh ranges.
+        reviewable_names = [s.name for s in sections
+                            if s.text.strip()
+                            and s.raw_name not in TABULAR_SECTIONS
+                            and s.name not in TABULAR_SECTIONS]
 
-            revised = self._review_text(
-                section.text, section.name, full_doc_text,
-                case_data, extra_texts
-            )
+        # Filter to requested sections if specified
+        if only_sections:
+            only_upper = [s.upper() for s in only_sections]
+            reviewable_names = [
+                name for name in reviewable_names
+                if any(filt in name for filt in only_upper)
+            ]
+            progress(f"Filtered to {len(reviewable_names)} sections: "
+                     f"{', '.join(reviewable_names)}")
 
-            if not revised or revised.strip() == section.text.strip():
-                progress(f"  {section.name}: no changes needed")
-                continue
+        for i, section_name in enumerate(reviewable_names, 1):
+            section_label = f"{section_name} ({i}/{len(reviewable_names)})"
+            try:
+                # Re-detect sections to get fresh character positions
+                current_sections = self.detect_sections()
+                section = None
+                for s in current_sections:
+                    if s.name == section_name:
+                        section = s
+                        break
+                if not section:
+                    progress(f"  {section_name}: could not re-locate, skipping")
+                    continue
 
-            progress(f"Applying redlines to {section.name}...")
-            changes = self._apply_redline(
-                section.range_start, section.range_end,
-                section.text, revised
-            )
-            total_changes += changes
+                fresh_text = self._get_range_text(section.range_start, section.range_end)
+                if not fresh_text.strip():
+                    progress(f"  {section_name}: empty, skipping")
+                    continue
 
-            # Fix heading name if it doesn't match canonical
-            if section.raw_name != section.name:
-                self._fix_heading_name(section)
+                progress(f"Pass 2: Reviewing {section_label}...")
 
-        progress(f"Review complete — {len(reviewable)} sections reviewed, "
+                revised = self._review_text(
+                    fresh_text, section_name, full_doc_text,
+                    case_data, extra_texts
+                )
+
+                if not revised or revised.strip() == fresh_text.strip():
+                    progress(f"  {section_name}: no changes needed")
+                    continue
+
+                # Check preservation ratio before applying
+                preservation = self._calc_preservation(fresh_text, revised)
+                if preservation < MIN_PRESERVATION_RATIO:
+                    progress(f"  {section_name}: LLM rewrote too aggressively "
+                             f"({preservation:.0%} preserved, min {MIN_PRESERVATION_RATIO:.0%}), skipping")
+                    logger.warning(f"Rejected LLM output for {section_name}: "
+                                   f"only {preservation:.0%} preserved")
+                    continue
+
+                # Restore any mangled subheading lines from the original
+                revised = self._restore_subheadings_in_revised(fresh_text, revised)
+
+                # Check subheadings are preserved (after restoration attempt)
+                dropped = self._check_subheadings_preserved(fresh_text, revised)
+                if dropped:
+                    progress(f"  {section_name}: LLM dropped subheadings "
+                             f"({', '.join(dropped)}), skipping")
+                    logger.warning(f"Rejected LLM output for {section_name}: "
+                                   f"dropped subheadings: {dropped}")
+                    continue
+
+                progress(f"  Applying redlines to {section_name} "
+                         f"({preservation:.0%} preserved)...")
+                changes = self._apply_redline(
+                    section.range_start, section.range_end,
+                    fresh_text, revised, section_name
+                )
+                total_changes += changes
+
+                # Fix subheading formatting (bold, underline, indent)
+                if changes > 0:
+                    time.sleep(1.0)  # let Word settle before formatting pass
+                    self._fix_subheading_formatting(section)
+
+            except Exception as e:
+                logger.error(f"Error reviewing {section_name}: {e}")
+                progress(f"  {section_name}: error ({e}), continuing...")
+
+        # Final full-document validation
+        progress("Running final validation...")
+        final_sections = self.detect_sections()
+        self._run_final_validation(final_sections, total_changes)
+
+        progress(f"Review complete — {len(reviewable_names)} sections reviewed, "
                  f"{total_changes} tracked changes applied.")
         return structural, total_changes
 
@@ -201,8 +299,8 @@ class ReportReviewer:
         from icharlotte_core.word_validator import fuzzy_match_section_heading
 
         sections = []
-        paras = self.doc.Paragraphs
-        para_count = paras.Count
+        paras = _com_retry(lambda: self.doc.Paragraphs)
+        para_count = _com_retry(lambda: paras.Count)
         logger.info(f"Scanning {para_count} paragraphs for section headings...")
 
         heading_indices = []  # (1-based index, canonical_name, raw_name, para_obj)
@@ -250,7 +348,6 @@ class ReportReviewer:
                 content_end = next_para.Range.Start
             else:
                 # Last section — content goes to end of document body
-                # (before closing/signature block, approximated as doc end)
                 content_end = self.doc.Content.End
 
             # Extract text
@@ -314,17 +411,7 @@ class ReportReviewer:
                 message="Sections are in the expected order",
             ))
 
-        # 3. Check heading name corrections needed
-        for section in sections:
-            if section.raw_name != section.name:
-                findings.append(Finding(
-                    severity="WARN", rule="heading_name",
-                    message=f'Heading "{section.raw_name}" should be "{section.name}"',
-                    expected=section.name, actual=section.raw_name,
-                    location=f"para {section.para_index}",
-                ))
-
-        # 4. Check for thin sections
+        # 3. Check for thin sections
         if self._style_guide:
             section_stats = self._style_guide.get("sections", {})
         else:
@@ -346,7 +433,7 @@ class ReportReviewer:
                     expected=f"~{typical} chars", actual=f"{content_len} chars",
                 ))
 
-        # 5. Check heading formatting (bold + underline + ALL CAPS)
+        # 4. Check heading formatting (bold + underline + ALL CAPS)
         for section in sections:
             try:
                 heading_range = self.doc.Range(
@@ -464,97 +551,313 @@ class ReportReviewer:
                 "=== END ADDITIONAL DOCUMENTS ===\n"
             )
 
-        prompt = f"""You are reviewing the "{section_name}" section of a litigation report written by a junior associate. Your task is to revise it to match the senior attorney's voice, tone, style, and thoroughness.
+        prompt = f"""You are reviewing the "{section_name}" section of a litigation report written by a junior associate. Your task is to make TARGETED, SURGICAL improvements to match the senior attorney's voice, tone, and style.
 
-IMPORTANT — REDLINE MODE INSTRUCTIONS:
-Your output will be compared word-by-word against the original text to generate Track Changes in Word. Follow these rules:
-1. Preserve any text that does not need to change EXACTLY as-is — same wording, same sentence structure.
-2. PRESERVE THE EXACT PARAGRAPH STRUCTURE — keep the same number of paragraphs and blank lines. Do NOT merge or split paragraphs.
-3. Only modify the specific words, sentences, or passages that need improvement.
-4. If a sentence is fine as-is, copy it verbatim.
-5. Do NOT add commentary, explanations, or markers — output ONLY the revised section text.
+CRITICAL — REDLINE MODE RULES:
+Your output will be compared character-by-character against the original to generate Track Changes in Microsoft Word. You MUST follow these rules precisely:
 
-=== VOICE AND STYLE (match the examples precisely) ===
-1. Write from defense counsel's perspective, addressing the insurance carrier.
-2. Use hedging phrases naturally: {', '.join(hedging)}.
-3. Formal, professional tone. Refer to parties as "Plaintiff" and "Defendant" (not first names).
-4. Complete, polished paragraphs. No bullet points in body text.
-5. Sub-headings on their own line, separated by blank lines.
-6. No markdown (no **, ##, *). Plain text only.
+1. DO NOT include the section heading (e.g., "{section_name}") in your output. You are revising ONLY the body content BELOW the heading.
+2. DO NOT include any sub-headings from the NEXT section. Only output content for THIS section.
+3. PRESERVE the original text as much as possible. Copy sentences that are acceptable VERBATIM — do not rephrase text that is already adequate.
+4. PRESERVE THE EXACT PARAGRAPH STRUCTURE — same number of paragraphs. Do NOT merge or split paragraphs.
+5. PRESERVE all tabular data, lists of medical providers, billing summaries, dollar amounts, dates, and factual details EXACTLY as written — copy them character-for-character. Do NOT insert spaces into proper nouns, provider names, or dollar amounts (e.g., "American" must stay "American", not "A merican").
+6. PRESERVE ALL SUB-HEADINGS EXACTLY AS WRITTEN. Any line that is a lettered sub-heading (e.g., "A.\tSomething", "B.\tSomething") or numbered sub-heading (e.g., "1.\tSomething", "2.\tSomething") MUST appear in your output VERBATIM on its own line, character-for-character identical including tabs. Do NOT modify, rephrase, reorder, merge, or remove sub-headings.{self._format_subheading_list(section_text)}
+7. Make only targeted word/phrase/sentence changes where the voice, tone, or style clearly needs improvement.
+8. If a section is already well-written, output it unchanged. It is perfectly acceptable to make zero changes.
+9. Do NOT add commentary, explanations, or markers — output ONLY the revised section body text.
+
+WHAT TO IMPROVE (only where clearly needed):
+- Shift passive or casual phrasing to defense counsel's formal voice
+- Add hedging language where appropriate: {', '.join(hedging)}
+- Refer to parties as "Plaintiff" and "Defendant" (not first names)
+- Fix grammatical errors, awkward phrasing, or unclear sentences
+- Ensure content flows logically
+
+WHAT TO LEAVE ALONE:
+- Factual content, dates, dollar amounts, case numbers
+- Tables, lists, and structured data
+- Sub-headings within the section
+- Text that is already professional and well-written
+- Paragraph structure and line breaks
 {example_block}
 {doc_context}
 {case_context}
 {extra_context}
-=== THE ASSOCIATE'S DRAFT TO REVIEW AND REVISE ===
+=== THE ASSOCIATE'S DRAFT SECTION BODY (below the "{section_name}" heading) ===
 {section_text}
 
 === INSTRUCTIONS ===
-Revise the above section text to match the senior attorney's voice and style shown in the examples. Fix any formatting issues. {"Add any significant facts or details from the case file data that the associate missed." if case_data else ""}
-Preserve the associate's correct analysis — only change what needs improvement.
-Output ONLY the revised section text, nothing else."""
+Revise the above section body text with MINIMAL, TARGETED changes. {"Add any significant facts from the case file data that the associate missed, but integrate them naturally — do not reorganize existing text." if case_data else ""}
+Preserve the associate's analysis and structure — only change what genuinely needs improvement.
+Output ONLY the revised section body text, nothing else. Do NOT include the section heading."""
 
         return prompt.strip()
 
     # ────── Redline Application ──────
 
+    def _format_subheading_list(self, section_text: str) -> str:
+        """Format a list of subheadings found in section text for the prompt."""
+        subs = self._extract_subheadings(section_text)
+        if not subs:
+            return ""
+        lines = "\n".join(f"   - {s}" for s in subs)
+        return f"\n   The following sub-headings appear in this section and MUST be preserved exactly:\n{lines}"
+
+    # Regex for subheading lines: "A.\tTitle" or "1.\tTitle" (with optional
+    # leading whitespace and tab/spaces after the marker)
+    _SUBHEADING_RE = re.compile(
+        r'^\s*([A-Z]\.[\t ]+\S.*|[0-9]+\.[\t ]+\S.*)', re.MULTILINE
+    )
+
+    @staticmethod
+    def _extract_subheadings(text: str) -> List[str]:
+        """Extract subheading lines from section text.
+
+        Returns full line text for each L1 (A., B.) or L2 (1., 2.) subheading.
+        """
+        results = []
+        for line in text.split('\r'):
+            line_s = line.strip()
+            if re.match(r'^[A-Z]\.[\t ]', line_s) or re.match(r'^[0-9]+\.[\t ]', line_s):
+                results.append(line_s)
+        # Also try \n split (LLM output uses \n)
+        if not results:
+            for line in text.split('\n'):
+                line_s = line.strip()
+                if re.match(r'^[A-Z]\.[\t ]', line_s) or re.match(r'^[0-9]+\.[\t ]', line_s):
+                    results.append(line_s)
+        return results
+
+    @staticmethod
+    def _check_subheadings_preserved(original: str, revised: str) -> List[str]:
+        """Return list of subheading labels found in original but missing from revised."""
+        orig_subs = ReportReviewer._extract_subheadings(original)
+        if not orig_subs:
+            return []
+
+        dropped = []
+        for label in orig_subs:
+            # Normalize: collapse whitespace, strip tab differences
+            label_norm = re.sub(r'[\t ]+', ' ', label).strip()
+            found = False
+            for rev_line in revised.replace('\r', '\n').split('\n'):
+                rev_norm = re.sub(r'[\t ]+', ' ', rev_line).strip()
+                if rev_norm == label_norm:
+                    found = True
+                    break
+            if not found:
+                dropped.append(label[:60])
+        return dropped
+
+    def _restore_subheadings_in_revised(self, original: str, revised: str) -> str:
+        """If the LLM mangled subheading lines, restore them from the original.
+
+        Matches by the letter/number prefix (A., B., 1., 2.) and replaces
+        the full line in revised with the original version.
+        """
+        orig_subs = self._extract_subheadings(original)
+        if not orig_subs:
+            return revised
+
+        # Build map: prefix -> original line
+        prefix_map = {}
+        for sub in orig_subs:
+            m = re.match(r'^([A-Z]\.|[0-9]+\.)', sub)
+            if m:
+                prefix_map[m.group(1)] = sub
+
+        # Fix revised lines that start with a known prefix but differ
+        lines = revised.replace('\r\n', '\n').split('\n')
+        fixed = []
+        for line in lines:
+            line_s = line.strip()
+            m = re.match(r'^([A-Z]\.|[0-9]+\.)', line_s)
+            if m and m.group(1) in prefix_map:
+                orig_line = prefix_map[m.group(1)]
+                orig_norm = re.sub(r'[\t ]+', ' ', orig_line).strip()
+                rev_norm = re.sub(r'[\t ]+', ' ', line_s).strip()
+                if rev_norm != orig_norm:
+                    # LLM changed the subheading — restore original
+                    logger.info(f"  Restoring subheading: '{line_s[:50]}' -> "
+                                f"'{orig_line[:50]}'")
+                    fixed.append(orig_line)
+                    continue
+            fixed.append(line)
+        return '\n'.join(fixed)
+
+    def _fix_subheading_formatting(self, section: 'SectionInfo'):
+        """After redline, ensure subheading paragraphs have correct bold,
+        underline, and indentation via COM.
+
+        L1 (A., B.): bold, underline, left=1440 twips, hanging=720
+        L2 (1., 2.): bold, underline, left=2160 twips, hanging=720
+        """
+        try:
+            range_obj = self.doc.Range(section.range_start, section.range_end)
+            paras = range_obj.Paragraphs
+            for i in range(1, paras.Count + 1):
+                para = paras(i)
+                text = para.Range.Text.strip().rstrip('\r')
+                if not text:
+                    continue
+
+                is_l1 = bool(re.match(r'^[A-Z]\.[\t ]', text))
+                is_l2 = bool(re.match(r'^[0-9]+\.[\t ]', text))
+
+                if not is_l1 and not is_l2:
+                    continue
+
+                # Fix bold
+                if para.Range.Bold != -1:  # -1 means all bold
+                    logger.info(f"  Fixing bold on subheading: '{text[:40]}'")
+                    para.Range.Bold = -1
+
+                # Fix underline (wdUnderlineSingle = 1)
+                if para.Range.Underline != 1:
+                    logger.info(f"  Fixing underline on subheading: '{text[:40]}'")
+                    para.Range.Underline = 1
+
+                # Fix indentation
+                pf = para.Format
+                if is_l1:
+                    # L1: left 1.0" (72pt), hanging 0.5" (36pt)
+                    if abs(pf.LeftIndent - 72) > 2:
+                        logger.info(f"  Fixing L1 indent on: '{text[:40]}'")
+                        pf.LeftIndent = 72      # 1.0" in points
+                        pf.FirstLineIndent = -36  # hanging 0.5"
+                elif is_l2:
+                    # L2: left 1.5" (108pt), hanging 0.5" (36pt)
+                    if abs(pf.LeftIndent - 108) > 2:
+                        logger.info(f"  Fixing L2 indent on: '{text[:40]}'")
+                        pf.LeftIndent = 108     # 1.5" in points
+                        pf.FirstLineIndent = -36  # hanging 0.5"
+
+        except Exception as e:
+            logger.warning(f"Could not fix subheading formatting: {e}")
+
     def _apply_redline(self, range_start: int, range_end: int,
-                       original_text: str, revised_text: str) -> int:
+                       original_text: str, revised_text: str,
+                       section_name: str = "") -> int:
         """Apply Track Changes for a section. Returns number of changes applied."""
         try:
             from icharlotte_core.word_hotkey import apply_flat_diff_redline
-            from icharlotte_core.word_validator import validate_after_edit
 
-            r = apply_flat_diff_redline(
-                doc_com=self.doc,
-                range_start=range_start,
-                range_end=range_end,
-                original_text=original_text,
-                revised_text=revised_text,
-                auto_enable_track_changes=True,
-            )
+            def _do_redline():
+                return apply_flat_diff_redline(
+                    doc_com=self.doc,
+                    range_start=range_start,
+                    range_end=range_end,
+                    original_text=original_text,
+                    revised_text=revised_text,
+                    auto_enable_track_changes=True,
+                )
+
+            r = _do_redline()
 
             if r['success']:
-                # Lightweight post-edit validation
                 time.sleep(0.3)
-                try:
-                    val = validate_after_edit(self.doc, range_start, range_end)
-                    if val.has_errors:
-                        val.print_summary()
-                        logger.warning("Post-redline validation found errors")
-                except Exception as ve:
-                    logger.debug(f"Validation error: {ve}")
-
+                logger.info(f"Applied {r['total_changes']} changes to {section_name} "
+                            f"({r.get('deleted_chars', 0)} del, "
+                            f"{r.get('inserted_chars', 0)} ins)")
                 return r['total_changes']
 
-            logger.warning("Redline application returned failure")
+            logger.warning(f"Redline application returned failure for {section_name}")
             return 0
 
         except Exception as e:
-            logger.error(f"Failed to apply redline: {e}")
+            logger.error(f"Failed to apply redline for {section_name}: {e}")
             return 0
 
-    def _fix_heading_name(self, section: SectionInfo):
-        """Apply a tracked change to correct a heading name."""
+    def _run_final_validation(self, sections: List[SectionInfo],
+                              total_changes: int = 0):
+        """Run final validation after all sections have been redlined.
+
+        Uses the shared word_validator.py checks:
+        - check_paragraph_marks_preserved (across full range)
+        - Section heading formatting check (only actual section headings, not all bold text)
+        """
+        from icharlotte_core.word_validator import (
+            Finding, ValidationResult,
+            check_paragraph_marks_preserved,
+        )
+
+        if not sections:
+            logger.warning("No sections to validate")
+            return
+
+        # Full range covering all reviewed sections
+        full_start = min(s.heading_range_start for s in sections)
+        full_end = max(s.range_end for s in sections)
+
+        result = ValidationResult(
+            context=f"Final report review validation "
+                    f"({len(sections)} sections, {total_changes} changes)"
+        )
+
+        # 1. Paragraph marks preserved (no formatting destruction)
+        result.findings.extend(
+            check_paragraph_marks_preserved(self.doc, full_start, full_end))
+
+        # 2. Check actual section headings are still bold/underline/ALL CAPS
+        for section in sections:
+            try:
+                hr = self.doc.Range(section.heading_range_start,
+                                    section.heading_range_end)
+                text = hr.Text.strip().rstrip('\r')
+                issues = []
+                if hr.Bold != -1 and hr.Bold != True:  # noqa: E712
+                    issues.append("lost bold")
+                if not hr.Underline:
+                    issues.append("lost underline")
+                if not text.isupper():
+                    issues.append("lost ALL CAPS")
+                if issues:
+                    result.findings.append(Finding(
+                        severity="ERROR",
+                        rule="section_heading_formatting",
+                        message=f"{section.name}: {', '.join(issues)}",
+                        location=f"chars {section.heading_range_start}-{section.heading_range_end}",
+                    ))
+                else:
+                    result.findings.append(Finding(
+                        severity="PASS",
+                        rule="section_heading_formatting",
+                        message=f"{section.name} heading intact",
+                    ))
+            except Exception as e:
+                logger.debug(f"Could not check heading {section.name}: {e}")
+
+        result.print_summary()
+
+        if result.has_errors:
+            logger.error("VALIDATION ERRORS found — review tracked changes carefully")
+        else:
+            logger.info(f"Final validation passed: {len(sections)} headings intact, "
+                        f"no errors in {total_changes} changes")
+
+    def _calc_preservation(self, original: str, revised: str) -> float:
+        """Calculate what fraction of the original text is preserved in the revision.
+
+        Uses diff_match_patch for accuracy. Returns 0.0-1.0.
+        """
         try:
-            heading_range = self.doc.Range(
-                section.heading_range_start, section.heading_range_end
-            )
-            text = heading_range.Text.strip().rstrip('\r')
+            from diff_match_patch import diff_match_patch
+            dmp = diff_match_patch()
+            diffs = dmp.diff_main(original, revised)
+            dmp.diff_cleanupSemantic(diffs)
 
-            # Enable track changes
-            if not self.doc.TrackRevisions:
-                self.doc.TrackRevisions = True
-
-            # Replace heading text (preserving paragraph mark)
-            content_range = self.doc.Range(
-                section.heading_range_start,
-                section.heading_range_end - 1  # exclude \r
-            )
-            content_range.Text = section.name
-            logger.info(f"Fixed heading: '{text}' -> '{section.name}'")
-
-        except Exception as e:
-            logger.warning(f"Could not fix heading name for {section.name}: {e}")
+            equal_chars = sum(len(text) for op, text in diffs if op == 0)
+            total_original = len(original)
+            if total_original == 0:
+                return 1.0
+            return equal_chars / total_original
+        except Exception:
+            # Fallback: simple ratio
+            shorter = min(len(original), len(revised))
+            longer = max(len(original), len(revised))
+            if longer == 0:
+                return 1.0
+            return shorter / longer
 
     # ────── Resource Loading ──────
 
@@ -664,7 +967,7 @@ Output ONLY the revised section text, nothing else."""
     def _get_range_text(self, start: int, end: int) -> str:
         """Get text from a specific range."""
         try:
-            return self.doc.Range(start, end).Text or ""
+            return _com_retry(lambda: self.doc.Range(start, end).Text or "")
         except Exception as e:
             logger.error(f"Could not get range text: {e}")
             return ""

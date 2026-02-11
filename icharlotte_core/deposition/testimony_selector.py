@@ -23,14 +23,15 @@ SYSTEM_PROMPT = """You are a legal assistant specializing in deposition transcri
 
 You will be given a list of question-and-answer exchanges from a deposition transcript, each with a unique ID number. You will also receive a user request describing what testimony they want extracted.
 
-Your task: Identify ALL exchanges that are relevant to the user's request. Be thorough — it is critical that you do not miss any relevant testimony. When in doubt about whether an exchange is relevant, include it.
+Your task: Identify the exchanges that are DIRECTLY relevant to the user's request. Be precise — only include testimony that substantively addresses the requested topic. Do NOT include exchanges that merely happen to be nearby or that discuss unrelated subjects.
 
 IMPORTANT RULES:
 1. Return ONLY a JSON array of the relevant exchange ID numbers.
 2. Do NOT reproduce or modify any testimony text.
 3. Do NOT explain your reasoning or add commentary.
-4. Include exchanges that are directly relevant AND exchanges that provide important context.
-5. If the user asks about a topic, include ALL Q/A pairs that discuss that topic, even tangentially.
+4. Only include exchanges where the question or answer directly discusses the requested topic.
+5. Do NOT include testimony about unrelated topics (e.g., if the user asks about the accident, do not include testimony about employment history, salary, education, or other background unless it directly relates to the accident).
+6. Include brief transitional exchanges (e.g., "Let me ask you about X") only if they introduce a directly relevant block of testimony.
 
 Example response format:
 [1, 2, 3, 7, 12, 15, 16, 17, 23]
@@ -59,13 +60,14 @@ class TestimonySelector:
             caller = LLMCaller()
         self.caller = caller
 
-    def select(self, index: TranscriptIndex, prompt: str) -> ExtractionResult:
+    def select(self, index: TranscriptIndex, prompt: str, on_chunk_done=None) -> ExtractionResult:
         """
         Select relevant exchanges from the index based on the user's prompt.
 
         Args:
             index: Parsed transcript index with all Q/A exchanges.
             prompt: User's extraction prompt (topic, category, question, etc.)
+            on_chunk_done: Optional callback(current_chunk, total_chunks) for progress.
 
         Returns:
             ExtractionResult with selected IDs grouped into consecutive runs.
@@ -83,6 +85,8 @@ class TestimonySelector:
             selected = self._select_chunk(chunk, prompt, index.deponent.full_name)
             all_selected_ids.extend(selected)
             logger.info(f"Chunk {chunk_num}: selected {len(selected)} exchanges")
+            if on_chunk_done:
+                on_chunk_done(chunk_num, len(chunks))
 
         # Build result with consecutive grouping
         result = ExtractionResult(prompt=prompt)

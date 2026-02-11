@@ -7,7 +7,6 @@ and optionally creates a highlighted PDF copy of the transcript.
 
 import os
 import re
-import copy
 import logging
 from typing import List, Optional, Tuple
 
@@ -152,11 +151,11 @@ class TestimonyFormatter:
         text_run.font.name = FONT_NAME
         text_run.font.size = FONT_SIZE
 
-        # Set tab stop at 0.5" from the indent start (i.e., 1.0" from margin)
-        self._set_tab_stop(para, Inches(1.0))
+        # Set tab stop at 1.0" from margin (= 1440 twips)
+        self._set_tab_stop(para, 1440)
 
-    def _set_tab_stop(self, paragraph, position):
-        """Set a tab stop at the given position."""
+    def _set_tab_stop(self, paragraph, position_twips: int):
+        """Set a tab stop at the given position (in twips)."""
         from docx.oxml.ns import qn
         from lxml import etree
 
@@ -167,31 +166,42 @@ class TestimonyFormatter:
 
         tab = etree.SubElement(tabs, qn('w:tab'))
         tab.set(qn('w:val'), 'left')
-        tab.set(qn('w:pos'), str(int(position)))
+        tab.set(qn('w:pos'), str(position_twips))
+
+    @staticmethod
+    def _merge_citation_range(exchanges: List[QAExchange]) -> str:
+        """
+        Merge a group of consecutive exchanges into a single page:line range.
+
+        Instead of "18:3-11; 18:12-20:2; 20:3-10", produces "18:3-20:10".
+        """
+        if not exchanges:
+            return ""
+        first = exchanges[0]
+        last = exchanges[-1]
+        if first.page_start == last.page_end:
+            return f"{first.page_start}:{first.line_start}-{last.line_end}"
+        return f"{first.page_start}:{first.line_start}-{last.page_end}:{last.line_end}"
 
     def _format_citation(self, exchanges: List[QAExchange], deponent_last_name: str) -> str:
         """
         Format a citation block for a group of consecutive exchanges.
 
-        Format: (Exh. __, ([LastName] Depo. Trns.) at p. [ranges].)
+        Format: (Exh. __, ([LastName] Depo. Trns.) at p. [range].)
         """
-        # Build page:line ranges
-        ranges = []
-        for ex in exchanges:
-            ranges.append(ex.citation_range())
-
-        # Merge consecutive/overlapping ranges on the same page
-        # For now, just join with semicolons
-        range_str = "; ".join(ranges)
-
-        last_name = deponent_last_name or "___"
+        range_str = self._merge_citation_range(exchanges)
+        raw_name = deponent_last_name or "___"
+        last_name = raw_name.title() if raw_name.isupper() else raw_name
         return f"(Exh. __ ({last_name} Depo. Trns.) at p. {range_str}.)"
 
     # =========================================================================
     # PDF Highlighting
     # =========================================================================
 
-    def highlight_pdf(self, index: TranscriptIndex, result: ExtractionResult) -> Optional[str]:
+    def highlight_pdf(
+        self, index: TranscriptIndex, result: ExtractionResult,
+        output_dir: str = None
+    ) -> Optional[str]:
         """
         Create or update a highlighted PDF copy of the transcript.
 
@@ -201,17 +211,20 @@ class TestimonyFormatter:
         Args:
             index: The transcript index.
             result: The extraction result with selected IDs.
+            output_dir: Directory for output. Defaults to transcript's directory.
 
         Returns:
             Path to the highlighted PDF, or None on failure.
         """
         source_path = index.source_pdf
-        source_dir = os.path.dirname(source_path)
         source_name = os.path.basename(source_path)
 
         # Determine highlighted copy path
+        if output_dir is None:
+            output_dir = os.path.dirname(source_path)
+        os.makedirs(output_dir, exist_ok=True)
         highlight_name = f"[H.AI] {source_name}"
-        highlight_path = os.path.join(source_dir, highlight_name)
+        highlight_path = os.path.join(output_dir, highlight_name)
 
         # Open existing highlighted copy or create from original
         if os.path.exists(highlight_path):
@@ -227,43 +240,46 @@ class TestimonyFormatter:
 
         # Build a mapping from transcript page → PDF page(s)
         page_map = self._build_page_map(doc, index.is_condensed)
-
         highlights_added = 0
 
         for ex in selected:
-            # Find the text to highlight (Q and A)
-            for text_block, line_num in [
-                (ex.question, ex.line_start),
-                (ex.answer, ex.line_end),  # answer starts after Q
-            ]:
-                # Search on the relevant PDF pages
-                pdf_pages = self._get_pdf_pages_for_transcript(
-                    ex.page_start, ex.page_end, page_map
+            # Highlight the full Q/A exchange using line-number-based
+            # region detection — more reliable than text search since
+            # PDF text contains timestamps, line numbers, and formatting
+            # that break multi-word fragment matching.
+            pdf_pages = self._get_pdf_pages_for_transcript(
+                ex.page_start, ex.page_end, page_map
+            )
+
+            for pdf_page_num in pdf_pages:
+                if pdf_page_num >= len(doc):
+                    continue
+
+                page = doc[pdf_page_num]
+                rects = self._get_line_range_rects(
+                    page, ex.page_start, ex.page_end,
+                    ex.line_start, ex.line_end, page_map
                 )
+                for rect in rects:
+                    annot = page.add_highlight_annot(rect)
+                    annot.set_colors(stroke=(1, 1, 0))  # Yellow
+                    annot.update()
+                    highlights_added += 1
 
-                for pdf_page_num in pdf_pages:
-                    if pdf_page_num >= len(doc):
-                        continue
-
-                    page = doc[pdf_page_num]
-
-                    # PDF text contains line numbers, timestamps, and Q./A.
-                    # markers that the parser strips. Try multiple search
-                    # strategies with progressively shorter fragments.
-                    rects = self._search_text_on_page(
-                        page, text_block, line_num
-                    )
-                    if rects:
-                        for rect in rects:
-                            annot = page.add_highlight_annot(rect)
-                            annot.set_colors(stroke=(1, 1, 0))  # Yellow
-                            annot.update()
-                            highlights_added += 1
-                        break  # Found on this page, no need to check others
-
-        # Save
-        doc.save(highlight_path)
-        doc.close()
+        # Save — must use temp file when overwriting the same file we opened
+        import tempfile
+        if os.path.exists(highlight_path) and os.path.samefile(
+            doc.name, highlight_path
+        ):
+            # Opened from highlight_path → save incremental or via temp
+            tmp_fd, tmp_path = tempfile.mkstemp(suffix=".pdf", dir=output_dir)
+            os.close(tmp_fd)
+            doc.save(tmp_path, garbage=3)
+            doc.close()
+            os.replace(tmp_path, highlight_path)
+        else:
+            doc.save(highlight_path)
+            doc.close()
 
         logger.info(f"Added {highlights_added} highlights to {highlight_path}")
         return highlight_path
@@ -287,8 +303,11 @@ class TestimonyFormatter:
             # court reporter name (Veritext, US Legal, etc. all vary).
             has_qa = '\n       Q.' in text or '\n       A.' in text
             if not has_qa:
-                # Count word:line reference patterns (e.g., "27:8", "145:12")
-                word_refs = re.findall(r'\b\d{1,3}:\d{1,2}\b', text)
+                # Count word index reference patterns (e.g., "27:8")
+                # Exclude timestamp patterns like "10:32:13AM" by
+                # stripping all timestamps first, then counting.
+                cleaned = re.sub(r'\d{1,2}:\d{2}:\d{2}\s*[AP]M', '', text)
+                word_refs = re.findall(r'\b\d{1,3}:\d{1,2}\b', cleaned)
                 if len(word_refs) >= 10:
                     continue
 
@@ -319,101 +338,83 @@ class TestimonyFormatter:
         return sorted(pdf_pages)
 
     @staticmethod
-    def _search_text_on_page(page, text_block: str, line_num: int = 0) -> list:
-        """
-        Search for transcript text on a PDF page using multiple strategies.
+    def _find_line_positions(page) -> dict:
+        """Find transcript line number y-positions on a PDF page.
 
-        The parser strips line numbers, timestamps, and Q./A. markers from
-        the text, but the PDF still contains them. Timestamps injected
-        mid-sentence break up multi-word phrases, so we progressively
-        try shorter fragments and finally fall back to single-word search.
-
-        Args:
-            page: PyMuPDF page object.
-            text_block: Cleaned transcript text (Q or A content).
-            line_num: Transcript line number for disambiguation.
+        Returns dict mapping line_number (1-25) to y0 coordinate.
         """
-        text = text_block.strip()
-        if not text:
+        line_positions = {}
+        text_dict = page.get_text("dict")
+        for block in text_dict.get("blocks", []):
+            if block.get("type") != 0:
+                continue
+            for line in block.get("lines", []):
+                for span in line.get("spans", []):
+                    text = span["text"].strip()
+                    bbox = span["bbox"]
+                    if bbox[0] < 100 and text.isdigit():
+                        num = int(text)
+                        if 1 <= num <= 25:
+                            line_positions[num] = bbox[1]
+        return line_positions
+
+    @staticmethod
+    def _get_line_range_rects(
+        page, page_start: int, page_end: int,
+        line_start: int, line_end: int, page_map: dict
+    ) -> list:
+        """
+        Get highlight rectangles for a transcript line range on a PDF page.
+
+        For multi-page exchanges, determines whether this PDF page is the
+        first, last, or a middle page of the range and adjusts accordingly:
+        - First page: highlight from line_start to bottom
+        - Middle page: highlight entire page
+        - Last page: highlight from top to line_end
+        - Single page: highlight from line_start to line_end
+        """
+        page_rect = page.rect
+        line_positions = TestimonyFormatter._find_line_positions(page)
+        if not line_positions:
             return []
 
-        words = text.split()
-        # Find first distinctive word (skip generic openers)
-        common = {"okay", "okay.", "well", "well,", "yes", "yes.", "no", "no.",
-                  "i", "the", "and", "so", "a", "it", "that", "this", "do",
-                  "did", "was", "were", "are", "is", "have", "has", "had",
-                  "but", "or", "if", "you", "your", "we", "my", "what",
-                  "yeah", "yeah.", "yep", "yep.", "new.", "oh", "--"}
-        start_idx = 0
-        for i, w in enumerate(words[:10]):
-            if w.lower().rstrip(".,;:!?") not in common and len(w) >= 4:
-                start_idx = i
+        # Determine which transcript page this PDF page contains
+        pdf_idx = page.number
+        tp_on_this_page = None
+        for tp, pdf_pages in page_map.items():
+            if pdf_idx in pdf_pages:
+                tp_on_this_page = tp
                 break
 
-        # Strategy 1: ~40 char fragment from distinctive start
-        fragment = " ".join(words[start_idx:])[:40].strip()
-        if len(fragment) >= 10:
-            rects = page.search_for(fragment)
-            if rects:
-                return rects
+        # Determine role of this PDF page in the exchange's span
+        is_first_page = (tp_on_this_page is not None and tp_on_this_page == page_start)
+        is_last_page = (tp_on_this_page is not None and tp_on_this_page == page_end)
+        single_page = (page_start == page_end)
 
-        # Strategy 2: Shorter fragments (timestamps break longer runs)
-        for length in [25, 15]:
-            fragment = " ".join(words[start_idx:])[:length].strip()
-            if len(fragment) >= 8:
-                rects = page.search_for(fragment)
-                if rects:
-                    return rects
+        min_y = min(line_positions.values())
+        max_y = max(line_positions.values())
 
-        # Strategy 3: Single distinctive word — for text where every
-        # multi-word fragment is broken by a timestamp/line-number
-        for i in range(start_idx, min(start_idx + 6, len(words))):
-            w = words[i]
-            clean_w = w.rstrip(".,;:!?")
-            if len(clean_w) >= 4 and clean_w.lower() not in common:
-                rects = page.search_for(w)
-                if len(rects) == 1:
-                    return rects  # Unique on page — safe match
-                if rects and line_num > 0:
-                    # Multiple matches; use line number to disambiguate.
-                    # Search for the line number near each rect.
-                    line_str = str(line_num)
-                    for rect in rects:
-                        # Look for the line number to the left of this text
-                        search_area = fitz.Rect(
-                            0, rect.y0 - 2, rect.x0, rect.y1 + 2
-                        )
-                        if page.search_for(line_str, clip=search_area):
-                            return [rect]
-                    # If line-number disambiguation failed, return first match
-                    return rects[:1]
-                if rects:
-                    return rects[:1]
+        if single_page or (is_first_page and is_last_page):
+            # Highlight from line_start to line_end
+            y_top = line_positions.get(line_start, min_y) - 2
+            y_bottom = line_positions.get(line_end, max_y) + 14
+        elif is_first_page:
+            # Highlight from line_start to bottom of page content
+            y_top = line_positions.get(line_start, min_y) - 2
+            y_bottom = max_y + 14
+        elif is_last_page:
+            # Highlight from top of page content to line_end
+            y_top = min_y - 2
+            y_bottom = line_positions.get(line_end, max_y) + 14
+        else:
+            # Middle page — highlight everything
+            y_top = min_y - 2
+            y_bottom = max_y + 14
 
-        # Strategy 4: Very short answers ("Yes.", "No.", "Yep.", "New.")
-        # Use the line number to find the right occurrence
-        if len(text) <= 5 and line_num > 0:
-            page_text = page.get_text("text")
-            line_str = f"\n{line_num}\n"
-            idx = page_text.find(line_str)
-            if idx >= 0:
-                # Get a snippet after the line number
-                after = page_text[idx + len(line_str):idx + len(line_str) + 80]
-                # The answer text should appear shortly after
-                ans_idx = after.find(text)
-                if ans_idx >= 0:
-                    # Search for the text clipped to this area of the page
-                    rects = page.search_for(text)
-                    if rects:
-                        # Find the rect closest to where we expect it
-                        # (by searching near the line number position)
-                        return rects[:1]
-
-        # Strategy 5: Last resort — just search the raw text
-        if len(text) >= 3:
-            rects = page.search_for(text)
-            if rects:
-                return rects[:1]
+        if y_top is not None and y_bottom is not None and y_bottom > y_top:
+            content_x0 = 65
+            content_x1 = page_rect.width - 20
+            return [fitz.Rect(content_x0, y_top, content_x1, y_bottom)]
 
         return []
 
