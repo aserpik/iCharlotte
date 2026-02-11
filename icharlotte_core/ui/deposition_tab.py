@@ -137,6 +137,9 @@ class DepositionTab(QWidget):
         # Map cursor positions in results viewer to transcript page numbers
         # List of (start_pos, end_pos, transcript_page) tuples
         self._result_page_anchors = []
+        # Map cursor positions to exchange IDs for deletion
+        # List of (start_pos, end_pos, [exchange_ids], transcript_idx, extraction_idx)
+        self._result_exchange_anchors = []
 
         self.setup_ui()
 
@@ -165,6 +168,12 @@ class DepositionTab(QWidget):
         self.remove_btn.setEnabled(False)
         toolbar.addWidget(self.remove_btn)
 
+        self.reparse_btn = QPushButton("Reparse")
+        self.reparse_btn.setToolTip("Re-extract text from the transcript PDF (clears cache)")
+        self.reparse_btn.clicked.connect(self._on_reparse)
+        self.reparse_btn.setEnabled(False)
+        toolbar.addWidget(self.reparse_btn)
+
         self.export_btn = QPushButton("Export to Word")
         self.export_btn.clicked.connect(self.on_export_word)
         self.export_btn.setEnabled(False)
@@ -175,6 +184,26 @@ class DepositionTab(QWidget):
         self.clear_results_btn.clicked.connect(self._on_clear_results)
         self.clear_results_btn.setEnabled(False)
         toolbar.addWidget(self.clear_results_btn)
+
+        # Highlight color picker
+        self._highlight_colors = [
+            ("#FFCC00", "Yellow"),
+            ("#FF6666", "Red"),
+            ("#66CC66", "Green"),
+            ("#6699FF", "Blue"),
+            ("#FF9933", "Orange"),
+            ("#FF99CC", "Pink"),
+        ]
+        self.color_btn = QPushButton()
+        self.color_btn.setFixedSize(28, 28)
+        self.color_btn.setToolTip("Highlight color for next extraction")
+        self.color_btn.clicked.connect(self._on_pick_color)
+        toolbar.addWidget(self.color_btn)
+        settings = QSettings("iCharlotte", "iCharlotte")
+        self._current_color = settings.value(
+            "deposition_tab/highlight_color", "#FFCC00"
+        )
+        self._update_color_btn()
 
         toolbar.addStretch()
 
@@ -195,6 +224,9 @@ class DepositionTab(QWidget):
         self.transcript_viewer = PdfViewerWidget()
         self.transcript_viewer.setAcceptDrops(False)
         self.transcript_viewer.web_view.setAcceptDrops(False)
+        self.transcript_viewer.annotationDeleteRequested.connect(
+            self._on_annotation_delete_requested
+        )
         self.splitter.addWidget(self.transcript_viewer)
 
         # Right: Extraction results
@@ -210,6 +242,10 @@ class DepositionTab(QWidget):
         self.results_viewer.setReadOnly(False)
         self.results_viewer.setFont(QFont("Times New Roman", 11))
         self.results_viewer.setTabStopDistance(40)  # Tab aligns with left margin indent
+        self.results_viewer.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.results_viewer.customContextMenuRequested.connect(
+            self._on_results_context_menu
+        )
         self.results_viewer.setPlaceholderText(
             "Enter a prompt below and click 'Extract' to find relevant testimony.\n\n"
             "Examples:\n"
@@ -505,6 +541,8 @@ class DepositionTab(QWidget):
         # Clear viewers
         self.transcript_viewer.clear()
         self.results_viewer.clear()
+        self._result_page_anchors.clear()
+        self._result_exchange_anchors.clear()
 
         if index:
             self._show_transcript(index)
@@ -517,6 +555,7 @@ class DepositionTab(QWidget):
             return
 
         self.remove_btn.setEnabled(True)
+        self.reparse_btn.setEnabled(True)
         self._save_state()
 
     def _show_transcript(self, index):
@@ -547,6 +586,7 @@ class DepositionTab(QWidget):
         has_extractions = any(t["extractions"] for t in self._transcripts)
         self.export_btn.setEnabled(has_extractions)
         self.remove_btn.setEnabled(True)
+        self.reparse_btn.setEnabled(True)
 
     # =========================================================================
     # Actions
@@ -683,6 +723,38 @@ class DepositionTab(QWidget):
 
         self._save_state()
 
+    def _on_reparse(self):
+        """Force reparse of the current transcript (clears cached index)."""
+        if self._active_idx < 0 or self._active_idx >= len(self._transcripts):
+            return
+        active = self._transcripts[self._active_idx]
+        pdf_path = active["path"]
+
+        # Clear existing extractions and results
+        active["extractions"].clear()
+        active["index"] = None
+        self.results_viewer.clear()
+        self._result_page_anchors.clear()
+        self._result_exchange_anchors.clear()
+
+        # Delete cached index file if it exists
+        from icharlotte_core.deposition.models import TranscriptIndex
+        cache_path = TranscriptIndex.cache_path_for(pdf_path)
+        if os.path.exists(cache_path):
+            os.remove(cache_path)
+            logger.info(f"Deleted cached index: {cache_path}")
+
+        # Reload with force_reparse
+        self.status_label.setText("Reparsing...")
+        self._show_progress("Reparsing transcript...")
+        self.load_btn.setEnabled(False)
+        self._pending_parse_path = pdf_path
+
+        self._parse_worker = ParseWorker(pdf_path, force_reparse=True)
+        self._parse_worker.finished.connect(self._on_parse_finished)
+        self._parse_worker.error.connect(self._on_parse_error)
+        self._parse_worker.start()
+
     def _populate_transcript_viewer(self, index):
         """Load the transcript PDF into the left panel viewer."""
         if index and index.source_pdf and os.path.isfile(index.source_pdf):
@@ -709,7 +781,7 @@ class DepositionTab(QWidget):
             return
 
         self.status_label.setText("Extracting...")
-        self._show_progress("Starting extraction...")
+        self._show_progress("Sending to LLM...", 0, 100)
         self.extract_btn.setEnabled(False)
         self.prompt_input.setEnabled(False)
 
@@ -722,11 +794,11 @@ class DepositionTab(QWidget):
 
     def _on_select_finished(self, result):
         """Handle successful testimony selection."""
-        self._hide_progress()
         self.extract_btn.setEnabled(True)
         self.prompt_input.setEnabled(True)
 
         if not result or not result.selected_ids:
+            self._hide_progress()
             self.status_label.setText("No relevant testimony found")
             QMessageBox.information(
                 self, "No Results",
@@ -739,28 +811,45 @@ class DepositionTab(QWidget):
         if 0 <= self._active_idx < len(self._transcripts):
             active = self._transcripts[self._active_idx]
             index = active["index"]
+            result.highlight_color = self._current_color
             active["extractions"].append((index, result))
             self.export_btn.setEnabled(True)
             self.clear_results_btn.setEnabled(True)
 
-            # Display results
+            # Phase 2: Format results (70-85%)
+            num_selected = len(result.selected_ids)
+            self._show_progress(
+                f"Formatting {num_selected} exchanges...", 72, 100
+            )
+            QApplication.processEvents()
             self._append_results(index, result)
+            self._show_progress("Formatting complete", 85, 100)
+            QApplication.processEvents()
 
-            # PDF highlighting — create [H.AI] copy and load in viewer
+            # Phase 3: PDF highlighting (85-100%)
             try:
                 from icharlotte_core.deposition.testimony_formatter import TestimonyFormatter
                 formatter = TestimonyFormatter()
                 ai_dir = self._get_ai_output_dir()
+                self._show_progress(
+                    f"Highlighting {num_selected} exchanges in PDF...", 86, 100
+                )
+                QApplication.processEvents()
                 highlight_path = formatter.highlight_pdf(
-                    index, result, output_dir=ai_dir
+                    index, result, output_dir=ai_dir,
+                    on_progress=lambda cur, total: self._on_highlight_progress(cur, total),
+                    color=result.highlight_color,
                 )
                 if highlight_path:
+                    self._show_progress("Loading highlighted PDF...", 97, 100)
+                    QApplication.processEvents()
                     self._load_highlighted_pdf(highlight_path)
             except Exception as e:
                 logger.exception("PDF highlighting failed")
 
+            self._hide_progress()
             self.status_label.setText(
-                f"Extracted {len(result.selected_ids)} exchanges in "
+                f"Extracted {num_selected} exchanges in "
                 f"{len(result.groups)} groups"
             )
 
@@ -792,18 +881,54 @@ class DepositionTab(QWidget):
         """Update progress label during extraction."""
         self.progress_label.setText(message)
 
+    def _on_highlight_progress(self, current: int, total: int):
+        """Update progress bar during PDF highlighting (85-97% of total bar)."""
+        pct = 85 + int((current / max(total, 1)) * 12)
+        self._show_progress(
+            f"Highlighting exchange {current}/{total}...", pct, 100
+        )
+        QApplication.processEvents()
+
     def _on_chunk_progress(self, current: int, total: int):
-        """Update progress bar with chunk completion."""
+        """Update progress bar with chunk completion (0-70% of total bar)."""
+        # LLM selection uses 0-70% of the progress bar
+        pct = int((current / max(total, 1)) * 70)
         if total > 1:
-            pct = int((current / total) * 100)
-            self._show_progress(f"Processing chunk {current}/{total}...", pct, 100)
+            self._show_progress(f"LLM analyzing chunk {current}/{total}...", pct, 100)
         else:
-            self._show_progress("Analyzing testimony with LLM...")
+            self._show_progress("LLM analyzing testimony...", pct, 100)
+
+    def _update_color_btn(self):
+        """Update the color button's background to reflect current color."""
+        self.color_btn.setStyleSheet(
+            f"background-color: {self._current_color}; "
+            "border: 1px solid #888; border-radius: 4px;"
+        )
+
+    def _on_pick_color(self):
+        """Show a popup menu with preset highlight colors."""
+        from PySide6.QtWidgets import QMenu
+        from PySide6.QtGui import QPixmap, QIcon
+        menu = QMenu(self)
+        for hex_color, name in self._highlight_colors:
+            pixmap = QPixmap(16, 16)
+            pixmap.fill(QColor(hex_color))
+            action = menu.addAction(QIcon(pixmap), name)
+            action.setData(hex_color)
+        chosen = menu.exec(
+            self.color_btn.mapToGlobal(self.color_btn.rect().bottomLeft())
+        )
+        if chosen:
+            self._current_color = chosen.data()
+            self._update_color_btn()
+            settings = QSettings("iCharlotte", "iCharlotte")
+            settings.setValue("deposition_tab/highlight_color", self._current_color)
 
     def _on_clear_results(self):
         """Clear all extraction results."""
         self.results_viewer.clear()
         self._result_page_anchors.clear()
+        self._result_exchange_anchors.clear()
         self.clear_results_btn.setEnabled(False)
         # Clear stored extractions on all transcripts
         for t in self._transcripts:
@@ -820,6 +945,116 @@ class DepositionTab(QWidget):
                 self.transcript_viewer.go_to_page(page_num)
                 break
 
+    def _on_results_context_menu(self, pos):
+        """Show context menu with option to delete a highlight group."""
+        cursor = self.results_viewer.cursorForPosition(pos)
+        click_pos = cursor.position()
+
+        target = None
+        for anchor in self._result_exchange_anchors:
+            start, end, ex_ids, transcript_idx, extraction_idx = anchor
+            if start <= click_pos <= end:
+                target = anchor
+                break
+
+        from PySide6.QtWidgets import QMenu
+        menu = self.results_viewer.createStandardContextMenu()
+        if target:
+            menu.addSeparator()
+            delete_action = menu.addAction("Delete this highlight group")
+        else:
+            delete_action = None
+
+        chosen = menu.exec(self.results_viewer.mapToGlobal(pos))
+        if chosen and chosen == delete_action:
+            self._delete_highlight_group(target)
+
+    def _delete_highlight_group(self, anchor):
+        """Delete a highlight group from results viewer and PDF annotations."""
+        start, end, ex_ids, transcript_idx, extraction_idx = anchor
+
+        # 1. Remove annotations from [H.AI] PDF
+        active = self._transcripts[transcript_idx]
+        index = active["index"]
+        ai_dir = self._get_ai_output_dir()
+        source_name = os.path.basename(index.source_pdf)
+        highlight_path = os.path.join(ai_dir, f"[H.AI] {source_name}")
+
+        if os.path.isfile(highlight_path):
+            import fitz
+            import tempfile
+            doc = fitz.open(highlight_path)
+            ex_id_set = {str(eid) for eid in ex_ids}
+            for page in doc:
+                annots_to_delete = []
+                for annot in (page.annots() or []):
+                    content = annot.info.get("content", "")
+                    if content.startswith("ex:") and content[3:] in ex_id_set:
+                        annots_to_delete.append(annot)
+                for annot in annots_to_delete:
+                    page.delete_annot(annot)
+            tmp_fd, tmp_path = tempfile.mkstemp(suffix=".pdf", dir=ai_dir)
+            os.close(tmp_fd)
+            doc.save(tmp_path, garbage=3)
+            doc.close()
+            os.replace(tmp_path, highlight_path)
+            self._load_highlighted_pdf(highlight_path)
+
+        # 2. Remove text from results viewer
+        cursor = self.results_viewer.textCursor()
+        cursor.setPosition(start)
+        cursor.setPosition(end, QTextCursor.KeepAnchor)
+        cursor.removeSelectedText()
+
+        # 3. Adjust anchor positions
+        removed_length = end - start
+        self._result_exchange_anchors.remove(anchor)
+
+        # Remove matching page anchor and adjust remaining positions
+        self._result_page_anchors = [
+            (s - removed_length if s > start else s,
+             e - removed_length if e > start else e, p)
+            for s, e, p in self._result_page_anchors
+            if not (s >= start and e <= end)
+        ]
+        self._result_exchange_anchors = [
+            (s - removed_length if s > start else s,
+             e - removed_length if e > start else e, ids, ti, ei)
+            for s, e, ids, ti, ei in self._result_exchange_anchors
+        ]
+
+        # 4. Remove exchange IDs from the extraction result
+        if 0 <= extraction_idx < len(active["extractions"]):
+            _, ext_result = active["extractions"][extraction_idx]
+            ex_id_set_int = set(ex_ids)
+            ext_result.selected_ids = [
+                eid for eid in ext_result.selected_ids if eid not in ex_id_set_int
+            ]
+            ext_result.groups = [
+                g for g in ext_result.groups
+                if not all(eid in ex_id_set_int for eid in g)
+            ]
+
+        self.status_label.setText(f"Deleted {len(ex_ids)} exchanges")
+
+    def _on_annotation_delete_requested(self, ex_id_str: str):
+        """Handle Delete key on a selected highlight in the PDF viewer."""
+        try:
+            ex_id = int(ex_id_str)
+        except ValueError:
+            return
+
+        # Find the anchor that contains this exchange ID
+        target = None
+        for anchor in self._result_exchange_anchors:
+            start, end, ex_ids, transcript_idx, extraction_idx = anchor
+            if ex_id in ex_ids:
+                target = anchor
+                break
+
+        if target:
+            self._delete_highlight_group(target)
+
     def _append_results(self, index, result):
         """Append extraction results to the right panel."""
         cursor = self.results_viewer.textCursor()
@@ -829,11 +1064,18 @@ class DepositionTab(QWidget):
         if self.results_viewer.toPlainText().strip():
             cursor.insertText("\n" + "=" * 60 + "\n\n")
 
-        # Prompt header
+        # Color indicator + prompt header
+        color = getattr(result, "highlight_color", "#FFCC00")
+        color_fmt = QTextCharFormat()
+        color_fmt.setBackground(QColor(color))
+        color_fmt.setFontPointSize(12)
+        color_fmt.setFontWeight(QFont.Bold)
+        cursor.insertText(" \u2588 ", color_fmt)
+
         header_fmt = QTextCharFormat()
         header_fmt.setFontWeight(QFont.Bold)
         header_fmt.setFontPointSize(12)
-        cursor.insertText(f"Extraction: {result.prompt}\n", header_fmt)
+        cursor.insertText(f" Extraction: {result.prompt}\n", header_fmt)
 
         # Normal formatting
         normal_fmt = QTextCharFormat()
@@ -856,6 +1098,10 @@ class DepositionTab(QWidget):
         cite_fmt.setForeground(QColor("#555"))
 
         exchange_map = {ex.id: ex for ex in index.exchanges}
+
+        # Determine extraction index for anchor tracking
+        active = self._transcripts[self._active_idx]
+        extraction_idx = len(active["extractions"]) - 1
 
         for group_idx, group_ids in enumerate(result.groups):
             group_exchanges = [exchange_map[eid] for eid in group_ids if eid in exchange_map]
@@ -893,7 +1139,12 @@ class DepositionTab(QWidget):
             cursor.insertText(citation, cite_fmt)
 
             group_end_pos = cursor.position()
+            group_ex_ids = [ex.id for ex in group_exchanges]
             self._result_page_anchors.append((group_start_pos, group_end_pos, first_page))
+            self._result_exchange_anchors.append((
+                group_start_pos, group_end_pos, group_ex_ids,
+                self._active_idx, extraction_idx
+            ))
 
         self.results_viewer.setTextCursor(cursor)
         self.results_viewer.ensureCursorVisible()
@@ -909,7 +1160,12 @@ class DepositionTab(QWidget):
             QTimer.singleShot(2000, lambda: self.transcript_viewer.go_to_page(page))
 
     def _get_ai_output_dir(self) -> str:
-        """Get the NOTES/AI OUTPUT directory for the current case."""
+        """Get the NOTES/AI OUTPUT directory for the current case.
+
+        Never returns the transcript's own directory — always resolves to
+        a NOTES/AI OUTPUT folder so we don't pollute the transcript folder.
+        """
+        # Try via file_number first
         if self.file_number:
             from icharlotte_core.utils import get_case_path
             case_path = get_case_path(self.file_number)
@@ -917,9 +1173,27 @@ class DepositionTab(QWidget):
                 ai_dir = os.path.join(case_path, "NOTES", "AI OUTPUT")
                 os.makedirs(ai_dir, exist_ok=True)
                 return ai_dir
-        # Fallback to transcript directory
+
+        # Fallback: derive case root from transcript path by walking up
+        # to find a folder that contains a NOTES subfolder
         if self._transcripts and self._active_idx >= 0:
-            return os.path.dirname(self._transcripts[self._active_idx]["path"])
+            transcript_path = self._transcripts[self._active_idx]["path"]
+            current = os.path.dirname(transcript_path)
+            while current and current != os.path.dirname(current):
+                notes_dir = os.path.join(current, "NOTES")
+                if os.path.isdir(notes_dir):
+                    ai_dir = os.path.join(notes_dir, "AI OUTPUT")
+                    os.makedirs(ai_dir, exist_ok=True)
+                    return ai_dir
+                current = os.path.dirname(current)
+
+            # Last resort: create NOTES/AI OUTPUT next to transcript
+            ai_dir = os.path.join(
+                os.path.dirname(transcript_path), "NOTES", "AI OUTPUT"
+            )
+            os.makedirs(ai_dir, exist_ok=True)
+            return ai_dir
+
         return os.getcwd()
 
     def on_export_word(self):

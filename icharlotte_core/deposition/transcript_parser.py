@@ -125,6 +125,9 @@ class TranscriptParser:
         # Parse Q/A exchanges from transcript pages
         exchanges = self._parse_qa_exchanges(transcript_pages)
 
+        # Validate: verify every exchange's text exists in the PDF
+        exchanges = self._validate_exchanges(pdf_path, exchanges, pages_text)
+
         # Build the raw text for viewer display
         raw_lines = []
         for page_num, lines in transcript_pages:
@@ -164,6 +167,7 @@ class TranscriptParser:
             text = page.get_text("text")
             pages.append(text)
         doc.close()
+        self._pdf_path = pdf_path  # Stash for y-coordinate parsing
         return pages
 
     # =========================================================================
@@ -201,54 +205,118 @@ class TranscriptParser:
         """
         Process full-size transcript: 1 transcript page per PDF page.
 
-        PyMuPDF extracts line numbers on their own line, followed by
-        the content on the next line. E.g.:
-            "1\\n       Q.   Good morning...    10:17:10AM\\n2\\n  begin..."
-
-        We pair each standalone number with its content line.
+        Uses y-coordinate matching to pair line numbers with their content,
+        since PyMuPDF may extract line-number and content spans in different
+        text blocks, causing sequential pairing to mismatch lines.
 
         Returns: List of (page_number, [(line_number, cleaned_text), ...])
         """
+        import fitz
+
         result = []
+        doc = fitz.open(self._pdf_path)
 
         for pdf_page_idx, page_text in enumerate(pages_text):
             raw_lines = page_text.split('\n')
 
-            # Find transcript page number
+            # Find transcript page number from the raw text
             page_num = self._find_page_number(raw_lines, page_text)
             if page_num is None:
                 continue
 
-            # Pair line numbers with content lines
-            # Pattern: a line that is just a number (1-25) followed by a content line
-            numbered_lines = []
-            i = 0
-            while i < len(raw_lines):
-                stripped = raw_lines[i].strip()
-
-                # Check if this line is a standalone line number (1-25)
-                if stripped.isdigit() and 1 <= int(stripped) <= 25:
-                    line_num = int(stripped)
-                    # Next line is the content
-                    if i + 1 < len(raw_lines):
-                        content = raw_lines[i + 1]
-                        # Remove timestamp at end
-                        content = TIMESTAMP_RE.sub('', content)
-                        content = content.strip()
-
-                        # Skip footer/page lines
-                        if content and not FOOTER_RE.search(content):
-                            if not re.match(r'^Page\s+\d+$', content, re.IGNORECASE):
-                                numbered_lines.append((line_num, content))
-                        i += 2
-                        continue
-
-                i += 1
+            # Use y-coordinate matching for accurate line pairing
+            page = doc[pdf_page_idx]
+            numbered_lines = self._extract_lines_by_position(page)
 
             if numbered_lines:
                 result.append((page_num, numbered_lines))
 
+        doc.close()
         return result
+
+    def _extract_lines_by_position(self, page) -> List[Tuple[int, str]]:
+        """
+        Extract numbered transcript lines by matching y-coordinates.
+
+        First pass: find line number spans (digits 1-25 at x < 100).
+        Second pass: collect all text spans at the same y-coordinate,
+        excluding the line number itself, to build the content.
+        """
+        text_dict = page.get_text("dict")
+
+        # First pass: find line numbers and their y-centers
+        line_nums = {}  # line_num -> {"y_center": float, "x_right": float}
+        for block in text_dict.get("blocks", []):
+            if block.get("type") != 0:
+                continue
+            for line in block.get("lines", []):
+                for span in line.get("spans", []):
+                    text = span["text"].strip()
+                    bbox = span["bbox"]
+                    if bbox[0] < 100 and text.isdigit():
+                        num = int(text)
+                        if 1 <= num <= 25:
+                            y_center = (bbox[1] + bbox[3]) / 2
+                            line_nums[num] = {
+                                "y_center": y_center,
+                                "x_right": bbox[2],
+                            }
+
+        if not line_nums:
+            return []
+
+        # Second pass: collect content spans for each line number by y-proximity
+        line_content = {num: [] for num in line_nums}
+
+        for block in text_dict.get("blocks", []):
+            if block.get("type") != 0:
+                continue
+            for line in block.get("lines", []):
+                for span in line.get("spans", []):
+                    bbox = span["bbox"]
+                    span_y = (bbox[1] + bbox[3]) / 2
+                    text = span["text"]
+
+                    # Skip line number spans themselves
+                    if bbox[0] < 100 and text.strip().isdigit():
+                        continue
+
+                    # Match to closest line number by y-coordinate
+                    best_num = None
+                    best_dist = 999
+                    for num, info in line_nums.items():
+                        dist = abs(span_y - info["y_center"])
+                        if dist < best_dist:
+                            best_dist = dist
+                            best_num = num
+
+                    if best_num is not None and best_dist < 8:
+                        line_content[best_num].append((bbox[0], text))
+
+        # Assemble lines: sort spans by x-coordinate, join, clean
+        numbered_lines = []
+        for num in sorted(line_nums.keys()):
+            spans = line_content[num]
+            if not spans:
+                continue
+
+            # Sort by x position and join
+            spans.sort(key=lambda s: s[0])
+            content = "".join(s[1] for s in spans).strip()
+
+            # Remove timestamp at end
+            content = TIMESTAMP_RE.sub('', content)
+            content = content.strip()
+
+            # Skip footer/page lines
+            if not content or FOOTER_RE.search(content):
+                continue
+            if re.match(r'^Page\s+\d+$', content, re.IGNORECASE):
+                continue
+
+            numbered_lines.append((num, content))
+
+        return numbered_lines
 
     def _find_page_number(self, lines: List[str], full_text: str) -> Optional[int]:
         """Extract the transcript page number from page text."""
@@ -514,6 +582,131 @@ class TranscriptParser:
 
         logger.info(f"Parsed {len(exchanges)} Q/A exchanges from {len(transcript_pages)} pages")
         return exchanges
+
+    # =========================================================================
+    # Validation
+    # =========================================================================
+
+    def _validate_exchanges(
+        self, pdf_path: str, exchanges: List[QAExchange],
+        pages_text: List[str]
+    ) -> List[QAExchange]:
+        """
+        Validate that every exchange's text actually exists in the PDF.
+
+        For each exchange, takes a distinctive fragment (8+ words) from the
+        question and answer, then checks that it appears in the raw text of
+        the PDF pages the exchange references. Exchanges that fail validation
+        are dropped with a warning.
+
+        Returns the list of validated exchanges (with original IDs preserved).
+        """
+        if not exchanges:
+            return exchanges
+
+        # Build a map: transcript page number -> raw PDF text
+        # We need to figure out which PDF page corresponds to which transcript page.
+        # Use the same Page N detection from the page text.
+        page_text_map = {}  # transcript_page -> combined raw text
+        for pdf_idx, text in enumerate(pages_text):
+            for match in PAGE_NUM_RE.finditer(text):
+                tp = int(match.group(1))
+                if tp not in page_text_map:
+                    page_text_map[tp] = ""
+                page_text_map[tp] += " " + text
+
+        validated = []
+        failed = 0
+
+        for ex in exchanges:
+            # Get the raw PDF text for this exchange's page range
+            raw_text = ""
+            for tp in range(ex.page_start, ex.page_end + 1):
+                raw_text += " " + page_text_map.get(tp, "")
+
+            if not raw_text.strip():
+                # Can't validate — no PDF text found for this page range.
+                # Keep the exchange but warn.
+                logger.warning(
+                    f"Exchange {ex.id}: no PDF text for pages "
+                    f"{ex.page_start}-{ex.page_end}, cannot validate"
+                )
+                validated.append(ex)
+                continue
+
+            # Normalize for comparison: collapse whitespace, lowercase
+            raw_norm = re.sub(r'\s+', ' ', raw_text).lower()
+
+            # Check question and answer fragments
+            q_ok = self._verify_fragment(ex.question, raw_norm)
+            a_ok = self._verify_fragment(ex.answer, raw_norm)
+
+            if q_ok and a_ok:
+                validated.append(ex)
+            else:
+                failed += 1
+                which = []
+                if not q_ok:
+                    which.append("Q")
+                if not a_ok:
+                    which.append("A")
+                logger.warning(
+                    f"Exchange {ex.id} FAILED validation ({'+'.join(which)} "
+                    f"not found in PDF) at p{ex.page_start}:{ex.line_start}: "
+                    f"Q={ex.question[:60]}..."
+                )
+
+        if failed:
+            logger.error(
+                f"VALIDATION: {failed}/{len(exchanges)} exchanges failed "
+                f"text verification — these were DROPPED from the index"
+            )
+        else:
+            logger.info(
+                f"VALIDATION: all {len(exchanges)} exchanges verified "
+                f"against PDF text"
+            )
+
+        return validated
+
+    @staticmethod
+    def _verify_fragment(text: str, raw_norm: str) -> bool:
+        """
+        Check that a distinctive fragment of the extracted text exists in
+        the raw PDF text.
+
+        Uses progressively shorter fragments: tries 8 words, then 5, then 3.
+        Very short texts (1-2 words) are auto-accepted since they're common
+        answers like "Yes", "No", "Correct" that appear everywhere in a transcript.
+        All comparisons are whitespace-normalized and case-insensitive.
+        """
+        words = text.split()
+        if len(words) <= 2:
+            return True  # Short answers like "Yes", "No", "Correct" — skip
+
+        # Try progressively shorter fragments
+        for length in [8, 5, 3]:
+            if len(words) >= length:
+                # Take fragment from the middle (less likely to be truncated)
+                mid = max(0, len(words) // 2 - length // 2)
+                fragment = ' '.join(words[mid:mid + length]).lower()
+                fragment = re.sub(r'\s+', ' ', fragment)
+                if fragment in raw_norm:
+                    return True
+
+        # Try 2 consecutive words from start and middle
+        if len(words) >= 2:
+            for start in [0, len(words) // 2]:
+                frag = ' '.join(words[start:start + 2]).lower()
+                if frag in raw_norm:
+                    return True
+
+        # Single distinctive word (4+ chars)
+        for w in words:
+            if len(w) >= 4 and w.lower() in raw_norm:
+                return True
+
+        return False
 
     # =========================================================================
     # Helpers

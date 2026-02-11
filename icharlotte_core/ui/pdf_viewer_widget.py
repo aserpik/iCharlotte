@@ -10,7 +10,8 @@ from PySide6.QtWebEngineCore import QWebEngineSettings
 class PdfViewerWidget(QWidget):
     """PDF viewer with automatic page tracking using embedded pdf.js."""
 
-    pageChanged = Signal(int)  # Emitted when current page changes
+    pageChanged = Signal(int)     # Emitted when current page changes
+    annotationDeleteRequested = Signal(str)  # Emitted with exchange ID when Delete pressed on highlight
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -112,6 +113,12 @@ class PdfViewerWidget(QWidget):
             cursor: text; transform-origin: 0% 0%;
         }
         .textLayer ::selection { background: rgba(0,0,255,0.3); }
+        .annot-overlay {
+            position: absolute; cursor: pointer; border: 2px solid transparent;
+            border-radius: 2px; z-index: 5;
+        }
+        .annot-overlay:hover { border-color: rgba(0,0,0,0.3); }
+        .annot-overlay.selected { border-color: #e00; border-style: dashed; }
         #loading {
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%,-50%);
@@ -138,6 +145,10 @@ class PdfViewerWidget(QWidget):
         let renderedPages = new Set(), renderingPages = new Set();
         let isLoading = false, pageHeights = [];
         const BUFFER = 2; // render this many pages above/below viewport
+
+        // Annotation selection state
+        let selectedAnnotExId = null;
+        let pendingDeleteExId = null;  // Set by Delete key, polled by Python
 
         async function loadPdf(url) {
             if (isLoading) return { success: false, error: 'Already loading' };
@@ -297,7 +308,7 @@ class PdfViewerWidget(QWidget):
                 pageDiv.appendChild(canvas);
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
 
-                // Highlight annotations (drawn directly on the main canvas)
+                // Highlight annotations (drawn on canvas + clickable overlays)
                 try {
                     const annots = await page.getAnnotations();
                     const highlights = annots.filter(a => a.subtype === 'Highlight');
@@ -306,11 +317,13 @@ class PdfViewerWidget(QWidget):
                         for (const a of highlights) {
                             const c = a.color || {0:255, 1:255, 2:0};
                             ctx.fillStyle = 'rgba(' + (c[0]||255) + ',' + (c[1]||255) + ',' + (c[2]||0) + ',0.3)';
-                            // quadPoints gives precise highlight quads; fall back to rect
+
+                            // Extract exchange ID from annotation content (format: "ex:123")
+                            const exId = (a.contentsObj && a.contentsObj.str || '').replace('ex:', '');
+
                             if (a.quadPoints && a.quadPoints.length) {
                                 for (let q = 0; q < a.quadPoints.length; q += 8) {
                                     const pts = a.quadPoints.slice(q, q + 8);
-                                    // quadPoints: [x1,y1, x2,y2, x3,y3, x4,y4]
                                     const xs = [pts[0], pts[2], pts[4], pts[6]];
                                     const ys = [pts[1], pts[3], pts[5], pts[7]];
                                     const minX = Math.min(...xs), maxX = Math.max(...xs);
@@ -318,12 +331,14 @@ class PdfViewerWidget(QWidget):
                                     const [vx1, vy1] = viewport.convertToViewportPoint(minX, maxY);
                                     const [vx2, vy2] = viewport.convertToViewportPoint(maxX, minY);
                                     ctx.fillRect(vx1, vy1, vx2 - vx1, vy2 - vy1);
+                                    if (exId) createAnnotOverlay(pageDiv, vx1, vy1, vx2-vx1, vy2-vy1, exId);
                                 }
                             } else {
                                 const r = a.rect;
                                 const [x1, y1] = viewport.convertToViewportPoint(r[0], r[3]);
                                 const [x2, y2] = viewport.convertToViewportPoint(r[2], r[1]);
                                 ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+                                if (exId) createAnnotOverlay(pageDiv, x1, y1, x2-x1, y2-y1, exId);
                             }
                         }
                     }
@@ -350,6 +365,49 @@ class PdfViewerWidget(QWidget):
             }
         }
 
+        function createAnnotOverlay(pageDiv, x, y, w, h, exId) {
+            const div = document.createElement('div');
+            div.className = 'annot-overlay';
+            div.dataset.exId = exId;
+            div.style.left = x + 'px';
+            div.style.top = y + 'px';
+            div.style.width = w + 'px';
+            div.style.height = h + 'px';
+            div.addEventListener('click', function(e) {
+                e.stopPropagation();
+                // Deselect all, select this exchange's overlays
+                document.querySelectorAll('.annot-overlay.selected').forEach(el => el.classList.remove('selected'));
+                document.querySelectorAll('.annot-overlay[data-ex-id="' + exId + '"]').forEach(el => el.classList.add('selected'));
+                selectedAnnotExId = exId;
+            });
+            pageDiv.appendChild(div);
+        }
+
+        // Click on empty area deselects
+        document.getElementById('viewerContainer').addEventListener('click', function(e) {
+            if (!e.target.classList.contains('annot-overlay')) {
+                document.querySelectorAll('.annot-overlay.selected').forEach(el => el.classList.remove('selected'));
+                selectedAnnotExId = null;
+            }
+        });
+
+        // Delete key triggers annotation deletion
+        document.addEventListener('keydown', function(e) {
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedAnnotExId) {
+                pendingDeleteExId = selectedAnnotExId;
+                // Remove overlays visually immediately
+                document.querySelectorAll('.annot-overlay[data-ex-id="' + selectedAnnotExId + '"]').forEach(el => el.remove());
+                selectedAnnotExId = null;
+            }
+        });
+
+        function getSelectedAnnotation() { return selectedAnnotExId; }
+        function getPendingDelete() {
+            const id = pendingDeleteExId;
+            pendingDeleteExId = null;
+            return id;
+        }
+
         function goToPage(pageNum) {
             if (pageNum < 1 || pageNum > totalPages) return false;
             const el = document.getElementById('page-' + pageNum);
@@ -368,7 +426,8 @@ class PdfViewerWidget(QWidget):
         function isReady() { return true; }
 
         window.pdfViewer = {
-            loadPdf, goToPage, getCurrentPage, getTotalPages, isReady
+            loadPdf, goToPage, getCurrentPage, getTotalPages, isReady,
+            getSelectedAnnotation, getPendingDelete
         };
     </script>
 </body>
@@ -381,13 +440,23 @@ class PdfViewerWidget(QWidget):
         self.poll_timer.start(500)  # Poll every 500ms
 
     def _poll_current_page(self):
-        """Query current page from pdf.js."""
+        """Query current page and pending annotation deletes from pdf.js."""
         if not self._viewer_ready:
             return
         self.web_view.page().runJavaScript(
             "window.pdfViewer ? window.pdfViewer.getCurrentPage() : 0",
             self._on_page_result
         )
+        # Check for pending annotation deletion
+        self.web_view.page().runJavaScript(
+            "window.pdfViewer ? window.pdfViewer.getPendingDelete() : null",
+            self._on_pending_delete
+        )
+
+    def _on_pending_delete(self, ex_id):
+        """Handle pending annotation deletion from JS."""
+        if ex_id:
+            self.annotationDeleteRequested.emit(str(ex_id))
 
     def _on_page_result(self, page):
         """Handle page query result."""

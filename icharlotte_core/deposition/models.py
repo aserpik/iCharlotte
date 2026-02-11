@@ -128,6 +128,7 @@ class ExtractionResult:
     prompt: str                              # The user's extraction prompt
     selected_ids: List[int] = field(default_factory=list)  # IDs of selected exchanges
     groups: List[List[int]] = field(default_factory=list)   # Consecutive groups for citations
+    highlight_color: str = "#FFCC00"         # Hex color for PDF highlights
 
     def group_consecutive(self, selected_ids: List[int]):
         """Group selected IDs into consecutive runs for citation blocks."""
