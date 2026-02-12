@@ -129,6 +129,12 @@ class ExtractionResult:
     selected_ids: List[int] = field(default_factory=list)  # IDs of selected exchanges
     groups: List[List[int]] = field(default_factory=list)   # Consecutive groups for citations
     highlight_color: str = "#FFCC00"         # Hex color for PDF highlights
+    # For highlight extraction: maps exchange_id -> set of (page, line) tuples
+    # that were actually highlighted. When set, _append_results trims display
+    # to only the highlighted lines instead of showing full Q/A text.
+    highlighted_lines_by_ex: dict = field(default_factory=dict)
+    # Raw transcript text for each highlighted line: {(page, line): "text"}
+    highlighted_line_text: dict = field(default_factory=dict)
 
     def group_consecutive(self, selected_ids: List[int]):
         """Group selected IDs into consecutive runs for citation blocks."""

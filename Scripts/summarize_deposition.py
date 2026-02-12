@@ -488,9 +488,13 @@ def add_markdown_to_doc(doc, content):
             run.font.size = Pt(12)
             continue
 
-        # List items
-        if stripped.startswith('* ') or stripped.startswith('- '):
-            text = stripped[2:].strip()
+        # List items (handle *, -, •, and numbered bullets)
+        if stripped.startswith('* ') or stripped.startswith('- ') or stripped.startswith('• '):
+            # Strip bullet prefix (handle •  which is 1 char + space)
+            if stripped.startswith('• '):
+                text = stripped[2:].strip()
+            else:
+                text = stripped[2:].strip()
             p = doc.add_paragraph()
             p.paragraph_format.line_spacing = 1.0
             p.paragraph_format.left_indent = Inches(0.5)

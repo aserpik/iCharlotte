@@ -96,6 +96,8 @@ CREATE INDEX IF NOT EXISTS idx_email_events_ts ON email_events(timestamp);
 CREATE INDEX IF NOT EXISTS idx_idle_periods_start ON idle_periods(start_time);
 CREATE INDEX IF NOT EXISTS idx_window_events_case ON window_events(case_number);
 CREATE INDEX IF NOT EXISTS idx_email_events_case ON email_events(case_number);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_email_events_dedup
+    ON email_events(event_type, subject, recipients);
 """
 
 
@@ -244,7 +246,7 @@ class ActivityDB:
             conn = self._get_connection()
             try:
                 cursor = conn.execute(
-                    "INSERT INTO email_events (timestamp, event_type, subject, "
+                    "INSERT OR IGNORE INTO email_events (timestamp, event_type, subject, "
                     "recipients, folder, has_attachment, body_preview, case_number) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     (timestamp, event_type, subject, recipients, folder,

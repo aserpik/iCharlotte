@@ -65,6 +65,7 @@ from icharlotte_core.ui.case_view_enhanced import (
     ProcessingLogWidget, ProcessingLogDB, FileTagsDB, EnhancedFileTreeWidget
 )
 from icharlotte_core.ui.dialogs import FileNumberDialog, VariablesDialog, PromptsDialog, LLMSettingsDialog
+from icharlotte_core.ui.report_generator_dialog import ReportGeneratorDialog, ReportPipelineWorker
 from icharlotte_core.subpoena_tracker import SubpoenaTrackerWorker
 from icharlotte_core.ui.tabs import ChatTab, IndexTab
 from icharlotte_core.ui.email_tab import EmailTab
@@ -603,6 +604,11 @@ class MainWindow(QMainWindow):
         btn_proc_log.clicked.connect(self.open_processing_log)
         toolbar_layout.addWidget(btn_proc_log)
 
+        btn_generate_report = QPushButton("Generate Report")
+        btn_generate_report.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold;")
+        btn_generate_report.clicked.connect(self.open_report_generator)
+        toolbar_layout.addWidget(btn_generate_report)
+
         toolbar_layout.addStretch()
 
         # Wrapper for vertical layout of Case View
@@ -837,6 +843,8 @@ class MainWindow(QMainWindow):
         # --- Tab: Depositions ---
         self.deposition_tab = DepositionTab()
         self.tabs.addTab(self.deposition_tab, "Depositions")
+        if self.file_number:
+            self.deposition_tab.load_case(self.file_number)
 
         # --- Tab: Liability & Exposure ---
         self.liability_tab = LiabilityExposureTab()
@@ -1841,6 +1849,52 @@ class MainWindow(QMainWindow):
 
         dialog = ProcessingLogWidget(self.file_number, self)
         dialog.exec()
+
+    def open_report_generator(self):
+        """Open the report generator dialog and start pipeline if accepted."""
+        if not self.file_number:
+            QMessageBox.warning(self, "No Case", "Please load a case first.")
+            return
+
+        dialog = ReportGeneratorDialog(self.file_number, self)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        config = dialog.get_config()
+
+        # Create status widget
+        status_widget = StatusWidget(
+            "Report Generator",
+            f"{config['report_type']} for {self.file_number}"
+        )
+        self.status_list_layout.insertWidget(0, status_widget)
+
+        # Create and start worker
+        worker = ReportPipelineWorker(config, self)
+        self.agent_runners.append(worker)
+
+        # Connect signals to status widget
+        worker.stage_started.connect(status_widget.update_pass_start)
+        worker.stage_completed.connect(status_widget.update_pass_complete)
+        worker.stage_failed.connect(status_widget.update_pass_failed)
+        worker.progress_update.connect(status_widget.update_progress)
+        worker.log_update.connect(lambda msg: status_widget.append_log(msg))
+        worker.output_file.connect(status_widget.set_output_file)
+        worker.finished_signal.connect(lambda ok: status_widget.set_finished(ok))
+        worker.finished_signal.connect(lambda: self._cleanup_report_worker(worker))
+
+        # Switch to status tab area
+        self.tabs.setCurrentIndex(1)
+
+        worker.start()
+
+    def _cleanup_report_worker(self, worker):
+        """Clean up finished report pipeline worker."""
+        try:
+            if worker in self.agent_runners:
+                self.agent_runners.remove(worker)
+        except Exception as e:
+            log_event(f"Error cleaning up report worker: {e}", "error")
 
     def toggle_advanced_filters(self, checked):
         """Toggle visibility of advanced filter panel."""

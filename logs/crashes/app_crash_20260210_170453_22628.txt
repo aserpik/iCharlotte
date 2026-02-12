@@ -1,0 +1,60 @@
+======================================================================
+iCharlotte Application Crash Report
+======================================================================
+
+Crash Time: 2026-02-10T17:04:53.880467
+Uptime: 148.3 seconds
+Source: main_thread
+
+----------------------------------------------------------------------
+EXCEPTION
+----------------------------------------------------------------------
+Type: AttributeError
+Message: 'MedRecordExtractorDialog' object has no attribute 'Accepted'
+
+Traceback:
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte.py", line 1737, in _run_med_record_extractor
+    if not dialog.exec():
+                        ^
+AttributeError: 'MedRecordExtractorDialog' object has no attribute 'Accepted'. Did you mean: 'accepted'?
+
+----------------------------------------------------------------------
+RECENT CHECKPOINTS
+----------------------------------------------------------------------
+  [2026-02-10T17:02:35.233163] Application starting
+  [2026-02-10T17:02:35.233221] Parsing command-line arguments
+  [2026-02-10T17:02:35.235482] Configuring Qt WebEngine
+  [2026-02-10T17:02:35.235553] Creating QApplication
+  [2026-02-10T17:02:35.301467] Creating MainWindow
+  [2026-02-10T17:02:35.301733] MainWindow.__init__ starting
+  [2026-02-10T17:02:35.561851] setup_ui starting - creating tabs
+  [2026-02-10T17:02:35.564451] Creating MasterCaseTab
+  [2026-02-10T17:02:37.283414] Creating ChatTab
+  [2026-02-10T17:02:40.684758] setup_ui complete - all tabs created
+  [2026-02-10T17:02:42.420581] Showing MainWindow
+  [2026-02-10T17:02:42.461820] Entering Qt event loop
+
+----------------------------------------------------------------------
+ADDITIONAL CONTEXT
+----------------------------------------------------------------------
+  startup_file_number: 3000.075
+  startup_case_path: Z:\Shared\Current Clients\3000 - PERMA\075 - Saltarelli v. City of Hesperia
+  startup_tab: 7
+  current_file_number: 3000.075
+  current_case_path: Z:\Shared\Current Clients\3000 - PERMA\075 - Saltarelli v. City of Hesperia
+
+----------------------------------------------------------------------
+SYSTEM INFORMATION
+----------------------------------------------------------------------
+Python: 3.13.12
+Platform: Windows-11-10.0.26200-SP0
+PID: 22628
+
+----------------------------------------------------------------------
+QT STATE
+----------------------------------------------------------------------
+  app_name: python3
+  window_visible: True
+  window_size: 1200x800
+  file_number: 3000.075

@@ -28,13 +28,14 @@ LINE_NUM_RE = re.compile(r'^\s{0,4}(\d{1,2})\s{1,6}')
 TIMESTAMP_RE = re.compile(r'\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?\s*$', re.IGNORECASE)
 
 # Page header/footer: "Page 7" or "Page  7" at end of extracted text block
-PAGE_NUM_RE = re.compile(r'(?:^|\n)\s*Page\s+(\d+)\s*$', re.MULTILINE)
+# Use [^\d\n] to handle any separator (middle dot \xb7, non-breaking space \xa0, etc.)
+PAGE_NUM_RE = re.compile(r'(?:^|\n)\s*Page[^\d\n]{0,5}(\d+)\s*$', re.MULTILINE)
 
 # Condensed page header within text: " Page 7 " or "Page 7"
-CONDENSED_PAGE_RE = re.compile(r'\bPage\s+(\d+)\b')
+CONDENSED_PAGE_RE = re.compile(r'\bPage[^\d\n]{0,5}(\d+)\b')
 
-# Q/A markers: "Q." or "A." possibly with leading whitespace (from indentation)
-QA_MARKER_RE = re.compile(r'^\s*(Q|A)\.\s+(.*)$')
+# Q/A markers: "Q." or "A." (or "Q"/"A" followed by spaces, no period) with leading whitespace
+QA_MARKER_RE = re.compile(r'^\s*(Q|A)\.?\s{2,}(.*)$')
 
 # Colloquy/non-testimony markers
 COLLOQUY_RE = re.compile(
@@ -311,7 +312,7 @@ class TranscriptParser:
             # Skip footer/page lines
             if not content or FOOTER_RE.search(content):
                 continue
-            if re.match(r'^Page\s+\d+$', content, re.IGNORECASE):
+            if re.match(r'^Page[^\d\n]{0,5}\d+$', content, re.IGNORECASE):
                 continue
 
             numbered_lines.append((num, content))
@@ -366,7 +367,7 @@ class TranscriptParser:
         content = content.rstrip()
 
         # Skip if content is just "Page N" (page number at bottom)
-        if re.match(r'^\s*Page\s+\d+\s*$', content, re.IGNORECASE):
+        if re.match(r'^\s*Page[^\d\n]{0,5}\d+\s*$', content, re.IGNORECASE):
             return None
 
         return (line_num, content)
@@ -508,6 +509,10 @@ class TranscriptParser:
 
         for page_num, lines in transcript_pages:
             for line_num, text in lines:
+                # Normalize: replace middle dots (·, \xb7) and non-breaking
+                # spaces (\xa0) with regular spaces — common in PDF extraction
+                text = text.replace('\xb7', ' ').replace('\xa0', ' ')
+
                 # Skip empty content
                 if not text.strip():
                     continue

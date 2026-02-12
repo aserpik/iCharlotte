@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QLabel,
     QPushButton, QTextEdit, QPlainTextEdit,
     QFileDialog, QMessageBox, QProgressBar, QApplication,
-    QToolBar, QSizePolicy, QComboBox
+    QToolBar, QSizePolicy, QComboBox, QCheckBox
 )
 from PySide6.QtCore import Qt, Signal, QThread, QTimer, QSettings
 from PySide6.QtGui import (
@@ -67,10 +67,11 @@ class SelectWorker(QThread):
     progress = Signal(str)      # Phase description
     chunk_progress = Signal(int, int)  # (current_chunk, total_chunks)
 
-    def __init__(self, index, prompt: str):
+    def __init__(self, index, prompt: str, context: str = ""):
         super().__init__()
         self.index = index
         self.prompt = prompt
+        self.context = context
 
     def run(self):
         try:
@@ -88,6 +89,7 @@ class SelectWorker(QThread):
 
             result = selector.select(
                 self.index, self.prompt,
+                context=self.context,
                 on_chunk_done=lambda cur, total: self.chunk_progress.emit(cur, total)
             )
             self.finished.emit(result)
@@ -155,6 +157,11 @@ class DepositionTab(QWidget):
         self.load_btn.clicked.connect(self.on_load_transcript)
         toolbar.addWidget(self.load_btn)
 
+        self.open_folder_btn = QPushButton("Open Folder")
+        self.open_folder_btn.setToolTip("Open the DISCOVERY/TRANSCRIPTS folder in Explorer")
+        self.open_folder_btn.clicked.connect(self._on_open_folder)
+        toolbar.addWidget(self.open_folder_btn)
+
         self.transcript_combo = QComboBox()
         self.transcript_combo.setMinimumWidth(200)
         self.transcript_combo.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -173,6 +180,12 @@ class DepositionTab(QWidget):
         self.reparse_btn.clicked.connect(self._on_reparse)
         self.reparse_btn.setEnabled(False)
         toolbar.addWidget(self.reparse_btn)
+
+        self.extract_highlights_btn = QPushButton("Extract Highlights")
+        self.extract_highlights_btn.setToolTip("Extract text from existing PDF highlight annotations")
+        self.extract_highlights_btn.clicked.connect(self._on_extract_highlights)
+        self.extract_highlights_btn.setEnabled(False)
+        toolbar.addWidget(self.extract_highlights_btn)
 
         self.export_btn = QPushButton("Export to Word")
         self.export_btn.clicked.connect(self.on_export_word)
@@ -204,6 +217,21 @@ class DepositionTab(QWidget):
             "deposition_tab/highlight_color", "#FFCC00"
         )
         self._update_color_btn()
+
+        # Case context controls
+        self.context_checkbox = QCheckBox("Case Context")
+        self.context_checkbox.setToolTip("Include case context in extraction prompts")
+        toolbar.addWidget(self.context_checkbox)
+
+        self.context_edit_btn = QPushButton("Edit...")
+        self.context_edit_btn.setToolTip("Edit case context (background text and/or document)")
+        self.context_edit_btn.clicked.connect(self._on_edit_context)
+        toolbar.addWidget(self.context_edit_btn)
+
+        # Per-case context state
+        self._context_text = ""
+        self._context_file_path = ""
+        self._context_file_text = ""
 
         toolbar.addStretch()
 
@@ -254,6 +282,7 @@ class DepositionTab(QWidget):
             "  - \"prior medical treatment for back and neck\""
         )
         self.results_viewer.cursorPositionChanged.connect(self._on_results_clicked)
+        self.results_viewer.installEventFilter(self)
         right_layout.addWidget(self.results_viewer)
 
         self.splitter.addWidget(right_container)
@@ -426,7 +455,10 @@ class DepositionTab(QWidget):
                 {"pdf_path": t["path"], "label": self._label_for(t)}
                 for t in self._transcripts
             ],
-            "active_index": self._active_idx
+            "active_index": self._active_idx,
+            "context_text": self._context_text,
+            "context_file_path": self._context_file_path,
+            "context_enabled": self.context_checkbox.isChecked(),
         }
         try:
             with open(self._state_path(), "w", encoding="utf-8") as f:
@@ -471,6 +503,24 @@ class DepositionTab(QWidget):
             active = max(0, active)
             self.transcript_combo.setCurrentIndex(active)
 
+        # Restore case context
+        self._context_text = data.get("context_text", "")
+        self._context_file_path = data.get("context_file_path", "")
+        self._context_file_text = ""
+        # Re-extract file text if path still exists
+        if self._context_file_path and os.path.exists(self._context_file_path):
+            try:
+                from icharlotte_core.document_processor import DocumentProcessor
+                dp = DocumentProcessor()
+                self._context_file_text = (dp.extract_text(self._context_file_path) or "").strip()
+            except Exception as e:
+                logger.warning(f"Could not re-extract context file: {e}")
+                self._context_file_path = ""
+        elif self._context_file_path:
+            logger.warning(f"Context file no longer exists: {self._context_file_path}")
+            self._context_file_path = ""
+        self.context_checkbox.setChecked(data.get("context_enabled", False))
+
     def _try_load_cached_index(self, pdf_path: str):
         """Try to load a cached TranscriptIndex without full parsing."""
         try:
@@ -501,7 +551,7 @@ class DepositionTab(QWidget):
     def load_case(self, file_number: str):
         """Called when the active case changes."""
         # Save current case state
-        if self.file_number and self._transcripts:
+        if self.file_number:
             self._save_state()
 
         self.file_number = file_number
@@ -520,6 +570,10 @@ class DepositionTab(QWidget):
         self.extract_btn.setEnabled(False)
         self.export_btn.setEnabled(False)
         self.remove_btn.setEnabled(False)
+        self._context_text = ""
+        self._context_file_path = ""
+        self._context_file_text = ""
+        self.context_checkbox.setChecked(False)
 
         # Load persisted state for new case
         if file_number:
@@ -575,6 +629,7 @@ class DepositionTab(QWidget):
         # Enable prompt input
         self.prompt_input.setEnabled(True)
         self.extract_btn.setEnabled(True)
+        self.extract_highlights_btn.setEnabled(True)
 
         self.status_label.setText(
             f"{len(index.exchanges)} Q/A exchanges | "
@@ -592,19 +647,64 @@ class DepositionTab(QWidget):
     # Actions
     # =========================================================================
 
+    def _on_edit_context(self):
+        """Open the case context dialog."""
+        from icharlotte_core.ui.dialogs import CaseContextDialog
+        dlg = CaseContextDialog(
+            context_text=self._context_text,
+            context_file_path=self._context_file_path,
+            context_file_text=self._context_file_text,
+            parent=self,
+        )
+        if dlg.exec() == dlg.Accepted:
+            self._context_text = dlg.get_context_text()
+            self._context_file_path = dlg.get_context_file_path()
+            self._context_file_text = dlg.get_context_file_text()
+            # Auto-check if context was provided
+            has_context = bool(self._context_text or self._context_file_text)
+            self.context_checkbox.setChecked(has_context)
+            self._save_state()
+
+    def _build_context_for_llm(self) -> str:
+        """Build the combined context string from text + file for LLM injection."""
+        if not self.context_checkbox.isChecked():
+            return ""
+        parts = []
+        if self._context_text:
+            parts.append(self._context_text)
+        if self._context_file_text:
+            parts.append(f"[Context from file: {os.path.basename(self._context_file_path)}]\n{self._context_file_text}")
+        return "\n\n".join(parts) if parts else ""
+
+    def _on_open_folder(self):
+        """Open the DISCOVERY/TRANSCRIPTS folder in Explorer."""
+        folder = None
+        if self.file_number:
+            from icharlotte_core.utils import get_case_path
+            case_root = get_case_path(self.file_number)
+            if case_root:
+                transcript_dir = os.path.join(case_root, "DISCOVERY", "TRANSCRIPTS")
+                if os.path.isdir(transcript_dir):
+                    folder = transcript_dir
+                elif os.path.isdir(case_root):
+                    folder = case_root
+        if folder:
+            os.startfile(folder)
+        else:
+            QMessageBox.information(self, "Open Folder", "No case folder available. Load a case first.")
+
     def on_load_transcript(self):
         """Open file dialog to select a transcript PDF."""
         start_dir = ""
         if self.file_number:
-            main_win = self.window()
-            if main_win and hasattr(main_win, 'case_root_path'):
-                case_root = main_win.case_root_path
-                if case_root:
-                    transcript_dir = os.path.join(case_root, "DISCOVERY", "TRANSCRIPTS")
-                    if os.path.isdir(transcript_dir):
-                        start_dir = transcript_dir
-                    else:
-                        start_dir = case_root
+            from icharlotte_core.utils import get_case_path
+            case_root = get_case_path(self.file_number)
+            if case_root:
+                transcript_dir = os.path.join(case_root, "DISCOVERY", "TRANSCRIPTS")
+                if os.path.isdir(transcript_dir):
+                    start_dir = transcript_dir
+                else:
+                    start_dir = case_root
 
         path, _ = QFileDialog.getOpenFileName(
             self, "Select Deposition Transcript", start_dir,
@@ -785,7 +885,8 @@ class DepositionTab(QWidget):
         self.extract_btn.setEnabled(False)
         self.prompt_input.setEnabled(False)
 
-        self._select_worker = SelectWorker(index, prompt)
+        context = self._build_context_for_llm()
+        self._select_worker = SelectWorker(index, prompt, context=context)
         self._select_worker.finished.connect(self._on_select_finished)
         self._select_worker.error.connect(self._on_select_error)
         self._select_worker.progress.connect(self._on_extract_progress)
@@ -936,6 +1037,73 @@ class DepositionTab(QWidget):
         self.export_btn.setEnabled(False)
         self.status_label.setText("Results cleared")
 
+    def _on_extract_highlights(self):
+        """Extract text from existing PDF highlight annotations."""
+        if self._active_idx < 0:
+            QMessageBox.warning(self, "No Transcript", "Please load a transcript first.")
+            return
+
+        active = self._transcripts[self._active_idx]
+        index = active.get("index")
+        if not index:
+            QMessageBox.warning(self, "No Transcript", "Transcript is still loading.")
+            return
+
+        # Use the PDF currently displayed (may be [H.AI] copy or original)
+        pdf_path = active.get("path", "")
+        ai_dir = self._get_ai_output_dir()
+        hai_name = f"[H.AI] {os.path.basename(pdf_path)}"
+        hai_path = os.path.join(ai_dir, hai_name)
+        scan_path = hai_path if os.path.exists(hai_path) else pdf_path
+
+        self.status_label.setText("Scanning for highlights...")
+        QApplication.processEvents()
+
+        try:
+            from icharlotte_core.deposition.testimony_formatter import TestimonyFormatter
+            formatter = TestimonyFormatter()
+            result = formatter.extract_highlighted_exchanges(index, scan_path)
+        except Exception as e:
+            logger.exception("Highlight extraction failed")
+            QMessageBox.critical(self, "Error", f"Failed to extract highlights:\n\n{e}")
+            self.status_label.setText("Highlight extraction failed")
+            return
+
+        if not result or not result.selected_ids:
+            self.status_label.setText("No highlights found")
+            QMessageBox.information(
+                self, "No Highlights",
+                "No highlight annotations were found in the PDF.\n"
+                "Ensure the PDF has highlight annotations (e.g., from Adobe Acrobat)."
+            )
+            return
+
+        # Store as extraction
+        result.highlight_color = self._current_color
+        active["extractions"].append((index, result))
+        self.export_btn.setEnabled(True)
+        self.clear_results_btn.setEnabled(True)
+
+        # Display results
+        self._append_results(index, result)
+
+        # Re-highlight in user's chosen color
+        try:
+            formatter_hl = TestimonyFormatter()
+            highlight_path = formatter_hl.highlight_pdf(
+                index, result, output_dir=ai_dir, color=result.highlight_color
+            )
+            if highlight_path:
+                self._load_highlighted_pdf(highlight_path)
+        except Exception as e:
+            logger.exception("PDF re-highlighting failed")
+
+        num_selected = len(result.selected_ids)
+        self.status_label.setText(
+            f"Extracted {num_selected} highlighted exchanges in "
+            f"{len(result.groups)} groups"
+        )
+
     def _on_results_clicked(self):
         """Navigate PDF viewer to the page corresponding to clicked results text."""
         cursor = self.results_viewer.textCursor()
@@ -944,6 +1112,19 @@ class DepositionTab(QWidget):
             if start <= pos <= end:
                 self.transcript_viewer.go_to_page(page_num)
                 break
+
+    def eventFilter(self, obj, event):
+        """Handle Delete key in results viewer to delete highlight group."""
+        if obj is self.results_viewer and event.type() == event.Type.KeyPress:
+            if event.key() in (Qt.Key_Delete, Qt.Key_Backspace):
+                cursor = self.results_viewer.textCursor()
+                click_pos = cursor.position()
+                for anchor in self._result_exchange_anchors:
+                    start, end, ex_ids, transcript_idx, extraction_idx = anchor
+                    if start <= click_pos <= end:
+                        self._delete_highlight_group(anchor)
+                        return True
+        return super().eventFilter(obj, event)
 
     def _on_results_context_menu(self, pos):
         """Show context menu with option to delete a highlight group."""
@@ -1099,6 +1280,10 @@ class DepositionTab(QWidget):
 
         exchange_map = {ex.id: ex for ex in index.exchanges}
 
+        # Build transcript page → PDF page (1-indexed for pdf.js) mapping
+        # so click-to-navigate goes to the correct page.
+        tp_to_pdf = self._build_tp_to_pdf_map(index)
+
         # Determine extraction index for anchor tracking
         active = self._transcripts[self._active_idx]
         extraction_idx = len(active["extractions"]) - 1
@@ -1116,12 +1301,22 @@ class DepositionTab(QWidget):
             first_page = group_exchanges[0].page_start
 
             for ex in group_exchanges:
-                cursor.setBlockFormat(qa_block_fmt)
-                cursor.insertText("Q.\t", marker_fmt)
-                cursor.insertText(f"{ex.question}\n", normal_fmt)
-                cursor.setBlockFormat(qa_block_fmt)
-                cursor.insertText("A.\t", marker_fmt)
-                cursor.insertText(f"{ex.answer}\n", normal_fmt)
+                # When we have per-line highlight data, show only the
+                # highlighted transcript lines (trimmed Q/A) instead of the
+                # full exchange which may include objections / colloquy.
+                hl_lines = result.highlighted_lines_by_ex.get(ex.id)
+                if hl_lines and result.highlighted_line_text:
+                    self._append_highlighted_lines(
+                        cursor, ex, hl_lines, result.highlighted_line_text,
+                        qa_block_fmt, marker_fmt, normal_fmt,
+                    )
+                else:
+                    cursor.setBlockFormat(qa_block_fmt)
+                    cursor.insertText("Q.\t", marker_fmt)
+                    cursor.insertText(f"{ex.question}\n", normal_fmt)
+                    cursor.setBlockFormat(qa_block_fmt)
+                    cursor.insertText("A.\t", marker_fmt)
+                    cursor.insertText(f"{ex.answer}\n", normal_fmt)
 
             # Reset block format for citation
             cursor.setBlockFormat(QTextBlockFormat())
@@ -1140,7 +1335,9 @@ class DepositionTab(QWidget):
 
             group_end_pos = cursor.position()
             group_ex_ids = [ex.id for ex in group_exchanges]
-            self._result_page_anchors.append((group_start_pos, group_end_pos, first_page))
+            # Convert transcript page to PDF page (1-indexed) for pdf.js navigation
+            pdf_page = tp_to_pdf.get(first_page, first_page)
+            self._result_page_anchors.append((group_start_pos, group_end_pos, pdf_page))
             self._result_exchange_anchors.append((
                 group_start_pos, group_end_pos, group_ex_ids,
                 self._active_idx, extraction_idx
@@ -1148,6 +1345,95 @@ class DepositionTab(QWidget):
 
         self.results_viewer.setTextCursor(cursor)
         self.results_viewer.ensureCursorVisible()
+
+    @staticmethod
+    def _append_highlighted_lines(cursor, ex, hl_lines, line_text,
+                                  qa_block_fmt, marker_fmt, normal_fmt):
+        """Append only the highlighted lines of an exchange to results.
+
+        Reconstructs Q and A text from only the transcript lines that
+        were actually highlighted, skipping objections and colloquy that
+        weren't highlighted.
+        """
+        import re
+
+        # Collect highlighted lines in order: (page, line) -> text
+        sorted_lines = sorted(hl_lines)
+        q_parts = []
+        a_parts = []
+        in_answer = False
+
+        for tp, ln in sorted_lines:
+            text = line_text.get((tp, ln), "")
+            if not text:
+                continue
+
+            # Detect Q./A. markers to split into question and answer
+            qa_match = re.match(r'^([QA])\.\s+(.*)', text)
+            if qa_match:
+                marker = qa_match.group(1)
+                content = qa_match.group(2)
+                if marker == 'Q':
+                    in_answer = False
+                    q_parts.append(content)
+                else:
+                    in_answer = True
+                    a_parts.append(content)
+            elif text.startswith("THE WITNESS:"):
+                # Witness answer after objection
+                in_answer = True
+                a_parts.append(text.replace("THE WITNESS:", "").strip())
+            else:
+                # Continuation line — add to current section
+                if in_answer:
+                    a_parts.append(text)
+                else:
+                    q_parts.append(text)
+
+        # Output Q if we have highlighted question text
+        if q_parts:
+            cursor.setBlockFormat(qa_block_fmt)
+            cursor.insertText("Q.\t", marker_fmt)
+            cursor.insertText(" ".join(q_parts) + "\n", normal_fmt)
+
+        # Output A if we have highlighted answer text
+        if a_parts:
+            cursor.setBlockFormat(qa_block_fmt)
+            cursor.insertText("A.\t", marker_fmt)
+            cursor.insertText(" ".join(a_parts) + "\n", normal_fmt)
+
+        # Fallback: if no Q or A extracted (all lines were colloquy),
+        # show the raw highlighted text
+        if not q_parts and not a_parts:
+            for tp, ln in sorted_lines:
+                text = line_text.get((tp, ln), "")
+                if text:
+                    cursor.setBlockFormat(qa_block_fmt)
+                    cursor.insertText(f"{text}\n", normal_fmt)
+
+    def _build_tp_to_pdf_map(self, index) -> dict:
+        """Build transcript page → pdf.js page (1-indexed) mapping.
+
+        Uses the testimony formatter's page map for accuracy. Falls back to
+        identity mapping (transcript page = pdf page) if unavailable.
+        """
+        try:
+            import fitz
+            from icharlotte_core.deposition.testimony_formatter import TestimonyFormatter
+            pdf_path = index.source_pdf
+            doc = fitz.open(pdf_path)
+            tf = TestimonyFormatter()
+            page_map = tf._build_page_map(doc, index.is_condensed)
+            doc.close()
+            # page_map: transcript_page -> [pdf_page_indices (0-based)]
+            # Convert to 1-indexed for pdf.js
+            tp_to_pdf = {}
+            for tp, pdf_indices in page_map.items():
+                tp_to_pdf[tp] = pdf_indices[0] + 1  # first matching PDF page, 1-indexed
+            return tp_to_pdf
+        except Exception:
+            logger.debug("Failed to build tp→pdf map, using identity", exc_info=True)
+            return {}
 
     def _load_highlighted_pdf(self, highlight_path: str):
         """Reload the viewer with the highlighted PDF copy."""

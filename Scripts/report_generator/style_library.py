@@ -25,6 +25,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 DEFAULT_REPORTS_DIR = os.path.join(PROJECT_ROOT, "autodownloadreports")
 STYLE_GUIDE_PATH = os.path.join(PROJECT_ROOT, "config", "report_style_guide.json")
 STYLE_EXAMPLES_DIR = os.path.join(PROJECT_ROOT, "config", "report_style_examples")
+SUBSECTION_EXAMPLES_DIR = os.path.join(PROJECT_ROOT, "config", "report_style_examples", "subsections")
 
 # Section headings to look for (must match template_extractor.py)
 REPORT_SECTIONS = [
@@ -406,10 +407,394 @@ def update_library(new_report_path: str):
         print(f"No new sections to add from {filename}")
 
 
+def extract_subsections_from_docx(docx_path: str) -> Dict[str, Dict[str, str]]:
+    """
+    Extract subsection-level text from a report .docx file.
+    Detects bold/underlined subheadings within each section.
+    Returns Dict[section_name, Dict[subsection_name, text]].
+    """
+    try:
+        doc = Document(docx_path)
+    except Exception as e:
+        logger.warning(f"Could not open {docx_path}: {e}")
+        return {}
+
+    sections = {}
+    current_section = None
+    current_subsection = None
+    current_text = []
+    subsections = {}  # section -> {subsection -> text}
+
+    def _save_subsection():
+        nonlocal current_subsection, current_text
+        if current_section and current_subsection and current_text:
+            text = "\n".join(current_text).strip()
+            if len(text) >= 50:
+                if current_section not in subsections:
+                    subsections[current_section] = {}
+                subsections[current_section][current_subsection] = text
+        current_text = []
+
+    for para in doc.paragraphs:
+        text = para.text.strip()
+        if not text:
+            if current_subsection:
+                current_text.append("")
+            continue
+
+        # Check if this is a section heading
+        upper = text.upper()
+        matched_section = None
+        for heading in REPORT_SECTIONS:
+            if upper == heading:
+                matched_section = heading
+                break
+
+        if matched_section:
+            _save_subsection()
+            section_key = SECTION_NORMALIZE.get(matched_section, matched_section)
+            current_section = section_key
+            current_subsection = None
+            current_text = []
+            continue
+
+        if not current_section:
+            continue
+
+        # Check if this is a subheading (bold or bold+underline, short line)
+        is_subheading = False
+        if len(text) < 80 and len(text.split()) <= 8:
+            # Check if paragraph has bold formatting
+            runs = para.runs
+            if runs:
+                all_bold = all(r.bold for r in runs if r.text.strip())
+                if all_bold and runs[0].text.strip():
+                    is_subheading = True
+
+            # Also check for lettered/numbered patterns
+            if re.match(r'^[A-Z]\.\s+', text) or re.match(r'^\d+\.\s+', text):
+                is_subheading = True
+
+        if is_subheading:
+            _save_subsection()
+            # Normalize subsection name: strip A./B./1./2. prefix, strip tabs
+            sub_name = re.sub(r'^[A-Z]\.\s*', '', text)
+            sub_name = re.sub(r'^\d+\.\s*', '', sub_name)
+            sub_name = sub_name.replace('\t', ' ').strip()
+            if sub_name:
+                current_subsection = sub_name
+                current_text = []
+        elif current_subsection:
+            current_text.append(text)
+        # If no subsection yet, text belongs to section intro (skip for subsection library)
+
+    # Save last subsection
+    _save_subsection()
+
+    return subsections
+
+
+def build_subsection_library(reports_dir: str = None) -> Dict:
+    """
+    Parse all reports and build subsection-level example library.
+    Returns summary of what was built.
+    """
+    if reports_dir is None:
+        reports_dir = DEFAULT_REPORTS_DIR
+
+    if not os.path.exists(reports_dir):
+        raise FileNotFoundError(f"Reports directory not found: {reports_dir}")
+
+    docx_files = [
+        os.path.join(reports_dir, f)
+        for f in os.listdir(reports_dir)
+        if f.endswith('.docx') and not f.startswith('~$')
+    ]
+
+    if not docx_files:
+        raise ValueError(f"No .docx files found in {reports_dir}")
+
+    print(f"Parsing {len(docx_files)} reports for subsections...")
+
+    # Collect all subsections: section -> subsection_name -> [(source, text)]
+    all_subsections: Dict[str, Dict[str, List[Tuple[str, str]]]] = {}
+
+    for filepath in docx_files:
+        filename = os.path.basename(filepath)
+        subsections = extract_subsections_from_docx(filepath)
+
+        for section_name, subs in subsections.items():
+            if section_name not in all_subsections:
+                all_subsections[section_name] = {}
+            for sub_name, text in subs.items():
+                # Normalize subsection name for matching
+                norm_name = _normalize_subsection_name(sub_name)
+                if norm_name not in all_subsections[section_name]:
+                    all_subsections[section_name][norm_name] = []
+                all_subsections[section_name][norm_name].append((filename, text))
+
+    # Save top examples per subsection
+    os.makedirs(SUBSECTION_EXAMPLES_DIR, exist_ok=True)
+    summary = {"sections": {}}
+
+    for section_name, subs in all_subsections.items():
+        section_dir = os.path.join(
+            SUBSECTION_EXAMPLES_DIR,
+            section_name.lower().replace(" ", "_")
+        )
+        os.makedirs(section_dir, exist_ok=True)
+
+        section_summary = {}
+        for sub_name, examples in subs.items():
+            if len(examples) < 1:
+                continue
+
+            # Sort by length (longer = more detailed), take top 5
+            examples.sort(key=lambda x: len(x[1]), reverse=True)
+            selected = examples[:5]
+
+            safe_sub = sub_name.lower().replace(" ", "_").replace("/", "_")
+            safe_sub = re.sub(r'[^\w]', '_', safe_sub)[:60]  # limit filename length
+            filepath = os.path.join(section_dir, f"{safe_sub}.json")
+
+            data = {
+                "subsection_name": sub_name,
+                "section": section_name,
+                "total_found": len(examples),
+                "examples": [
+                    {"source": src, "text": text, "char_count": len(text)}
+                    for src, text in selected
+                ]
+            }
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+
+            section_summary[sub_name] = {
+                "total_found": len(examples),
+                "stored": len(selected)
+            }
+
+        summary["sections"][section_name] = section_summary
+        sub_count = len(section_summary)
+        print(f"  {section_name}: {sub_count} unique subsections")
+
+    return summary
+
+
+def _normalize_subsection_name(name: str) -> str:
+    """Normalize subsection name for matching across reports."""
+    # Lowercase, strip common prefixes, normalize whitespace
+    n = name.strip().lower()
+    # Remove leading letters/numbers (A., B., 1., 2.)
+    n = re.sub(r'^[a-z]\.\s*', '', n)
+    n = re.sub(r'^\d+\.\s*', '', n)
+    # Normalize common variations
+    n = n.replace("plaintiff's", "plaintiff")
+    n = n.replace("defendant's", "defendant")
+    n = n.replace("'s", "")
+    n = n.replace("'s", "")
+    # Collapse whitespace
+    n = re.sub(r'\s+', ' ', n).strip()
+    return n.title()  # Title Case for consistency
+
+
+def get_subsection_examples(section_name: str, subsection_name: str,
+                            max_examples: int = 3) -> List[str]:
+    """Load example texts for a specific subsection type."""
+    section_dir = os.path.join(
+        SUBSECTION_EXAMPLES_DIR,
+        section_name.lower().replace(" ", "_")
+    )
+    if not os.path.exists(section_dir):
+        return []
+
+    # Normalize the requested subsection name
+    norm_requested = _normalize_subsection_name(subsection_name)
+
+    # Try exact match first
+    for filename in os.listdir(section_dir):
+        if not filename.endswith('.json'):
+            continue
+        filepath = os.path.join(section_dir, filename)
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            stored_name = data.get("subsection_name", "")
+            if _normalize_subsection_name(stored_name) == norm_requested:
+                return [ex["text"] for ex in data.get("examples", [])[:max_examples]]
+        except Exception:
+            continue
+
+    # Fuzzy match: find best overlap by word similarity
+    best_match = None
+    best_score = 0
+    req_words = set(norm_requested.lower().split())
+
+    for filename in os.listdir(section_dir):
+        if not filename.endswith('.json'):
+            continue
+        filepath = os.path.join(section_dir, filename)
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            stored_name = data.get("subsection_name", "")
+            stored_words = set(_normalize_subsection_name(stored_name).lower().split())
+            overlap = len(req_words & stored_words)
+            if overlap > best_score and overlap >= 1:
+                best_score = overlap
+                best_match = data
+        except Exception:
+            continue
+
+    if best_match and best_score >= 1:
+        return [ex["text"] for ex in best_match.get("examples", [])[:max_examples]]
+
+    return []
+
+
+def distill_rich_style_guide(reports_dir: str = None) -> Dict:
+    """
+    Use LLM (Pro model) to analyze examples and distill a comprehensive,
+    section-specific style guide with actionable rules.
+    """
+    from icharlotte_core.llm_config import LLMCaller
+
+    caller = LLMCaller()
+
+    # Load all section examples
+    if not os.path.exists(STYLE_EXAMPLES_DIR):
+        raise FileNotFoundError("Style examples not found. Run 'build' first.")
+
+    all_examples = {}
+    for filename in os.listdir(STYLE_EXAMPLES_DIR):
+        if filename.endswith('.json'):
+            section_name = filename.replace('.json', '').replace('_', ' ').upper()
+            filepath = os.path.join(STYLE_EXAMPLES_DIR, filename)
+            with open(filepath, 'r', encoding='utf-8') as f:
+                all_examples[section_name] = json.load(f)
+
+    # Build the rich guide section by section
+    guide = {
+        "general": {},
+        "sections": {}
+    }
+
+    # First: distill general rules from all sections
+    print("Distilling general style rules...")
+    all_samples = []
+    for section_name, data in all_examples.items():
+        examples = data.get("examples", [])
+        if examples:
+            sample = examples[0]["text"][:3000]
+            all_samples.append(f"### {section_name}\n{sample}\n")
+
+    general_prompt = """Analyze these litigation report sections written by a senior defense attorney for insurance carriers. Extract SPECIFIC, ACTIONABLE rules (not vague principles).
+
+Return a JSON object with these exact keys:
+
+{
+  "tone": "one sentence describing the overall tone",
+  "perspective": "who is writing, for whom",
+  "hedging_rules": {
+    "when_to_hedge": ["list of specific situations where hedging phrases should be used, e.g., 'predictions about future events', 'opinions about liability'"],
+    "when_NOT_to_hedge": ["list of specific situations where direct statements are used, e.g., 'established facts', 'procedural dates', 'undisputed events'"],
+    "preferred_phrases": ["list of hedging phrases actually used in the examples"],
+    "max_per_paragraph": "guidance on how many hedging phrases per paragraph is appropriate"
+  },
+  "party_references": {
+    "plaintiff": "how plaintiff is referred to (e.g., 'Plaintiff', never first name)",
+    "defendant": "how defendant is referred to",
+    "other_parties": "how witnesses, experts, etc. are referred to"
+  },
+  "voice_rules": ["list of specific voice/grammar rules, e.g., 'use past tense for events', 'use passive for allegations'"],
+  "what_NOT_to_change": ["list of patterns that are already correct and should be left alone, e.g., 'dollar amounts', 'dates', 'provider names'"]
+}
+
+IMPORTANT: Base your rules ONLY on what you observe in the examples. Do not invent rules."""
+
+    general_text = "\n".join(all_samples[:6])
+    try:
+        result = caller.call(
+            prompt=general_prompt,
+            text=general_text,
+            task_type="summary",
+            agent_id="agent_report_review",
+        )
+        if result:
+            json_match = re.search(r'\{[\s\S]*\}', result)
+            if json_match:
+                guide["general"] = json.loads(json_match.group())
+                print("  General rules extracted successfully")
+            else:
+                print("  WARNING: Could not parse general rules JSON")
+    except Exception as e:
+        print(f"  ERROR distilling general rules: {e}")
+
+    # Then: distill section-specific rules
+    for section_name, data in all_examples.items():
+        examples = data.get("examples", [])
+        if not examples:
+            continue
+
+        print(f"Distilling rules for {section_name}...")
+
+        # Use top 3 examples, truncated
+        sample_texts = []
+        for i, ex in enumerate(examples[:3], 1):
+            truncated = ex["text"][:4000]
+            sample_texts.append(f"=== EXAMPLE {i} (from {ex['source']}) ===\n{truncated}\n")
+
+        section_prompt = f"""Analyze these {section_name} sections from litigation reports written by a senior defense attorney.
+
+Extract SPECIFIC rules for how THIS section type should be written. Return a JSON object:
+
+{{
+  "purpose": "one sentence describing what this section does",
+  "voice_profile": "specific voice for this section type (e.g., 'narrative past tense' or 'analytical with hedged conclusions')",
+  "typical_structure": "how the section is typically organized",
+  "hedging_level": "none/light/moderate/heavy — how much hedging is typical in this section",
+  "specific_rules": ["list of 3-5 specific writing rules observed in these examples"],
+  "common_phrases": ["list of recurring professional phrases used in this section type"],
+  "what_to_leave_alone": ["things specific to this section that should never be modified"]
+}}
+
+IMPORTANT: Be specific and concrete. 'Use formal tone' is too vague. 'Refer to medical providers by full name and credentials on first mention' is good."""
+
+        sample_text = "\n\n".join(sample_texts)
+        try:
+            result = caller.call(
+                prompt=section_prompt,
+                text=sample_text,
+                task_type="summary",
+                agent_id="agent_report_review",
+            )
+            if result:
+                json_match = re.search(r'\{[\s\S]*\}', result)
+                if json_match:
+                    guide["sections"][section_name] = json.loads(json_match.group())
+                    print(f"  {section_name}: rules extracted")
+                else:
+                    print(f"  {section_name}: WARNING - could not parse JSON")
+        except Exception as e:
+            print(f"  {section_name}: ERROR - {e}")
+
+    # Save
+    os.makedirs(os.path.dirname(STYLE_GUIDE_PATH), exist_ok=True)
+    with open(STYLE_GUIDE_PATH, 'w', encoding='utf-8') as f:
+        json.dump(guide, f, indent=2, ensure_ascii=False)
+
+    print(f"\nRich style guide saved to: {STYLE_GUIDE_PATH}")
+    print(f"  General rules: {'yes' if guide['general'] else 'no'}")
+    print(f"  Section rules: {len(guide['sections'])} sections")
+    return guide
+
+
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage:")
         print("  python -m Scripts.report_generator.style_library build [--reports-dir PATH]")
+        print("  python -m Scripts.report_generator.style_library build-subsections [--reports-dir PATH]")
+        print("  python -m Scripts.report_generator.style_library distill [--use-llm]")
         print("  python -m Scripts.report_generator.style_library update <report.docx>")
         sys.exit(1)
 
@@ -430,6 +815,28 @@ if __name__ == "__main__":
         # Distill style guide (rule-based for now, LLM later)
         print("\nDistilling style guide...")
         guide = distill_style_guide()
+        print("Done!")
+
+    elif command == "build-subsections":
+        reports_dir = None
+        if "--reports-dir" in sys.argv:
+            idx = sys.argv.index("--reports-dir")
+            reports_dir = sys.argv[idx + 1]
+
+        summary = build_subsection_library(reports_dir)
+        print("\n--- Subsection Library Summary ---")
+        for section, subs in summary["sections"].items():
+            print(f"  {section}:")
+            for sub_name, info in subs.items():
+                print(f"    {sub_name}: {info['total_found']} found, {info['stored']} stored")
+
+    elif command == "distill":
+        if "--use-llm" in sys.argv:
+            print("Distilling rich style guide with LLM (Pro model)...")
+            guide = distill_rich_style_guide()
+        else:
+            print("Distilling rule-based style guide...")
+            guide = distill_style_guide()
         print("Done!")
 
     elif command == "update":

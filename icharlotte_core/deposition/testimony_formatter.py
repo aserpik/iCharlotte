@@ -298,36 +298,60 @@ class TestimonyFormatter:
         """
         Build a mapping from transcript page numbers to PDF page indices.
 
-        For full-size: transcript page N ≈ PDF page N-1 (approximately)
-        For condensed: transcript pages are packed 4-per-PDF-page
+        For condensed transcripts: parse "Page N" markers (multiple per PDF page).
+        For full-size transcripts: try markers first, fall back to detecting
+        transcript pages by line-number resets (lines 1-25 pattern), which is
+        format-agnostic and works regardless of court reporter service.
         """
         page_map = {}  # transcript_page -> [pdf_page_indices]
 
+        # First pass: try to find "Page N" markers on each page.
+        # Use a permissive regex — court reporters embed arbitrary characters
+        # (middle dots, non-breaking spaces, etc.) between "Page" and the number.
+        content_pages = []  # (pdf_idx, has_qa) for pages that aren't word index
         for pdf_idx in range(len(doc)):
             page = doc[pdf_idx]
             text = page.get_text("text")
 
-            # Skip word index pages that appear after the transcript.
-            # These have dense "word line:col" entries (e.g., "accident 27:8")
-            # but no Q./A. testimony markers. Detect by structure, not by
-            # court reporter name (Veritext, US Legal, etc. all vary).
-            has_qa = '\n       Q.' in text or '\n       A.' in text
+            # Skip word index pages (dense "word line:col" refs, no Q/A).
+            has_qa = bool(re.search(r'\n[\s\xa0]+Q\.', text) or
+                          re.search(r'\n[\s\xa0]+A\.', text))
             if not has_qa:
-                # Count word index reference patterns (e.g., "27:8")
-                # Exclude timestamp patterns like "10:32:13AM" by
-                # stripping all timestamps first, then counting.
                 cleaned = re.sub(r'\d{1,2}:\d{2}:\d{2}\s*[AP]M', '', text)
                 word_refs = re.findall(r'\b\d{1,3}:\d{1,2}\b', cleaned)
                 if len(word_refs) >= 10:
                     continue
 
-            # Find all "Page N" markers on this PDF page
-            for match in re.finditer(r'Page\s+(\d+)', text):
+            content_pages.append(pdf_idx)
+
+            for match in re.finditer(r'Page[^\d\n]{0,5}(\d+)', text):
                 tp_num = int(match.group(1))
                 if tp_num not in page_map:
                     page_map[tp_num] = []
                 if pdf_idx not in page_map[tp_num]:
                     page_map[tp_num].append(pdf_idx)
+
+        # If markers covered most content pages, we're done (condensed or good markers).
+        mapped_pdf_pages = {pp for pages in page_map.values() for pp in pages}
+        if len(mapped_pdf_pages) >= len(content_pages) * 0.5:
+            return page_map
+
+        # Fallback for non-condensed transcripts: each content PDF page is one
+        # transcript page. Detect the first transcript page by checking if any
+        # markers were found; otherwise scan for the first page with line 1.
+        logger.debug(
+            "Page markers sparse (%d/%d) — falling back to positional mapping",
+            len(mapped_pdf_pages), len(content_pages),
+        )
+        page_map.clear()
+        # Find the starting transcript page number from whatever markers we had,
+        # or default to assuming content_pages[0] is transcript page 1.
+        first_tp = min(page_map.keys()) if page_map else 1
+        page_map.clear()
+
+        for i, pdf_idx in enumerate(content_pages):
+            tp_num = first_tp + i
+            page_map[tp_num] = [pdf_idx]
 
         return page_map
 
@@ -420,6 +444,47 @@ class TestimonyFormatter:
         return line_info
 
     @staticmethod
+    def _extract_line_text(page, line_info: dict) -> dict:
+        """Extract cleaned text content for each transcript line on a PDF page.
+
+        Uses y-coordinate matching (same approach as the transcript parser)
+        to pair text spans with their line numbers.
+
+        Returns: {line_num: cleaned_text_string}
+        """
+        text_dict = page.get_text("dict")
+        line_spans = {num: [] for num in line_info}
+
+        for block in text_dict.get("blocks", []):
+            if block.get("type") != 0:
+                continue
+            for line in block.get("lines", []):
+                for span in line.get("spans", []):
+                    bbox = span["bbox"]
+                    span_y = (bbox[1] + bbox[3]) / 2
+                    # Skip line number spans
+                    if bbox[0] < 100 and span["text"].strip().isdigit():
+                        continue
+                    # Match to closest line by y
+                    for num, li in line_info.items():
+                        mid_y = (li["y0"] + li["y1"]) / 2
+                        if abs(span_y - mid_y) < 8:
+                            line_spans[num].append((bbox[0], span["text"]))
+                            break
+
+        result = {}
+        for num, spans in line_spans.items():
+            if spans:
+                # Sort by x position and join
+                spans.sort(key=lambda s: s[0])
+                text = " ".join(s[1].strip() for s in spans if s[1].strip())
+                # Clean non-breaking spaces and special chars
+                text = text.replace('\xa0', ' ').replace('\xb7', ' ').strip()
+                if text:
+                    result[num] = text
+        return result
+
+    @staticmethod
     def _get_line_range_rects(
         page, page_start: int, page_end: int,
         line_start: int, line_end: int, page_map: dict
@@ -483,4 +548,121 @@ class TestimonyFormatter:
             rects.append(rect)
 
         return rects
+
+    # =========================================================================
+    # Extract Existing Highlight Annotations
+    # =========================================================================
+
+    def extract_highlighted_exchanges(
+        self, index: TranscriptIndex, pdf_path: str
+    ) -> Optional[ExtractionResult]:
+        """
+        Scan a PDF for existing highlight annotations and match them to
+        parsed Q/A exchanges.
+
+        Args:
+            index: The parsed transcript index.
+            pdf_path: Path to the PDF (original or [H.AI] copy).
+
+        Returns:
+            ExtractionResult with matched exchange IDs, or None if no highlights.
+        """
+        doc = fitz.open(pdf_path)
+        try:
+            page_map = self._build_page_map(doc, index.is_condensed)
+
+            # Build reverse map: pdf_page_index -> [transcript_page_numbers]
+            reverse_map = {}
+            for tp, pdf_pages in page_map.items():
+                for pp in pdf_pages:
+                    reverse_map.setdefault(pp, []).append(tp)
+
+            # Collect all highlighted lines across all pages:
+            # set of (transcript_page, line_num)
+            all_highlighted = set()
+            # Also collect the cleaned text for each highlighted line
+            line_text = {}  # (transcript_page, line_num) -> text
+
+            for pdf_idx in range(len(doc)):
+                page = doc[pdf_idx]
+
+                # Collect highlight annotation rects on this page
+                highlight_rects = []
+                annot = page.first_annot
+                while annot:
+                    if annot.type[0] == fitz.PDF_ANNOT_HIGHLIGHT:
+                        highlight_rects.append(annot.rect)
+                    annot = annot.next
+
+                if not highlight_rects:
+                    continue
+
+                # Get line info for this page
+                line_info = self._find_line_info(page)
+                if not line_info:
+                    continue
+
+                # Get transcript pages on this PDF page
+                tp_nums = reverse_map.get(pdf_idx, [])
+                if not tp_nums:
+                    continue
+
+                # Extract line text using positional matching (same as parser)
+                page_line_text = self._extract_line_text(page, line_info)
+
+                # Find which lines overlap with highlights
+                for line_num, li in line_info.items():
+                    for hr in highlight_rects:
+                        if li["y0"] < hr.y1 and li["y1"] > hr.y0:
+                            for tp in tp_nums:
+                                all_highlighted.add((tp, line_num))
+                                if line_num in page_line_text:
+                                    line_text[(tp, line_num)] = page_line_text[line_num]
+                            break
+
+            if not all_highlighted:
+                return None
+
+            # Match highlighted lines to exchanges and track which lines
+            # within each exchange are highlighted, so display can trim to
+            # only the highlighted portions.
+            matched_ids = set()
+            highlighted_lines_by_ex = {}  # ex_id -> set of (page, line)
+            for ex in index.exchanges:
+                ex_highlighted = set()
+                total_lines = 0
+                for tp in range(ex.page_start, ex.page_end + 1):
+                    if tp == ex.page_start and tp == ex.page_end:
+                        lines = range(ex.line_start, ex.line_end + 1)
+                    elif tp == ex.page_start:
+                        lines = range(ex.line_start, 26)
+                    elif tp == ex.page_end:
+                        lines = range(1, ex.line_end + 1)
+                    else:
+                        lines = range(1, 26)
+                    for ln in lines:
+                        total_lines += 1
+                        if (tp, ln) in all_highlighted:
+                            ex_highlighted.add((tp, ln))
+
+                if not ex_highlighted:
+                    continue
+
+                # For short exchanges (1-3 lines), any hit is enough.
+                # For longer exchanges, require at least 40% highlighted.
+                if total_lines <= 3 or len(ex_highlighted) / total_lines >= 0.4:
+                    matched_ids.add(ex.id)
+                    highlighted_lines_by_ex[ex.id] = ex_highlighted
+
+            if not matched_ids:
+                return None
+
+            result = ExtractionResult(prompt="Highlighted text")
+            result.highlighted_lines_by_ex = highlighted_lines_by_ex
+            result.highlighted_line_text = line_text
+            result.group_consecutive(sorted(matched_ids))
+            return result
+
+        finally:
+            doc.close()
 

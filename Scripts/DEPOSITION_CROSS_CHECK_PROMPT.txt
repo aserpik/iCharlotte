@@ -46,6 +46,7 @@ Ensure all exhibits are listed at the end of the summary with:
 
 OUTPUT FORMAT:
 - Return the final summary with any corrections or enhancements
+- Preserve the exact formatting: bold topic headings and bullet points using markdown dashes ("- ") at the start of each line
 - Add IMPEACHMENT ALERT section if applicable
 - Add EXHIBIT LIST at the end
 - Do NOT include meta-commentary about your review process

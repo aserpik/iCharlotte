@@ -1411,9 +1411,9 @@ class WordLLMPopup(QDialog):
         format_row = QHBoxLayout()
         self.format_combo = QComboBox()
         self.format_combo.addItems([
+            FORMAT_MARKDOWN,
             FORMAT_PLAIN,
             FORMAT_MATCH,
-            FORMAT_MARKDOWN,
             FORMAT_DEFAULT,
             FORMAT_CUSTOM
         ])
@@ -1911,7 +1911,7 @@ class WordLLMPopup(QDialog):
             else:
                 self.format_preview.setText("Formatting will match the selected text (captured on execute)")
         elif format_type == FORMAT_MARKDOWN:
-            self.format_preview.setText("Markdown syntax: **bold**, *italic*, _underline_, `code`")
+            self.format_preview.setText("Markdown: # headings, **bold**, *italic*, - bullets, `code`")
         elif format_type == FORMAT_DEFAULT:
             self.format_preview.setText("Uses Word's default paragraph style")
         elif format_type == FORMAT_CUSTOM:
@@ -2905,6 +2905,8 @@ class WordLLMPopup(QDialog):
             except:
                 pass
 
+            print(f"[DEBUG] _set_word_text_internal: format_type='{format_type}', text[:200]='{text[:200]}'")
+
             if format_type == FORMAT_PLAIN:
                 # Insert text, but still handle bullet points properly
                 self._insert_with_bullets(word, selection, text)
@@ -3137,23 +3139,39 @@ class WordLLMPopup(QDialog):
                 if i < len(items) - 1:
                     selection.TypeParagraph()
 
-    def _parse_bullet_items(self, text: str) -> list:
-        """Parse text into items, combining bullet lines with their continuations."""
+    def _parse_markdown_items(self, text: str) -> list:
+        """Parse markdown text into structured items: headings, bullets, and body text.
+
+        Returns list of dicts with keys:
+            type: 'heading', 'bullet', 'body'
+            text: content (markdown markers stripped)
+            level: heading level (1-3) for headings only
+        """
         lines = text.split('\n')
         bullet_pattern = re.compile(r'^[\s]*[-*•]\s+(.*)$')
         numbered_pattern = re.compile(r'^[\s]*\d+[.)]\s+(.*)$')
+        heading_pattern = re.compile(r'^(#{1,3})\s+(.+)$')
 
         items = []
         current_bullet = None
 
         for line in lines:
+            heading_match = heading_pattern.match(line)
             bullet_match = bullet_pattern.match(line)
             numbered_match = numbered_pattern.match(line)
 
-            if bullet_match or numbered_match:
+            if heading_match:
+                # Flush pending bullet
+                if current_bullet is not None:
+                    items.append({'type': 'bullet', 'text': current_bullet})
+                    current_bullet = None
+                level = len(heading_match.group(1))
+                items.append({'type': 'heading', 'text': heading_match.group(2).strip(), 'level': level})
+
+            elif bullet_match or numbered_match:
                 # Save previous bullet if exists
                 if current_bullet is not None:
-                    items.append({'is_bullet': True, 'text': current_bullet})
+                    items.append({'type': 'bullet', 'text': current_bullet})
 
                 # Start new bullet
                 current_bullet = bullet_match.group(1) if bullet_match else numbered_match.group(1)
@@ -3165,87 +3183,138 @@ class WordLLMPopup(QDialog):
             else:
                 # Non-bullet line or empty line
                 if current_bullet is not None:
-                    items.append({'is_bullet': True, 'text': current_bullet})
+                    items.append({'type': 'bullet', 'text': current_bullet})
                     current_bullet = None
 
-                # Add non-bullet item (even if empty, to preserve paragraph breaks)
-                if line.strip() or (items and items[-1]['is_bullet']):
-                    items.append({'is_bullet': False, 'text': line.strip()})
+                # Add body item (even if empty, to preserve paragraph breaks)
+                if line.strip() or (items and items[-1].get('type') == 'bullet'):
+                    items.append({'type': 'body', 'text': line.strip()})
 
         # Don't forget the last bullet
         if current_bullet is not None:
-            items.append({'is_bullet': True, 'text': current_bullet})
+            items.append({'type': 'bullet', 'text': current_bullet})
 
         return items
 
-    def _insert_with_markdown(self, word, selection, text: str):
-        """Parse markdown and insert with Word formatting, including proper bullet lists.
+    def _parse_bullet_items(self, text: str) -> list:
+        """Parse text into items, combining bullet lines with their continuations.
 
-        Enhanced to handle table cell context with appropriate indentation.
+        Legacy wrapper - converts new format to old format for _insert_with_bullets.
+        """
+        md_items = self._parse_markdown_items(text)
+        items = []
+        for item in md_items:
+            if item['type'] == 'bullet':
+                items.append({'is_bullet': True, 'text': item['text']})
+            else:
+                items.append({'is_bullet': False, 'text': item['text']})
+        return items
+
+    def _insert_with_markdown(self, word, selection, text: str):
+        """Parse markdown and insert with Word formatting.
+
+        Handles headings, bullet lists, inline bold/italic/code, and body text.
+        Heading formatting follows report generator conventions:
+            # Heading  → Bold, ALL CAPS (section header)
+            ## Heading → Bold + Underline (L1 subheading)
+            ### Heading → Bold (L2 subheading)
         """
         # Check if we're in a table
         in_table = self._is_in_table(selection)
         if in_table:
             print("Inserting markdown within table cell")
 
-        # First pass: group lines into items (bullet items include their continuations)
-        items = self._parse_bullet_items(text)
+        items = self._parse_markdown_items(text)
 
         in_bullet_list = False
         for i, item in enumerate(items):
-            if item['is_bullet']:
-                if not in_bullet_list:
-                    # First bullet - apply formatting and set up list template
-                    in_bullet_list = True
+            item_type = item['type']
 
-                    # Apply Word's bullet formatting (enables auto-continuation on Enter)
+            # --- End bullet list if switching to non-bullet ---
+            if item_type != 'bullet' and in_bullet_list:
+                in_bullet_list = False
+                try:
+                    selection.Range.ListFormat.RemoveNumbers()
+                    para = selection.ParagraphFormat
+                    para.LeftIndent = 0
+                    para.FirstLineIndent = 0
+                except Exception as e:
+                    print(f"Could not remove bullet formatting: {e}")
+
+            if item_type == 'heading':
+                level = item.get('level', 1)
+                heading_text = item['text']
+
+                # Reset paragraph formatting for heading
+                try:
+                    para = selection.ParagraphFormat
+                    para.LeftIndent = 0
+                    para.FirstLineIndent = 0
+                except:
+                    pass
+
+                font = selection.Font
+                font.Bold = -1  # All headings are bold
+                font.Italic = 0
+
+                if level == 1:
+                    # Section header: bold, all caps
+                    font.AllCaps = -1
+                    font.Underline = 0
+                    heading_text = heading_text.upper()
+                elif level == 2:
+                    # L1 subheading: bold + underline
+                    font.AllCaps = 0
+                    font.Underline = 1
+                else:
+                    # L2 subheading: bold only
+                    font.AllCaps = 0
+                    font.Underline = 0
+
+                # Strip any inline markdown from heading text
+                clean_text = re.sub(r'\*\*(.+?)\*\*', r'\1', heading_text)
+                clean_text = re.sub(r'__(.+?)__', r'\1', clean_text)
+                selection.TypeText(clean_text)
+
+                # Reset font after heading
+                font.Bold = 0
+                font.AllCaps = 0
+                font.Underline = 0
+
+                if i < len(items) - 1:
+                    selection.TypeParagraph()
+
+            elif item_type == 'bullet':
+                if not in_bullet_list:
+                    in_bullet_list = True
                     try:
                         selection.Range.ListFormat.ApplyBulletDefault()
-
-                        # Modify the ListTemplate level settings for correct indentation
                         list_fmt = selection.Range.ListFormat
                         if list_fmt.ListTemplate and list_fmt.ListLevelNumber > 0:
                             level = list_fmt.ListTemplate.ListLevels(list_fmt.ListLevelNumber)
                             if in_table:
-                                # Smaller indents for table cells
-                                level.NumberPosition = 18  # 0.25 inch
-                                level.TextPosition = 36    # 0.5 inch
-                                level.TabPosition = 36     # 0.5 inch
+                                level.NumberPosition = 18
+                                level.TextPosition = 36
+                                level.TabPosition = 36
                             else:
-                                level.NumberPosition = 36  # 0.5 inch - where bullet sits
-                                level.TextPosition = 54    # 0.75 inch - where text starts
-                                level.TabPosition = 54     # 0.75 inch - tab stop
+                                level.NumberPosition = 36
+                                level.TextPosition = 54
+                                level.TabPosition = 54
                     except Exception as e:
                         print(f"Could not modify list template: {e}")
 
-                # For subsequent bullets, Word's list continuation handles formatting
-                # Insert the text (parse for inline markdown formatting)
                 self._insert_formatted_text(selection, item['text'])
 
                 if i < len(items) - 1:
                     selection.TypeParagraph()
-            else:
-                # Non-bullet item
-                if in_bullet_list:
-                    in_bullet_list = False
-                    try:
-                        selection.Range.ListFormat.RemoveNumbers()
-                        para = selection.ParagraphFormat
-                        para.LeftIndent = 0
-                        para.FirstLineIndent = 0
-                    except Exception as e:
-                        print(f"Could not remove bullet formatting: {e}")
 
+            else:
+                # Body text
                 if item['text']:
                     self._insert_formatted_text(selection, item['text'])
 
                 if i < len(items) - 1:
                     selection.TypeParagraph()
-
-        # End bullet list if we finished in one
-        if in_bullet_list:
-            # Move to end and remove list format for next content
-            pass  # List ends naturally
 
     def _insert_formatted_text(self, selection, text: str):
         """Insert text with inline markdown formatting (bold, italic, etc.)."""
@@ -3436,9 +3505,12 @@ class WordLLMPopup(QDialog):
                 )
             else:
                 system_prompt = (
-                    "You are a helpful writing assistant. Follow the user's instructions "
-                    "precisely. Output only the requested text without any preamble, "
-                    "explanation, or markdown formatting unless specifically asked."
+                    "You are a helpful writing assistant for Microsoft Word documents. "
+                    "Follow the user's instructions precisely. Output only the requested "
+                    "text without any preamble or explanation. "
+                    "Use markdown formatting for structure: # for section headers, "
+                    "## for subheadings, ### for sub-subheadings, **bold** for emphasis, "
+                    "and - for bullet points. Do not use code blocks or HTML."
                 )
 
             print(f"Calling LLMHandler.generate...")

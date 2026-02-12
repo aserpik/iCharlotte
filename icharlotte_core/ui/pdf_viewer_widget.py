@@ -106,7 +106,7 @@ class PdfViewerWidget(QWidget):
         .textLayer {
             position: absolute; left: 0; top: 0; right: 0; bottom: 0;
             overflow: hidden; opacity: 0.2; line-height: 1.0;
-            user-select: text;
+            user-select: text; z-index: 2;
         }
         .textLayer > span {
             color: transparent; position: absolute; white-space: pre;
@@ -471,6 +471,18 @@ class PdfViewerWidget(QWidget):
     def _on_spin_changed(self, value):
         """Navigate to page when spin box changes."""
         self.go_to_page(value)
+
+    def clear(self):
+        """Reset the viewer to a blank state."""
+        self.current_pdf_path = None
+        self.current_page = 1
+        self.total_pages = 0
+        self._pending_pdf = None
+        self.page_label.setText("Page: - / -")
+        self.page_spin.setMaximum(1)
+        self.page_spin.setValue(1)
+        if self._viewer_ready:
+            self.web_view.page().runJavaScript("window.pdfViewer && window.pdfViewer.close && window.pdfViewer.close()")
 
     def load_pdf(self, path):
         """Load a PDF file."""

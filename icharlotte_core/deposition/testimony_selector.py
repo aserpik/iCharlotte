@@ -60,7 +60,8 @@ class TestimonySelector:
             caller = LLMCaller()
         self.caller = caller
 
-    def select(self, index: TranscriptIndex, prompt: str, on_chunk_done=None) -> ExtractionResult:
+    def select(self, index: TranscriptIndex, prompt: str, context: str = "",
+               on_chunk_done=None) -> ExtractionResult:
         """
         Select relevant exchanges from the index based on the user's prompt.
 
@@ -82,7 +83,7 @@ class TestimonySelector:
 
         for chunk_num, chunk in enumerate(chunks, 1):
             logger.info(f"Processing chunk {chunk_num}/{len(chunks)} ({len(chunk)} exchanges)")
-            selected = self._select_chunk(chunk, prompt, index.deponent.full_name)
+            selected = self._select_chunk(chunk, prompt, index.deponent.full_name, context)
             all_selected_ids.extend(selected)
             logger.info(f"Chunk {chunk_num}: selected {len(selected)} exchanges")
             if on_chunk_done:
@@ -108,7 +109,8 @@ class TestimonySelector:
         return [exchanges[i:i + chunk_size] for i in range(0, len(exchanges), chunk_size)]
 
     def _select_chunk(
-        self, exchanges: List[QAExchange], prompt: str, deponent_name: str
+        self, exchanges: List[QAExchange], prompt: str, deponent_name: str,
+        context: str = ""
     ) -> List[int]:
         """Run LLM selection on a single chunk of exchanges."""
         # Format exchanges for LLM
@@ -116,9 +118,11 @@ class TestimonySelector:
 
         # Build prompt (instructions) and text (exchanges) separately
         # so LLMCaller formats them correctly for each provider
+        context_block = f"\n\nCASE CONTEXT:\n{context}" if context else ""
         instructions = (
             f"{SYSTEM_PROMPT}\n\n"
-            f"DEPONENT: {deponent_name}\n\n"
+            f"DEPONENT: {deponent_name}"
+            f"{context_block}\n\n"
             f"USER'S REQUEST:\n{prompt}"
         )
 
@@ -134,8 +138,12 @@ class TestimonySelector:
             logger.error("LLM returned no response for testimony selection")
             return []
 
+        logger.info(f"LLM response (first 500 chars): {response[:500]}")
+
         # Parse response — expect a JSON array of IDs
-        return self._parse_response(response, exchanges)
+        parsed = self._parse_response(response, exchanges)
+        logger.info(f"Parsed {len(parsed)} IDs from response")
+        return parsed
 
     def _format_exchanges(self, exchanges: List[QAExchange]) -> str:
         """Format exchanges for LLM input."""
