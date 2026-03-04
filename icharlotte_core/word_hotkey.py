@@ -16,6 +16,7 @@ prompts (document prompts for Word, email prompts for Outlook).
 import os
 import json
 import threading
+import logging
 from typing import Optional, Callable
 
 from PySide6.QtWidgets import (
@@ -61,6 +62,26 @@ try:
     HAS_WIN32 = True
 except ImportError:
     HAS_WIN32 = False
+
+logger = logging.getLogger("icharlotte.word_hotkey")
+
+# Set up file logging for word_hotkey so COM errors are captured
+def _setup_word_hotkey_logger():
+    import datetime
+    from logging.handlers import RotatingFileHandler
+    _log_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'logs')
+    os.makedirs(_log_dir, exist_ok=True)
+    log_file = os.path.join(_log_dir, f"icharlotte_{datetime.datetime.now().strftime('%Y-%m-%d')}.log")
+    handler = RotatingFileHandler(log_file, maxBytes=10*1024*1024, backupCount=7, encoding='utf-8')
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(logging.Formatter(
+        '%(asctime)s [%(name)s] %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    ))
+    logger.addHandler(handler)
+    logger.setLevel(logging.DEBUG)
+
+_setup_word_hotkey_logger()
 
 try:
     from .document_processor import DocumentProcessor
@@ -118,6 +139,9 @@ def detect_active_app_context() -> tuple:
         # Check for Outlook Inspector (compose/reply window)
         if class_name == OUTLOOK_INSPECTOR_CLASS:
             # Verify it's a compose window via COM
+            outlook = None
+            inspector = None
+            word_editor = None
             try:
                 pythoncom.CoInitialize()
                 outlook = win32com.client.GetActiveObject("Outlook.Application")
@@ -127,18 +151,28 @@ def detect_active_app_context() -> tuple:
                     try:
                         word_editor = inspector.WordEditor
                         if word_editor:
+                            del word_editor; word_editor = None
+                            del outlook; outlook = None
                             return APP_CONTEXT_OUTLOOK, inspector
                     except:
                         pass
-            except:
-                pass
+            except Exception as e:
+                logger.debug(f"Outlook COM check failed: {e}")
+            finally:
+                # Release COM objects to prevent GC crashes
+                try:
+                    if word_editor is not None:
+                        del word_editor
+                    if inspector is not None:
+                        del inspector
+                    if outlook is not None:
+                        del outlook
+                except Exception:
+                    pass
 
         return APP_CONTEXT_UNKNOWN, None
     except Exception as e:
-        try:
-            print(f"Error detecting app context: {e}")
-        except OSError:
-            pass
+        logger.error(f"COM error detecting app context: {type(e).__name__}: {e}", exc_info=True)
         return APP_CONTEXT_UNKNOWN, None
 
 
@@ -156,11 +190,12 @@ def detect_case_from_document() -> tuple:
     if not HAS_MASTER_DB:
         return None, None, "Database not available"
 
+    doc = None
+    word = None
     try:
         pythoncom.CoInitialize()
 
         # Try to connect to Word
-        word = None
         try:
             word = win32com.client.GetActiveObject("Word.Application")
         except:
@@ -174,13 +209,20 @@ def detect_case_from_document() -> tuple:
 
         doc = word.ActiveDocument
         if not doc:
+            del word; word = None
             return None, None, "No active document"
 
         # Get the document's full path
         try:
             doc_path = doc.FullName
         except:
+            del doc; doc = None
+            del word; word = None
             return None, None, "Document not saved"
+
+        # Release COM objects immediately — we only need the string path
+        del doc; doc = None
+        del word; word = None
 
         if not doc_path or doc_path.startswith("Document"):
             return None, None, "Document not saved"
@@ -229,7 +271,17 @@ def detect_case_from_document() -> tuple:
             return None, file_number, f"Database error: {str(e)}"
 
     except Exception as e:
+        logger.error(f"COM error in detect_case_from_document: {type(e).__name__}: {e}", exc_info=True)
         return None, None, f"Error: {str(e)}"
+    finally:
+        # Ensure COM objects are released to prevent GC crashes
+        try:
+            if doc is not None:
+                del doc
+            if word is not None:
+                del word
+        except Exception:
+            pass
 
 
 def kill_zombie_word_processes():
@@ -304,6 +356,7 @@ AVAILABLE_MODELS = [
     ("Gemini 2.5 Pro", "Gemini", "gemini-2.5-pro"),
     ("Gemini 2.0 Flash", "Gemini", "models/gemini-2.0-flash"),
     ("Gemini 3 Flash Preview", "Gemini", "gemini-3-flash-preview"),
+    ("Gemini 3.1 Pro Preview", "Gemini", "gemini-3.1-pro-preview"),
     ("Gemini 3 Pro Preview", "Gemini", "gemini-3-pro-preview"),
     ("Claude Sonnet 4", "Claude", "claude-sonnet-4-20250514"),
     ("Claude Haiku 4 (Fast)", "Claude", "claude-haiku-4-20250514"),
@@ -551,6 +604,8 @@ def apply_flat_diff_redline(doc_com, range_start, range_end, original_text,
             return result
 
         # --- 1. Build Word paragraph map ---
+        # \x01 = inline shape (image/snippet), \x07 = cell mark
+        INLINE_SHAPE_CHAR = '\x01'
         word_paras = []
         try:
             para_collection = range_obj.Paragraphs
@@ -559,12 +614,22 @@ def apply_flat_diff_redline(doc_com, range_start, range_end, original_text,
                 wp = para_collection(i)
                 text = wp.Range.Text
                 content = text[:-1] if text.endswith('\r') else text
+                # Track positions of inline shape chars within this paragraph
+                # so we can exclude them from the flat diff text but preserve
+                # their Word positions for correct offset mapping.
+                shape_offsets = [j for j, ch in enumerate(content)
+                                 if ch == INLINE_SHAPE_CHAR]
+                clean_content = content.replace(INLINE_SHAPE_CHAR, '')
                 word_paras.append({
                     'start': wp.Range.Start,
                     'end': wp.Range.End,
                     'text': text,
                     'content': content,
+                    'clean_content': clean_content,
+                    'shape_offsets': shape_offsets,
                 })
+                if shape_offsets:
+                    print(f"  Para [{i-1}]: {len(shape_offsets)} inline shape(s) detected — preserved")
         except Exception as e:
             print(f"Could not enumerate Word paragraphs: {e}")
             return result
@@ -572,18 +637,20 @@ def apply_flat_diff_redline(doc_com, range_start, range_end, original_text,
         print(f"Word paragraphs: {len(word_paras)}")
 
         # --- 2. Build flat original text with boundary spaces ---
+        # Use clean_content (no \x01 inline shape chars) so the diff
+        # never sees or tries to delete inline shapes.
         orig_flat = ''
         flat_para_starts = []
         boundary_positions = set()
 
         for i, wp in enumerate(word_paras):
-            if i > 0 and wp['content']:
-                prev_had_content = any(word_paras[j]['content'] for j in range(i))
+            if i > 0 and wp['clean_content']:
+                prev_had_content = any(word_paras[j]['clean_content'] for j in range(i))
                 if prev_had_content:
                     boundary_positions.add(len(orig_flat))
                     orig_flat += ' '
             flat_para_starts.append(len(orig_flat))
-            orig_flat += wp['content']
+            orig_flat += wp['clean_content']
         flat_para_starts.append(len(orig_flat))  # sentinel
 
         print(f"Original flat: {len(orig_flat)} chars, "
@@ -662,6 +729,15 @@ def apply_flat_diff_redline(doc_com, range_start, range_end, original_text,
             para_idx = bisect.bisect_right(flat_para_starts, flat_pos) - 1
             para_idx = max(0, min(para_idx, len(word_paras) - 1))
             offset = flat_pos - flat_para_starts[para_idx]
+            # Adjust offset to account for inline shape chars (\x01) that
+            # were stripped from clean_content but still occupy Word positions.
+            shape_offsets = word_paras[para_idx].get('shape_offsets', [])
+            if shape_offsets:
+                adjusted = offset
+                for so in shape_offsets:
+                    if so <= adjusted:
+                        adjusted += 1
+                return word_paras[para_idx]['start'] + adjusted
             return word_paras[para_idx]['start'] + offset
 
         for operation in reversed(operations):
@@ -792,12 +868,13 @@ class ReviewWorkerThread(QThread):
     finished = Signal(object, int, str)  # (structural_result, total_changes, error)
 
     def __init__(self, reviewer, selection_range=None, include_case_data=False,
-                 extra_doc_paths=None, parent=None):
+                 extra_doc_paths=None, doc_name=None, parent=None):
         super().__init__(parent)
         self.reviewer = reviewer
         self.selection_range = selection_range
         self.include_case_data = include_case_data
         self.extra_doc_paths = extra_doc_paths
+        self.doc_name = doc_name  # Document name to re-acquire in worker thread
         self._cancelled = False
 
     def run(self):
@@ -808,6 +885,30 @@ class ReviewWorkerThread(QThread):
             if self._cancelled:
                 self.finished.emit(None, 0, "cancelled")
                 return
+
+            # Re-acquire Word COM object in this thread (COM objects can't cross threads)
+            # Use gencache (early-binding) to avoid _LazyAddAttr_ fatal crashes (0x8001010e)
+            try:
+                word = win32com.client.gencache.EnsureDispatch("Word.Application")
+            except Exception:
+                word = win32com.client.Dispatch("Word.Application")
+            if self.doc_name:
+                # Find the document by name
+                doc = None
+                for i in range(1, word.Documents.Count + 1):
+                    if word.Documents(i).Name == self.doc_name:
+                        doc = word.Documents(i)
+                        break
+                if not doc:
+                    doc = word.ActiveDocument
+            else:
+                doc = word.ActiveDocument
+
+            if not doc:
+                self.finished.emit(None, 0, "Could not re-acquire Word document in worker thread")
+                return
+
+            self.reviewer.doc = doc
 
             structural, total_changes = self.reviewer.run(
                 selection_range=self.selection_range,
@@ -821,6 +922,9 @@ class ReviewWorkerThread(QThread):
                 self.finished.emit(structural, total_changes, "")
         except Exception as e:
             if not self._cancelled:
+                import traceback
+                tb = traceback.format_exc()
+                print(f"[ReviewWorker ERROR] {tb}")
                 self.finished.emit(None, 0, str(e))
         finally:
             pythoncom.CoUninitialize()
@@ -1472,6 +1576,20 @@ class WordLLMPopup(QDialog):
         self.redline_checkbox.stateChanged.connect(self._save_redline_preference)
         ai_layout.addWidget(self.redline_checkbox)
 
+        # Legal Research checkbox (only visible for Word context)
+        self.legal_research_checkbox = QCheckBox("📚 Perform Legal Research")
+        self.legal_research_checkbox.setStyleSheet("color: #cdd6f4; font-size: 11px;")
+        self.legal_research_checkbox.setToolTip(
+            "Search California case law and statutes, then inject verified\n"
+            "legal citations into the AI response. Uses CourtListener API\n"
+            "and CA Legislative Info."
+        )
+        self.legal_research_checkbox.setChecked(
+            self.redline_settings.get("legal_research_default", False)
+        )
+        self.legal_research_checkbox.stateChanged.connect(self._save_legal_research_preference)
+        ai_layout.addWidget(self.legal_research_checkbox)
+
         ai_layout.addStretch()
         self.tab_widget.addTab(ai_tab, "AI Prompt")
 
@@ -1526,6 +1644,18 @@ class WordLLMPopup(QDialog):
 
     def _populate_case_variables(self):
         """Populate the Case Variables tab with detected case info."""
+        try:
+            self._populate_case_variables_impl()
+        except Exception as e:
+            # Log but don't crash — this is a non-critical UI update
+            try:
+                from icharlotte_core.app_crash_handler import log_error
+                log_error(f"_populate_case_variables failed: {e}")
+            except Exception:
+                pass
+
+    def _populate_case_variables_impl(self):
+        """Internal implementation of case variable population."""
         # Clear existing variable widgets (except stretch)
         while self.variables_layout.count() > 0:
             item = self.variables_layout.takeAt(0)
@@ -1652,7 +1782,13 @@ class WordLLMPopup(QDialog):
             self.case_info_label.setText("")
             return
 
-        self._detected_case, self._detected_file_number, self._case_detection_error = detect_case_from_document()
+        try:
+            self._detected_case, self._detected_file_number, self._case_detection_error = detect_case_from_document()
+        except Exception as e:
+            logger.error(f"COM error in _detect_and_update_case: {type(e).__name__}: {e}", exc_info=True)
+            self._detected_case = None
+            self._detected_file_number = None
+            self._case_detection_error = f"COM error: {e}"
 
         if self._detected_case:
             plaintiff = self._detected_case.get("plaintiff_last_name", "Unknown")
@@ -1666,7 +1802,10 @@ class WordLLMPopup(QDialog):
             self.case_info_label.setText("")
 
         # Populate the variables tab
-        self._populate_case_variables()
+        try:
+            self._populate_case_variables()
+        except Exception as e:
+            logger.error(f"COM error in _populate_case_variables: {type(e).__name__}: {e}", exc_info=True)
 
     def load_prompts(self):
         """Load saved prompts from file (both Word and Outlook prompts)."""
@@ -1813,9 +1952,10 @@ class WordLLMPopup(QDialog):
             self.status_label.setText(f"Deleted '{name}'")
 
     def _update_redline_checkbox_visibility(self):
-        """Show/hide redline checkbox and review button based on app context."""
+        """Show/hide redline checkbox, legal research checkbox, and review button based on app context."""
         is_word = self.app_context == APP_CONTEXT_WORD
         self.redline_checkbox.setVisible(is_word)
+        self.legal_research_checkbox.setVisible(is_word)
         self.review_btn.setVisible(is_word)
 
     def _save_redline_preference(self):
@@ -1828,28 +1968,51 @@ class WordLLMPopup(QDialog):
         self.redline_settings["use_all_text_default"] = self.use_all_text_check.isChecked()
         save_redline_settings(GEMINI_DATA_DIR, self.redline_settings)
 
+    def _save_legal_research_preference(self, state):
+        """Persist legal research checkbox state."""
+        self.redline_settings["legal_research_default"] = bool(state)
+        self._save_redline_settings()
+
+    def _save_redline_settings(self):
+        """Helper to persist redline settings to disk."""
+        save_redline_settings(GEMINI_DATA_DIR, self.redline_settings)
+
+    def _get_legal_research_engine(self):
+        """Lazy-initialize the legal research engine."""
+        if not hasattr(self, '_legal_research_engine') or self._legal_research_engine is None:
+            import os
+            from icharlotte_core.legal_research.engine import LegalResearchEngine
+            token = os.environ.get("COURTLISTENER_API_TOKEN", "")
+            if not token:
+                return None
+            self._legal_research_engine = LegalResearchEngine(courtlistener_token=token)
+        return self._legal_research_engine
+
     def set_app_context(self, context: str, inspector=None):
         """Set the application context and update UI accordingly."""
         self.app_context = context
         self.active_inspector = inspector
 
-        if context == APP_CONTEXT_OUTLOOK:
-            self.title_label.setText("AI Assistant for Outlook")
-            self.setWindowTitle("AI Assistant - Email")
-            # Hide case variables tab for Outlook
-            self.tab_widget.setTabVisible(1, False)
-        else:
-            self.title_label.setText("AI Assistant for Word")
-            self.setWindowTitle("AI Assistant - Document")
-            # Show case variables tab for Word
-            self.tab_widget.setTabVisible(1, True)
-            # Detect case from document path
-            self._detect_and_update_case()
+        try:
+            if context == APP_CONTEXT_OUTLOOK:
+                self.title_label.setText("AI Assistant for Outlook")
+                self.setWindowTitle("AI Assistant - Email")
+                # Hide case variables tab for Outlook
+                self.tab_widget.setTabVisible(1, False)
+            else:
+                self.title_label.setText("AI Assistant for Word")
+                self.setWindowTitle("AI Assistant - Document")
+                # Show case variables tab for Word
+                self.tab_widget.setTabVisible(1, True)
+                # Detect case from document path
+                self._detect_and_update_case()
 
-        # Update redline checkbox visibility based on context
-        self._update_redline_checkbox_visibility()
+            # Update redline checkbox visibility based on context
+            self._update_redline_checkbox_visibility()
 
-        self.refresh_combo()  # Refresh prompts for context
+            self.refresh_combo()  # Refresh prompts for context
+        except Exception as e:
+            logger.error(f"Error in set_app_context({context}): {type(e).__name__}: {e}", exc_info=True)
 
     def _on_format_changed(self, format_type: str):
         """Handle format dropdown change."""
@@ -2249,6 +2412,60 @@ class WordLLMPopup(QDialog):
 
             QApplication.processEvents()
 
+            # Legal Research: if checkbox is checked, run research and augment prompt
+            if self.legal_research_checkbox.isChecked():
+                engine = self._get_legal_research_engine()
+                if engine:
+                    self.status_label.setText("Researching legal authority...")
+                    QApplication.processEvents()
+
+                    from icharlotte_core.legal_research.prompts import build_augmented_system_prompt
+
+                    def _llm_for_research(system_prompt, user_prompt):
+                        """Synchronous LLM call for research sub-steps."""
+                        from icharlotte_core.llm import LLMHandler
+                        provider, model_id = self._get_selected_model()
+                        settings = {
+                            'temperature': 0.3,
+                            'top_p': 0.95,
+                            'max_tokens': -1,
+                            'stream': False,
+                            'thinking_level': 'None',
+                        }
+                        return LLMHandler.generate(
+                            provider=provider, model=model_id,
+                            system_prompt=system_prompt,
+                            user_prompt=user_prompt,
+                            file_contents="", settings=settings,
+                        )
+
+                    try:
+                        research_result = engine.research(
+                            query=full_prompt,
+                            llm_callback=_llm_for_research,
+                            status_callback=lambda msg: (
+                                self.status_label.setText(msg),
+                                QApplication.processEvents(),
+                            ),
+                        )
+                        authority_block = research_result.format_authority_block()
+                        self._pending_research_result = research_result
+                    except Exception as e:
+                        print(f"[LegalResearch] Engine error: {e}")
+                        self._pending_research_result = None
+                        authority_block = ""
+
+                    if authority_block:
+                        full_prompt = f"{full_prompt}\n\n{authority_block}\n\nIMPORTANT: You MUST ONLY cite cases and statutes from the [LEGAL AUTHORITY] section above. Do NOT fabricate or hallucinate any citations."
+
+                    self.status_label.setText("Generating response with legal citations...")
+                    QApplication.processEvents()
+                else:
+                    self._pending_research_result = None
+                    print("[LegalResearch] No COURTLISTENER_API_TOKEN in .env — skipping research")
+            else:
+                self._pending_research_result = None
+
             # Store format type for callback
             self._pending_format_type = format_type
             self._is_outlook_task = False
@@ -2355,8 +2572,33 @@ class WordLLMPopup(QDialog):
                     self._set_word_text_internal(result, self._pending_format_type,
                                                 word=word, selection=selection)
 
-            self.status_label.setText("Done!")
-            QTimer.singleShot(500, self.close)
+            # Show legal research verification summary if available
+            if hasattr(self, '_pending_research_result') and self._pending_research_result:
+                rr = self._pending_research_result
+                if rr.verification:
+                    pass_count = sum(1 for v in rr.verification if v.status == "PASS")
+                    fixed_count = sum(1 for v in rr.verification if v.status == "FIXED")
+                    flagged_count = sum(1 for v in rr.verification if v.status == "FLAGGED")
+                    summary_parts = []
+                    if pass_count:
+                        summary_parts.append(f"✓ {pass_count} verified")
+                    if fixed_count:
+                        summary_parts.append(f"⚠ {fixed_count} corrected")
+                    if flagged_count:
+                        summary_parts.append(f"✗ {flagged_count} flagged")
+                    if summary_parts:
+                        self.status_label.setText(f"Citations: {', '.join(summary_parts)}")
+                        QTimer.singleShot(3000, self.close)
+                    else:
+                        self.status_label.setText("Done!")
+                        QTimer.singleShot(500, self.close)
+                else:
+                    self.status_label.setText("Done!")
+                    QTimer.singleShot(500, self.close)
+                self._pending_research_result = None
+            else:
+                self.status_label.setText("Done!")
+                QTimer.singleShot(500, self.close)
         except Exception as e:
             self.status_label.setText(f"Error inserting: {str(e)[:50]}")
             self.execute_btn.setEnabled(True)
@@ -2453,12 +2695,19 @@ class WordLLMPopup(QDialog):
             self.status_label.setStyleSheet("color: #a6adc8; font-style: italic;")
             QApplication.processEvents()
 
+            # Capture doc name for re-acquisition in worker thread
+            try:
+                doc_name = doc.Name
+            except Exception:
+                doc_name = None
+
             # Start worker thread
             self._review_thread = ReviewWorkerThread(
                 reviewer=reviewer,
                 selection_range=sel_range,
                 include_case_data=options["include_case_data"],
                 extra_doc_paths=options["extra_doc_paths"] or None,
+                doc_name=doc_name,
                 parent=self,
             )
             self._review_thread.progress.connect(self._on_review_progress)
@@ -3987,35 +4236,35 @@ class WordHotkeyManager:
 
     def _show_popup(self):
         """Show the popup dialog (on main thread)."""
-        if self.popup is None or not self.popup.isVisible():
-            # Detect active application context BEFORE creating popup
-            app_context, inspector = detect_active_app_context()
+        try:
+            if self.popup is None or not self.popup.isVisible():
+                # Detect active application context BEFORE creating popup
+                app_context, inspector = detect_active_app_context()
 
-            # Only show if Word or Outlook compose is active
-            if app_context == APP_CONTEXT_UNKNOWN:
-                try:
-                    print("Win+V pressed but neither Word nor Outlook compose is active")
-                except OSError:
-                    pass
-                return
+                # Only show if Word or Outlook compose is active
+                if app_context == APP_CONTEXT_UNKNOWN:
+                    logger.debug("Win+V pressed but neither Word nor Outlook compose is active")
+                    return
 
-            # Capture cursor position on main thread
-            from PySide6.QtGui import QCursor
-            cursor_pos = QCursor.pos()
+                # Capture cursor position on main thread
+                from PySide6.QtGui import QCursor
+                cursor_pos = QCursor.pos()
 
-            self.popup = WordLLMPopup(
-                parent=None,  # No parent so it's a top-level window
-                llm_callback=self._get_llm_callback(),
-                cursor_pos=cursor_pos
-            )
+                self.popup = WordLLMPopup(
+                    parent=None,  # No parent so it's a top-level window
+                    llm_callback=self._get_llm_callback(),
+                    cursor_pos=cursor_pos
+                )
 
-            # Set the detected context before showing
-            self.popup.set_app_context(app_context, inspector)
+                # Set the detected context before showing
+                self.popup.set_app_context(app_context, inspector)
 
-            self.popup.show()
+                self.popup.show()
 
-            # Force focus to the popup window (Windows focus stealing prevention workaround)
-            self._force_focus(self.popup)
+                # Force focus to the popup window (Windows focus stealing prevention workaround)
+                self._force_focus(self.popup)
+        except Exception as e:
+            logger.error(f"Error in _show_popup: {type(e).__name__}: {e}", exc_info=True)
 
     def _force_focus(self, window):
         """Force focus to the window using Windows API."""

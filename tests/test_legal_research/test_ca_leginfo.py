@@ -66,7 +66,7 @@ class TestGetSection(unittest.TestCase):
         """Successful fetch returns a StatuteResult with parsed text."""
         html = """
         <html><body>
-        <div id="codeLawSectionNoContent">
+        <div id="codeLawSectionNoHead">
             <b>1714.</b> (a) Everyone is responsible, not only for the result
             of his or her willful acts, but also for an injury occasioned to
             another by his or her want of ordinary care or skill in the
@@ -114,7 +114,7 @@ class TestGetSection(unittest.TestCase):
     @patch("icharlotte_core.legal_research.sources.ca_leginfo.requests.get")
     def test_get_section_too_short_text(self, mock_get):
         """If scraped text is too short, return None."""
-        html = '<html><body><div id="codeLawSectionNoContent">Hi</div></body></html>'
+        html = '<html><body><div id="codeLawSectionNoHead">Hi</div></body></html>'
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.text = html
@@ -136,7 +136,7 @@ class TestSearchCode(unittest.TestCase):
         """search_code returns a list with one StatuteResult on success."""
         html = """
         <html><body>
-        <div id="codeLawSectionNoContent">
+        <div id="codeLawSectionNoHead">
             <b>437c.</b> (a) A party may move for summary judgment in an action
             if it is contended that the action has no merit or that there is
             no defense to the action or proceeding.

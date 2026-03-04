@@ -199,7 +199,9 @@ class CALegInfoClient:
             return None
 
         soup = BeautifulSoup(resp.text, "html.parser")
-        content_div = soup.find("div", id="codeLawSectionNoContent")
+        content_div = soup.find("div", id="codeLawSectionNoHead")
+        if content_div is None:
+            content_div = soup.find("div", id="codeLawSectionNoContent")
         if content_div is None:
             return None
 

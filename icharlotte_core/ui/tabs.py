@@ -301,6 +301,14 @@ class ChatTab(QWidget):
         self.update_template_menu()
         toolbar_layout.addWidget(self.template_btn)
 
+        # Legal Research checkbox
+        self.legal_research_check = QCheckBox("Legal Research")
+        self.legal_research_check.setStyleSheet("font-size: 11px;")
+        self.legal_research_check.setToolTip(
+            "Search CA case law and statutes, inject verified citations into response"
+        )
+        toolbar_layout.addWidget(self.legal_research_check)
+
         toolbar_layout.addStretch()
 
         # Attachment indicator
@@ -1071,6 +1079,43 @@ class ChatTab(QWidget):
         file_content = self.read_files_content()
         attachments = self.get_attachment_info()
 
+        # Legal Research: if checked, run research before LLM call
+        research_result = None
+        if self.legal_research_check.isChecked():
+            engine = self._get_legal_research_engine()
+            if engine:
+                self.chat_history.append("<i>Researching legal authority...</i>")
+                QApplication.processEvents()
+
+                research_query = user_text
+                if file_content:
+                    research_query += "\n\nContext:\n" + file_content[:2000]
+
+                def _llm_for_research(system_prompt, user_prompt):
+                    from icharlotte_core.llm import LLMHandler
+                    return LLMHandler.generate(
+                        provider=self.provider_combo.currentText(),
+                        model=self.model_combo.currentText(),
+                        system_prompt=system_prompt,
+                        user_prompt=user_prompt,
+                        file_contents="",
+                        settings={**self.settings, 'stream': False, 'temperature': 0.3},
+                    )
+
+                try:
+                    research_result = engine.research(
+                        query=research_query,
+                        llm_callback=_llm_for_research,
+                        status_callback=lambda msg: (
+                            self.chat_history.append(f"<i>  {msg}</i>"),
+                            QApplication.processEvents(),
+                        ),
+                    )
+                except Exception as e:
+                    self.chat_history.append(f"<font color='orange'>Research error: {e}</font>")
+
+        self._pending_research = research_result
+
         # Build user message for history
         full_msg = user_text
         if file_content:
@@ -1106,11 +1151,20 @@ class ChatTab(QWidget):
         cursor.movePosition(QTextCursor.MoveOperation.End)
         self.stream_start_pos = cursor.position()
 
+        # Build system prompt (augment with legal authority if research was done)
+        effective_system_prompt = self.system_prompt
+        if research_result:
+            from icharlotte_core.legal_research.prompts import build_augmented_system_prompt
+            authority = research_result.format_authority_block()
+            effective_system_prompt = build_augmented_system_prompt(
+                self.system_prompt, authority
+            )
+
         # Start Worker
         self.worker = LLMWorker(
             self.provider_combo.currentText(),
             self.model_combo.currentText(),
-            self.system_prompt,
+            effective_system_prompt,
             user_text,
             file_content,
             settings,
@@ -1123,6 +1177,17 @@ class ChatTab(QWidget):
         self.worker.start()
 
         self.update_context_indicator()
+
+    def _get_legal_research_engine(self):
+        """Lazy-initialize the legal research engine."""
+        if not hasattr(self, '_legal_research_engine') or self._legal_research_engine is None:
+            import os
+            from icharlotte_core.legal_research.engine import LegalResearchEngine
+            token = os.environ.get("COURTLISTENER_API_TOKEN", "")
+            if not token:
+                return None
+            self._legal_research_engine = LegalResearchEngine(courtlistener_token=token)
+        return self._legal_research_engine
 
     def on_streaming_token(self, token: str):
         """Handle real-time token display during streaming."""
@@ -1164,6 +1229,35 @@ class ChatTab(QWidget):
         cursor.insertHtml(html_text)
         self.chat_history.append("")  # New line
         self.chat_history.append("-" * 50)
+
+        # Show legal research sources if available
+        if hasattr(self, '_pending_research') and self._pending_research:
+            rr = self._pending_research
+            sources_parts = []
+            sources_parts.append("<b>Legal Sources Found</b>")
+            if rr.verification:
+                pass_count = sum(1 for v in rr.verification if v.status == "PASS")
+                fixed_count = sum(1 for v in rr.verification if v.status == "FIXED")
+                flagged_count = sum(1 for v in rr.verification if v.status == "FLAGGED")
+                parts = []
+                if pass_count: parts.append(f"verified:{pass_count}")
+                if fixed_count: parts.append(f"fixed:{fixed_count}")
+                if flagged_count: parts.append(f"flagged:{flagged_count}")
+                if parts:
+                    sources_parts.append(f"<i>Citations: {', '.join(parts)}</i>")
+            for c in rr.cases:
+                line = f"- <b>{c.formatted_citation}</b>"
+                if c.url:
+                    line += f' -- <a href="{c.url}">View</a>'
+                sources_parts.append(line)
+            for s in rr.statutes:
+                line = f"- <b>{s.formatted_citation}</b>"
+                if s.url:
+                    line += f' -- <a href="{s.url}">View</a>'
+                sources_parts.append(line)
+            for line in sources_parts:
+                self.chat_history.append(line)
+            self._pending_research = None
 
         # Save assistant message to persistence
         if self.persistence and self.current_conversation_id:
