@@ -209,7 +209,9 @@ class TestResearchResult(unittest.TestCase):
         block = result.format_authority_block()
         self.assertIn("[LEGAL AUTHORITY]", block)
         self.assertIn("Smith v. Jones (2020) 123 Cal.App.4th 456", block)
+        self.assertIn("Holding: The court held that...", block)
         self.assertIn("Civ. Code, \u00a7 1714", block)
+        self.assertIn("Text: Everyone is responsible...", block)
 
     def test_to_dict(self):
         case = CaseResult(

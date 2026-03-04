@@ -1089,7 +1089,7 @@ class ChatTab(QWidget):
 
                 research_query = user_text
                 if file_content:
-                    research_query += "\n\nContext:\n" + file_content[:2000]
+                    research_query += "\n\nContext:\n" + file_content[:8000]
 
                 def _llm_for_research(system_prompt, user_prompt):
                     from icharlotte_core.llm import LLMHandler

@@ -124,7 +124,11 @@ class ResearchResult:
     verification: List[VerificationStatus] = field(default_factory=list)
 
     def format_authority_block(self) -> str:
-        """Format results as a [LEGAL AUTHORITY] block for insertion into documents."""
+        """Format results as a [LEGAL AUTHORITY] block for insertion into documents.
+
+        Includes case holdings/snippets and statute text so the LLM can
+        cite specific propositions from the authorities.
+        """
         lines = ["[LEGAL AUTHORITY]"]
 
         if self.cases:
@@ -135,12 +139,22 @@ class ResearchResult:
                 if case.negative_treatment:
                     entry += f" [NOTE: {case.negative_treatment}]"
                 lines.append(entry)
+                # Include holding/snippet so LLM can cite specific propositions
+                if case.snippet:
+                    snippet_text = case.snippet[:500].strip()
+                    if snippet_text:
+                        lines.append(f"    Holding: {snippet_text}")
 
         if self.statutes:
             lines.append("")
             lines.append("Statutes:")
             for statute in self.statutes:
                 lines.append(f"  - {statute.formatted_citation}")
+                # Include statute text so LLM can cite specific language
+                if statute.text:
+                    stat_text = statute.text[:800].strip()
+                    if stat_text:
+                        lines.append(f"    Text: {stat_text}")
 
         if self.verification:
             flagged = [v for v in self.verification if v.status == "FLAGGED"]

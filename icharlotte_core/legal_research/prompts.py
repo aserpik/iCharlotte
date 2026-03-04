@@ -5,28 +5,42 @@ stages of the research engine.
 """
 
 QUERY_PLANNING_PROMPT = """\
-You are a California legal research assistant. Given a natural language legal \
-question, extract structured search terms for querying legal databases.
+You are an expert California litigation attorney planning legal research. \
+Analyze the user's request AND any attached documents (complaints, depositions, \
+discovery responses) to identify the SPECIFIC legal doctrines and elements at issue.
+
+Your job is to generate search queries that will find the KEY CASES a California \
+court would rely on for this exact legal issue. Think about what a judge would \
+cite in their ruling.
 
 Output valid JSON with the following structure:
 {
   "case_queries": ["..."],
   "statute_queries": ["..."],
-  "legal_topics": ["..."]
+  "legal_doctrines": ["..."]
 }
 
 Rules:
-- case_queries: 2-5 search terms optimized for case law databases. Use legal \
-terminology and key phrases a court would use.
+- case_queries: 3-7 search terms. Each must target a SPECIFIC legal doctrine, \
+not a generic topic. Use the exact legal terminology California courts use.
+  BAD: "negligence premises liability"
+  GOOD: "landowner duty protect invitee unforeseeable criminal act third party"
+  GOOD: "foreseeability sudden criminal assault business premises California"
+  GOOD: "negligent hiring supervision retention elements employer liability"
+  GOOD: "prior similar incidents notice foreseeability premises liability"
 - statute_queries: specific California code sections in the format \
 "Code Name section NUMBER" (e.g., "Civil Code section 1714", \
-"Code of Civil Procedure section 340.5"). Only include sections you are \
-confident are relevant.
-- legal_topics: 1-3 broad legal topics (e.g., "premises liability", \
-"medical malpractice", "breach of fiduciary duty").
+"Code of Civil Procedure section 437c"). Include ALL relevant code sections — \
+both substantive (duty, elements) and procedural (summary judgment standard).
+- legal_doctrines: 2-5 specific legal doctrines at issue. These should be \
+precise enough to identify the controlling case law.
+  BAD: "negligence"
+  GOOD: "landowner's duty to protect against foreseeable criminal acts of third parties"
+  GOOD: "employer liability for negligent hiring, supervision, and retention"
 
-Focus on California state law. Prefer California-specific search terms and \
-code sections. Output ONLY the JSON object, no commentary."""
+Analyze any attached complaint to identify specific causes of action and elements. \
+Analyze depositions and discovery for facts relevant to each element. \
+Focus on California state law. Output ONLY the JSON object, no commentary."""
 
 SYNTHESIS_PROMPT = """\
 You are a California litigation attorney drafting a legal research memorandum.
@@ -86,6 +100,32 @@ Status meanings:
 
 If a citation cannot be found in the provided sources, mark it FLAGGED. \
 Never assume a citation is correct — verify against the provided authorities."""
+
+RELEVANCE_RANKING_PROMPT = """\
+You are a California litigation attorney selecting the most relevant cases \
+for a specific legal issue. You will be given a list of case names and snippets \
+from a database search, along with the legal question.
+
+Your task:
+1. Select the 10-15 MOST RELEVANT cases for the specific legal issues.
+2. Prioritize: California Supreme Court > Court of Appeal > other courts.
+3. Prioritize: cases that directly address the legal doctrine at issue.
+4. Prioritize: more recent cases over older ones (unless the older case is seminal).
+5. For each selected case, explain in 1 sentence WHY it is relevant.
+
+Output valid JSON:
+{
+  "selected_cases": [
+    {
+      "index": 0,
+      "relevance": "Seminal case establishing duty of care standard under Civ. Code 1714"
+    }
+  ]
+}
+
+The "index" is the 0-based position of the case in the list provided. \
+Select ONLY cases that are directly relevant to the legal issues. \
+Quality over quantity. Output ONLY the JSON object, no commentary."""
 
 CITATION_INSTRUCTION = (
     "You MUST ONLY cite cases and statutes from the [LEGAL AUTHORITY] section "

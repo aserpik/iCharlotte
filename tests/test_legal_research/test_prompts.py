@@ -23,7 +23,7 @@ class TestQueryPlanningPrompt(unittest.TestCase):
         """Prompt specifies the expected JSON keys."""
         self.assertIn("case_queries", QUERY_PLANNING_PROMPT)
         self.assertIn("statute_queries", QUERY_PLANNING_PROMPT)
-        self.assertIn("legal_topics", QUERY_PLANNING_PROMPT)
+        self.assertIn("legal_doctrines", QUERY_PLANNING_PROMPT)
 
     def test_query_planning_prompt_mentions_california(self):
         self.assertIn("California", QUERY_PLANNING_PROMPT)

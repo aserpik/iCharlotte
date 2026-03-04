@@ -9,25 +9,26 @@ class TestLegalResearchEngine(unittest.TestCase):
     def setUp(self):
         self.engine = LegalResearchEngine(courtlistener_token="test-token")
 
+    @patch.object(LegalResearchEngine, '_enrich_top_cases')
     @patch.object(LegalResearchEngine, '_search_sources')
     @patch.object(LegalResearchEngine, '_plan_queries')
-    def test_research_returns_result(self, mock_plan, mock_search):
+    def test_research_returns_result(self, mock_plan, mock_search, mock_enrich):
+        cases = [CaseResult(
+            name="Rowland v. Christian", citation="69 Cal.2d 108",
+            date="1968-08-08", court="Supreme Court of California",
+            snippet="Duty of care", url="http://test", cluster_id=1
+        )]
+        statutes = [StatuteResult(
+            code="CIV", section="1714", title="Civil Code",
+            text="Everyone is responsible...", url="http://test"
+        )]
         mock_plan.return_value = {
             "case_queries": ["premises liability duty of care"],
             "statute_queries": ["Civil Code section 1714"],
-            "legal_topics": ["premises liability"],
+            "legal_doctrines": ["premises liability"],
         }
-        mock_search.return_value = (
-            [CaseResult(
-                name="Rowland v. Christian", citation="69 Cal.2d 108",
-                date="1968-08-08", court="Supreme Court of California",
-                snippet="Duty of care", url="http://test", cluster_id=1
-            )],
-            [StatuteResult(
-                code="CIV", section="1714", title="Civil Code",
-                text="Everyone is responsible...", url="http://test"
-            )],
-        )
+        mock_search.return_value = (cases, statutes)
+        mock_enrich.return_value = cases  # pass through
 
         def mock_llm(system, user):
             return "Analysis with citations."

@@ -8,6 +8,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 from .models import CaseResult, ResearchResult, StatuteResult, VerificationStatus
 from .prompts import (
     QUERY_PLANNING_PROMPT,
+    RELEVANCE_RANKING_PROMPT,
     SYNTHESIS_PROMPT,
     VERIFICATION_PROMPT,
 )
@@ -20,6 +21,11 @@ logger = logging.getLogger(__name__)
 # Type alias: llm_callback(system_prompt, user_prompt) -> str
 LLMCallback = Callable[[str, str], str]
 
+# Max cases to keep after relevance filtering
+_MAX_RELEVANT_CASES = 15
+# Max chars of opinion text to fetch per case
+_OPINION_SNIPPET_LENGTH = 1500
+
 
 class LegalResearchEngine:
     """Stateless research engine -- no Qt dependency.
@@ -27,8 +33,10 @@ class LegalResearchEngine:
     Pipeline:
     1. Query planning (LLM extracts search terms from natural language)
     2. Parallel source search (CourtListener, CA Leginfo, CA Courts)
-    3. Synthesis (LLM produces memo with citations)
-    4. Verification (LLM cross-checks every citation against source data)
+    3. Relevance filtering (LLM selects top cases)
+    4. Case enrichment (fetch opinion text for top cases)
+    5. Synthesis (LLM produces memo with citations)
+    6. Verification (LLM cross-checks every citation against source data)
     """
 
     def __init__(self, courtlistener_token: str):
@@ -79,7 +87,17 @@ class LegalResearchEngine:
         status("Searching legal databases...")
         cases, statutes = self._search_sources(search_plan)
 
-        # Phase 3: Synthesis
+        # Phase 3: Relevance Filtering
+        if len(cases) > _MAX_RELEVANT_CASES:
+            status("Filtering most relevant cases...")
+            cases = self._rank_and_filter(query, cases, llm_callback)
+
+        # Phase 4: Case Enrichment (fetch opinion text for top cases)
+        if cases:
+            status("Fetching case holdings...")
+            cases = self._enrich_top_cases(cases)
+
+        # Phase 5: Synthesis
         status("Synthesizing legal analysis...")
         result = ResearchResult(query=query, cases=cases, statutes=statutes)
         authority_block = result.format_authority_block()
@@ -89,7 +107,7 @@ class LegalResearchEngine:
         )
         result.memo = memo
 
-        # Phase 4: Verification
+        # Phase 6: Verification
         if cases or statutes:
             status("Verifying citations...")
             result.verification = self._verify_citations(
@@ -128,9 +146,9 @@ class LegalResearchEngine:
         except (json.JSONDecodeError, ValueError):
             # Fallback: use the raw query as a single search term
             return {
-                "case_queries": [query],
+                "case_queries": [query[:200]],
                 "statute_queries": [],
-                "legal_topics": [],
+                "legal_doctrines": [],
             }
 
     def _search_sources(
@@ -184,6 +202,109 @@ class LegalResearchEngine:
                 unique_cases.append(c)
 
         return unique_cases, statutes
+
+    def _rank_and_filter(
+        self,
+        query: str,
+        cases: List[CaseResult],
+        llm_callback: LLMCallback,
+    ) -> List[CaseResult]:
+        """Use LLM to select the most relevant cases."""
+        # Build a compact list for the LLM
+        case_list = []
+        for i, c in enumerate(cases):
+            entry = f"[{i}] {c.formatted_citation}"
+            if c.snippet:
+                entry += f" -- {c.snippet[:150]}"
+            case_list.append(entry)
+
+        user_prompt = (
+            f"LEGAL QUESTION:\n{query[:3000]}\n\n"
+            f"CASES ({len(cases)} total):\n" + "\n".join(case_list)
+        )
+
+        raw = llm_callback(RELEVANCE_RANKING_PROMPT, user_prompt)
+        try:
+            cleaned = raw.strip()
+            if cleaned.startswith("```"):
+                cleaned = cleaned.split("\n", 1)[1] if "\n" in cleaned else cleaned[3:]
+                if cleaned.endswith("```"):
+                    cleaned = cleaned[:-3]
+                cleaned = cleaned.strip()
+            data = json.loads(cleaned)
+            selected = data.get("selected_cases", [])
+
+            filtered = []
+            for entry in selected:
+                idx = entry.get("index")
+                if isinstance(idx, int) and 0 <= idx < len(cases):
+                    case = cases[idx]
+                    # Store relevance note in snippet if snippet is empty
+                    relevance = entry.get("relevance", "")
+                    if relevance and not case.snippet:
+                        case = CaseResult(
+                            name=case.name,
+                            citation=case.citation,
+                            date=case.date,
+                            court=case.court,
+                            snippet=relevance,
+                            url=case.url,
+                            cluster_id=case.cluster_id,
+                            negative_treatment=case.negative_treatment,
+                            relevance_score=case.relevance_score,
+                        )
+                    filtered.append(case)
+
+            return filtered if filtered else cases[:_MAX_RELEVANT_CASES]
+
+        except (json.JSONDecodeError, ValueError):
+            # Fallback: just take the first N
+            return cases[:_MAX_RELEVANT_CASES]
+
+    def _enrich_top_cases(self, cases: List[CaseResult]) -> List[CaseResult]:
+        """Fetch opinion text for top cases that have cluster IDs."""
+        enrichable = [c for c in cases if c.cluster_id]
+        if not enrichable:
+            return cases
+
+        # Fetch opinion text in parallel (limit to top 10)
+        enrichable = enrichable[:10]
+        cluster_to_text: Dict[int, str] = {}
+
+        with ThreadPoolExecutor(max_workers=5) as pool:
+            futures = {}
+            for c in enrichable:
+                f = pool.submit(self.cl_client.get_opinion_text, c.cluster_id)
+                futures[f] = c.cluster_id
+
+            for future in as_completed(futures):
+                cid = futures[future]
+                try:
+                    text = future.result()
+                    if text:
+                        cluster_to_text[cid] = text[:_OPINION_SNIPPET_LENGTH]
+                except Exception:
+                    logger.debug("Failed to fetch opinion for cluster %s", cid)
+
+        # Replace snippets with actual opinion text
+        enriched = []
+        for c in cases:
+            if c.cluster_id and c.cluster_id in cluster_to_text:
+                enriched.append(CaseResult(
+                    name=c.name,
+                    citation=c.citation,
+                    date=c.date,
+                    court=c.court,
+                    snippet=cluster_to_text[c.cluster_id],
+                    url=c.url,
+                    cluster_id=c.cluster_id,
+                    negative_treatment=c.negative_treatment,
+                    relevance_score=c.relevance_score,
+                ))
+            else:
+                enriched.append(c)
+
+        return enriched
 
     def _verify_citations(
         self,
