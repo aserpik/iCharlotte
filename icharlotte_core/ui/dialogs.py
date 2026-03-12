@@ -22,6 +22,8 @@ from ..chat.token_counter import TokenCounter
 # Available models per provider (must be defined before PromptsDialog class)
 AVAILABLE_MODELS = {
     "Gemini": [
+        ("gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
+        ("gemini-3.1-flash-lite-preview", "Gemini 3.1 Flash Lite Preview"),
         ("gemini-3-pro-preview", "Gemini 3 Pro Preview"),
         ("gemini-3-flash-preview", "Gemini 3 Flash Preview"),
         ("gemini-2.5-pro", "Gemini 2.5 Pro"),

@@ -239,4 +239,13 @@ BUILTIN_PROMPTS = [
         category='Extraction',
         is_builtin=True
     ),
+    QuickPrompt(
+        id='builtin_transcribe',
+        name='Transcribe',
+        prompt='Create a verbatim transcript of the audio in the uploaded document.',
+        category='Extraction',
+        is_builtin=True
+    ),
 ]
+
+TRANSCRIBE_PROMPT = 'Create a verbatim transcript of the audio in the uploaded document.'

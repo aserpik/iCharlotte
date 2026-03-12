@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QFileDialog, QMessageBox, QDialog, QProgressBar, QTabWidget,
     QTableWidget, QHeaderView, QTableWidgetItem, QCheckBox, QFileIconProvider,
     QLineEdit, QInputDialog, QMenu, QApplication, QToolButton, QScrollArea,
-    QSizePolicy
+    QSizePolicy, QSlider
 )
 from PySide6.QtCore import Qt, Signal, QThread, QFileInfo, QTimer, QSettings
 from PySide6.QtGui import QTextCursor, QDragEnterEvent, QDropEvent, QAction, QPixmap
@@ -28,7 +28,7 @@ from .chat_widgets import (
     ConversationSidebar, ResizableInputArea, ContextIndicator,
     MessageWidget, SearchResultsWidget, get_theme, THEMES
 )
-from ..chat import ChatPersistence, TokenCounter, Message, Conversation, BUILTIN_PROMPTS
+from ..chat import ChatPersistence, TokenCounter, Message, Conversation, BUILTIN_PROMPTS, TRANSCRIBE_PROMPT
 
 try:
     import fitz  # PyMuPDF
@@ -114,6 +114,7 @@ class OCRRunner(QThread):
                 
         except Exception as e:
             self.finished.emit(False, str(e), self.file_path)
+
 
 # --- Chat System ---
 
@@ -206,6 +207,14 @@ class ChatTab(QWidget):
         self.sys_prompt_btn.clicked.connect(self.open_sys_prompt)
         settings_layout.addWidget(self.sys_prompt_btn)
 
+        # Templates dropdown (under System Instructions)
+        self.template_btn = QToolButton()
+        self.template_btn.setText("Templates ▾")
+        self.template_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.template_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.update_template_menu()
+        settings_layout.addWidget(self.template_btn)
+
         settings_layout.addSpacing(10)
 
         # Theme toggle
@@ -225,14 +234,37 @@ class ChatTab(QWidget):
         settings_layout.addWidget(self.select_file_btn)
 
         self.file_list = QListWidget()
-        self.file_list.setFixedHeight(120)
+        self.file_list.setMinimumHeight(60)
+        self.file_list.setMaximumHeight(400)
         self.file_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.file_list.customContextMenuRequested.connect(self.show_file_context_menu)
         settings_layout.addWidget(self.file_list)
 
-        clear_files_btn = QPushButton("Clear Files")
+        # File list height slider
+        height_slider = QSlider(Qt.Orientation.Horizontal)
+        height_slider.setMinimum(60)
+        height_slider.setMaximum(400)
+        height_slider.setValue(120)
+        height_slider.setToolTip("Drag to resize file list height")
+        height_slider.valueChanged.connect(lambda v: self.file_list.setFixedHeight(v))
+        self.file_list.setFixedHeight(120)
+        settings_layout.addWidget(height_slider)
+
+        # Select All / Deselect All / Clear Files buttons
+        file_btn_layout = QHBoxLayout()
+        select_all_btn = QPushButton("All")
+        select_all_btn.setToolTip("Select all files")
+        select_all_btn.clicked.connect(lambda: self._set_all_file_checks(Qt.CheckState.Checked))
+        deselect_all_btn = QPushButton("None")
+        deselect_all_btn.setToolTip("Deselect all files")
+        deselect_all_btn.clicked.connect(lambda: self._set_all_file_checks(Qt.CheckState.Unchecked))
+        clear_files_btn = QPushButton("Clear")
+        clear_files_btn.setToolTip("Remove all files")
         clear_files_btn.clicked.connect(self.clear_files)
-        settings_layout.addWidget(clear_files_btn)
+        file_btn_layout.addWidget(select_all_btn)
+        file_btn_layout.addWidget(deselect_all_btn)
+        file_btn_layout.addWidget(clear_files_btn)
+        settings_layout.addLayout(file_btn_layout)
 
         clear_chat_btn = QPushButton("Clear Chat")
         clear_chat_btn.setToolTip("Clear the current conversation and start a new one")
@@ -293,13 +325,6 @@ class ChatTab(QWidget):
 
         # Toolbar row
         toolbar_layout = QHBoxLayout()
-
-        # Quick prompts dropdown
-        self.template_btn = QToolButton()
-        self.template_btn.setText("Templates")
-        self.template_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.update_template_menu()
-        toolbar_layout.addWidget(self.template_btn)
 
         # Legal Research checkbox
         self.legal_research_check = QCheckBox("Legal Research")
@@ -698,7 +723,9 @@ class ChatTab(QWidget):
         
         # Set default model
         if provider == "Gemini":
-            idx = self.model_combo.findText("gemini-3-flash-preview")
+            idx = self.model_combo.findText("gemini-3.1-flash-lite-preview")
+            if idx == -1:
+                idx = self.model_combo.findText("gemini-3-flash-preview")
             if idx != -1:
                 self.model_combo.setCurrentIndex(idx)
             else:
@@ -727,7 +754,10 @@ class ChatTab(QWidget):
     def select_files(self):
         files, _ = QFileDialog.getOpenFileNames(
             self, "Select Files", "",
-            "All Supported (*.pdf *.docx *.txt *.msg *.png *.jpg *.jpeg *.gif *.webp);;Documents (*.pdf *.docx *.txt *.msg);;Images (*.png *.jpg *.jpeg *.gif *.webp)"
+            "All Supported (*.pdf *.docx *.txt *.msg *.png *.jpg *.jpeg *.gif *.webp *.mp3 *.mp4 *.m4a *.wav *.ogg *.flac *.aac *.wma *.avi *.mkv *.mov *.webm);;"
+            "Documents (*.pdf *.docx *.txt *.msg);;"
+            "Images (*.png *.jpg *.jpeg *.gif *.webp);;"
+            "Audio/Video (*.mp3 *.mp4 *.m4a *.wav *.ogg *.flac *.aac *.wma *.avi *.mkv *.mov *.webm)"
         )
         for f in files:
             self.add_file(f)
@@ -772,6 +802,11 @@ class ChatTab(QWidget):
             # Persist the added file
             if self.persistence:
                 self.persistence.add_attached_file(final_path)
+
+    def _set_all_file_checks(self, state):
+        """Set all file list items to the given check state."""
+        for i in range(self.file_list.count()):
+            self.file_list.item(i).setCheckState(state)
 
     def clear_files(self):
         """Clear all attached files and persist the change."""
@@ -937,7 +972,8 @@ class ChatTab(QWidget):
         Files are collected immediately but processed asynchronously to avoid
         blocking Windows Explorer during OCR or other heavy operations.
         """
-        supported_extensions = (".pdf", ".docx", ".txt", ".msg", ".png", ".jpg", ".jpeg", ".gif", ".webp")
+        supported_extensions = (".pdf", ".docx", ".txt", ".msg", ".png", ".jpg", ".jpeg", ".gif", ".webp",
+                                ".mp3", ".mp4", ".m4a", ".wav", ".ogg", ".flac", ".aac", ".wma", ".avi", ".mkv", ".mov", ".webm")
         files_to_add = []
         for url in event.mimeData().urls():
             path = url.toLocalFile()
@@ -1019,9 +1055,17 @@ class ChatTab(QWidget):
                             content += f"From: {sender}\nSubject: {subject}\n\n{body}\n"
                         except Exception as msg_err:
                             content += f"[Error reading .msg file: {msg_err}]\n"
+                    elif ext in self.AUDIO_VIDEO_EXTENSIONS:
+                        file_size = os.path.getsize(path)
+                        size_mb = file_size / (1024 * 1024)
+                        content += f"[Audio/Video file: {os.path.basename(path)}, {size_mb:.1f} MB]\n"
+                        content += "[WARNING: This model cannot process audio/video content]\n"
                 except Exception as e:
                     content += f"[Error reading file: {e}]\n"
         return content
+
+    AUDIO_VIDEO_EXTENSIONS = {'.mp3', '.mp4', '.m4a', '.wav', '.ogg', '.flac', '.aac', '.wma',
+                              '.avi', '.mkv', '.mov', '.webm'}
 
     def stop_generation(self):
         """Stop the current generation."""
@@ -1079,6 +1123,30 @@ class ChatTab(QWidget):
         file_content = self.read_files_content()
         attachments = self.get_attachment_info()
 
+        # Detect audio/video attachments
+        audio_files = self._get_checked_audio_files()
+        current_provider = self.provider_combo.currentText()
+
+        # Safety: warn for non-Gemini providers (they can't process media)
+        if audio_files and current_provider != "Gemini":
+            file_names = ", ".join(os.path.basename(f) for f in audio_files)
+            reply = QMessageBox.warning(
+                self, "Audio/Video Files Detected",
+                f"You have audio/video files attached:\n{file_names}\n\n"
+                f"{current_provider} models cannot process audio/video and will "
+                f"likely hallucinate a fake transcript.\n\n"
+                f"Switch to Gemini for native audio/video support, or click "
+                f"No to send anyway.",
+                QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel
+            )
+            if reply == QMessageBox.StandardButton.Cancel:
+                self.send_btn.setEnabled(True)
+                self.stop_btn.setEnabled(False)
+                return
+            # User chose No — clear audio_files so we don't try to upload
+            audio_files = []
+
         # Legal Research: if checked, run research before LLM call
         research_result = None
         if self.legal_research_check.isChecked():
@@ -1087,9 +1155,18 @@ class ChatTab(QWidget):
                 self.chat_history.append("<i>Researching legal authority...</i>")
                 QApplication.processEvents()
 
-                research_query = user_text
-                if file_content:
-                    research_query += "\n\nContext:\n" + file_content[:8000]
+                # Extract focused legal questions instead of sending raw prompt
+                from icharlotte_core.legal_research.prompts import QUERY_EXTRACTION_PROMPT
+                self.chat_history.append("<i>  Extracting legal questions...</i>")
+                QApplication.processEvents()
+                research_query = _llm_for_research(
+                    QUERY_EXTRACTION_PROMPT,
+                    (user_text + ("\n\nContext:\n" + file_content[:8000] if file_content else ""))[:8000]
+                )
+                if not research_query or len(research_query.strip()) < 20:
+                    research_query = user_text
+                    if file_content:
+                        research_query += "\n\nContext:\n" + file_content[:8000]
 
                 def _llm_for_research(system_prompt, user_prompt):
                     from icharlotte_core.llm import LLMHandler
@@ -1103,6 +1180,10 @@ class ChatTab(QWidget):
                     )
 
                 try:
+                    # Pass the original user text so the engine can extract
+                    # specific case names that QUERY_EXTRACTION_PROMPT may
+                    # have stripped out.
+                    _orig = (user_text + ("\n\n" + file_content[:8000] if file_content else ""))[:8000]
                     research_result = engine.research(
                         query=research_query,
                         llm_callback=_llm_for_research,
@@ -1110,6 +1191,7 @@ class ChatTab(QWidget):
                             self.chat_history.append(f"<i>  {msg}</i>"),
                             QApplication.processEvents(),
                         ),
+                        original_prompt=_orig,
                     )
                 except Exception as e:
                     self.chat_history.append(f"<font color='orange'>Research error: {e}</font>")
@@ -1156,19 +1238,26 @@ class ChatTab(QWidget):
         if research_result:
             from icharlotte_core.legal_research.prompts import build_augmented_system_prompt
             authority = research_result.format_authority_block()
+            memo = research_result.memo or ""
             effective_system_prompt = build_augmented_system_prompt(
-                self.system_prompt, authority
+                self.system_prompt, authority, research_memo=memo
             )
 
-        # Start Worker
+        # Start Worker (pass media files for Gemini native upload)
+        media_for_upload = audio_files if (audio_files and current_provider == "Gemini") else None
+        if media_for_upload:
+            self.chat_history.append("<i>Uploading media to Gemini...</i>")
+            QApplication.processEvents()
+
         self.worker = LLMWorker(
-            self.provider_combo.currentText(),
+            current_provider,
             self.model_combo.currentText(),
             effective_system_prompt,
             user_text,
             file_content,
             settings,
-            history=list(self.conversation_history[:-1])  # Exclude the message we just added
+            history=list(self.conversation_history[:-1]),  # Exclude the message we just added
+            media_files=media_for_upload
         )
 
         self.worker.new_token.connect(self.on_streaming_token)
@@ -1188,6 +1277,21 @@ class ChatTab(QWidget):
                 return None
             self._legal_research_engine = LegalResearchEngine(courtlistener_token=token)
         return self._legal_research_engine
+
+    def _get_checked_audio_files(self):
+        """Return list of checked audio/video file paths."""
+        audio_files = []
+        for i in range(self.file_list.count()):
+            item = self.file_list.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                path = item.data(Qt.ItemDataRole.UserRole)
+                if path:
+                    ext = os.path.splitext(path)[1].lower()
+                    if ext in self.AUDIO_VIDEO_EXTENSIONS:
+                        audio_files.append(path)
+        return audio_files
+
+
 
     def on_streaming_token(self, token: str):
         """Handle real-time token display during streaming."""
@@ -1218,6 +1322,19 @@ class ChatTab(QWidget):
         cursor.setPosition(self.stream_start_pos)
         cursor.movePosition(QTextCursor.MoveOperation.End, QTextCursor.MoveMode.KeepAnchor)
         cursor.removeSelectedText()
+
+        # Apply deterministic citation cross-check if legal research was done
+        if hasattr(self, '_pending_research') and self._pending_research:
+            rr = self._pending_research
+            if rr.cases:
+                try:
+                    from icharlotte_core.legal_research.engine import LegalResearchEngine
+                    known_names = rr.get_known_case_names()
+                    text = LegalResearchEngine._deterministic_citation_check(
+                        text, known_names
+                    )
+                except Exception as e:
+                    print(f"[ChatTab] Deterministic citation check failed: {e}")
 
         # Convert markdown to HTML
         try:
@@ -1483,11 +1600,10 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
         menu = QMenu(self)
 
         # Built-in prompts
-        builtin_menu = menu.addMenu("Built-in")
         for prompt in BUILTIN_PROMPTS:
             action = QAction(prompt.name, self)
             action.triggered.connect(lambda checked, p=prompt: self.insert_template(p.prompt))
-            builtin_menu.addAction(action)
+            menu.addAction(action)
 
         # Custom prompts (if persistence available)
         if self.persistence:
@@ -1495,11 +1611,10 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
             custom_prompts = [p for p in prompts if not p.is_builtin]
             if custom_prompts:
                 menu.addSeparator()
-                custom_menu = menu.addMenu("Custom")
                 for prompt in custom_prompts:
                     action = QAction(prompt.name, self)
                     action.triggered.connect(lambda checked, p=prompt: self.insert_template(p.prompt))
-                    custom_menu.addAction(action)
+                    menu.addAction(action)
 
         menu.addSeparator()
         manage_action = QAction("Manage Templates...", self)

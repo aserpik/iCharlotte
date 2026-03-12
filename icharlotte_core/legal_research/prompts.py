@@ -17,7 +17,8 @@ Output valid JSON with the following structure:
 {
   "case_queries": ["..."],
   "statute_queries": ["..."],
-  "legal_doctrines": ["..."]
+  "legal_doctrines": ["..."],
+  "requested_cases": ["..."]
 }
 
 Rules:
@@ -37,10 +38,42 @@ precise enough to identify the controlling case law.
   BAD: "negligence"
   GOOD: "landowner's duty to protect against foreseeable criminal acts of third parties"
   GOOD: "employer liability for negligent hiring, supervision, and retention"
+- requested_cases: If the user mentions ANY specific case by name (e.g., \
+"Polibrid Coatings v. Superior Court", "Aguilar v. Atlantic Richfield"), \
+extract the FULL case name exactly as the user wrote it and include it here. \
+If the user does not mention any specific cases, use an empty list [].
 
 Analyze any attached complaint to identify specific causes of action and elements. \
 Analyze depositions and discovery for facts relevant to each element. \
 Focus on California state law. Output ONLY the JSON object, no commentary."""
+
+QUERY_EXTRACTION_PROMPT = """\
+You are extracting legal research queries from a litigation analysis prompt. \
+The user has a long prompt containing case facts, parties, causes of action, and \
+instructions. Your job is to identify EVERY cause of action and legal doctrine \
+at issue and produce a focused research query for each one.
+
+Rules:
+- Identify ALL causes of action mentioned (negligence, breach of contract, \
+equitable indemnity, contribution, premises liability, etc.)
+- For each cause of action, write a specific query targeting the key legal \
+doctrine that would be disputed (not just "negligence elements" but the \
+specific contested issue like "contractor duty to property owner for work \
+outside contracted scope")
+- Include queries for major defenses mentioned (comparative fault, open and \
+obvious danger, nondelegable duty, etc.)
+- Output 3-7 queries, one per line
+- Each query should be specific enough to find relevant California case law
+- Do NOT include party names, case facts, or formatting instructions
+
+Examples:
+- "commercial landlord nondelegable duty independent contractor repairs California"
+- "contractor liability scope of work not contracted premises liability"
+- "property owner prior knowledge dangerous condition comparative fault tenant"
+- "breach oral contract time and materials arrangement California elements"
+- "equitable indemnity apportionment fault between property owner and contractor"
+
+Keep total output under 800 characters."""
 
 SYNTHESIS_PROMPT = """\
 You are a California litigation attorney drafting a legal research memorandum.
@@ -72,11 +105,23 @@ You are a legal citation verification specialist. This task is \
 malpractice-level serious — incorrect citations in court filings can result \
 in sanctions, case dismissal, and bar discipline.
 
-For each citation in the text, check:
-- EXISTENCE: Does this case or statute actually exist in the provided sources?
-- ACCURACY: Is the citation format correct (name, year, volume, reporter, page)?
-- SUPPORT: Does the cited authority actually support the proposition stated?
-- TREATMENT: Has the authority been overruled, disapproved, or limited?
+You will be given:
+1. DRAFT TEXT containing citations
+2. SOURCE DATA containing the ONLY authorities that may be cited
+3. KNOWN CASE NAMES — an explicit list of case names from the source data
+
+Your verification process for EACH citation in the draft:
+1. EXISTENCE CHECK: Find the case name in the KNOWN CASE NAMES list. If the \
+case name does NOT appear in the list, it MUST be marked FLAGGED immediately — \
+do not try to infer or assume it exists.
+2. ACCURACY CHECK: If found, compare year, volume, reporter, and page against SOURCE DATA.
+3. SUPPORT CHECK: Does the cited authority actually support the stated proposition?
+4. TREATMENT CHECK: Has the authority been overruled, disapproved, or limited?
+
+CRITICAL RULE: A citation is ONLY valid if its case name appears in the \
+KNOWN CASE NAMES list. Any citation not in that list is FLAGGED, period. \
+Do NOT give the benefit of the doubt. Do NOT assume a citation is real just \
+because it "sounds right" or you think you recognize it.
 
 Output valid JSON with this structure:
 {
@@ -93,13 +138,13 @@ Output valid JSON with this structure:
 }
 
 Status meanings:
-- PASS: Citation exists, is accurate, supports the proposition, and is good law.
-- FIXED: Citation had a minor error (typo, wrong page, formatting) that was corrected.
-- FLAGGED: Citation could not be verified, does not support the proposition, \
+- PASS: Citation exists IN THE KNOWN CASE NAMES, is accurate, supports the proposition, and is good law.
+- FIXED: Citation exists but had a minor error (typo, wrong page, formatting) that was corrected.
+- FLAGGED: Citation NOT FOUND in KNOWN CASE NAMES, does not support the proposition, \
   or the authority has been negatively treated. MUST be reviewed by attorney.
 
-If a citation cannot be found in the provided sources, mark it FLAGGED. \
-Never assume a citation is correct — verify against the provided authorities."""
+Default to FLAGGED. Only mark PASS if you can confirm the case name is in \
+the KNOWN CASE NAMES list AND the citation details match SOURCE DATA."""
 
 RELEVANCE_RANKING_PROMPT = """\
 You are a California litigation attorney selecting the most relevant cases \
@@ -127,28 +172,107 @@ The "index" is the 0-based position of the case in the list provided. \
 Select ONLY cases that are directly relevant to the legal issues. \
 Quality over quantity. Output ONLY the JSON object, no commentary."""
 
+RESEARCH_FRAMING_INSTRUCTION = (
+    "LEGAL DRAFTING REQUIREMENTS:\n"
+    "You are drafting a legal document for a California litigation attorney. "
+    "Write thorough, comprehensive, and persuasive prose. Develop each "
+    "argument fully — state the legal rule, cite authority, apply the rule to "
+    "the facts, and address counterarguments. Do NOT write skeletal or "
+    "abbreviated arguments. Each section should have substantive depth "
+    "comparable to what a practicing attorney would file with a court.\n\n"
+    "MANDATORY CASE LAW CITATION REQUIREMENTS:\n"
+    "You have been provided with researched legal authorities in the [LEGAL "
+    "RESEARCH MEMO] and [LEGAL AUTHORITY] sections below. You MUST weave these "
+    "citations into your analysis. Specifically:\n\n"
+    "- For EVERY legal element you analyze (duty, breach, causation, notice, "
+    "etc.), cite at least one case from the provided authorities that supports "
+    "the rule you are stating. Use California citation format: Case Name (Year) "
+    "Volume Reporter Page.\n"
+    "- NEVER repeat the same proposition in both the text and a citation "
+    "parenthetical. If the sentence already states the rule the case stands "
+    "for, a bare citation is sufficient — do NOT add '(holding that [same "
+    "rule])'. Only include a parenthetical when it adds NEW information the "
+    "reader does not already have from the surrounding text.\n"
+    "  BAD:  'Trial continuances require good cause. (Falcone (2008) 164 "
+    "Cal.App.4th 814 (holding that trial continuances require good cause).)'\n"
+    "  GOOD: 'Trial continuances require good cause. (In re Marriage of "
+    "Falcone & Fyke (2008) 164 Cal.App.4th 814, 823.)'\n"
+    "  GOOD: 'As the court held in Falcone, trial continuances are disfavored "
+    "but may be granted upon an affirmative showing of good cause. (164 "
+    "Cal.App.4th at p. 823.)'\n"
+    "- When presenting counterarguments or the opposing party's likely position, "
+    "cite a case supporting that position too, then distinguish it on the facts.\n"
+    "- Do NOT say 'the provided authorities are insufficient' unless you have "
+    "genuinely searched the [LEGAL RESEARCH MEMO] and [LEGAL AUTHORITY] and "
+    "found zero relevant cases for that point. Even general negligence or "
+    "contract principles from the provided cases can support your analysis.\n"
+    "- If a cause of action is not directly addressed by the provided cases, "
+    "apply the closest analogous authority and note that further research may "
+    "be warranted.\n"
+    "- If the user asks you to cite a case that is NOT in [LEGAL AUTHORITY], "
+    "do NOT make up a citation. Instead, state: 'The case [name] could not be "
+    "verified in legal databases. Further research is needed to confirm this "
+    "citation before it can be included.'\n"
+    "- NEVER guess or fabricate citation details (year, volume, reporter, page). "
+    "If you don't have the exact citation from [LEGAL AUTHORITY], don't cite it.\n\n"
+    "IMPORTANT: These citation requirements do NOT override the formatting, "
+    "structure, or style instructions in the user's prompt. Follow the user's "
+    "requested format exactly — just ensure case law citations are woven into "
+    "the prose wherever legal rules or elements are discussed."
+)
+
 CITATION_INSTRUCTION = (
-    "You MUST ONLY cite cases and statutes from the [LEGAL AUTHORITY] section "
-    "below. Do NOT fabricate or hallucinate any citations. If you cannot find "
-    "sufficient authority in the provided sources, state that expressly rather "
-    "than inventing references."
+    "STRICT CITATION RULES (VIOLATION = MALPRACTICE):\n"
+    "1. You may ONLY cite cases and statutes that appear in the [LEGAL RESEARCH "
+    "MEMO] and [LEGAL AUTHORITY] sections below.\n"
+    "2. Do NOT fabricate, hallucinate, or guess ANY citation details (case name, "
+    "year, volume, reporter, page number). Every element of every citation must "
+    "come from the provided sources.\n"
+    "3. If the user asks you to cite a SPECIFIC CASE that is NOT listed in "
+    "[LEGAL AUTHORITY], you MUST respond: 'The case [name] could not be verified "
+    "in legal databases and cannot be cited without manual verification by the "
+    "attorney.' Do NOT invent a citation for it.\n"
+    "4. If [LEGAL AUTHORITY] contains an 'UNFOUND CASES' section listing cases "
+    "that were not found, you are ABSOLUTELY PROHIBITED from citing those cases.\n"
+    "5. If you cannot find sufficient authority for a point, state that expressly "
+    "rather than inventing support.\n\n"
+    "Cite statutes as: Code Name, \u00a7 Section (e.g., Civ. Code, \u00a7 1714).\n"
+    "Note any negative treatment (overruled, disapproved) when citing a negatively "
+    "treated case."
 )
 
 
 def build_augmented_system_prompt(
-    base_system_prompt: str, authority_block: str
+    base_system_prompt: str,
+    authority_block: str,
+    research_memo: str = "",
 ) -> str:
-    """Combine a base system prompt with citation instructions and authority.
+    """Combine a base system prompt with citation instructions, memo, and authority.
 
     Args:
         base_system_prompt: The base system prompt for the task.
         authority_block: Pre-formatted block of legal authorities.
+        research_memo: Optional synthesis memo from the research engine.
 
     Returns:
-        Combined prompt with base, citation instruction, and authority block.
+        Combined prompt with base, citation instruction, memo, and authority block.
     """
-    return (
-        f"{base_system_prompt}\n\n"
-        f"{CITATION_INSTRUCTION}\n\n"
-        f"[LEGAL AUTHORITY]\n{authority_block}"
-    )
+    parts = [base_system_prompt]
+
+    if research_memo:
+        parts.append("")
+        parts.append(RESEARCH_FRAMING_INSTRUCTION)
+
+    parts.append("")
+    parts.append(CITATION_INSTRUCTION)
+
+    if research_memo:
+        parts.append("")
+        parts.append("[LEGAL RESEARCH MEMO]")
+        parts.append(research_memo)
+        parts.append("[/LEGAL RESEARCH MEMO]")
+
+    parts.append("")
+    parts.append(f"[LEGAL AUTHORITY]\n{authority_block}")
+
+    return "\n".join(parts)

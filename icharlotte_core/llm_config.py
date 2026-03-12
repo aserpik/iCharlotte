@@ -251,6 +251,13 @@ GEMINI3_MODEL_SEQUENCE = [
     ),
     ModelSpec(
         provider="Gemini",
+        model="gemini-3.1-flash-lite-preview",
+        max_tokens=-1,
+        supports_thinking=True,
+        cost_tier="standard"
+    ),
+    ModelSpec(
+        provider="Gemini",
         model="gemini-3-flash-preview",
         max_tokens=-1,
         supports_thinking=True,
@@ -625,7 +632,9 @@ class LLMConfig:
         return None
 
     def is_provider_available(self, provider: str) -> bool:
-        """Check if a provider has an API key configured."""
+        """Check if a provider is available. Claude uses CLI (Max subscription), no API key needed."""
+        if provider == "Claude":
+            return True
         return self.get_api_key(provider) is not None
 
     def get_available_providers(self) -> List[str]:

@@ -8,6 +8,9 @@ Provides comprehensive crash logging for the main GUI application with:
 - System state capture (memory, open files, Qt state)
 - Rotating crash logs
 - Startup/shutdown logging
+- Stderr capture for C-level / COM / WebEngine fatal messages
+- Heartbeat file for detecting silent deaths (GPU crash, OS kill, etc.)
+- Previous-session crash detection on startup
 """
 
 import os
@@ -19,6 +22,8 @@ import atexit
 import platform
 import json
 import logging
+import signal
+import ctypes
 from logging.handlers import RotatingFileHandler
 from typing import Optional, Callable, Any
 from functools import wraps
@@ -79,6 +84,315 @@ app_logger = setup_rotating_log('icharlotte.app', 'app.log')
 # Crash-specific logger (separate file for easy finding)
 crash_logger = setup_rotating_log('icharlotte.crash', 'app_crash.log', max_bytes=5*1024*1024, backup_count=3)
 
+# Heartbeat and stderr paths
+HEARTBEAT_PATH = os.path.join(CRASH_LOG_DIR, 'heartbeat.json')
+STDERR_LOG_PATH = os.path.join(LOG_DIR, 'stderr.log')
+
+
+# =============================================================================
+# Stderr Capture — catches C-level, COM, and WebEngine fatal messages
+# =============================================================================
+
+class StderrCapture:
+    """Tee stderr to both console and a log file.
+
+    C-level fatal exceptions (e.g. Windows code 0x8001010e), Qt/WebEngine
+    GPU errors, and Chromium crash messages are written to stderr and never
+    reach Python's exception system.  This captures them to a rotated log.
+    """
+
+    def __init__(self, log_path: str, original_stderr):
+        self._original = original_stderr
+        self._log_path = log_path
+        self._file = None
+        try:
+            self._file = open(log_path, 'a', encoding='utf-8', errors='replace')
+            self._file.write(f"\n{'='*60}\nStderr capture started: {datetime.datetime.now().isoformat()}\n{'='*60}\n")
+            self._file.flush()
+        except Exception:
+            pass
+
+    def write(self, text):
+        # Always forward to original stderr
+        if self._original:
+            try:
+                self._original.write(text)
+            except Exception:
+                pass
+        # Also write to log file
+        if self._file and text.strip():
+            try:
+                self._file.write(text)
+                self._file.flush()
+            except Exception:
+                pass
+
+    def flush(self):
+        if self._original:
+            try:
+                self._original.flush()
+            except Exception:
+                pass
+        if self._file:
+            try:
+                self._file.flush()
+            except Exception:
+                pass
+
+    def fileno(self):
+        if self._original:
+            return self._original.fileno()
+        raise OSError("no fileno")
+
+    def isatty(self):
+        return False
+
+    def close(self):
+        if self._file:
+            try:
+                self._file.close()
+            except Exception:
+                pass
+
+    @property
+    def encoding(self):
+        return getattr(self._original, 'encoding', 'utf-8')
+
+
+def install_stderr_capture():
+    """Install stderr capture.  Returns the capture object."""
+    capture = StderrCapture(STDERR_LOG_PATH, sys.stderr)
+    sys.stderr = capture
+
+    # Also redirect the C runtime's stderr (fd 2) to the same log file
+    # so that C-level fprintf(stderr, ...) from Qt/Chromium/COM is captured
+    try:
+        stderr_fd_log = STDERR_LOG_PATH + '.fd2'
+        c_stderr = os.open(stderr_fd_log, os.O_WRONLY | os.O_CREAT | os.O_APPEND)
+        os.dup2(c_stderr, 2)
+        os.close(c_stderr)
+    except Exception:
+        pass
+
+    return capture
+
+
+# =============================================================================
+# Heartbeat — detects silent crashes on next startup
+# =============================================================================
+
+def _write_heartbeat(pid: int, checkpoints: list, context: dict):
+    """Write heartbeat JSON atomically."""
+    data = {
+        'pid': pid,
+        'timestamp': datetime.datetime.now().isoformat(),
+        'clean_shutdown': False,
+        'checkpoints': checkpoints[-20:] if checkpoints else [],
+        'context': {k: str(v) for k, v in (context or {}).items()},
+    }
+    # Get memory info
+    try:
+        import psutil
+        mem = psutil.Process(pid).memory_info()
+        data['rss_mb'] = round(mem.rss / 1024 / 1024, 2)
+    except Exception:
+        pass
+    tmp = HEARTBEAT_PATH + '.tmp'
+    try:
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(data, f, default=str)
+        os.replace(tmp, HEARTBEAT_PATH)
+    except Exception:
+        pass
+
+
+def _mark_clean_shutdown():
+    """Mark the heartbeat as clean shutdown."""
+    try:
+        if os.path.exists(HEARTBEAT_PATH):
+            with open(HEARTBEAT_PATH, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            data['clean_shutdown'] = True
+            data['shutdown_time'] = datetime.datetime.now().isoformat()
+            with open(HEARTBEAT_PATH, 'w', encoding='utf-8') as f:
+                json.dump(data, f, default=str)
+    except Exception:
+        pass
+
+
+def check_previous_crash() -> Optional[dict]:
+    """Check if the previous session crashed (no clean shutdown).
+
+    Call this at startup BEFORE installing the new heartbeat.
+    Returns crash info dict if previous session died, else None.
+    """
+    try:
+        if not os.path.exists(HEARTBEAT_PATH):
+            return None
+        with open(HEARTBEAT_PATH, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        if data.get('clean_shutdown'):
+            return None
+        # Previous session didn't shut down cleanly
+        return data
+    except Exception:
+        return None
+
+
+def _log_previous_crash(prev: dict):
+    """Write a crash report for the previous session's silent death."""
+    crash_time = datetime.datetime.now()
+    last_heartbeat = prev.get('timestamp', 'unknown')
+    pid = prev.get('pid', 'unknown')
+
+    # Collect stderr evidence (Python-level + C-level fd2)
+    stderr_tail = ''
+    for spath in [STDERR_LOG_PATH, STDERR_LOG_PATH + '.fd2']:
+        try:
+            if os.path.exists(spath):
+                with open(spath, 'r', encoding='utf-8', errors='replace') as f:
+                    lines = f.readlines()
+                    if lines:
+                        stderr_tail += f'\n--- {os.path.basename(spath)} ---\n'
+                        stderr_tail += ''.join(lines[-50:])
+        except Exception:
+            pass
+
+    # Collect faulthandler evidence
+    faulthandler_tail = ''
+    fh_path = os.path.join(CRASH_LOG_DIR, 'faulthandler.log')
+    try:
+        if os.path.exists(fh_path):
+            with open(fh_path, 'r', encoding='utf-8', errors='replace') as f:
+                lines = f.readlines()
+                faulthandler_tail = ''.join(lines[-80:]) if lines else ''
+    except Exception:
+        pass
+
+    # Check Windows Event Log for the crashed PID
+    wer_info = ''
+    if platform.system() == 'Windows' and pid != 'unknown':
+        try:
+            wer_info = _query_windows_error_reports(pid, last_heartbeat)
+        except Exception:
+            pass
+
+    # Build report
+    report_lines = [
+        "=" * 70,
+        "SILENT CRASH DETECTED (previous session)",
+        "=" * 70,
+        f"Detection Time:   {crash_time.isoformat()}",
+        f"Last Heartbeat:   {last_heartbeat}",
+        f"Previous PID:     {pid}",
+        f"Memory at death:  {prev.get('rss_mb', 'N/A')} MB RSS",
+        "",
+    ]
+
+    if prev.get('checkpoints'):
+        report_lines.append("Last Checkpoints:")
+        for cp in prev['checkpoints'][-10:]:
+            ts = cp.get('time', '?')
+            desc = cp.get('description', '?')
+            report_lines.append(f"  [{ts}] {desc}")
+        report_lines.append("")
+
+    if prev.get('context'):
+        report_lines.append("Context:")
+        for k, v in prev['context'].items():
+            report_lines.append(f"  {k}: {v}")
+        report_lines.append("")
+
+    if stderr_tail.strip():
+        report_lines.append("-" * 70)
+        report_lines.append("STDERR (last 50 lines before crash):")
+        report_lines.append("-" * 70)
+        report_lines.append(stderr_tail)
+        report_lines.append("")
+
+    if faulthandler_tail.strip():
+        report_lines.append("-" * 70)
+        report_lines.append("FAULTHANDLER LOG (tail):")
+        report_lines.append("-" * 70)
+        report_lines.append(faulthandler_tail)
+        report_lines.append("")
+
+    if wer_info:
+        report_lines.append("-" * 70)
+        report_lines.append("WINDOWS ERROR REPORTING:")
+        report_lines.append("-" * 70)
+        report_lines.append(wer_info)
+        report_lines.append("")
+
+    full_text = '\n'.join(report_lines)
+
+    # Write to crash log
+    crash_logger.critical(full_text)
+
+    # Also write a standalone crash report file
+    timestamp = crash_time.strftime("%Y%m%d_%H%M%S")
+    txt_path = os.path.join(CRASH_LOG_DIR, f"silent_crash_{timestamp}_{pid}.txt")
+    try:
+        with open(txt_path, 'w', encoding='utf-8') as f:
+            f.write(full_text)
+    except Exception:
+        pass
+
+    # Write JSON version
+    json_path = os.path.join(CRASH_LOG_DIR, f"silent_crash_{timestamp}_{pid}.json")
+    try:
+        json_report = {
+            'event': 'silent_crash',
+            'detection_time': crash_time.isoformat(),
+            'last_heartbeat': last_heartbeat,
+            'pid': pid,
+            'rss_mb': prev.get('rss_mb'),
+            'checkpoints': prev.get('checkpoints', []),
+            'context': prev.get('context', {}),
+            'stderr_tail': stderr_tail[-2000:] if stderr_tail else '',
+            'faulthandler_tail': faulthandler_tail[-2000:] if faulthandler_tail else '',
+            'wer_info': wer_info[:2000] if wer_info else '',
+        }
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(json_report, f, indent=2, default=str)
+    except Exception:
+        pass
+
+    return txt_path
+
+
+def _query_windows_error_reports(pid, last_heartbeat_str: str) -> str:
+    """Query Windows Event Log for application crash events near the heartbeat time."""
+    try:
+        import subprocess
+        # Query Application Error events (Event ID 1000) from the last 24 hours
+        result = subprocess.run(
+            [
+                'powershell', '-NoProfile', '-Command',
+                'Get-WinEvent -FilterHashtable @{LogName="Application";Id=1000} '
+                '-MaxEvents 10 -ErrorAction SilentlyContinue | '
+                'Select-Object TimeCreated,Message | Format-List'
+            ],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.stdout.strip():
+            return result.stdout.strip()[:3000]
+        # Also check for WER events (Event ID 1001)
+        result2 = subprocess.run(
+            [
+                'powershell', '-NoProfile', '-Command',
+                'Get-WinEvent -FilterHashtable @{LogName="Application";Id=1001} '
+                '-MaxEvents 5 -ErrorAction SilentlyContinue | '
+                'Select-Object TimeCreated,Message | Format-List'
+            ],
+            capture_output=True, text=True, timeout=10
+        )
+        if result2.stdout.strip():
+            return result2.stdout.strip()[:3000]
+    except Exception:
+        pass
+    return ''
+
 
 # =============================================================================
 # Application Crash Handler
@@ -109,6 +423,9 @@ class AppCrashHandler:
         self._installed = False
         self._qt_app = None
         self._main_window = None
+        self._heartbeat_timer = None
+        self._stderr_capture = None
+        self._clean_shutdown = False
 
     @classmethod
     def get_instance(cls) -> 'AppCrashHandler':
@@ -131,7 +448,19 @@ class AppCrashHandler:
         self._qt_app = qt_app
         self._main_window = main_window
 
-        # Store original hooks
+        # --- Check for previous session crash BEFORE overwriting heartbeat ---
+        prev_crash = check_previous_crash()
+        if prev_crash:
+            _log_previous_crash(prev_crash)
+            app_logger.warning(
+                f"Previous session (PID {prev_crash.get('pid')}) crashed silently. "
+                f"Last heartbeat: {prev_crash.get('timestamp')}. See logs/crashes/."
+            )
+
+        # --- Install stderr capture ---
+        self._stderr_capture = install_stderr_capture()
+
+        # --- Store original hooks ---
         self._original_excepthook = sys.excepthook
 
         # Install our hook
@@ -142,8 +471,27 @@ class AppCrashHandler:
             self._original_thread_excepthook = threading.excepthook
             threading.excepthook = self._thread_exception_hook
 
-        # Register cleanup
+        # --- Install signal handlers for SIGTERM, SIGBREAK, SIGABRT ---
+        for sig in (signal.SIGTERM, signal.SIGABRT):
+            try:
+                signal.signal(sig, self._signal_handler)
+            except (OSError, ValueError):
+                pass
+        # Windows-specific: SIGBREAK (Ctrl+Break / taskkill)
+        if hasattr(signal, 'SIGBREAK'):
+            try:
+                signal.signal(signal.SIGBREAK, self._signal_handler)
+            except (OSError, ValueError):
+                pass
+
+        # --- Register cleanup ---
         atexit.register(self._on_exit)
+
+        # --- Write initial heartbeat ---
+        _write_heartbeat(os.getpid(), self.checkpoints, self.context)
+
+        # --- Start heartbeat thread (writes every 5 seconds) ---
+        self._start_heartbeat_thread()
 
         self._installed = True
         self._log_startup()
@@ -154,6 +502,85 @@ class AppCrashHandler:
             self._qt_app = qt_app
         if main_window:
             self._main_window = main_window
+
+    def _start_heartbeat_thread(self):
+        """Start a daemon thread that writes heartbeat every 5 seconds."""
+        def _beat():
+            while not self._clean_shutdown:
+                _write_heartbeat(os.getpid(), self.checkpoints, self.context)
+                # Sleep in small increments so we can stop quickly
+                for _ in range(50):  # 5 seconds total
+                    if self._clean_shutdown:
+                        break
+                    threading.Event().wait(0.1)
+        t = threading.Thread(target=_beat, name='heartbeat', daemon=True)
+        t.start()
+
+    def _signal_handler(self, signum, frame):
+        """Handle termination signals — log before death."""
+        sig_name = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
+        crash_time = datetime.datetime.now()
+        uptime = (crash_time - self.start_time).total_seconds()
+
+        # Write crash report
+        crash_logger.critical("=" * 70)
+        crash_logger.critical(f"SIGNAL RECEIVED: {sig_name} (signal {signum})")
+        crash_logger.critical(f"Time: {crash_time.isoformat()}")
+        crash_logger.critical(f"Uptime: {uptime:.1f}s")
+        crash_logger.critical("=" * 70)
+
+        # Dump all thread tracebacks
+        crash_logger.critical("Thread tracebacks at signal time:")
+        for thread_id, stack in sys._current_frames().items():
+            thread_name = 'unknown'
+            for t in threading.enumerate():
+                if t.ident == thread_id:
+                    thread_name = t.name
+                    break
+            crash_logger.critical(f"\n--- Thread {thread_name} (id={thread_id}) ---")
+            for line in traceback.format_stack(stack):
+                crash_logger.critical(line.rstrip())
+
+        if self.checkpoints:
+            crash_logger.critical("Last Checkpoints:")
+            for cp in self.checkpoints[-10:]:
+                crash_logger.critical(f"  [{cp['time']}] {cp['description']}")
+
+        # Write a standalone report
+        timestamp = crash_time.strftime("%Y%m%d_%H%M%S")
+        txt_path = os.path.join(CRASH_LOG_DIR, f"signal_crash_{timestamp}_{os.getpid()}.txt")
+        try:
+            with open(txt_path, 'w', encoding='utf-8') as f:
+                f.write(f"Signal {sig_name} received at {crash_time.isoformat()}\n")
+                f.write(f"Uptime: {uptime:.1f}s\n\n")
+                for thread_id, stack in sys._current_frames().items():
+                    thread_name = 'unknown'
+                    for t in threading.enumerate():
+                        if t.ident == thread_id:
+                            thread_name = t.name
+                            break
+                    f.write(f"\n--- Thread {thread_name} (id={thread_id}) ---\n")
+                    f.write(''.join(traceback.format_stack(stack)))
+        except Exception:
+            pass
+
+        # Mark heartbeat so we know it was a signal, not silent
+        try:
+            data = {
+                'pid': os.getpid(),
+                'timestamp': crash_time.isoformat(),
+                'clean_shutdown': False,
+                'death_cause': f'signal:{sig_name}',
+                'checkpoints': self.checkpoints[-20:],
+            }
+            with open(HEARTBEAT_PATH, 'w', encoding='utf-8') as f:
+                json.dump(data, f, default=str)
+        except Exception:
+            pass
+
+        # Re-raise to default handler
+        signal.signal(signum, signal.SIG_DFL)
+        os.kill(os.getpid(), signum)
 
     def checkpoint(self, description: str, **extra):
         """
@@ -231,17 +658,24 @@ class AppCrashHandler:
         app_logger.info("=" * 70)
 
     def _on_exit(self):
-        """Log normal application shutdown."""
+        """Log normal application shutdown and mark heartbeat as clean."""
+        self._clean_shutdown = True
         uptime = (datetime.datetime.now() - self.start_time).total_seconds()
 
         app_logger.info("=" * 70)
-        app_logger.info("iCharlotte Application Shutting Down")
+        app_logger.info("iCharlotte Application Shutting Down (clean)")
         app_logger.info(f"Uptime: {uptime:.1f} seconds ({uptime/60:.1f} minutes)")
         app_logger.info("=" * 70)
+
+        # Mark heartbeat as clean shutdown
+        _mark_clean_shutdown()
 
     def _exception_hook(self, exc_type, exc_value, exc_tb):
         """Handle uncaught exceptions in main thread."""
         self._write_crash_report(exc_type, exc_value, exc_tb, 'main_thread')
+
+        # Also dump all thread stacks for context
+        self._dump_all_threads()
 
         # Try to show error message box if Qt is available
         self._try_show_error_dialog(exc_type, exc_value)
@@ -263,6 +697,22 @@ class AppCrashHandler:
         # Call original hook
         if self._original_thread_excepthook:
             self._original_thread_excepthook(args)
+
+    def _dump_all_threads(self):
+        """Dump tracebacks of all running threads to crash log."""
+        try:
+            crash_logger.critical("--- All thread tracebacks ---")
+            for thread_id, stack in sys._current_frames().items():
+                thread_name = 'unknown'
+                for t in threading.enumerate():
+                    if t.ident == thread_id:
+                        thread_name = t.name
+                        break
+                crash_logger.critical(f"\n  Thread {thread_name} (id={thread_id}):")
+                for line in traceback.format_stack(stack):
+                    crash_logger.critical(f"    {line.rstrip()}")
+        except Exception:
+            pass
 
     def _write_crash_report(self, exc_type, exc_value, exc_tb, source: str):
         """Write a comprehensive crash report."""

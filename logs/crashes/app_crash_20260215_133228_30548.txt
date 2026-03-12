@@ -1,0 +1,63 @@
+======================================================================
+iCharlotte Application Crash Report
+======================================================================
+
+Crash Time: 2026-02-15T13:32:28.385729
+Uptime: 161993.9 seconds
+Source: main_thread
+
+----------------------------------------------------------------------
+EXCEPTION
+----------------------------------------------------------------------
+Type: PermissionError
+Message: [WinError 5] Access is denied: 'Z:\\Shared\\Current Clients\\3000 - PERMA\\075 - Saltarelli v. City of Hesperia\\NOTES\\AI OUTPUT\\tmpttjdjuur.pdf' -> 'Z:\\Shared\\Current Clients\\3000 - PERMA\\075 - Saltarelli v. City of Hesperia\\NOTES\\AI OUTPUT\\[H.AI] [H[ Officer Chambers.pdf'
+
+Traceback:
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte_core\ui\deposition_tab.py", line 1155, in eventFilter
+    self._delete_highlight_group(anchor)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+  File "C:\geminiterminal2\icharlotte_core\ui\deposition_tab.py", line 1211, in _delete_highlight_group
+    os.replace(tmp_path, highlight_path)
+    ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [WinError 5] Access is denied: 'Z:\\Shared\\Current Clients\\3000 - PERMA\\075 - Saltarelli v. City of Hesperia\\NOTES\\AI OUTPUT\\tmpttjdjuur.pdf' -> 'Z:\\Shared\\Current Clients\\3000 - PERMA\\075 - Saltarelli v. City of Hesperia\\NOTES\\AI OUTPUT\\[H.AI] [H[ Officer Chambers.pdf'
+
+----------------------------------------------------------------------
+RECENT CHECKPOINTS
+----------------------------------------------------------------------
+  [2026-02-13T16:32:39.469238] Application starting
+  [2026-02-13T16:32:39.469287] Parsing command-line arguments
+  [2026-02-13T16:32:39.472107] Configuring Qt WebEngine
+  [2026-02-13T16:32:39.472171] Creating QApplication
+  [2026-02-13T16:32:39.554485] Creating MainWindow
+  [2026-02-13T16:32:39.555001] MainWindow.__init__ starting
+  [2026-02-13T16:32:39.700203] setup_ui starting - creating tabs
+  [2026-02-13T16:32:39.704864] Creating MasterCaseTab
+  [2026-02-13T16:32:41.068830] Creating ChatTab
+  [2026-02-13T16:32:45.703291] setup_ui complete - all tabs created
+  [2026-02-13T16:32:48.421322] Showing MainWindow
+  [2026-02-13T16:32:48.487537] Entering Qt event loop
+
+----------------------------------------------------------------------
+ADDITIONAL CONTEXT
+----------------------------------------------------------------------
+  startup_file_number: 3000.075
+  startup_case_path: Z:\Shared\Current Clients\3000 - PERMA\075 - Saltarelli v. City of Hesperia
+  startup_tab: 2
+  current_file_number: 3000.075
+  current_case_path: Z:\Shared\Current Clients\3000 - PERMA\075 - Saltarelli v. City of Hesperia
+
+----------------------------------------------------------------------
+SYSTEM INFORMATION
+----------------------------------------------------------------------
+Python: 3.13.12
+Platform: Windows-11-10.0.26200-SP0
+PID: 30548
+
+----------------------------------------------------------------------
+QT STATE
+----------------------------------------------------------------------
+  app_name: python3
+  window_visible: True
+  window_size: 1920x1009
+  file_number: 3000.075

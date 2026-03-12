@@ -9,6 +9,8 @@ import datetime
 import logging
 from difflib import SequenceMatcher
 
+import fitz  # PyMuPDF
+
 from PySide6.QtCore import QThread, Signal
 
 from docx import Document
@@ -21,11 +23,83 @@ import docx.opc.constants as opc_constants
 log = logging.getLogger(__name__)
 
 # --- Regex patterns ---
-ID_PATTERN = re.compile(r'(\d{3,6})[.\-](\d{1,4})')
+ID_PATTERN = re.compile(r'(\d{3,7})[.\-](\d{1,4})')
 DATE_PATTERN = re.compile(r'(\d{4})[.\-](\d{2})[.\-](\d{2})')
 SEPARATOR_STRIP = re.compile(r'^[\s,_\-]+')
 CNR_PATTERN = re.compile(r'\bCNR\b', re.IGNORECASE)
 REPLY_OBJECTION_PATTERN = re.compile(r'(reply|objection)', re.IGNORECASE)
+
+# Facility names that are too generic — trigger first-page PDF extraction
+UNINFORMATIVE_FACILITY = {
+    "pos", "file copy", "filecopy", "file_copy", "records", "unknown",
+    "copy", "copies", "meds", "medical", "med", "billing", "bills",
+    "radiology", "imaging", "films", "subpoena", "",
+}
+
+# Regex to find facility name after TO: / TO THE CUSTODIAN OF RECORDS on subpoena first page
+_TO_CUSTODIAN_PATTERN = re.compile(
+    r'TO(?:\s+THE)?\s*(?::|\s)\s*'
+    r'(?:CUSTODIAN\s+OF\s+RECORDS\s*(?:OF|FOR|,|:|\n)\s*)?'
+    r'([A-Z][A-Za-z0-9\s,.\-&\'()]+)',
+    re.MULTILINE
+)
+
+
+def _extract_facility_from_pdf(pdf_path):
+    """Try to extract the facility/custodian name from the first page of a subpoena PDF.
+
+    Looks for patterns like:
+      - "TO THE CUSTODIAN OF RECORDS OF <facility>"
+      - "TO: <facility>"
+
+    Returns:
+        Facility name string, or None if extraction fails.
+    """
+    try:
+        doc = fitz.open(pdf_path)
+        if len(doc) == 0:
+            doc.close()
+            return None
+        text = doc[0].get_text()
+        doc.close()
+    except Exception:
+        return None
+
+    if not text or len(text.strip()) < 20:
+        return None
+
+    match = _TO_CUSTODIAN_PATTERN.search(text)
+    if not match:
+        return None
+
+    raw = match.group(1).strip()
+    # Clean up: take lines until we hit a line that looks like an address or instruction
+    lines = raw.split('\n')
+    facility_lines = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            break
+        # Stop at address-like lines (starts with digit) or legal boilerplate
+        if re.match(r'^\d', line):
+            break
+        if re.search(r'\b(YOU ARE|HEREBY|COMMANDED|ORDERED|PLEASE|ATTACHED)\b', line, re.IGNORECASE):
+            break
+        facility_lines.append(line)
+        # Facility names are typically 1-2 lines
+        if len(facility_lines) >= 2:
+            break
+
+    if not facility_lines:
+        return None
+
+    facility = ' '.join(facility_lines).strip().rstrip(',').rstrip(':').strip()
+
+    # Reject if still too short or too generic
+    if len(facility) < 3 or facility.lower() in UNINFORMATIVE_FACILITY:
+        return None
+
+    return facility
 
 
 def parse_subpoena_id(filename):
@@ -197,13 +271,29 @@ class SubpoenaTrackerWorker(QThread):
                 if sid is None:
                     skipped.append(fname)
                     continue
+                facility = remainder if remainder else "Unknown"
+                full_path = os.path.join(root, fname)
+
+                # If the facility name from the filename is uninformative,
+                # try to extract it from the first page of the PDF
+                if facility.lower().strip() in UNINFORMATIVE_FACILITY:
+                    pdf_facility = _extract_facility_from_pdf(full_path)
+                    if pdf_facility:
+                        self.progress.emit(f"Extracted facility from PDF: {pdf_facility}")
+                        facility = pdf_facility
+
                 if sid not in subpoenas:
                     subpoenas[sid] = {
-                        "facility": remainder if remainder else "Unknown",
-                        "subpoena_path": os.path.join(root, fname),
+                        "facility": facility,
+                        "subpoena_path": full_path,
                     }
                 else:
-                    self.warning.emit(f"Duplicate subpoena ID {sid}: {fname}")
+                    # Prefer the entry with a real facility name over uninformative ones
+                    existing = subpoenas[sid]["facility"]
+                    if (existing.lower().strip() in UNINFORMATIVE_FACILITY
+                            and facility.lower().strip() not in UNINFORMATIVE_FACILITY):
+                        subpoenas[sid]["facility"] = facility
+                        subpoenas[sid]["subpoena_path"] = full_path
 
         for s in skipped:
             self.warning.emit(f"Could not parse subpoena ID from: {s}")
@@ -230,14 +320,24 @@ class SubpoenaTrackerWorker(QThread):
         received = {}
         skipped = []
 
-        # Only scan direct children of the Subpoenaed folder.
-        # Files nested inside record subfolders are actual record contents
-        # (DICOM images, viewer software, etc.), not subpoena-matching items.
+        # Scan direct children and one level of subfolders (vendor folders like
+        # JJ Photocopy, CNR, Gemini, COMPEX contain record files with subpoena IDs).
         try:
             for entry in os.scandir(folder):
-                self._classify_received_item(
-                    entry.name, entry.path, received, skipped, is_file=entry.is_file()
-                )
+                if entry.is_file():
+                    self._classify_received_item(
+                        entry.name, entry.path, received, skipped, is_file=True
+                    )
+                elif entry.is_dir():
+                    # Scan inside vendor subfolders
+                    try:
+                        for sub_entry in os.scandir(entry.path):
+                            self._classify_received_item(
+                                sub_entry.name, sub_entry.path, received, skipped,
+                                is_file=sub_entry.is_file()
+                            )
+                    except OSError:
+                        pass
         except OSError as e:
             self.warning.emit(f"Error scanning Subpoenaed folder: {e}")
 
@@ -435,6 +535,10 @@ class SubpoenaTrackerWorker(QThread):
                 raw_filename = row.cells[0].text.strip()
                 pages = row.cells[1].text.strip()
 
+                # Skip section headers and non-file entries (no pages, no extension)
+                if not pages and not raw_filename.lower().endswith(('.pdf', '.doc', '.docx', '.xlsx', '.msg')):
+                    continue
+
                 # Try to parse subpoena ID
                 sid, _ = parse_subpoena_id(raw_filename)
                 entries.append({
@@ -587,6 +691,53 @@ class SubpoenaTrackerWorker(QThread):
                     run.font.name = 'Times New Roman'
                     run.font.size = Pt(12)
 
+        # Append unmatched received records (different vendor IDs from copy services)
+        unmatched_received = {sid: rec for sid, rec in received.items()
+                              if sid not in subpoenas}
+        # Build a set of non-subpoena record basenames for dedup
+        non_sub_basenames = {os.path.splitext(k)[0].lower() for k in non_subpoena_records}
+        if unmatched_received:
+            for sid in sorted(unmatched_received.keys()):
+                rec = unmatched_received[sid]
+                # Skip if already listed as a non-subpoena record from med chron
+                rec_basename = os.path.splitext(os.path.basename(rec["path"]))[0].lower()
+                if rec_basename in non_sub_basenames:
+                    continue
+                row_cells = table.add_row().cells
+                for col_idx, width in enumerate(col_widths):
+                    row_cells[col_idx].width = width
+
+                # Column 1: Reference number from copy service
+                run = row_cells[0].paragraphs[0].add_run(sid)
+                run.font.name = 'Times New Roman'
+                run.font.size = Pt(12)
+                run.font.color.rgb = RGBColor(128, 128, 128)
+
+                # Column 2: Facility — extract from filename after client name
+                facility = self._extract_facility_from_received(
+                    os.path.basename(rec["path"]))
+                run = row_cells[1].paragraphs[0].add_run(facility)
+                run.font.name = 'Times New Roman'
+                run.font.size = Pt(12)
+
+                # Column 3: Records Received — hyperlinked
+                rec_p = row_cells[2].paragraphs[0]
+                label = rec["status"]
+                add_hyperlink(rec_p, rec["path"], label)
+
+                # Column 4-5: Check med chron by filename
+                basename = os.path.splitext(os.path.basename(rec["path"]))[0]
+                chron_list = chronologies.get(sid, [])
+                self._write_chron_dates(row_cells[3], chron_list)
+                if chron_list and sid in pages_map:
+                    run = row_cells[4].paragraphs[0].add_run(pages_map[sid])
+                    run.font.name = 'Times New Roman'
+                    run.font.size = Pt(12)
+                elif basename in pages_map:
+                    run = row_cells[4].paragraphs[0].add_run(pages_map[basename])
+                    run.font.name = 'Times New Roman'
+                    run.font.size = Pt(12)
+
         # Save
         output_dir = os.path.join(self.case_path, "NOTES", "AI OUTPUT")
         os.makedirs(output_dir, exist_ok=True)
@@ -595,6 +746,26 @@ class SubpoenaTrackerWorker(QThread):
         doc.save(output_path)
 
         self.finished_result.emit(True, output_path)
+
+    @staticmethod
+    def _extract_facility_from_received(filename):
+        """Extract facility name from received record filename.
+
+        Handles patterns like:
+          6900848-01_Deshawn Stampley_Healthpointe Medical Group, Inc Meds.pdf
+          6900848-13 Bear Valley Community Hospital Meds CNR.pdf
+        """
+        basename = os.path.splitext(filename)[0]
+        # Pattern 1: ID_Client Name_Facility
+        parts = basename.split('_')
+        if len(parts) >= 3:
+            return '_'.join(parts[2:]).strip()
+        # Pattern 2: ID Facility (after the first space-separated ID)
+        _, remainder = parse_subpoena_id(basename)
+        if remainder:
+            # Strip client name if present (e.g., "Deshawn Stampley_...")
+            return remainder.strip()
+        return basename
 
     def _write_chron_dates(self, cell, chron_list):
         """Write chronology dates as hyperlinked entries, one per line."""

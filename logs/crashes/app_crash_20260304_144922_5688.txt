@@ -1,0 +1,73 @@
+======================================================================
+iCharlotte Application Crash Report
+======================================================================
+
+Crash Time: 2026-03-04T14:49:22.374661
+Uptime: 6814.0 seconds
+Source: main_thread
+
+----------------------------------------------------------------------
+EXCEPTION
+----------------------------------------------------------------------
+Type: AttributeError
+Message: 'ReportPipelineWorker' object has no attribute 'success'
+
+Traceback:
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte.py", line 2387, in process_checked_items
+    self.add_status_task(display_name, details, sys.executable, args, script_name=script_name, file_path=path)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte.py", line 2040, in add_status_task
+    running = sum(1 for r in self.agent_runners if r.success is None)
+  File "C:\geminiterminal2\icharlotte.py", line 2040, in <genexpr>
+    running = sum(1 for r in self.agent_runners if r.success is None)
+                                                   ^^^^^^^^^
+AttributeError: 'ReportPipelineWorker' object has no attribute 'success'
+
+----------------------------------------------------------------------
+RECENT CHECKPOINTS
+----------------------------------------------------------------------
+  [2026-03-04T14:38:33.046607] Starting agent: summarize.py
+  [2026-03-04T14:38:33.081220] Starting agent: summarize.py
+  [2026-03-04T14:38:33.117110] Starting agent: summarize.py
+  [2026-03-04T14:38:59.391458] Starting agent: summarize.py
+  [2026-03-04T14:38:59.435752] Starting agent: summarize.py
+  [2026-03-04T14:38:59.472961] Starting agent: summarize.py
+  [2026-03-04T14:38:59.515335] Starting agent: summarize.py
+  [2026-03-04T14:38:59.552139] Starting agent: summarize.py
+  [2026-03-04T14:39:50.108955] Agent completed: summarize.py
+  [2026-03-04T14:39:50.785370] Agent completed: summarize.py
+  [2026-03-04T14:39:55.552924] Agent completed: summarize.py
+  [2026-03-04T14:40:04.745167] Agent completed: summarize.py
+  [2026-03-04T14:40:05.110207] Agent completed: summarize.py
+  [2026-03-04T14:40:11.615862] Agent completed: summarize.py
+  [2026-03-04T14:40:12.725749] Agent completed: summarize.py
+  [2026-03-04T14:40:18.834543] Agent completed: summarize.py
+  [2026-03-04T14:40:29.774905] Agent completed: summarize.py
+  [2026-03-04T14:41:14.387498] Agent completed: summarize_discovery.py
+  [2026-03-04T14:41:43.108723] Agent completed: summarize_discovery.py
+  [2026-03-04T14:48:44.495562] Starting agent: docket.py
+
+----------------------------------------------------------------------
+ADDITIONAL CONTEXT
+----------------------------------------------------------------------
+  startup_file_number: 5800.056
+  startup_case_path: Z:\Shared\Current Clients\5800 - AMTRUST\056 - Frutus
+  startup_tab: 2
+  current_file_number: 5800.056
+  current_case_path: Z:\Shared\Current Clients\5800 - AMTRUST\056 - Frutus
+
+----------------------------------------------------------------------
+SYSTEM INFORMATION
+----------------------------------------------------------------------
+Python: 3.13.12
+Platform: Windows-11-10.0.26200-SP0
+PID: 5688
+
+----------------------------------------------------------------------
+QT STATE
+----------------------------------------------------------------------
+  app_name: python3
+  window_visible: True
+  window_size: 1920x1009
+  file_number: 5800.048

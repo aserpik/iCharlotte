@@ -272,6 +272,7 @@ async def solve_recaptcha(page):
     await asyncio.sleep(1)
 
     # Verify it worked by checking the anchor frame
+    solved = False
     try:
         for f in page.frames:
             if f.url and "google.com/recaptcha" in f.url and "anchor" in f.url:
@@ -279,14 +280,50 @@ async def solve_recaptcha(page):
                     "document.querySelector('#recaptcha-anchor')?.getAttribute('aria-checked')"
                 )
                 if is_checked == "true":
-                    print("reCAPTCHA SOLVED!")
-                    return True
+                    print("reCAPTCHA SOLVED (anchor verified)!")
+                    solved = True
                 break
     except Exception:
         pass
 
-    # Even if anchor check fails, token injection + getResponse override should work
-    print("reCAPTCHA token injected (anchor check inconclusive - proceeding).")
+    if solved:
+        return True
+
+    # Drupal's captcha module reads g-recaptcha-response on POST.
+    # The token is already in the textarea. The form will validate server-side.
+    # Ensure the response textarea is properly named and filled.
+    try:
+        await page.evaluate(f"""(token) => {{
+            // Ensure the textarea exists and has the token
+            let ta = document.querySelector('textarea[name="g-recaptcha-response"]');
+            if (!ta) {{
+                // Some Drupal captcha setups use a different wrapper
+                ta = document.querySelector('#g-recaptcha-response');
+            }}
+            if (!ta) {{
+                // Create it if missing (shouldn't happen but just in case)
+                const form = document.querySelector('#ecp-searchform-form');
+                if (form) {{
+                    ta = document.createElement('textarea');
+                    ta.name = 'g-recaptcha-response';
+                    ta.id = 'g-recaptcha-response';
+                    ta.style.display = 'none';
+                    form.appendChild(ta);
+                }}
+            }}
+            if (ta) {{
+                ta.value = token;
+            }}
+
+            // Also set captcha_response if Drupal uses that field name
+            const cr = document.querySelector('input[name="captcha_response"]');
+            if (cr) {{ cr.value = token; }}
+        }}""", token)
+        print("reCAPTCHA token re-confirmed in form fields.")
+    except Exception as e:
+        print(f"Warning: Could not re-confirm token: {e}")
+
+    print("reCAPTCHA token injected (proceeding with form submit).")
     return True
 
 
@@ -406,28 +443,48 @@ async def main():
 
             # --- Step 2: Enter case number ---
             print(f"Entering case number: {case_number}")
-            # Journal Technologies uses label-based fields; find input near "Case Number" label
+            # Journal Technologies form has: Last Name, First Name, Company Name, Case Number
+            # as sequential text inputs. Labels contain huge dropdown HTML that breaks
+            # text-based selectors. Use row iteration with first-child-text check.
+            filled = False
+
+            # Method 1: Iterate form-group rows, match label's first text node
             try:
-                await page.fill("//label[contains(., 'Case Number')]/following::input[1]", case_number)
+                rows = await page.query_selector_all(".form-group")
+                for row in rows:
+                    label = await row.query_selector("label.searchRow")
+                    if label:
+                        # Get only the label's own first text node, not child element text
+                        label_text = await label.evaluate(
+                            "el => el.childNodes[0]?.textContent?.trim() || ''"
+                        )
+                        if label_text.lower() == "case number":
+                            inp = await row.query_selector("input.form-control[type='text']")
+                            if inp:
+                                await inp.fill(case_number)
+                                filled = True
+                                print(f"  Filled via row label match: '{label_text}'")
+                                break
             except Exception as e:
-                print(f"Primary XPath failed: {e}. Trying fallback selectors...")
+                print(f"  Method 1 (row iteration) failed: {e}")
+
+            # Method 2: Positional — 4th text input in the search form
+            if not filled:
                 try:
-                    await page.locator("text=Case Number").locator("xpath=../..").locator("input[type=text]").first.fill(case_number)
-                except Exception as e2:
-                    print(f"Fallback failed: {e2}. Trying broad input search...")
-                    # Last resort: find any text input that looks like a case number field
-                    inputs = await page.query_selector_all("input[type='text']")
-                    filled = False
-                    for inp in inputs:
-                        name = await inp.get_attribute("name") or ""
-                        placeholder = await inp.get_attribute("placeholder") or ""
-                        if "case" in name.lower() or "case" in placeholder.lower() or "number" in name.lower():
-                            await inp.fill(case_number)
-                            filled = True
-                            break
-                    if not filled and inputs:
-                        # Fill the first visible text input as last resort
-                        await inputs[0].fill(case_number)
+                    inputs = await page.query_selector_all(
+                        "#ecp-searchform-form input.form-control[type='text']"
+                    )
+                    if len(inputs) >= 4:
+                        await inputs[3].fill(case_number)
+                        filled = True
+                        print("  Filled via positional input (4th text field).")
+                except Exception as e:
+                    print(f"  Method 2 (positional) failed: {e}")
+
+            if not filled:
+                print("ERROR: Could not find Case Number input field.")
+                await page.screenshot(path="lake_error_screenshot.png")
+                sys.exit(1)
 
             # --- Step 3: Solve reCAPTCHA ---
             print("Solving reCAPTCHA...")
@@ -448,7 +505,9 @@ async def main():
             print("Submitting search...")
             await page.screenshot(path="lake_debug_before_submit.png")
 
-            # Journal Technologies Drupal form typically uses #edit-submit
+            pre_url = page.url
+
+            # Try clicking the Search button first
             submit_clicked = False
             for selector in ["#edit-submit", "input[value='Search']", "button:has-text('Search')", "input[type='submit']"]:
                 try:
@@ -461,16 +520,50 @@ async def main():
                 except Exception:
                     continue
 
-            if not submit_clicked:
-                print("Could not find search button. Trying form submit via JS...")
-                await page.evaluate("document.querySelector('form')?.submit()")
-
             # Wait for navigation/AJAX response
             try:
-                await page.wait_for_load_state("networkidle", timeout=30000)
+                await page.wait_for_load_state("networkidle", timeout=15000)
             except Exception:
-                print("  networkidle timeout - continuing anyway...")
+                pass
             await asyncio.sleep(2)
+
+            # Check if the page actually changed (form might have blocked submit)
+            # Note: reCAPTCHA text is in an iframe, not in body.innerText
+            page_text = await page.evaluate("document.body?.innerText?.substring(0, 1000) || ''")
+            still_on_search = "case number" in page_text.lower() and "last name" in page_text.lower() and "first name" in page_text.lower()
+
+            if still_on_search:
+                print("  Form submission appears blocked. Trying JS form.submit() bypass...")
+                # Bypass client-side validation by submitting the form directly via JS
+                # This sends the g-recaptcha-response textarea to the server for validation
+                try:
+                    # Remove all submit event listeners by cloning the form, then submit
+                    await page.evaluate("""() => {
+                        const form = document.getElementById('ecp-searchform-form');
+                        if (form) {
+                            // Clone removes all JS event handlers
+                            const newForm = form.cloneNode(true);
+                            form.parentNode.replaceChild(newForm, form);
+                            newForm.submit();
+                        }
+                    }""")
+                    print("  JS form.submit() dispatched.")
+                    try:
+                        await page.wait_for_load_state("networkidle", timeout=30000)
+                    except Exception:
+                        pass
+                    await asyncio.sleep(2)
+                except Exception as e:
+                    print(f"  JS form submit failed: {e}")
+
+                # Check again
+                page_text2 = await page.evaluate("document.body?.innerText?.substring(0, 1000) || ''")
+                still_on_search2 = "case number" in page_text2.lower() and "last name" in page_text2.lower() and "first name" in page_text2.lower()
+                if still_on_search2:
+                    print("  Still on search page after JS submit. Server may have rejected captcha.")
+                    await page.screenshot(path="lake_debug_after_jssubmit.png")
+                else:
+                    print("  JS form submit succeeded — page navigated.")
 
             await page.screenshot(path="lake_debug_after_submit.png")
             print(f"  Page URL after submit: {page.url}")
@@ -511,7 +604,7 @@ async def main():
                 sys.exit(1)
 
             # Try exact match first, then fall back to first link
-            case_links = await page.query_selector_all(case_link)
+            case_links = await page.query_selector_all(found_link)
             if not case_links:
                 print("No case links found in search results.")
                 sys.exit(1)

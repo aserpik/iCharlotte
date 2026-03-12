@@ -35,7 +35,7 @@ class CaseDataManager:
         if not os.path.exists(path):
             return {}
         try:
-            with open(path, 'r') as f:
+            with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except json.JSONDecodeError:
             print(f"Error decoding JSON for {file_num}")
@@ -43,7 +43,7 @@ class CaseDataManager:
 
     def _save_json(self, file_num: str, data: Dict):
         path = self._get_file_path(file_num)
-        with open(path, 'w') as f:
+        with open(path, 'w', encoding='utf-8') as f:
             json.dump(data, f, indent=4)
 
     def get_variable_obj(self, file_num: str, key: str) -> Optional[Dict]:

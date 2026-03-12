@@ -247,6 +247,22 @@ class TestimonyFormatter:
         else:
             stroke_color = (1.0, 0.8, 0.0)
 
+        # Remove existing highlights for the exchanges we're about to re-highlight
+        # so color changes don't stack duplicates, but other prompts' highlights stay
+        selected_ids = set(result.selected_ids)
+        for pg_idx in range(len(doc)):
+            pg = doc[pg_idx]
+            annot = pg.first_annot
+            while annot:
+                nxt = annot.next
+                if annot.type[0] == fitz.PDF_ANNOT_HIGHLIGHT:
+                    info = annot.info.get("content", "")
+                    if info.startswith("ex:"):
+                        ex_id = info[3:]
+                        if ex_id in selected_ids:
+                            pg.delete_annot(annot)
+                annot = nxt
+
         # Build a mapping from transcript page → PDF page(s)
         page_map = self._build_page_map(doc, index.is_condensed)
         highlights_added = 0

@@ -403,7 +403,13 @@ class MainWindow(QMainWindow):
             pass
 
         self.agent_runners = [] # Keep references to prevent GC
+        self._agent_queue = []  # Queued agents waiting to run (when concurrency limit reached)
+        self.MAX_CONCURRENT_AGENTS = 4  # Max subprocess agents running simultaneously
         self._tree_generation = 0  # Incremented on each populate_tree to ignore stale worker callbacks
+        self._populating_tree = False  # Re-entrancy guard for populate_tree
+        self._tree_refresh_timer = QTimer()
+        self._tree_refresh_timer.setSingleShot(True)
+        self._tree_refresh_timer.timeout.connect(self.populate_tree)
         self.cached_models = {} # Cache for models: {provider: [list]}
         self.fetcher = None
 
@@ -423,7 +429,6 @@ class MainWindow(QMainWindow):
         if self.case_path:
             self.populate_tree()
             self.load_status_history()
-            self.check_docket_expiry(file_number)
 
         # Register global hotkeys (Win+F for Open File, Win+C for Change File)
         self._setup_global_hotkeys()
@@ -677,7 +682,7 @@ class MainWindow(QMainWindow):
         self.refresh_btn = QPushButton()
         self.refresh_btn.setIcon(self.style().standardIcon(self.style().StandardPixmap.SP_BrowserReload))
         self.refresh_btn.setToolTip("Refresh Tree")
-        self.refresh_btn.clicked.connect(self.populate_tree)
+        self.refresh_btn.clicked.connect(self._schedule_tree_refresh)
         header_layout.addWidget(self.refresh_btn)
 
         self.search_input = QLineEdit()
@@ -747,8 +752,8 @@ class MainWindow(QMainWindow):
 
         # Enhanced File Tree with additional columns
         self.tree = EnhancedFileTreeWidget()
-        self.tree.item_moved.connect(lambda: self.populate_tree())
-        self.tree.folder_created.connect(lambda p: self.populate_tree())
+        self.tree.item_moved.connect(lambda: self._schedule_tree_refresh())
+        self.tree.folder_created.connect(lambda p: self._schedule_tree_refresh())
         self.tree.setHeaderLabels([
             "Category / File",
             "Size",
@@ -1152,7 +1157,10 @@ class MainWindow(QMainWindow):
         should_add = current_state != "all"
 
         for item in items:
-            current_tasks = list(item.data(0, Qt.ItemDataRole.UserRole + 2) or [])
+            try:
+                current_tasks = list(item.data(0, Qt.ItemDataRole.UserRole + 2) or [])
+            except RuntimeError:
+                continue
             if should_add:
                 if agent_id not in current_tasks:
                     current_tasks.append(agent_id)
@@ -1169,8 +1177,11 @@ class MainWindow(QMainWindow):
         """Clear all tasks from multiple items."""
         self.tree.blockSignals(True)
         for item in items:
-            item.setData(0, Qt.ItemDataRole.UserRole + 2, [])
-            self.update_item_tasks_ui(item)
+            try:
+                item.setData(0, Qt.ItemDataRole.UserRole + 2, [])
+                self.update_item_tasks_ui(item)
+            except RuntimeError:
+                continue
         self.tree.blockSignals(False)
 
     def toggle_agent_task(self, item, agent_id):
@@ -1331,7 +1342,6 @@ class MainWindow(QMainWindow):
                     self.email_update_tab.on_case_changed(new_file_num)
 
                 log_event(f"Switched to case {new_file_num}")
-                self.check_docket_expiry(new_file_num)
             else:
                 QMessageBox.critical(self, "Error", f"Could not find case directory for {new_file_num}")
 
@@ -1390,75 +1400,8 @@ class MainWindow(QMainWindow):
                 self.deposition_tab.load_case(file_number)
 
             log_event(f"Switched to case {self.file_number}")
-            self.check_docket_expiry(file_number)
         else:
             QMessageBox.critical(self, "Error", f"Could not find case directory for {file_number}")
-
-    def check_docket_expiry(self, file_number):
-        """Checks if the last docket download was more than 30 days ago and runs the agent if so."""
-        log_debug(f"check_docket_expiry: starting for {file_number}")
-        try:
-            from icharlotte_core.master_db import MasterCaseDatabase
-            db = MasterCaseDatabase()
-            case = db.get_case(file_number)
-
-            if not case:
-                log_debug(f"check_docket_expiry: no case found for {file_number}")
-                return
-
-            last_download = case.get('last_docket_download')
-            run_agent = False
-            
-            if not last_download:
-                # Try to find existing docket in AI OUTPUT
-                ai_output_dir = os.path.join(self.case_path, "NOTES", "AI OUTPUT")
-                dockets = glob.glob(os.path.join(ai_output_dir, "Docket_*.pdf"))
-                if dockets:
-                    dockets.sort(key=os.path.getmtime, reverse=True)
-                    latest_docket = dockets[0]
-                    # Try to extract date from filename (Docket_YYYY.MM.DD.pdf)
-                    match = re.search(r"Docket_(\d{4}\.\d{2}\.\d{2})", os.path.basename(latest_docket))
-                    if match:
-                        file_date_str = match.group(1).replace(".", "-")
-                        try:
-                            file_date = datetime.datetime.strptime(file_date_str, "%Y-%m-%d")
-                            db.update_last_docket_download(file_number, file_date_str)
-                            last_download = file_date_str
-                            log_event(f"Detected existing docket from {file_date_str} for {file_number}. Updated database.")
-                        except ValueError:
-                            pass
-                    
-                    if not last_download:
-                        # Fallback to file mtime if filename date fails
-                        mtime = os.path.getmtime(latest_docket)
-                        mtime_str = datetime.datetime.fromtimestamp(mtime).strftime("%Y-%m-%d")
-                        db.update_last_docket_download(file_number, mtime_str)
-                        last_download = mtime_str
-                        log_event(f"Detected existing docket (mtime: {mtime_str}) for {file_number}. Updated database.")
-
-            if not last_download:
-                log_event(f"No previous docket download recorded for {file_number}. Triggering Docket Agent.")
-                run_agent = True
-            else:
-                try:
-                    last_date = datetime.datetime.strptime(last_download, "%Y-%m-%d")
-                    days_elapsed = (datetime.datetime.now() - last_date).days
-                    if days_elapsed > 30:
-                        log_event(f"Last docket download for {file_number} was {days_elapsed} days ago (> 30). Triggering Docket Agent.")
-                        run_agent = True
-                except ValueError:
-                    log_event(f"Invalid docket download date format for {file_number}: {last_download}. Triggering Docket Agent.")
-                    run_agent = True
-            
-            if run_agent:
-                # Run docket.py using run_agent
-                log_debug(f"check_docket_expiry: auto-running Docket Agent for {file_number}")
-                self.run_agent("Docket Agent (Auto)", "docket.py", "file_number", None)
-            else:
-                log_debug(f"check_docket_expiry: docket is current for {file_number}")
-
-        except Exception as e:
-            log_event(f"Error checking docket expiry: {e}", "error")
 
     def view_docket(self):
         if not self.case_path:
@@ -2083,6 +2026,37 @@ class MainWindow(QMainWindow):
         for i in range(self.tree.topLevelItemCount()):
             check_item(self.tree.topLevelItem(i))
 
+    def _count_running_agents(self):
+        """Count currently running subprocess agents (excludes queued ones)."""
+        return sum(
+            1 for r in self.agent_runners
+            if getattr(r, 'success', None) is None and r not in self._agent_queue
+        )
+
+    def _check_system_memory_ok(self):
+        """Return True if system memory is below critical threshold."""
+        try:
+            import psutil
+            mem = psutil.virtual_memory()
+            available_gb = mem.available / (1024 ** 3)
+            if available_gb < 1.0:
+                log_warning(f"System memory critically low: {available_gb:.1f}GB available")
+                return False
+            return True
+        except ImportError:
+            return True  # Can't check, allow it
+
+    def _drain_agent_queue(self):
+        """Start queued agents if slots are available."""
+        while self._agent_queue and self._count_running_agents() < self.MAX_CONCURRENT_AGENTS:
+            if not self._check_system_memory_ok():
+                log_warning("Pausing agent queue drain — system memory low")
+                break
+            runner = self._agent_queue.pop(0)
+            log_debug(f"Dequeuing agent: {runner.status_widget.task_id} — running={self._count_running_agents()}")
+            runner.status_widget.update_progress(0, "Starting...")
+            runner.start()
+
     def add_status_task(self, name, details, command, args, script_name=None, file_path=None):
         status_widget = StatusWidget(name, details)
         self.status_list_layout.insertWidget(0, status_widget) # Add to top
@@ -2090,25 +2064,74 @@ class MainWindow(QMainWindow):
         runner = AgentRunner(command, args, status_widget, task_id=status_widget.task_id, file_number=self.file_number)
         self.agent_runners.append(runner) # Keep alive
         runner.finished.connect(lambda: self.cleanup_runner(runner))
+        runner.finished.connect(lambda _=None: self._drain_agent_queue())
+
+        # Store retry info on widget for serialization
+        status_widget._retry_command = command
+        status_widget._retry_args = list(args)
+        status_widget._retry_script_name = script_name
+        status_widget._retry_file_path = file_path
+
+        # Retry button — re-launches the same task
+        status_widget.retry_requested.connect(
+            lambda: self.add_status_task(name, details, command, list(args), script_name, file_path)
+        )
 
         # Log processing entry when agent finishes
         if script_name and file_path and self.file_number:
             runner.finished.connect(lambda success: self._log_processing_entry(script_name, file_path, success))
 
+        running = self._count_running_agents()
+        log_debug(f"add_status_task: {name} — total_runners={len(self.agent_runners)}, running={running}, queued={len(self._agent_queue)}")
+
+        # Check concurrency limit and system memory
+        if running >= self.MAX_CONCURRENT_AGENTS:
+            self._agent_queue.append(runner)
+            status_widget.update_progress(0, f"Queued (#{len(self._agent_queue)}) — waiting for slot...")
+            log_info(f"Agent '{name}' queued — {running} already running (max {self.MAX_CONCURRENT_AGENTS})")
+            return runner
+
+        if not self._check_system_memory_ok():
+            self._agent_queue.append(runner)
+            status_widget.update_progress(0, "Queued — system memory low")
+            log_warning(f"Agent '{name}' queued due to low system memory")
+            return runner
+
         runner.start()
         return runner
 
     def _log_processing_entry(self, script_name, file_path, success):
-        """Log a processing entry when an agent finishes."""
+        """Log a processing entry when an agent finishes.
+
+        Instead of triggering a full tree rebuild (which destroys all QTreeWidgetItems
+        and causes segfaults when other code holds stale references), we do a targeted
+        update of just the processing status column for the affected file.
+        """
         try:
             if not self.file_number:
                 return
             proc_log = ProcessingLogDB(self.file_number)
             status = "success" if success else "failed"
             proc_log.add_entry(file_path, script_name, status)
-            # Refresh the tree to show updated status
-            self.populate_tree()
+            log_debug(f"_log_processing_entry: {script_name} {status} for {os.path.basename(file_path)} — updating status column (no tree rebuild)")
+
+            # Refresh the cached proc log so status queries see the new entry
+            if hasattr(self, '_cached_proc_log') and self._cached_proc_log is not None:
+                self._cached_proc_log = ProcessingLogDB(self.file_number)
+
+            # Targeted update: just update column 4 (processing status) for this file
+            item = self.tree_item_map.get(file_path)
+            if item is not None:
+                try:
+                    new_status = self._get_file_processing_status(file_path)
+                    item.setText(4, new_status)
+                    log_debug(f"_log_processing_entry: updated status for {os.path.basename(file_path)} → '{new_status}'")
+                except RuntimeError:
+                    log_warning(f"_log_processing_entry: stale tree item for {os.path.basename(file_path)}")
+            else:
+                log_debug(f"_log_processing_entry: file not in tree_item_map, skipping status update")
         except Exception as e:
+            log_error(f"Error logging processing entry: {e}")
             log_event(f"Error logging processing entry: {e}", "error")
 
     def cleanup_runner(self, runner):
@@ -2132,7 +2155,8 @@ class MainWindow(QMainWindow):
         # Disconnect all runners from their widgets before deleting
         # to prevent signals being sent to deleted widgets
         for runner in self.agent_runners:
-            runner.disconnect_widget()
+            if hasattr(runner, 'disconnect_widget'):
+                runner.disconnect_widget()
 
         for i in range(self.status_list_layout.count() - 1, -1, -1):
             item = self.status_list_layout.itemAt(i)
@@ -2177,27 +2201,60 @@ class MainWindow(QMainWindow):
             
             for item_data in history:
                 widget = StatusWidget.from_dict(item_data)
-                
+
+                # Restore retry info from serialized data, or reconstruct from agent name + filename
+                retry_cmd = item_data.get("retry_command")
+                retry_args = item_data.get("retry_args")
+                retry_script = item_data.get("retry_script_name")
+                retry_fp = item_data.get("retry_file_path")
+
+                if not retry_cmd or not retry_args:
+                    # Reconstruct from agent name and details (filename)
+                    agent_name = item_data.get("agent_name", "")
+                    filename = item_data.get("details", "")
+                    agent = next((a for a in self.AGENTS if a["name"] == agent_name), None)
+                    if agent and filename and self.case_path:
+                        # Search for the file in the case folder
+                        for root, dirs, files in os.walk(self.case_path):
+                            if filename in files:
+                                retry_fp = os.path.join(root, filename)
+                                break
+                        if retry_fp:
+                            retry_cmd = sys.executable
+                            retry_script = agent["script"]
+                            retry_args = [os.path.join(SCRIPTS_DIR, retry_script), retry_fp]
+
+                if retry_cmd and retry_args:
+                    widget._retry_command = retry_cmd
+                    widget._retry_args = retry_args
+                    widget._retry_script_name = retry_script
+                    widget._retry_file_path = retry_fp
+                    name = item_data.get("agent_name", "Unknown")
+                    details = item_data.get("details", "")
+                    widget.retry_requested.connect(
+                        lambda _n=name, _d=details, _c=retry_cmd, _a=retry_args, _s=retry_script, _f=retry_fp:
+                            self.add_status_task(_n, _d, _c, list(_a), _s, _f)
+                    )
+
                 # Try to reconnect to running agent
                 reconnected = False
                 if not widget.is_finished:
                     task_id = getattr(widget, 'task_id', None)
                     if task_id:
                         for runner in self.agent_runners:
-                            if getattr(runner, 'task_id', None) == task_id:
+                            if getattr(runner, 'task_id', None) == task_id and hasattr(runner, 'reconnect_widget'):
                                 runner.reconnect_widget(widget)
                                 reconnected = True
-                                # If runner is already finished, we can remove it now that we synced state
-                                if runner.success is not None:
+                                if getattr(runner, 'success', None) is not None:
                                      self.agent_runners.remove(runner)
                                 break
-                    
+
                     if not reconnected:
                         # Mark as interrupted if we couldn't find the runner
                         widget.status_text_label.setText(widget.status_text_label.text() + " (Interrupted)")
                         widget.status_text_label.setStyleSheet("color: orange; font-weight: bold;")
                         widget.is_finished = True
-                
+
                 self.status_list_layout.addWidget(widget)
                 
             log_event(f"Loaded {len(history)} status items from history")
@@ -2588,7 +2645,25 @@ class MainWindow(QMainWindow):
         except:
             return ""
 
+    def _schedule_tree_refresh(self):
+        """Debounced tree refresh — coalesces rapid calls into one."""
+        self._tree_refresh_timer.start(500)
+
     def populate_tree(self):
+        # Re-entrancy guard: if we're already inside populate_tree (e.g. via
+        # processEvents re-entrancy), defer to a scheduled refresh instead.
+        if self._populating_tree:
+            log_debug("populate_tree: SKIPPED (re-entrant call) — scheduling deferred refresh")
+            self._schedule_tree_refresh()
+            return
+
+        self._populating_tree = True
+        try:
+            self._populate_tree_inner()
+        finally:
+            self._populating_tree = False
+
+    def _populate_tree_inner(self):
         # Increment generation so stale worker callbacks are ignored
         self._tree_generation += 1
         current_gen = self._tree_generation
@@ -2723,8 +2798,6 @@ class MainWindow(QMainWindow):
             log_error(f"add_tree_batch CRASHED: gen={_batch_gen}, +{_batch_dirs}d/+{_batch_files}f, map_size={len(self.tree_item_map)}, error={e}", exc_info=True)
             raise
 
-        QApplication.processEvents()
-
     def on_scan_complete(self):
         log_debug(f"on_scan_complete: gen={self._tree_generation}, case={self.file_number}, map_size={len(self.tree_item_map)}, visited={len(self.visited_paths)}")
         try:
@@ -2821,6 +2894,44 @@ if __name__ == "__main__":
 
         checkpoint("Showing MainWindow")
         window.show()
+
+        # Start periodic health monitor to capture state before silent crashes
+        from PySide6.QtCore import QTimer as _QTimer
+        _health_timer = _QTimer()
+        def _health_check():
+            try:
+                import psutil
+                proc = psutil.Process(os.getpid())
+                mem = proc.memory_info()
+                children = proc.children()
+                threads = proc.num_threads()
+                # Count running agents
+                running_agents = 0
+                agent_names = []
+                if hasattr(window, 'agent_runners'):
+                    for runner in window.agent_runners:
+                        if getattr(runner, 'success', None) is None:  # Still running
+                            running_agents += 1
+                            name = os.path.basename(runner.args[0]) if hasattr(runner, 'args') and runner.args else "?"
+                            agent_names.append(name)
+                log_debug(
+                    f"HEALTH: RSS={mem.rss // 1024 // 1024}MB, "
+                    f"threads={threads}, child_procs={len(children)}, "
+                    f"running_agents={running_agents}"
+                    + (f" [{', '.join(agent_names)}]" if agent_names else "")
+                )
+                # Warn if memory is getting high (>1.5GB)
+                if mem.rss > 1_500_000_000:
+                    log_warning(f"HIGH MEMORY: {mem.rss // 1024 // 1024}MB RSS — crash risk")
+                # Dump faulthandler traceback periodically when agents are running
+                if running_agents > 0:
+                    _faulthandler_file.write(f"\n--- Health check {__import__('datetime').datetime.now().isoformat()} agents={running_agents} ---\n")
+                    faulthandler.dump_traceback(file=_faulthandler_file, all_threads=True)
+                    _faulthandler_file.flush()
+            except Exception:
+                pass
+        _health_timer.timeout.connect(_health_check)
+        _health_timer.start(30000)  # Every 30 seconds
 
         checkpoint("Entering Qt event loop")
         sys.exit(app.exec())

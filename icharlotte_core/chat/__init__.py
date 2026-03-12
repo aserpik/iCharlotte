@@ -3,7 +3,7 @@
 
 from .persistence import ChatPersistence
 from .token_counter import TokenCounter
-from .models import Conversation, Message, QuickPrompt, BUILTIN_PROMPTS
+from .models import Conversation, Message, QuickPrompt, BUILTIN_PROMPTS, TRANSCRIBE_PROMPT
 
 __all__ = [
     'ChatPersistence',
@@ -11,5 +11,6 @@ __all__ = [
     'Conversation',
     'Message',
     'QuickPrompt',
-    'BUILTIN_PROMPTS'
+    'BUILTIN_PROMPTS',
+    'TRANSCRIBE_PROMPT'
 ]

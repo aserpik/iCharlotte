@@ -1,0 +1,266 @@
+======================================================================
+SILENT CRASH DETECTED (previous session)
+======================================================================
+Detection Time:   2026-03-05T11:32:51.940721
+Last Heartbeat:   2026-03-05T11:31:15.143266
+Previous PID:     24956
+Memory at death:  N/A MB RSS
+
+Last Checkpoints:
+  [2026-03-04T18:07:12.133465] setup_ui starting - creating tabs
+  [2026-03-04T18:07:12.134765] Creating MasterCaseTab
+  [2026-03-04T18:07:13.257904] Creating ChatTab
+  [2026-03-04T18:07:13.556337] setup_ui complete - all tabs created
+  [2026-03-04T18:07:13.859143] Showing MainWindow
+  [2026-03-04T18:07:13.936228] Entering Qt event loop
+  [2026-03-04T18:31:42.667933] Starting agent: report.py
+  [2026-03-04T18:31:44.648979] Agent completed: report.py
+  [2026-03-04T18:32:35.787663] Starting agent: docket.py
+  [2026-03-04T18:34:59.000335] Agent completed: docket.py
+
+Context:
+  startup_file_number: None
+  startup_case_path: None
+  startup_tab: None
+  current_file_number: None
+  current_case_path: None
+
+----------------------------------------------------------------------
+STDERR (last 50 lines before crash):
+----------------------------------------------------------------------
+
+--- stderr.log ---
+    running = sum(1 for r in self.agent_runners if r.success is None)
+  File "C:\geminiterminal2\icharlotte.py", line 2040, in <genexpr>
+    running = sum(1 for r in self.agent_runners if r.success is None)
+                                                   ^^^^^^^^^
+AttributeError: 'ReportPipelineWorker' object has no attribute 'success'
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte.py", line 2387, in process_checked_items
+    self.add_status_task(display_name, details, sys.executable, args, script_name=script_name, file_path=path)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte.py", line 2040, in add_status_task
+    running = sum(1 for r in self.agent_runners if r.success is None)
+  File "C:\geminiterminal2\icharlotte.py", line 2040, in <genexpr>
+    running = sum(1 for r in self.agent_runners if r.success is None)
+                                                   ^^^^^^^^^
+AttributeError: 'ReportPipelineWorker' object has no attribute 'success'
+
+============================================================
+Stderr capture started: 2026-03-04T14:49:40.006564
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-04T17:49:15.575994
+============================================================
+[DEBUG] refresh_data_inner STARTTraceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte_core\ui\master_case_tab.py", line 1597, in on_case_double_clicked
+    self.main_window.load_case_by_number(file_number)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte.py", line 1370, in load_case_by_number
+    self.clear_all_status()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\geminiterminal2\icharlotte.py", line 2101, in clear_all_status
+    runner.disconnect_widget()
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ReportPipelineWorker' object has no attribute 'disconnect_widget'
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte_core\ui\master_case_tab.py", line 1597, in on_case_double_clicked
+    self.main_window.load_case_by_number(file_number)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte.py", line 1370, in load_case_by_number
+    self.clear_all_status()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\geminiterminal2\icharlotte.py", line 2101, in clear_all_status
+    runner.disconnect_widget()
+    ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'ReportPipelineWorker' object has no attribute 'disconnect_widget'
+
+============================================================
+Stderr capture started: 2026-03-04T18:07:11.935297
+============================================================
+[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START
+--- stderr.log.fd2 ---
+  File "C:\geminiterminal2\icharlotte.py", line 2040, in add_status_task
+
+    running = sum(1 for r in self.agent_runners if r.success is None)
+
+  File "C:\geminiterminal2\icharlotte.py", line 2040, in <genexpr>
+
+    running = sum(1 for r in self.agent_runners if r.success is None)
+
+                                                   ^^^^^^^^^
+
+AttributeError: 'ReportPipelineWorker' object has no attribute 'success'
+
+[DEBUG] refresh_data_inner START
+
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+
+
+----------------------------------------------------------------------
+FAULTHANDLER LOG (tail):
+----------------------------------------------------------------------
+  File "C:\geminiterminal2\icharlotte_core\sent_items_monitor.py", line 327 in run
+
+Thread 0x00009304 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 359 in wait
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\queue.py", line 199 in get
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_generic.py", line 57 in process
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x0000ca84 (most recent call first):
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_winkeyboard.py", line 563 in listen
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\__init__.py", line 294 in listen
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x00009eac (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 363 in wait
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 660 in wait
+  File "C:\geminiterminal2\icharlotte_core\app_crash_handler.py", line 515 in _beat
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x00003cec (most recent call first):
+  File "C:\geminiterminal2\icharlotte_core\ui\deposition_tab.py", line 730 in on_load_transcript
+  File "C:\geminiterminal2\icharlotte.py", line 2846 in <module>
+Windows fatal exception: access violation
+
+Thread 0x00005eb0 (most recent call first):
+  File "<frozen os>", line 380 in walk
+  File "C:\geminiterminal2\icharlotte.py", line 317 in run
+
+Thread 0x000084f0 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\ssl.py", line 1140 in read
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\ssl.py", line 1285 in recv
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\httpcore\_backends\sync.py", line 128 in read
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\httpcore\_sync\http11.py", line 217 in _receive_event
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\httpcore\_sync\http11.py", line 177 in _receive_response_headers
+  <invalid frame>
+
+Thread 0x00009648 (most recent call first):
+  File "C:\geminiterminal2\icharlotte_core\sent_items_monitor.py", line 327 in run
+
+Thread 0x00009304 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 359 in wait
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\queue.py", line 199 in get
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_generic.py", line 57 in process
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x0000ca84 (most recent call first):
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_winkeyboard.py", line 563 in listen
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\__init__.py", line 294 in listen
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x00009eac (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 363 in wait
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 660 in wait
+  File "C:\geminiterminal2\icharlotte_core\app_crash_handler.py", line 515 in _beat
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Current thread 0x00003cec (most recent call first):
+  File "C:\geminiterminal2\icharlotte_core\ui\chat_widgets.py", line 176 in refresh_list
+  File "C:\geminiterminal2\icharlotte_core\ui\chat_widgets.py", line 172 in set_conversations
+  File "C:\geminiterminal2\icharlotte_core\ui\tabs.py", line 416 in refresh_conversation_list
+  File "C:\geminiterminal2\icharlotte_core\ui\tabs.py", line 396 in load_case
+  File "C:\geminiterminal2\icharlotte.py", line 1388 in load_case_by_number
+  File "C:\geminiterminal2\icharlotte_core\ui\master_case_tab.py", line 1597 in on_case_double_clicked
+  File "C:\geminiterminal2\icharlotte.py", line 2846 in <module>
+
+============================================================
+Session start: 2026-03-05T11:32:51.926796
+============================================================
+
+
+----------------------------------------------------------------------
+WINDOWS ERROR REPORTING:
+----------------------------------------------------------------------
+TimeCreated : 3/5/2026 11:31:20 AM
+Message     : Faulting application name: python3.13.exe, version: 3.13.12150.1013, time stamp: 0x69823dc6
+              Faulting module name: shiboken6.abi3.dll, version: 0.0.0.0, time stamp: 0x691c816a
+              Exception code: 0xc0000005
+              Fault offset: 0x0000000000026f00
+              Faulting process id: 0x617C
+              Faulting application start time: 0x1DCAC44C4BDBDFE
+              Faulting application path: C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\python3.13.exe
+              Faulting module path: 
+              C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\shiboken6\shiboken6.abi3.dll
+              Report Id: a7b1f87a-0e9e-4dff-a2fc-8b49be6a8abb
+              Faulting package full name: PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0
+              Faulting package-relative application ID: Python
+
+TimeCreated : 3/5/2026 10:44:36 AM
+Message     : Faulting application name: Explorer.EXE, version: 10.0.26100.7920, time stamp: 0x819f2d1e
+              Faulting module name: Microsoft.UI.Xaml.dll, version: 3.1.6.0, time stamp: 0x97cdad17
+              Exception code: 0xc000027b
+              Fault offset: 0x00000000003a3385
+              Faulting process id: 0x2DF4
+              Faulting application start time: 0x1DCAA97CF74C57B
+              Faulting application path: C:\WINDOWS\Explorer.EXE
+              Faulting module path: C:\WINDOWS\SystemApps\Microsoft.WindowsAppRuntime.CBS_8wekyb3d8bbwe\Microsoft.UI.Xaml.dll
+              Report Id: 61b46024-5088-4a12-b226-625b94f22899
+              Faulting package full name: 
+              Faulting package-relative application ID: 
+
+TimeCreated : 3/4/2026 6:06:53 PM
+Message     : Faulting application name: python3.13.exe, version: 3.13.12150.1013, time stamp: 0x69823dc6
+              Faulting module name: Qt6Core.dll, version: 6.10.1.0, time stamp: 0x6915b375
+              Exception code: 0xc0000409
+              Fault offset: 0x000000000001be08
+              Faulting process id: 0x84C8
+              Faulting application start time: 0x1DCAC4230C60263
+              Faulting application path: C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\python3.13.exe
+              Faulting module path: 
+              C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\PySide6\Qt6Core.dll
+              Report Id: f14b141c-679e-413c-9d1c-c5c5f8910731
+              Faulting package full name: PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0
+              Faulting package-relative application ID: Python
+
+TimeCreated : 3/4/2026 5:48:07 PM
+Message     : Faulting application name: python3.13.exe, version: 3.13.12150

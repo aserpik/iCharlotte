@@ -17,8 +17,8 @@ import logging
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QLabel,
     QPushButton, QTextEdit, QPlainTextEdit,
-    QFileDialog, QMessageBox, QProgressBar, QApplication,
-    QToolBar, QSizePolicy, QComboBox, QCheckBox
+    QDialog, QFileDialog, QMessageBox, QProgressBar, QApplication,
+    QToolBar, QSizePolicy, QComboBox, QCheckBox, QSlider
 )
 from PySide6.QtCore import Qt, Signal, QThread, QTimer, QSettings
 from PySide6.QtGui import (
@@ -67,11 +67,12 @@ class SelectWorker(QThread):
     progress = Signal(str)      # Phase description
     chunk_progress = Signal(int, int)  # (current_chunk, total_chunks)
 
-    def __init__(self, index, prompt: str, context: str = ""):
+    def __init__(self, index, prompt: str, context: str = "", relevance_level: int = 4):
         super().__init__()
         self.index = index
         self.prompt = prompt
         self.context = context
+        self.relevance_level = relevance_level
 
     def run(self):
         try:
@@ -90,7 +91,8 @@ class SelectWorker(QThread):
             result = selector.select(
                 self.index, self.prompt,
                 context=self.context,
-                on_chunk_done=lambda cur, total: self.chunk_progress.emit(cur, total)
+                on_chunk_done=lambda cur, total: self.chunk_progress.emit(cur, total),
+                relevance_level=self.relevance_level,
             )
             self.finished.emit(result)
         except Exception as e:
@@ -217,6 +219,25 @@ class DepositionTab(QWidget):
             "deposition_tab/highlight_color", "#FFCC00"
         )
         self._update_color_btn()
+
+        # Relevance level slider
+        self._relevance_names = {1: "Broad", 2: "Moderate", 3: "Balanced", 4: "Focused", 5: "Precise"}
+        self.relevance_label = QLabel("Relevance:")
+        self.relevance_label.setToolTip("How selective the extraction should be (Broad = more results, Precise = fewer)")
+        toolbar.addWidget(self.relevance_label)
+        self.relevance_slider = QSlider(Qt.Horizontal)
+        self.relevance_slider.setMinimum(1)
+        self.relevance_slider.setMaximum(5)
+        self.relevance_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.relevance_slider.setTickInterval(1)
+        self.relevance_slider.setFixedWidth(100)
+        saved_level = int(settings.value("deposition_tab/relevance_level", 4))
+        self.relevance_slider.setValue(saved_level)
+        self.relevance_slider.valueChanged.connect(self._on_relevance_changed)
+        toolbar.addWidget(self.relevance_slider)
+        self.relevance_value_label = QLabel(self._relevance_names[saved_level])
+        self.relevance_value_label.setFixedWidth(55)
+        toolbar.addWidget(self.relevance_value_label)
 
         # Case context controls
         self.context_checkbox = QCheckBox("Case Context")
@@ -656,7 +677,7 @@ class DepositionTab(QWidget):
             context_file_text=self._context_file_text,
             parent=self,
         )
-        if dlg.exec() == dlg.Accepted:
+        if dlg.exec() == QDialog.DialogCode.Accepted:
             self._context_text = dlg.get_context_text()
             self._context_file_path = dlg.get_context_file_path()
             self._context_file_text = dlg.get_context_file_text()
@@ -886,7 +907,10 @@ class DepositionTab(QWidget):
         self.prompt_input.setEnabled(False)
 
         context = self._build_context_for_llm()
-        self._select_worker = SelectWorker(index, prompt, context=context)
+        self._select_worker = SelectWorker(
+            index, prompt, context=context,
+            relevance_level=self.relevance_slider.value()
+        )
         self._select_worker.finished.connect(self._on_select_finished)
         self._select_worker.error.connect(self._on_select_error)
         self._select_worker.progress.connect(self._on_extract_progress)
@@ -1024,6 +1048,12 @@ class DepositionTab(QWidget):
             self._update_color_btn()
             settings = QSettings("iCharlotte", "iCharlotte")
             settings.setValue("deposition_tab/highlight_color", self._current_color)
+
+    def _on_relevance_changed(self, value: int):
+        """Update label and persist relevance slider value."""
+        self.relevance_value_label.setText(self._relevance_names.get(value, ""))
+        settings = QSettings("iCharlotte", "iCharlotte")
+        settings.setValue("deposition_tab/relevance_level", value)
 
     def _on_clear_results(self):
         """Clear all extraction results."""

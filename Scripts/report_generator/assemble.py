@@ -945,7 +945,7 @@ def _looks_like_date(text):
 
 def _default_output_path(gathered_data: Dict) -> str:
     """Generate the default output path."""
-    output_dir = gathered_data.get("output_dir", "")
+    output_dir = gathered_data.get("report_output_dir", "") or gathered_data.get("output_dir", "")
     report_type = gathered_data.get("report_type", "FSR")
 
     if not output_dir:

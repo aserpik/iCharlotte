@@ -104,8 +104,18 @@ def file_lock(lock_path: str, timeout: float = LOCK_TIMEOUT):
             # Lock file exists - check if it's stale
             try:
                 lock_age = time.time() - os.path.getmtime(lock_path)
+                # Read holder PID for diagnostics
+                try:
+                    with open(lock_path, 'r') as lf:
+                        holder_info = lf.read().strip()
+                except Exception:
+                    holder_info = "unknown"
+                wait_elapsed = time.time() - start_time
+                logging.info(f"Lock contention on {os.path.basename(lock_path)}: held by [{holder_info}], age={lock_age:.1f}s, waiting={wait_elapsed:.1f}s, my_pid={os.getpid()}")
+
                 if lock_age > STALE_THRESHOLD:
                     # Lock is stale, remove it and retry
+                    logging.warning(f"Removing stale lock {lock_path} (age={lock_age:.1f}s)")
                     try:
                         os.remove(lock_path)
                         continue

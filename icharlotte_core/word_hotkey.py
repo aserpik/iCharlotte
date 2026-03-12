@@ -17,7 +17,9 @@ import os
 import json
 import threading
 import logging
-from typing import Optional, Callable
+import uuid
+from dataclasses import dataclass, field
+from typing import Optional, Callable, Dict, Any
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
@@ -284,10 +286,20 @@ def detect_case_from_document() -> tuple:
             pass
 
 
+_last_zombie_check = 0.0  # timestamp of last kill_zombie run
+
 def kill_zombie_word_processes():
     """Kill Word processes that don't have visible windows (zombies)."""
+    global _last_zombie_check
     if not HAS_WIN32:
         return
+
+    # Skip if checked recently (avoid blocking main thread with subprocess)
+    import time as _time
+    now = _time.time()
+    if now - _last_zombie_check < 30.0:
+        return
+    _last_zombie_check = now
 
     try:
         # Find PIDs of visible Word windows
@@ -355,9 +367,10 @@ AVAILABLE_MODELS = [
     ("Gemini 2.5 Flash (Fast)", "Gemini", "gemini-2.5-flash"),
     ("Gemini 2.5 Pro", "Gemini", "gemini-2.5-pro"),
     ("Gemini 2.0 Flash", "Gemini", "models/gemini-2.0-flash"),
-    ("Gemini 3 Flash Preview", "Gemini", "gemini-3-flash-preview"),
     ("Gemini 3.1 Pro Preview", "Gemini", "gemini-3.1-pro-preview"),
+    ("Gemini 3.1 Flash Lite Preview", "Gemini", "gemini-3.1-flash-lite-preview"),
     ("Gemini 3 Pro Preview", "Gemini", "gemini-3-pro-preview"),
+    ("Gemini 3 Flash Preview", "Gemini", "gemini-3-flash-preview"),
     ("Claude Sonnet 4", "Claude", "claude-sonnet-4-20250514"),
     ("Claude Haiku 4 (Fast)", "Claude", "claude-haiku-4-20250514"),
     ("GPT-4o", "OpenAI", "gpt-4o"),
@@ -365,6 +378,89 @@ AVAILABLE_MODELS = [
 ]
 
 DEFAULT_MODEL_INDEX = 0  # Gemini 2.5 Flash
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Parallel Task Infrastructure — TaskData, bookmarks, TaskManager, StatusBar
+# ════════════════════════════════════════════════════════════════════════════
+
+@dataclass
+class TaskData:
+    """All state needed to insert an LLM result into Word after async completion."""
+    task_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
+    bookmark_name: str = ""
+    document_name: str = ""
+    document_com: Any = None
+    has_selection: bool = False
+    original_text: str = ""
+    original_text_raw: str = ""
+    captured_format: Optional[Dict] = None
+    format_type: str = FORMAT_PLAIN
+    redline_mode_active: bool = False
+    redline_settings: Optional[Dict] = None
+    research_result: Any = None
+    do_legal_research: bool = False  # Whether to run legal research in worker thread
+    legal_research_engine: Any = None  # LegalResearchEngine instance (if research requested)
+    legal_research_model: Optional[tuple] = None  # (provider, model_id) for research LLM calls
+    prompt_preview: str = ""
+    provider: str = ""
+    model_id: str = ""
+    system_prompt: str = ""
+    full_prompt: str = ""
+    status: str = "pending"       # pending -> running -> inserting -> done -> error
+    result_text: str = ""
+    error_msg: str = ""
+
+
+def _create_task_bookmark(doc_com, range_start: int, range_end: int, task_id: str) -> str:
+    """Create a temporary Word bookmark at the given range.
+
+    Bookmarks auto-adjust their positions when text is inserted/deleted
+    elsewhere in the document, solving the range displacement problem
+    for parallel tasks.
+    """
+    bookmark_name = f"_ICHARLOTTE_{task_id}"
+    try:
+        # Clamp to document bounds to avoid "Value out of range" if the
+        # document was edited between capture time and bookmark creation.
+        doc_end = doc_com.Content.End
+        range_start = min(range_start, doc_end - 1)
+        range_end = min(range_end, doc_end - 1)
+        if range_start < 0:
+            range_start = 0
+        if range_end < range_start:
+            range_end = range_start
+        target_range = doc_com.Range(range_start, range_end)
+        doc_com.Bookmarks.Add(Name=bookmark_name, Range=target_range)
+        print(f"Created bookmark '{bookmark_name}' at {range_start}-{range_end}")
+        return bookmark_name
+    except Exception as e:
+        print(f"Failed to create bookmark: {e}")
+        return ""
+
+
+def _get_bookmark_range(doc_com, bookmark_name: str):
+    """Retrieve the current range of a bookmark. Returns (start, end) or None."""
+    try:
+        if doc_com.Bookmarks.Exists(bookmark_name):
+            bm = doc_com.Bookmarks(bookmark_name)
+            return bm.Range.Start, bm.Range.End
+        else:
+            print(f"Bookmark '{bookmark_name}' no longer exists")
+            return None
+    except Exception as e:
+        print(f"Failed to get bookmark range: {e}")
+        return None
+
+
+def _delete_task_bookmark(doc_com, bookmark_name: str):
+    """Delete a temporary bookmark after insertion is complete."""
+    try:
+        if doc_com.Bookmarks.Exists(bookmark_name):
+            doc_com.Bookmarks(bookmark_name).Delete()
+            print(f"Deleted bookmark '{bookmark_name}'")
+    except Exception as e:
+        print(f"Failed to delete bookmark '{bookmark_name}': {e}")
 
 
 class CustomFormatDialog(QDialog):
@@ -862,6 +958,817 @@ class LLMWorkerThread(QThread):
         self._cancelled = True
 
 
+# ════════════════════════════════════════════════════════════════════════════
+# Parallel Task Execution — TaskLLMWorkerThread, TaskManager, TaskStatusBar
+# ════════════════════════════════════════════════════════════════════════════
+
+class TaskLLMWorkerThread(QThread):
+    """Worker thread for a single parallel task's LLM call."""
+    finished = Signal(str, str, str)  # (task_id, result, error)
+    status_update = Signal(str, str)  # (task_id, status_message)
+
+    def __init__(self, task_data: TaskData, parent=None):
+        super().__init__(parent)
+        self.task_data = task_data
+        self._cancelled = False
+
+    def _emit_status(self, message: str):
+        """Emit a status update for the status bar."""
+        self.status_update.emit(self.task_data.task_id, message)
+
+    def run(self):
+        if self._cancelled:
+            self.finished.emit(self.task_data.task_id, "", "cancelled")
+            return
+        try:
+            # ── Legal research (runs in worker thread to keep main thread free) ──
+            if self.task_data.do_legal_research and self.task_data.legal_research_engine:
+                self._run_legal_research()
+                if self._cancelled:
+                    self.finished.emit(self.task_data.task_id, "", "cancelled")
+                    return
+
+            if self.task_data.do_legal_research:
+                self._emit_status("Research 4/4 · Generating response with citations...")
+            else:
+                self._emit_status("Generating response...")
+            from icharlotte_core.llm import LLMHandler
+            settings = {
+                'temperature': 0.7,
+                'top_p': 0.95,
+                'max_tokens': -1,
+                'stream': False,
+                'thinking_level': 'None',
+            }
+            result = LLMHandler.generate(
+                provider=self.task_data.provider,
+                model=self.task_data.model_id,
+                system_prompt=self.task_data.system_prompt,
+                user_prompt=self.task_data.full_prompt,
+                file_contents="",
+                settings=settings,
+            )
+            if self._cancelled:
+                self.finished.emit(self.task_data.task_id, "", "cancelled")
+            else:
+                self.finished.emit(self.task_data.task_id, (result or "").strip(), "")
+        except Exception as e:
+            if not self._cancelled:
+                self.finished.emit(self.task_data.task_id, "", str(e))
+
+    def _run_legal_research(self):
+        """Run legal research and augment the task's full_prompt. Runs in worker thread."""
+        try:
+            engine = self.task_data.legal_research_engine
+            provider, model_id = self.task_data.legal_research_model or (self.task_data.provider, self.task_data.model_id)
+
+            from icharlotte_core.legal_research.prompts import (
+                QUERY_EXTRACTION_PROMPT,
+                CITATION_INSTRUCTION,
+                RESEARCH_FRAMING_INSTRUCTION,
+            )
+            from icharlotte_core.llm import LLMHandler
+
+            def _llm_for_research(system_prompt, user_prompt):
+                settings = {
+                    'temperature': 0.3,
+                    'top_p': 0.95,
+                    'max_tokens': -1,
+                    'stream': False,
+                    'thinking_level': 'None',
+                }
+                return LLMHandler.generate(
+                    provider=provider, model=model_id,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    file_contents="", settings=settings,
+                )
+
+            # Step 1/4: Extract legal questions
+            self._emit_status("Research 1/4 · Extracting legal questions...")
+            research_query = _llm_for_research(
+                QUERY_EXTRACTION_PROMPT, self.task_data.full_prompt[:8000]
+            )
+            if not research_query or len(research_query.strip()) < 20:
+                research_query = self.task_data.full_prompt[:2000]
+
+            if self._cancelled:
+                return
+
+            # Step 2/4: Searching legal databases
+            self._emit_status("Research 2/4 · Searching legal databases...")
+            research_result = engine.research(
+                query=research_query,
+                llm_callback=_llm_for_research,
+                status_callback=lambda msg: self._emit_status(f"Research 2/4 · {msg}"),
+                original_prompt=self.task_data.full_prompt[:8000],
+            )
+
+            if self._cancelled:
+                return
+
+            # Step 3/4: Building authority block
+            self._emit_status("Research 3/4 · Compiling citations...")
+            authority_block = research_result.format_authority_block()
+            self.task_data.research_result = research_result
+
+            if authority_block and research_result:
+                # Override system prompt to legal drafting persona
+                from icharlotte_core.legal_research.prompts import build_augmented_system_prompt
+                memo = research_result.memo or ""
+                self.task_data.system_prompt = build_augmented_system_prompt(
+                    self.task_data.system_prompt, authority_block, research_memo=memo
+                )
+                # Also inject into user prompt for models that weight user content more
+                if memo:
+                    self.task_data.full_prompt = (
+                        f"{RESEARCH_FRAMING_INSTRUCTION}\n\n"
+                        f"{self.task_data.full_prompt}\n\n"
+                        f"[LEGAL RESEARCH MEMO]\n{memo}\n[/LEGAL RESEARCH MEMO]\n\n"
+                        f"{authority_block}\n\n"
+                        f"{CITATION_INSTRUCTION}"
+                    )
+                else:
+                    self.task_data.full_prompt = (
+                        f"{self.task_data.full_prompt}\n\n"
+                        f"{authority_block}\n\n"
+                        f"{CITATION_INSTRUCTION}"
+                    )
+
+            # Step 4/4 will be "Generating response..." emitted in run()
+
+        except Exception as e:
+            print(f"[TaskLLMWorkerThread] Legal research failed: {e}")
+            self.task_data.research_result = None
+
+    def cancel(self):
+        self._cancelled = True
+
+
+class _InsertionProxy:
+    """Lightweight adapter to reuse WordLLMPopup's text insertion methods.
+
+    Rather than duplicating ~500 lines of insertion/formatting code,
+    we set the attributes the methods access and bind the methods
+    from WordLLMPopup's class.
+    """
+    def __init__(self, task_data: TaskData):
+        self._captured_format = task_data.captured_format
+        self._original_document = task_data.document_com
+        self.custom_format_settings = task_data.captured_format or {}
+        self.redline_settings = task_data.redline_settings or {}
+
+    # These methods will be bound after WordLLMPopup is defined (see bottom of this block)
+
+
+class TaskManagerSignals(QObject):
+    """Signals for TaskManager → TaskStatusBar communication."""
+    task_added = Signal(str)                # task_id
+    task_status_changed = Signal(str, str)  # task_id, new_status
+    task_description_changed = Signal(str, str)  # task_id, description
+    task_completed = Signal(str)            # task_id
+    task_error = Signal(str, str)           # task_id, error_msg
+    all_tasks_done = Signal()
+
+
+class TaskManager(QObject):
+    """Singleton managing parallel LLM tasks and sequential Word insertions.
+
+    - Multiple LLM calls run in parallel (each in its own QThread)
+    - Word COM insertions happen sequentially on the main thread
+    - Bookmarks track ranges so positions auto-adjust across parallel edits
+    """
+
+    _instance = None
+
+    @classmethod
+    def instance(cls) -> 'TaskManager':
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def __init__(self):
+        super().__init__()
+        self.signals = TaskManagerSignals()
+        self._tasks: Dict[str, TaskData] = {}
+        self._workers: Dict[str, TaskLLMWorkerThread] = {}
+        self._insertion_queue: list = []
+        self._inserting = False
+
+    def submit_task(self, task_data: TaskData) -> str:
+        """Submit a new task for parallel execution. Returns task_id."""
+        task_data.status = "running"
+        self._tasks[task_data.task_id] = task_data
+
+        worker = TaskLLMWorkerThread(task_data)
+        worker.finished.connect(self._on_llm_finished)
+        worker.status_update.connect(self._on_worker_status_update)
+        self._workers[task_data.task_id] = worker
+
+        self.signals.task_added.emit(task_data.task_id)
+        self.signals.task_status_changed.emit(task_data.task_id, "running")
+
+        worker.start()
+        print(f"[TaskManager] Task {task_data.task_id} submitted: '{task_data.prompt_preview}'")
+        return task_data.task_id
+
+    def _on_worker_status_update(self, task_id: str, message: str):
+        """Forward worker status updates to the status bar."""
+        self.signals.task_description_changed.emit(task_id, message)
+
+    def cancel_task(self, task_id: str):
+        """Cancel a running task."""
+        if task_id in self._workers:
+            self._workers[task_id].cancel()
+        if task_id in self._tasks:
+            td = self._tasks[task_id]
+            td.status = "cancelled"
+            if td.bookmark_name and td.document_com:
+                _delete_task_bookmark(td.document_com, td.bookmark_name)
+            self.signals.task_status_changed.emit(task_id, "cancelled")
+            self._check_all_done()
+
+    def get_task(self, task_id: str) -> Optional[TaskData]:
+        return self._tasks.get(task_id)
+
+    def get_active_tasks(self) -> list:
+        return [td for td in self._tasks.values()
+                if td.status in ("pending", "running", "inserting")]
+
+    def _on_llm_finished(self, task_id: str, result: str, error: str):
+        """Handle LLM completion — queue for insertion (runs on main thread)."""
+        if task_id not in self._tasks:
+            return
+
+        td = self._tasks[task_id]
+        self._workers.pop(task_id, None)
+
+        if error:
+            td.status = "error"
+            td.error_msg = error
+            if error != "cancelled":
+                self.signals.task_error.emit(task_id, error)
+            if td.bookmark_name and td.document_com:
+                _delete_task_bookmark(td.document_com, td.bookmark_name)
+            self._check_all_done()
+            return
+
+        if not result:
+            td.status = "error"
+            td.error_msg = "LLM returned empty response"
+            self.signals.task_error.emit(task_id, td.error_msg)
+            if td.bookmark_name and td.document_com:
+                _delete_task_bookmark(td.document_com, td.bookmark_name)
+            self._check_all_done()
+            return
+
+        # Apply deterministic citation cross-check on the final LLM output
+        # if legal research was performed (non-LLM safety net)
+        if td.research_result and td.research_result.cases:
+            try:
+                from icharlotte_core.legal_research.engine import LegalResearchEngine
+                known_names = td.research_result.get_known_case_names()
+                result = LegalResearchEngine._deterministic_citation_check(
+                    result, known_names
+                )
+            except Exception as e:
+                print(f"[TaskManager] Deterministic citation check failed: {e}")
+
+        td.result_text = result
+        td.status = "inserting"
+        self._insertion_queue.append(task_id)
+        self.signals.task_status_changed.emit(task_id, "inserting")
+
+        # Defer insertion so the event loop can process UI events first
+        # (prevents freezing the second popup if user opened one)
+        QTimer.singleShot(0, self._process_insertion_queue)
+
+    def _process_insertion_queue(self):
+        """Process the next task in the insertion queue (sequential, main thread)."""
+        if self._inserting or not self._insertion_queue:
+            return
+
+        self._inserting = True
+        task_id = self._insertion_queue.pop(0)
+        td = self._tasks.get(task_id)
+        if not td:
+            self._inserting = False
+            return
+
+        # Process pending events (e.g. show_popup signal) before blocking on COM
+        QApplication.processEvents()
+
+        try:
+            self._insert_result(td)
+            td.status = "done"
+            self.signals.task_completed.emit(task_id)
+        except Exception as e:
+            print(f"[TaskManager] Insertion failed for {task_id}: {e}")
+            import traceback
+            traceback.print_exc()
+            td.status = "error"
+            td.error_msg = str(e)
+            # Fallback: copy to clipboard
+            try:
+                QApplication.clipboard().setText(td.result_text)
+                print(f"[TaskManager] Result copied to clipboard for task {task_id}")
+            except Exception:
+                pass
+            self.signals.task_error.emit(task_id, f"Insertion failed: {e}\nResult copied to clipboard.")
+        finally:
+            # Clean up bookmark
+            if td and td.bookmark_name and td.document_com:
+                _delete_task_bookmark(td.document_com, td.bookmark_name)
+            self._inserting = False
+            self._check_all_done()
+            # Process next in queue
+            if self._insertion_queue:
+                QTimer.singleShot(100, self._process_insertion_queue)
+
+    def _insert_result(self, td: TaskData):
+        """Insert LLM result into Word at the bookmark location."""
+        # Verify document is still open and get its Application object.
+        # IMPORTANT: We derive `word` from `doc.Application` rather than
+        # GetActiveObject so that word and doc are always in the same
+        # Word process.  When multiple Word instances are running (common
+        # on Windows when documents are opened from different sources),
+        # GetActiveObject returns whichever instance is foreground, which
+        # may be a DIFFERENT process than the one owning the target doc.
+        # That mismatch causes word.Selection to point at the wrong
+        # document, so the insertion silently goes nowhere.
+        doc = td.document_com
+        word = None
+
+        if doc:
+            try:
+                _ = doc.Name  # test if COM ref is alive
+                word = doc.Application
+                print(f"[TaskManager] Using doc.Application for '{doc.Name}'")
+            except Exception as e:
+                print(f"[TaskManager] Stored doc COM ref stale: {e}")
+                doc = None
+
+        # Fallback: find document by name via GetActiveObject
+        if not doc and td.document_name:
+            try:
+                word = win32com.client.GetActiveObject("Word.Application")
+            except Exception:
+                try:
+                    word = win32com.client.GetObject(Class="Word.Application")
+                except Exception:
+                    raise Exception("Could not connect to Word")
+            if word:
+                try:
+                    for i in range(1, word.Documents.Count + 1):
+                        candidate = word.Documents(i)
+                        if candidate.Name == td.document_name:
+                            doc = candidate
+                            word = doc.Application  # ensure same process
+                            print(f"[TaskManager] Found doc by name: '{td.document_name}'")
+                            break
+                except Exception:
+                    pass
+
+        if not doc:
+            raise Exception(f"Document '{td.document_name or 'unknown'}' is no longer open")
+        if not word:
+            raise Exception("Could not connect to Word")
+
+        # Activate document
+        doc.Activate()
+
+        # Resolve bookmark to current range
+        if td.bookmark_name:
+            bm_range = _get_bookmark_range(doc, td.bookmark_name)
+            if bm_range is None:
+                # Bookmark lost — fall back to current selection
+                print(f"[TaskManager] Bookmark lost, falling back to current selection")
+                selection = word.Selection
+                range_start = selection.Range.Start
+                range_end = selection.Range.End
+            else:
+                range_start, range_end = bm_range
+        else:
+            # No bookmark (e.g., no selection was made) — insert at current cursor
+            print(f"[TaskManager] No bookmark — inserting at current cursor position")
+            selection = word.Selection
+            range_start = selection.Range.Start
+            range_end = selection.Range.Start  # Insertion point
+
+        # Lock Word UI during insertion
+        ui_locked = False
+        try:
+            word.ScreenUpdating = False
+            word.Interactive = False
+            ui_locked = True
+        except Exception:
+            pass
+
+        try:
+            # Clamp to document bounds to avoid "Value out of range"
+            doc_end = doc.Content.End
+            range_start = min(range_start, doc_end - 1)
+            range_end = min(range_end, doc_end - 1)
+            if range_start < 0:
+                range_start = 0
+            if range_end < range_start:
+                range_end = range_start
+
+            # Select the bookmark range
+            if td.has_selection:
+                target_range = doc.Range(range_start, range_end)
+            else:
+                target_range = doc.Range(range_start, range_start)
+            target_range.Select()
+            selection = word.Selection
+
+            if td.redline_mode_active:
+                r = apply_flat_diff_redline(
+                    doc_com=doc,
+                    range_start=range_start,
+                    range_end=range_end,
+                    original_text=td.original_text_raw or td.original_text,
+                    revised_text=td.result_text,
+                    auto_enable_track_changes=(
+                        td.redline_settings.get("auto_enable_track_changes", True)
+                        if td.redline_settings else True
+                    ),
+                )
+                if not r['success']:
+                    # Fallback to plain replacement
+                    self._do_plain_insert(word, selection, td)
+            else:
+                self._do_plain_insert(word, selection, td)
+
+            print(f"[TaskManager] Successfully inserted result for task {td.task_id}")
+        finally:
+            if ui_locked:
+                try:
+                    word.Interactive = True
+                    word.ScreenUpdating = True
+                except Exception:
+                    try:
+                        fresh = win32com.client.GetActiveObject("Word.Application")
+                        fresh.Interactive = True
+                        fresh.ScreenUpdating = True
+                    except Exception:
+                        print("WARNING: Could not unlock Word UI")
+
+            # Bring Word to the foreground showing the correct document.
+            # After doc.Activate(), the document is active within Word but
+            # the window may be behind other apps if the user switched away.
+            try:
+                if doc:
+                    doc.Activate()
+                if word and HAS_WIN32:
+                    import win32con
+                    hwnd = getattr(word, 'hwnd', 0) or 0
+                    if hwnd:
+                        if win32gui.IsIconic(hwnd):
+                            win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
+                        win32gui.SetForegroundWindow(hwnd)
+                        print(f"[TaskManager] Brought Word to foreground (hwnd={hwnd})")
+            except Exception as e:
+                print(f"[TaskManager] Could not bring Word to foreground: {e}")
+
+
+    def _do_plain_insert(self, word, selection, td: TaskData):
+        """Insert text using the appropriate format mode via _InsertionProxy."""
+        proxy = _InsertionProxy(td)
+        proxy._set_word_text_internal(
+            td.result_text, td.format_type,
+            word=word, selection=selection
+        )
+
+    def _check_all_done(self):
+        """Emit all_tasks_done if no active tasks remain."""
+        if not self.get_active_tasks():
+            self.signals.all_tasks_done.emit()
+
+
+class TaskStatusBar(QWidget):
+    """Floating always-on-top widget showing active AI tasks.
+
+    Appears in bottom-right of screen. Each task shows:
+    - Spinner/status icon
+    - Document name + prompt preview
+    - Cancel button
+
+    Auto-hides 3 seconds after all tasks complete.
+    """
+
+    _instance = None
+
+    @classmethod
+    def instance(cls) -> 'TaskStatusBar':
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def __init__(self):
+        super().__init__(None)
+        self.setWindowFlags(
+            Qt.WindowType.Tool |
+            Qt.WindowType.FramelessWindowHint |
+            Qt.WindowType.WindowStaysOnTopHint
+        )
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+
+        self._task_rows: Dict[str, QWidget] = {}
+        self._spinner_timers: Dict[str, QTimer] = {}
+        self._auto_hide_timer = QTimer(self)
+        self._auto_hide_timer.setSingleShot(True)
+        self._auto_hide_timer.timeout.connect(self.hide)
+
+        self._setup_ui()
+        self._connect_signals()
+
+    def _setup_ui(self):
+        self.setMinimumWidth(320)
+        self.setMaximumWidth(420)
+
+        self._container = QFrame(self)
+        self._container.setStyleSheet("""
+            QFrame#taskStatusContainer {
+                background-color: #1e1e2e;
+                border: 1px solid #6c63ff;
+                border-radius: 8px;
+            }
+        """)
+        self._container.setObjectName("taskStatusContainer")
+
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(self._container)
+
+        self._layout = QVBoxLayout(self._container)
+        self._layout.setContentsMargins(10, 8, 10, 8)
+        self._layout.setSpacing(4)
+
+        header = QLabel("AI Tasks")
+        header.setStyleSheet("color: #6c63ff; font-weight: bold; font-size: 11px; background: transparent;")
+        self._layout.addWidget(header)
+
+    def _connect_signals(self):
+        tm = TaskManager.instance()
+        tm.signals.task_added.connect(self._on_task_added)
+        tm.signals.task_status_changed.connect(self._on_task_status_changed)
+        tm.signals.task_description_changed.connect(self._on_task_description_changed)
+        tm.signals.task_completed.connect(self._on_task_completed)
+        tm.signals.task_error.connect(self._on_task_error)
+        tm.signals.all_tasks_done.connect(self._on_all_done)
+
+    def show_preparing(self, prep_id: str, prompt_preview: str):
+        """Show a 'preparing' row immediately before the task is submitted.
+
+        Called right after the popup hides so the user sees instant feedback.
+        The row is replaced when the real task is submitted via _on_task_added.
+        """
+        self._auto_hide_timer.stop()
+
+        row = QFrame()
+        row.setStyleSheet("QFrame { background: transparent; }")
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 2, 0, 2)
+        row_layout.setSpacing(6)
+
+        spinner = QLabel("⠋")
+        spinner.setStyleSheet("color: #f9e2af; font-size: 12px; background: transparent;")
+        spinner.setFixedWidth(16)
+        spinner.setObjectName("spinner")
+        row_layout.addWidget(spinner)
+
+        spin_chars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        spin_idx = [0]
+        timer = QTimer()
+        timer.setInterval(100)
+        timer.timeout.connect(lambda: (
+            spinner.setText(spin_chars[spin_idx[0] % len(spin_chars)]),
+            spin_idx.__setitem__(0, spin_idx[0] + 1)
+        ))
+        timer.start()
+        self._spinner_timers[prep_id] = timer
+
+        prompt_short = prompt_preview[:35] + "..." if len(prompt_preview) > 35 else prompt_preview
+        desc_label = QLabel(f"Preparing · {prompt_short}")
+        desc_label.setStyleSheet("color: #cdd6f4; font-size: 11px; background: transparent;")
+        row_layout.addWidget(desc_label, stretch=1)
+
+        self._task_rows[prep_id] = row
+        self._layout.addWidget(row)
+        self._reposition()
+        self.show()
+        self.raise_()
+
+    def upgrade_preparing(self, prep_id: str, task_id: str):
+        """Replace a 'preparing' row with the real task_id after submission."""
+        if prep_id in self._task_rows:
+            row = self._task_rows.pop(prep_id)
+            timer = self._spinner_timers.pop(prep_id, None)
+            if timer:
+                self._spinner_timers[task_id] = timer
+            self._task_rows[task_id] = row
+
+            # Update description from TaskManager
+            tm = TaskManager.instance()
+            td = tm.get_task(task_id)
+            if td:
+                for child in row.findChildren(QLabel):
+                    if child.objectName() != "spinner":
+                        doc_short = td.document_name[:18] if td.document_name else "Word"
+                        prompt_short = td.prompt_preview[:35] + "..." if len(td.prompt_preview) > 35 else td.prompt_preview
+                        child.setText(f"{doc_short} · {prompt_short}")
+                        child.setToolTip(f"Document: {td.document_name}\nPrompt: {td.prompt_preview}")
+                        break
+
+            # Add cancel button if not present
+            cancel_btn = row.findChild(QPushButton)
+            if not cancel_btn:
+                cancel_btn = QPushButton("✕")
+                cancel_btn.setFixedSize(18, 18)
+                cancel_btn.setStyleSheet("""
+                    QPushButton {
+                        background: #45475a; color: #cdd6f4;
+                        border-radius: 9px; font-size: 9px;
+                        border: none; padding: 0px;
+                    }
+                    QPushButton:hover { background: #f38ba8; color: white; }
+                """)
+                cancel_btn.setToolTip("Cancel task")
+                cancel_btn.clicked.connect(lambda checked=False, tid=task_id: TaskManager.instance().cancel_task(tid))
+                row.layout().addWidget(cancel_btn)
+
+    def _on_task_added(self, task_id: str):
+        self._auto_hide_timer.stop()
+
+        # If there's already a preparing row for this task, skip creating a new one
+        if task_id in self._task_rows:
+            return
+
+        tm = TaskManager.instance()
+        td = tm.get_task(task_id)
+        if not td:
+            return
+
+        row = QFrame()
+        row.setStyleSheet("QFrame { background: transparent; }")
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(0, 2, 0, 2)
+        row_layout.setSpacing(6)
+
+        # Animated spinner
+        spinner = QLabel("⠋")
+        spinner.setStyleSheet("color: #f9e2af; font-size: 12px; background: transparent;")
+        spinner.setFixedWidth(16)
+        spinner.setObjectName("spinner")
+        row_layout.addWidget(spinner)
+
+        # Start spinner animation
+        spin_chars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        spin_idx = [0]
+        timer = QTimer()
+        timer.setInterval(100)
+        timer.timeout.connect(lambda: (
+            spinner.setText(spin_chars[spin_idx[0] % len(spin_chars)]),
+            spin_idx.__setitem__(0, spin_idx[0] + 1)
+        ))
+        timer.start()
+        self._spinner_timers[task_id] = timer
+
+        # Task description
+        doc_short = td.document_name[:18] if td.document_name else "Word"
+        prompt_short = td.prompt_preview[:35] + "..." if len(td.prompt_preview) > 35 else td.prompt_preview
+        desc_label = QLabel(f"{doc_short} · {prompt_short}")
+        desc_label.setStyleSheet("color: #cdd6f4; font-size: 11px; background: transparent;")
+        desc_label.setToolTip(f"Document: {td.document_name}\nPrompt: {td.prompt_preview}")
+        row_layout.addWidget(desc_label, stretch=1)
+
+        # Cancel button
+        cancel_btn = QPushButton("✕")
+        cancel_btn.setFixedSize(18, 18)
+        cancel_btn.setStyleSheet("""
+            QPushButton {
+                background: #45475a; color: #cdd6f4;
+                border-radius: 9px; font-size: 9px;
+                border: none; padding: 0px;
+            }
+            QPushButton:hover { background: #f38ba8; color: white; }
+        """)
+        cancel_btn.setToolTip("Cancel task")
+        cancel_btn.clicked.connect(lambda checked=False, tid=task_id: TaskManager.instance().cancel_task(tid))
+        row_layout.addWidget(cancel_btn)
+
+        self._task_rows[task_id] = row
+        self._layout.addWidget(row)
+
+        self._reposition()
+        self.show()
+        self.raise_()
+
+    def _on_task_status_changed(self, task_id: str, status: str):
+        row = self._task_rows.get(task_id)
+        if not row:
+            return
+        spinner = row.findChild(QLabel, "spinner")
+        if not spinner:
+            return
+
+        if status == "inserting":
+            # Stop animation, show static icon
+            timer = self._spinner_timers.pop(task_id, None)
+            if timer:
+                timer.stop()
+            spinner.setText("▸")
+            spinner.setStyleSheet("color: #89b4fa; font-size: 12px; background: transparent;")
+            # Update description to show inserting state
+            for child in row.findChildren(QLabel):
+                if child is not spinner and child.objectName() != "spinner":
+                    child.setText("Inserting into document...")
+                    break
+        elif status == "cancelled":
+            timer = self._spinner_timers.pop(task_id, None)
+            if timer:
+                timer.stop()
+            spinner.setText("—")
+            spinner.setStyleSheet("color: #6c7086; font-size: 12px; background: transparent;")
+            QTimer.singleShot(2000, lambda: self._remove_task_row(task_id))
+
+    def _on_task_description_changed(self, task_id: str, description: str):
+        """Update the description label for a running task."""
+        row = self._task_rows.get(task_id)
+        if not row:
+            return
+        spinner = row.findChild(QLabel, "spinner")
+        for child in row.findChildren(QLabel):
+            if child is not spinner and child.objectName() != "spinner":
+                child.setText(description)
+                child.setToolTip(description)
+                break
+
+    def _on_task_completed(self, task_id: str):
+        timer = self._spinner_timers.pop(task_id, None)
+        if timer:
+            timer.stop()
+
+        row = self._task_rows.get(task_id)
+        if not row:
+            return
+        spinner = row.findChild(QLabel, "spinner")
+        if spinner:
+            spinner.setText("✓")
+            spinner.setStyleSheet("color: #a6e3a1; font-size: 12px; font-weight: bold; background: transparent;")
+        for child in row.findChildren(QLabel):
+            if child is not spinner and child.objectName() != "spinner":
+                child.setText("Done — inserted into document")
+                child.setStyleSheet("color: #a6e3a1; font-size: 11px; background: transparent;")
+                break
+        QTimer.singleShot(2000, lambda: self._remove_task_row(task_id))
+
+    def _on_task_error(self, task_id: str, error: str):
+        timer = self._spinner_timers.pop(task_id, None)
+        if timer:
+            timer.stop()
+
+        row = self._task_rows.get(task_id)
+        if not row:
+            return
+        spinner = row.findChild(QLabel, "spinner")
+        if spinner:
+            spinner.setText("✗")
+            spinner.setStyleSheet("color: #f38ba8; font-size: 12px; font-weight: bold; background: transparent;")
+            spinner.setToolTip(error)
+        # Update description label to show error
+        for child in row.findChildren(QLabel):
+            if child is not spinner and child.objectName() != "spinner":
+                short_err = error[:60] + "..." if len(error) > 60 else error
+                child.setText(f"Error: {short_err}")
+                child.setStyleSheet("color: #f38ba8; font-size: 11px; background: transparent;")
+                break
+        QTimer.singleShot(8000, lambda: self._remove_task_row(task_id))
+
+    def _remove_task_row(self, task_id: str):
+        timer = self._spinner_timers.pop(task_id, None)
+        if timer:
+            timer.stop()
+        row = self._task_rows.pop(task_id, None)
+        if row:
+            self._layout.removeWidget(row)
+            row.deleteLater()
+            self._reposition()
+
+    def _on_all_done(self):
+        self._auto_hide_timer.start(3000)
+
+    def _reposition(self):
+        screen = QApplication.primaryScreen()
+        if screen:
+            geo = screen.availableGeometry()
+            self.adjustSize()
+            x = geo.right() - self.width() - 20
+            y = geo.bottom() - self.height() - 20
+            self.move(x, y)
+
+
 class ReviewWorkerThread(QThread):
     """Worker thread for running the report review without blocking the UI."""
     progress = Signal(str)  # progress message
@@ -1243,6 +2150,7 @@ class WordLLMPopup(QDialog):
         self._original_range_end = None  # Range end position
         self._original_has_selection = False  # Whether original capture had a selection
         self._redline_mode_active = False  # Whether current operation uses redline
+        self._word_ui_locked = False  # Whether Word UI is locked (Interactive=False)
 
         self.setWindowTitle("AI Assistant")
         self.setWindowFlags(
@@ -2313,43 +3221,67 @@ class WordLLMPopup(QDialog):
             QMessageBox.warning(self, "Prompt Required", "Please enter or select a prompt.")
             return
 
-        self.status_label.setText("Processing...")
-        self.execute_btn.setEnabled(False)
-        self.cancel_btn.setText("Cancel Task")
-        QApplication.processEvents()
+        # Capture all UI state before hiding popup
+        self._exec_format_type = self.format_combo.currentText()
+        self._exec_use_all_text = self.use_all_text_check.isChecked()
+        self._exec_legal_research = self.legal_research_checkbox.isChecked()
+        self._exec_redline_checked = self.redline_checkbox.isChecked()
 
-        # Run in a slight delay to allow UI to update
-        QTimer.singleShot(100, lambda: self._do_execute(prompt))
+        # Generate a prep_id so we can show the status bar immediately
+        import uuid
+        self._prep_id = str(uuid.uuid4())[:8]
+
+        # Hide popup immediately so user can keep working
+        self.hide()
+
+        # Show status bar with "Preparing..." row right away
+        tsb = TaskStatusBar.instance()
+        tsb.show_preparing(self._prep_id, prompt[:40])
+        QApplication.processEvents()  # Force paint so status bar renders immediately
+
+        # Small delay to allow UI to update before _do_execute
+        QTimer.singleShot(50, lambda: self._do_execute(prompt))
 
     def _do_execute(self, prompt: str):
         """Actually execute the LLM call - dispatch to Word or Outlook handler."""
         try:
+            print(f"[DEBUG] _do_execute entered. app_context={self.app_context}")
             # Dispatch based on context
             if self.app_context == APP_CONTEXT_OUTLOOK:
+                self.show()  # Re-show for Outlook (uses old worker thread path)
                 self._do_execute_outlook(prompt)
                 return
 
             # Default: Word context
             # Check if Word is running with a document open
+            QApplication.processEvents()  # Keep UI responsive
             word = self._get_word_app()
+            QApplication.processEvents()  # Keep UI responsive
 
             if not word:
-                self.status_label.setText("Word is not running")
-                self.execute_btn.setEnabled(True)
-                QMessageBox.warning(self, "Word Not Found",
+                prep_id = getattr(self, '_prep_id', None)
+                if prep_id:
+                    tsb = TaskStatusBar.instance()
+                    tsb._remove_task_row(prep_id)
+                    tsb._on_all_done()
+                    self._prep_id = None
+                QMessageBox.warning(None, "Word Not Found",
                     "Microsoft Word is not running or no document is open.\n\nPlease open a Word document first, then try again.")
+                self.close()
                 return
 
+            # Use pre-captured UI state (captured in execute() before popup was hidden)
+            format_type = getattr(self, '_exec_format_type', FORMAT_PLAIN)
+            use_all_text = getattr(self, '_exec_use_all_text', False)
+
             # Capture format if "Match Selection" is chosen
-            format_type = self.format_combo.currentText()
             if format_type == FORMAT_MATCH:
                 self._capture_selection_format(word)
+                QApplication.processEvents()  # Keep UI responsive
 
             # Get Word selection
-            selected_text, has_selection = self._get_word_selection_internal()
-
-            # Check if we should use all document text as context
-            use_all_text = self.use_all_text_check.isChecked()
+            selected_text, has_selection = self._get_word_selection_internal(word)
+            QApplication.processEvents()  # Keep UI responsive
 
             # When redline mode is active, prepend instruction to preserve unchanged text
             redline_prefix = ""
@@ -2412,77 +3344,119 @@ class WordLLMPopup(QDialog):
 
             QApplication.processEvents()
 
-            # Legal Research: if checkbox is checked, run research and augment prompt
-            if self.legal_research_checkbox.isChecked():
-                engine = self._get_legal_research_engine()
-                if engine:
-                    self.status_label.setText("Researching legal authority...")
-                    QApplication.processEvents()
-
-                    from icharlotte_core.legal_research.prompts import build_augmented_system_prompt
-
-                    def _llm_for_research(system_prompt, user_prompt):
-                        """Synchronous LLM call for research sub-steps."""
-                        from icharlotte_core.llm import LLMHandler
-                        provider, model_id = self._get_selected_model()
-                        settings = {
-                            'temperature': 0.3,
-                            'top_p': 0.95,
-                            'max_tokens': -1,
-                            'stream': False,
-                            'thinking_level': 'None',
-                        }
-                        return LLMHandler.generate(
-                            provider=provider, model=model_id,
-                            system_prompt=system_prompt,
-                            user_prompt=user_prompt,
-                            file_contents="", settings=settings,
-                        )
-
-                    try:
-                        research_result = engine.research(
-                            query=full_prompt,
-                            llm_callback=_llm_for_research,
-                            status_callback=lambda msg: (
-                                self.status_label.setText(msg),
-                                QApplication.processEvents(),
-                            ),
-                        )
-                        authority_block = research_result.format_authority_block()
-                        self._pending_research_result = research_result
-                    except Exception as e:
-                        print(f"[LegalResearch] Engine error: {e}")
-                        self._pending_research_result = None
-                        authority_block = ""
-
-                    if authority_block:
-                        full_prompt = f"{full_prompt}\n\n{authority_block}\n\nIMPORTANT: You MUST ONLY cite cases and statutes from the [LEGAL AUTHORITY] section above. Do NOT fabricate or hallucinate any citations."
-
-                    self.status_label.setText("Generating response with legal citations...")
-                    QApplication.processEvents()
+            # Legal Research: defer to worker thread (no longer blocks main thread)
+            _do_legal_research = getattr(self, '_exec_legal_research', False)
+            print(f"[DEBUG] legal_research = {_do_legal_research}")
+            _legal_research_engine = None
+            _legal_research_model = None
+            if _do_legal_research:
+                _legal_research_engine = self._get_legal_research_engine()
+                if _legal_research_engine:
+                    _legal_research_model = self._get_selected_model()
+                    print("[DEBUG] Legal research will run in worker thread")
                 else:
-                    self._pending_research_result = None
+                    _do_legal_research = False
                     print("[LegalResearch] No COURTLISTENER_API_TOKEN in .env — skipping research")
             else:
-                self._pending_research_result = None
+                print("[DEBUG] Legal research checkbox NOT checked — skipping")
+            self._pending_research_result = None
 
-            # Store format type for callback
-            self._pending_format_type = format_type
-            self._is_outlook_task = False
+            print("[DEBUG] Past legal research block, about to build TaskData...")
+            # ── Build TaskData and submit to TaskManager ──
+            print("[DEBUG] Reached TaskManager path — building TaskData...")
+            provider, model_id = self._get_selected_model()
+            print(f"[DEBUG] Selected model: {provider}/{model_id}")
 
-            # Start worker thread for LLM call
-            llm_func = self.llm_callback if self.llm_callback else self._default_llm_call
-            self._worker_thread = LLMWorkerThread(llm_func, full_prompt, self)
-            # Store redline state on thread for result handler
-            self._worker_thread.redline_mode = self._redline_mode_active
-            self._worker_thread.finished.connect(self._on_llm_result)
-            self._worker_thread.start()
+            # Build system prompt (same logic as _default_llm_call)
+            if self._redline_mode_active:
+                system_prompt = (
+                    "You are a helpful writing assistant operating in REDLINE MODE. "
+                    "Your output will be diffed against the original text to produce "
+                    "Track Changes in Microsoft Word. You MUST preserve unchanged text "
+                    "EXACTLY as written — same words, same order, same punctuation. "
+                    "Only modify the specific parts that need changing per the user's "
+                    "instructions. Output only the requested text without any preamble, "
+                    "explanation, or markdown formatting unless specifically asked."
+                )
+            else:
+                system_prompt = (
+                    "You are a helpful writing assistant for Microsoft Word documents. "
+                    "Follow the user's instructions precisely. Output only the requested "
+                    "text without any preamble or explanation.\n\n"
+                    "FORMAT RULES (strict defaults — override ONLY if the user explicitly "
+                    "asks for headings, bullet points, numbered lists, or other structure):\n"
+                    "- Always write in plain narrative prose. No headings (#, ##, ###), "
+                    "no bullet points, no numbered lists, no markdown formatting.\n"
+                    "- Use **bold** sparingly and only when the user asks for emphasis.\n"
+                    "- Do not use code blocks or HTML.\n\n"
+                    "CONTINUATION RULE: When the user asks you to finish a sentence, "
+                    "fill in a blank, or continue from a specific point, output ONLY "
+                    "the new text that comes after the existing content. Do NOT repeat "
+                    "any part of the preceding sentence, paragraph, or context that was "
+                    "provided to you. Start exactly where the existing text leaves off."
+                )
+
+            task_data = TaskData(
+                document_name=self._original_document_name or "",
+                document_com=self._original_document,
+                has_selection=self._original_has_selection,
+                original_text=getattr(self, '_original_text', "") or "",
+                original_text_raw=getattr(self, '_original_text_raw', "") or "",
+                captured_format=self._captured_format,
+                format_type=format_type,
+                redline_mode_active=self._redline_mode_active,
+                redline_settings=self.redline_settings.copy() if self.redline_settings else {},
+                research_result=None,
+                do_legal_research=_do_legal_research,
+                legal_research_engine=_legal_research_engine,
+                legal_research_model=_legal_research_model,
+                prompt_preview=prompt[:40],
+                provider=provider,
+                model_id=model_id,
+                system_prompt=system_prompt,
+                full_prompt=full_prompt,
+            )
+
+            # Create bookmark for range tracking (auto-adjusts on concurrent edits)
+            if self._original_range_start is not None and self._original_document:
+                bm_name = _create_task_bookmark(
+                    self._original_document,
+                    self._original_range_start,
+                    self._original_range_end if self._original_range_end is not None else self._original_range_start,
+                    task_data.task_id,
+                )
+                task_data.bookmark_name = bm_name
+
+            # Upgrade the "preparing" row BEFORE submitting (submit emits task_added
+            # which would create a duplicate row if prep row isn't renamed first)
+            prep_id = getattr(self, '_prep_id', None)
+            if prep_id:
+                TaskStatusBar.instance().upgrade_preparing(prep_id, task_data.task_id)
+                self._prep_id = None
+
+            # Submit to TaskManager for parallel execution
+            print("[DEBUG] About to submit to TaskManager...")
+            TaskManager.instance().submit_task(task_data)
+            print("[DEBUG] TaskManager.submit_task() returned OK. Task submitted successfully.")
+
+            # Close popup for good (already hidden since execute())
+            self.close()
 
         except Exception as e:
-            self.status_label.setText(f"Error: {str(e)[:50]}")
-            self.execute_btn.setEnabled(True)
-            self.cancel_btn.setText("Cancel")
-            QMessageBox.critical(self, "Error", f"Failed to process:\n{e}")
+            import traceback
+            print(f"[DEBUG] _do_execute EXCEPTION: {e}")
+            traceback.print_exc()
+            logger.error(f"_do_execute failed: {type(e).__name__}: {e}", exc_info=True)
+            # Clean up the "preparing" row in status bar
+            prep_id = getattr(self, '_prep_id', None)
+            if prep_id:
+                tsb = TaskStatusBar.instance()
+                tsb._remove_task_row(prep_id)
+                tsb._on_all_done()
+                self._prep_id = None
+            # Popup is already hidden — show standalone error dialog and close
+            QMessageBox.critical(None, "AI Assistant Error", f"Failed to process:\n{e}")
+            self.close()
 
     def _on_llm_result(self, result: str, error: str):
         """Handle the result from the LLM worker thread."""
@@ -2520,6 +3494,10 @@ class WordLLMPopup(QDialog):
             else:
                 # Restore original document context before applying
                 # (handles case where user switched documents while LLM ran)
+                # NOTE: _restore_original_context() also locks Word UI
+                # (Interactive=False) to prevent cursor movement during
+                # insertion. We MUST unlock in the finally block below.
+                word = None
                 try:
                     word, selection = self._restore_original_context()
                 except Exception as ctx_err:
@@ -2534,43 +3512,48 @@ class WordLLMPopup(QDialog):
                     QTimer.singleShot(1500, self.close)
                     return
 
-                # Check if redline mode is active
-                if self._redline_mode_active:
-                    # Redline mode - apply changes as Track Changes
-                    try:
-                        # Apply redlines using diff-match-patch
-                        # Use raw (un-stripped) text so positions match Word range
-                        original_for_diff = getattr(self, '_original_text_raw', self._original_text)
-                        success = self._apply_redlines(
-                            word,
-                            selection,
-                            original_for_diff,
-                            result
-                        )
+                try:
+                    # Check if redline mode is active
+                    if self._redline_mode_active:
+                        # Redline mode - apply changes as Track Changes
+                        try:
+                            # Apply redlines using diff-match-patch
+                            # Use raw (un-stripped) text so positions match Word range
+                            original_for_diff = getattr(self, '_original_text_raw', self._original_text)
+                            success = self._apply_redlines(
+                                word,
+                                selection,
+                                original_for_diff,
+                                result
+                            )
 
-                        if success:
-                            self.status_label.setText("✓ Redlines applied!")
-                            self.status_label.setStyleSheet("color: #a6e3a1; font-style: italic;")
-                        else:
-                            # Fallback to replace mode
+                            if success:
+                                self.status_label.setText("✓ Redlines applied!")
+                                self.status_label.setStyleSheet("color: #a6e3a1; font-style: italic;")
+                            else:
+                                # Fallback to replace mode
+                                if self.redline_settings.get("redline_fallback_notify", True):
+                                    self.status_label.setText("⚠ Applied as replacement (redline unavailable)")
+                                    self.status_label.setStyleSheet("color: #f9e2af; font-style: italic;")
+                                self._set_word_text_internal(result, self._pending_format_type,
+                                                            word=word, selection=selection)
+
+                        except Exception as redline_error:
+                            print(f"Redline application failed: {redline_error}")
+                            # Fallback to replace mode on error
                             if self.redline_settings.get("redline_fallback_notify", True):
-                                self.status_label.setText("⚠ Applied as replacement (redline unavailable)")
+                                self.status_label.setText("⚠ Applied as replacement (redline error)")
                                 self.status_label.setStyleSheet("color: #f9e2af; font-style: italic;")
                             self._set_word_text_internal(result, self._pending_format_type,
                                                         word=word, selection=selection)
-
-                    except Exception as redline_error:
-                        print(f"Redline application failed: {redline_error}")
-                        # Fallback to replace mode on error
-                        if self.redline_settings.get("redline_fallback_notify", True):
-                            self.status_label.setText("⚠ Applied as replacement (redline error)")
-                            self.status_label.setStyleSheet("color: #f9e2af; font-style: italic;")
+                    else:
+                        # Replace mode
                         self._set_word_text_internal(result, self._pending_format_type,
                                                     word=word, selection=selection)
-                else:
-                    # Replace mode
-                    self._set_word_text_internal(result, self._pending_format_type,
-                                                word=word, selection=selection)
+                finally:
+                    # ALWAYS unlock Word UI after insertion completes
+                    if word:
+                        self._unlock_word_ui(word)
 
             # Show legal research verification summary if available
             if hasattr(self, '_pending_research_result') and self._pending_research_result:
@@ -2831,11 +3814,15 @@ class WordLLMPopup(QDialog):
         return None
 
     def _restore_original_context(self) -> tuple:
-        """Activate the original document and restore the selection.
+        """Activate the original document, lock Word UI, and restore selection.
 
         Call this before applying LLM results to ensure changes go to the
         correct document and location, even if the user switched documents
-        while the LLM was running.
+        or moved the cursor while the LLM was running.
+
+        IMPORTANT: This method locks Word's UI (Interactive=False) to prevent
+        the user from moving the cursor during insertion. The caller MUST
+        call _unlock_word_ui(word) in a finally block after insertion is done.
 
         Returns:
             (word_app, selection) tuple
@@ -2881,7 +3868,21 @@ class WordLLMPopup(QDialog):
                 f"is no longer open"
             )
 
-        # Step 4: Restore the selection to the original range
+        # Step 4: Lock Word UI BEFORE selecting the range.
+        # This prevents the user from moving the cursor between Select()
+        # and the subsequent TypeText() calls. COM cross-process calls pump
+        # Windows messages, so without this lock, user clicks/keystrokes
+        # processed during COM calls could move the cursor mid-insertion.
+        try:
+            word.ScreenUpdating = False
+            word.Interactive = False
+            self._word_ui_locked = True
+            print("Locked Word UI for insertion")
+        except Exception as e:
+            print(f"Could not lock Word UI: {e}")
+            self._word_ui_locked = False
+
+        # Step 5: Restore the selection to the original range
         if self._original_range_start is not None and self._original_range_end is not None:
             try:
                 if self._original_has_selection:
@@ -2902,18 +3903,94 @@ class WordLLMPopup(QDialog):
 
         selection = word.Selection
         if not selection:
+            self._unlock_word_ui(word)
             raise Exception("Could not access Word selection after restoring context")
 
         return word, selection
 
-    def _get_word_selection_internal(self) -> tuple:
-        """Get selected text from Word. Returns (text, has_selection)."""
+    def _unlock_word_ui(self, word):
+        """Re-enable Word UI after insertion is complete.
+
+        Must be called in a finally block after _restore_original_context().
+        """
+        if not getattr(self, '_word_ui_locked', False):
+            return
+        try:
+            word.Interactive = True
+            word.ScreenUpdating = True
+            self._word_ui_locked = False
+            print("Unlocked Word UI")
+        except Exception as e:
+            print(f"Could not unlock Word UI: {e}")
+            # Last resort: try to get a fresh Word connection and unlock
+            try:
+                fresh_word = win32com.client.GetActiveObject("Word.Application")
+                fresh_word.Interactive = True
+                fresh_word.ScreenUpdating = True
+                self._word_ui_locked = False
+                print("Unlocked Word UI via fresh connection")
+            except Exception:
+                print("WARNING: Could not unlock Word UI - user may need to restart Word")
+
+    def _capture_initial_document(self):
+        """Capture the active document and selection at Win+V time.
+
+        Called from _show_popup BEFORE the popup steals focus, so
+        word.ActiveDocument still refers to the document the user was
+        working in when they pressed Win+V.  The captured reference is
+        later used by _get_word_selection_internal to ensure the result
+        goes back to the correct document even if the user switches to
+        a different document while typing their prompt.
+        """
         try:
             word = self._get_word_app()
+            if not word:
+                return
+
+            doc = word.ActiveDocument
+            if doc:
+                self._original_document = doc
+                self._original_document_name = doc.Name
+                print(f"[Win+V] Pre-captured document at hotkey time: {self._original_document_name}")
+
+                # Also pre-capture the selection range so we know where
+                # the cursor/selection was when the hotkey was pressed.
+                selection = word.Selection
+                if selection:
+                    self._original_range_start = selection.Range.Start
+                    self._original_range_end = selection.Range.End
+                    text = selection.Text.strip() if selection.Text else ""
+                    self._original_has_selection = bool(text)
+                    self._original_text = text
+                    self._original_text_raw = selection.Text if selection.Text else ""
+                    print(f"[Win+V] Pre-captured selection: range={self._original_range_start}-{self._original_range_end}, has_selection={self._original_has_selection}")
+        except Exception as e:
+            print(f"[Win+V] Could not pre-capture document: {e}")
+
+    def _get_word_selection_internal(self, word=None) -> tuple:
+        """Get selected text from Word. Returns (text, has_selection)."""
+        try:
+            if word is None:
+                word = self._get_word_app()
 
             if not word:
                 print("Could not connect to Word")
                 return "", False
+
+            # If we pre-captured the document at Win+V time, activate it now
+            # so that word.Selection refers to the correct document's selection.
+            # This is the key fix for the "output goes to wrong document" bug:
+            # the user may have switched to a different document while typing
+            # their prompt, so word.ActiveDocument would be wrong.
+            if self._original_document is not None:
+                try:
+                    _ = self._original_document.Name  # test if COM ref alive
+                    self._original_document.Activate()
+                    print(f"Activated pre-captured document: {self._original_document_name}")
+                except Exception as e:
+                    print(f"Pre-captured document COM reference stale: {e}")
+                    self._original_document = None
+                    self._original_document_name = None
 
             # Try to get selection - this might work even if Documents.Count is 0
             selection = None
@@ -2926,15 +4003,16 @@ class WordLLMPopup(QDialog):
                 print("Selection object is None")
                 return "", False
 
-            # Always capture the document for later use (regardless of redline mode)
-            try:
-                self._original_document = word.ActiveDocument
-                self._original_document_name = self._original_document.Name if self._original_document else None
-                print(f"Captured document: {self._original_document_name or 'None'}")
-            except Exception as e:
-                print(f"Could not capture document: {e}")
-                self._original_document = None
-                self._original_document_name = None
+            # Capture the document for later use (if not already pre-captured)
+            if self._original_document is None:
+                try:
+                    self._original_document = word.ActiveDocument
+                    self._original_document_name = self._original_document.Name if self._original_document else None
+                    print(f"Captured document (fallback): {self._original_document_name or 'None'}")
+                except Exception as e:
+                    print(f"Could not capture document: {e}")
+                    self._original_document = None
+                    self._original_document_name = None
 
             text = ""
             raw_text_for_redline = ""
@@ -2963,7 +4041,7 @@ class WordLLMPopup(QDialog):
                 self._original_range_end = None
 
             # Store original text and range for potential redlining
-            if self.redline_checkbox.isChecked():
+            if getattr(self, '_exec_redline_checked', self.redline_checkbox.isChecked()):
                 # Validate redline prerequisites
                 is_valid, error_msg = self._validate_redline_prerequisites(text)
                 if not is_valid:
@@ -3756,10 +4834,18 @@ class WordLLMPopup(QDialog):
                 system_prompt = (
                     "You are a helpful writing assistant for Microsoft Word documents. "
                     "Follow the user's instructions precisely. Output only the requested "
-                    "text without any preamble or explanation. "
-                    "Use markdown formatting for structure: # for section headers, "
-                    "## for subheadings, ### for sub-subheadings, **bold** for emphasis, "
-                    "and - for bullet points. Do not use code blocks or HTML."
+                    "text without any preamble or explanation.\n\n"
+                    "FORMAT RULES (strict defaults — override ONLY if the user explicitly "
+                    "asks for headings, bullet points, numbered lists, or other structure):\n"
+                    "- Always write in plain narrative prose. No headings (#, ##, ###), "
+                    "no bullet points, no numbered lists, no markdown formatting.\n"
+                    "- Use **bold** sparingly and only when the user asks for emphasis.\n"
+                    "- Do not use code blocks or HTML.\n\n"
+                    "CONTINUATION RULE: When the user asks you to finish a sentence, "
+                    "fill in a blank, or continue from a specific point, output ONLY "
+                    "the new text that comes after the existing content. Do NOT repeat "
+                    "any part of the preceding sentence, paragraph, or context that was "
+                    "provided to you. Start exactly where the existing text leaves off."
                 )
 
             print(f"Calling LLMHandler.generate...")
@@ -4092,12 +5178,20 @@ class WordLLMPopup(QDialog):
         self.custom_input.setFocus()
 
     def closeEvent(self, event):
-        """Clean up worker thread when dialog is closed."""
+        """Clean up worker thread and ensure Word UI is unlocked."""
         if self._worker_thread and self._worker_thread.isRunning():
             self._worker_thread.cancel()
             self._worker_thread.terminate()
             self._worker_thread.wait(500)
             self._worker_thread = None
+        # Safety: ensure Word UI is never left locked (use direct COM, skip zombie check)
+        if getattr(self, '_word_ui_locked', False):
+            try:
+                word = win32com.client.GetActiveObject("Word.Application")
+                if word:
+                    self._unlock_word_ui(word)
+            except Exception:
+                pass
         super().closeEvent(event)
 
     def keyPressEvent(self, event):
@@ -4137,6 +5231,18 @@ class WordLLMPopup(QDialog):
         super().mouseReleaseEvent(event)
 
 
+# Bind _InsertionProxy methods from WordLLMPopup (must happen after class is defined)
+_InsertionProxy._set_word_text_internal = WordLLMPopup._set_word_text_internal
+_InsertionProxy._insert_with_format = WordLLMPopup._insert_with_format
+_InsertionProxy._insert_with_markdown = WordLLMPopup._insert_with_markdown
+_InsertionProxy._insert_with_bullets = WordLLMPopup._insert_with_bullets
+_InsertionProxy._insert_formatted_text = WordLLMPopup._insert_formatted_text
+_InsertionProxy._parse_markdown_items = WordLLMPopup._parse_markdown_items
+_InsertionProxy._parse_bullet_items = WordLLMPopup._parse_bullet_items
+_InsertionProxy._parse_markdown_segments = WordLLMPopup._parse_markdown_segments
+_InsertionProxy._is_in_table = WordLLMPopup._is_in_table
+
+
 class WordHotkeyManager:
     """Manages global hotkey registration and popup display."""
 
@@ -4149,11 +5255,17 @@ class WordHotkeyManager:
         self._hotkey_thread = None
         self._hotkey_thread_id = None  # Win32 thread ID for posting quit message
         self._stop_event = threading.Event()
+        self._watchdog_timer = None
 
     def start(self):
         """Start listening for the global hotkey using Windows RegisterHotKey API."""
+        # Check if already registered AND thread is still alive
         if self._hotkey_registered:
-            return True
+            if self._hotkey_thread is not None and self._hotkey_thread.is_alive():
+                return True
+            # Thread died — reset and re-register
+            print("Win+V hotkey thread died, re-registering...")
+            self._hotkey_registered = False
 
         self._stop_event.clear()
         self._hotkey_thread = threading.Thread(target=self._hotkey_message_loop, daemon=True)
@@ -4162,41 +5274,78 @@ class WordHotkeyManager:
         # Wait briefly for registration to complete
         import time
         time.sleep(0.1)
+
+        # Start watchdog timer to auto-restart if thread dies
+        self._start_watchdog()
+
         return self._hotkey_registered
 
     def _hotkey_message_loop(self):
         """Dedicated thread running a Windows message pump for RegisterHotKey."""
-        # Store this thread's ID so we can post WM_QUIT to it later
-        self._hotkey_thread_id = ctypes.windll.kernel32.GetCurrentThreadId()
+        try:
+            # Store this thread's ID so we can post WM_QUIT to it later
+            self._hotkey_thread_id = ctypes.windll.kernel32.GetCurrentThreadId()
 
-        # Register the hotkey on THIS thread
-        result = ctypes.windll.user32.RegisterHotKey(
-            None, _HOTKEY_ID, _MOD_WIN | _MOD_NOREPEAT, _VK_V
-        )
-        if not result:
-            err = ctypes.GetLastError()
-            print(f"RegisterHotKey failed (error {err}) - Win+V may be in use by another app")
-            # Fall back to keyboard library
-            self._fallback_to_keyboard_lib()
+            # Register the hotkey on THIS thread
+            result = ctypes.windll.user32.RegisterHotKey(
+                None, _HOTKEY_ID, _MOD_WIN | _MOD_NOREPEAT, _VK_V
+            )
+            if not result:
+                err = ctypes.GetLastError()
+                print(f"RegisterHotKey failed (error {err}) - Win+V may be in use by another app")
+                # Fall back to keyboard library
+                self._fallback_to_keyboard_lib()
+                return
+
+            self._hotkey_registered = True
+            print("Win+V hotkey registered via RegisterHotKey API")
+
+            # Message pump - blocks until WM_QUIT or stop event
+            msg = wintypes.MSG()
+            while not self._stop_event.is_set():
+                # Use GetMessage (blocks until a message arrives)
+                ret = ctypes.windll.user32.GetMessageW(ctypes.byref(msg), None, 0, 0)
+                if ret <= 0:  # WM_QUIT or error
+                    break
+                if msg.message == _WM_HOTKEY and msg.wParam == _HOTKEY_ID:
+                    import time as _t
+                    logger.debug(f"Win+V hotkey detected at {_t.strftime('%H:%M:%S')}, emitting show_popup signal")
+                    self.signals.show_popup.emit()
+
+            # Cleanup
+            ctypes.windll.user32.UnregisterHotKey(None, _HOTKEY_ID)
+            self._hotkey_registered = False
+            print("Win+V hotkey unregistered")
+        except Exception as e:
+            print(f"Win+V hotkey thread crashed: {e}")
+            try:
+                ctypes.windll.user32.UnregisterHotKey(None, _HOTKEY_ID)
+            except Exception:
+                pass
+            self._hotkey_registered = False
+
+    def _start_watchdog(self):
+        """Start a periodic timer that checks if the hotkey thread is alive."""
+        if self._watchdog_timer is not None:
             return
+        from PySide6.QtCore import QTimer
+        self._watchdog_timer = QTimer()
+        self._watchdog_timer.setInterval(30000)  # Check every 30 seconds
+        self._watchdog_timer.timeout.connect(self._watchdog_check)
+        self._watchdog_timer.start()
 
-        self._hotkey_registered = True
-        print("Win+V hotkey registered via RegisterHotKey API")
-
-        # Message pump - blocks until WM_QUIT or stop event
-        msg = wintypes.MSG()
-        while not self._stop_event.is_set():
-            # Use GetMessage (blocks until a message arrives)
-            ret = ctypes.windll.user32.GetMessageW(ctypes.byref(msg), None, 0, 0)
-            if ret <= 0:  # WM_QUIT or error
-                break
-            if msg.message == _WM_HOTKEY and msg.wParam == _HOTKEY_ID:
-                self.signals.show_popup.emit()
-
-        # Cleanup
-        ctypes.windll.user32.UnregisterHotKey(None, _HOTKEY_ID)
-        self._hotkey_registered = False
-        print("Win+V hotkey unregistered")
+    def _watchdog_check(self):
+        """Auto-restart the hotkey thread if it died."""
+        if self._stop_event.is_set():
+            return
+        if self._hotkey_thread is None or not self._hotkey_thread.is_alive():
+            if not self._hotkey_registered:
+                print("Win+V watchdog: hotkey thread died, restarting...")
+                self._hotkey_thread = None
+                self._hotkey_thread_id = None
+                self._stop_event.clear()
+                self._hotkey_thread = threading.Thread(target=self._hotkey_message_loop, daemon=True)
+                self._hotkey_thread.start()
 
     def _fallback_to_keyboard_lib(self):
         """Fall back to keyboard library if RegisterHotKey fails."""
@@ -4212,6 +5361,10 @@ class WordHotkeyManager:
 
     def stop(self):
         """Stop listening for the global hotkey."""
+        if self._watchdog_timer is not None:
+            self._watchdog_timer.stop()
+            self._watchdog_timer = None
+
         self._stop_event.set()
 
         # Post WM_QUIT to the hotkey thread to unblock GetMessage
@@ -4237,32 +5390,53 @@ class WordHotkeyManager:
     def _show_popup(self):
         """Show the popup dialog (on main thread)."""
         try:
+            logger.debug(f"_show_popup called. popup={self.popup}, visible={self.popup.isVisible() if self.popup else 'N/A'}")
+
             if self.popup is None or not self.popup.isVisible():
                 # Detect active application context BEFORE creating popup
                 app_context, inspector = detect_active_app_context()
+                logger.debug(f"_show_popup: app_context={app_context}")
 
                 # Only show if Word or Outlook compose is active
                 if app_context == APP_CONTEXT_UNKNOWN:
-                    logger.debug("Win+V pressed but neither Word nor Outlook compose is active")
+                    # Log what the foreground window actually is for debugging
+                    try:
+                        hwnd = win32gui.GetForegroundWindow()
+                        cls = win32gui.GetClassName(hwnd) if hwnd else "None"
+                        title = win32gui.GetWindowText(hwnd)[:60] if hwnd else "None"
+                        logger.debug(f"Win+V pressed but neither Word nor Outlook compose is active (fg={cls}, title={title})")
+                    except Exception:
+                        logger.debug("Win+V pressed but neither Word nor Outlook compose is active")
                     return
 
                 # Capture cursor position on main thread
                 from PySide6.QtGui import QCursor
                 cursor_pos = QCursor.pos()
 
+                logger.debug("_show_popup: creating new WordLLMPopup...")
                 self.popup = WordLLMPopup(
                     parent=None,  # No parent so it's a top-level window
                     llm_callback=self._get_llm_callback(),
                     cursor_pos=cursor_pos
                 )
+                logger.debug("_show_popup: popup created, setting context and showing")
 
                 # Set the detected context before showing
                 self.popup.set_app_context(app_context, inspector)
+
+                # Capture the active document NOW (at Win+V time) before the
+                # popup steals focus.  This prevents the bug where switching
+                # to another Word document while typing a prompt causes the
+                # result to be inserted into the wrong document.
+                if app_context == APP_CONTEXT_WORD:
+                    self.popup._capture_initial_document()
 
                 self.popup.show()
 
                 # Force focus to the popup window (Windows focus stealing prevention workaround)
                 self._force_focus(self.popup)
+            else:
+                logger.debug("_show_popup: popup already visible, skipping")
         except Exception as e:
             logger.error(f"Error in _show_popup: {type(e).__name__}: {e}", exc_info=True)
 
@@ -4330,7 +5504,14 @@ def init_word_hotkey(main_window=None) -> bool:
     global _hotkey_manager
 
     if _hotkey_manager is not None:
-        return True
+        # Manager exists — but ensure hotkey is actually alive
+        if _hotkey_manager._hotkey_registered and \
+           _hotkey_manager._hotkey_thread is not None and \
+           _hotkey_manager._hotkey_thread.is_alive():
+            return True
+        # Thread died or registration lost — restart
+        print("Win+V hotkey lost, restarting...")
+        return _hotkey_manager.start()
 
     _hotkey_manager = WordHotkeyManager(main_window)
     return _hotkey_manager.start()

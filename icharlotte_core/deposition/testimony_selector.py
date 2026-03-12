@@ -19,24 +19,71 @@ logger = logging.getLogger(__name__)
 # Maximum exchanges per LLM chunk (to stay within context limits)
 MAX_EXCHANGES_PER_CHUNK = 500
 
-SYSTEM_PROMPT = """You are a legal assistant specializing in deposition transcript analysis.
+SYSTEM_PROMPT_BASE = """You are a legal assistant specializing in deposition transcript analysis.
 
 You will be given a list of question-and-answer exchanges from a deposition transcript, each with a unique ID number. You will also receive a user request describing what testimony they want extracted.
 
-Your task: Identify the exchanges that are DIRECTLY relevant to the user's request. Be precise — only include testimony that substantively addresses the requested topic. Do NOT include exchanges that merely happen to be nearby or that discuss unrelated subjects.
+{relevance_guidance}
 
 IMPORTANT RULES:
 1. Return ONLY a JSON array of the relevant exchange ID numbers.
 2. Do NOT reproduce or modify any testimony text.
 3. Do NOT explain your reasoning or add commentary.
-4. Only include exchanges where the question or answer directly discusses the requested topic.
-5. Do NOT include testimony about unrelated topics (e.g., if the user asks about the accident, do not include testimony about employment history, salary, education, or other background unless it directly relates to the accident).
-6. Include brief transitional exchanges (e.g., "Let me ask you about X") only if they introduce a directly relevant block of testimony.
+4. Include brief transitional exchanges (e.g., "Let me ask you about X") only if they introduce a relevant block of testimony.
 
 Example response format:
 [1, 2, 3, 7, 12, 15, 16, 17, 23]
 
 Return ONLY the JSON array, nothing else."""
+
+RELEVANCE_GUIDANCE = {
+    1: (
+        "Your task: Be MAXIMALLY inclusive. Include ANY exchange where the requested topic "
+        "is mentioned, referenced, or even implied — no matter how briefly or tangentially. "
+        "Also include exchanges that discuss related body parts, activities, limitations, "
+        "treatments, or life impacts that COULD be connected to the topic, even indirectly. "
+        "Include surrounding context exchanges that help tell the full story. "
+        "When in doubt, ALWAYS include the exchange. Err heavily on the side of inclusion. "
+        "It is far better to include too much than to miss something potentially relevant."
+    ),
+    2: (
+        "Your task: Be broadly inclusive. Include testimony that discusses the topic or "
+        "provides useful context for understanding it. Include exchanges where the topic is "
+        "mentioned even briefly as part of a longer answer about other subjects. Include "
+        "testimony about related impacts, limitations, and life changes that may be connected "
+        "to the topic. When in doubt, include the exchange."
+    ),
+    3: (
+        "Your task: Include testimony that clearly relates to the user's request. "
+        "Some surrounding context is fine, but skip testimony that only tangentially "
+        "touches the subject. If the topic is mentioned as a minor aside within testimony "
+        "about a different subject, you may skip it."
+    ),
+    4: (
+        "Your task: Include only testimony that directly addresses the user's request. "
+        "Skip background and tangential mentions unless they are clearly important to "
+        "understanding the topic. Do NOT include testimony about unrelated subjects even "
+        "if the topic gets a brief mention. Focus on exchanges where the topic is a "
+        "primary subject of the question or answer."
+    ),
+    5: (
+        "Your task: Be EXTREMELY selective. Include ONLY exchanges where the question or "
+        "answer is SPECIFICALLY and PRIMARILY about the exact topic requested. Exclude "
+        "exchanges where the topic is merely mentioned in passing, listed among other "
+        "injuries/topics, or discussed as secondary context. If an exchange covers multiple "
+        "subjects and the requested topic is not the main focus, EXCLUDE it. "
+        "The bar for inclusion should be very high — when in doubt, EXCLUDE."
+    ),
+}
+
+# Default level matches roughly the old behavior
+DEFAULT_RELEVANCE_LEVEL = 4
+
+
+def _build_system_prompt(relevance_level: int = DEFAULT_RELEVANCE_LEVEL) -> str:
+    """Build the system prompt with the appropriate relevance guidance."""
+    level = max(1, min(5, relevance_level))
+    return SYSTEM_PROMPT_BASE.format(relevance_guidance=RELEVANCE_GUIDANCE[level])
 
 
 class TestimonySelector:
@@ -61,7 +108,7 @@ class TestimonySelector:
         self.caller = caller
 
     def select(self, index: TranscriptIndex, prompt: str, context: str = "",
-               on_chunk_done=None) -> ExtractionResult:
+               on_chunk_done=None, relevance_level: int = DEFAULT_RELEVANCE_LEVEL) -> ExtractionResult:
         """
         Select relevant exchanges from the index based on the user's prompt.
 
@@ -83,7 +130,7 @@ class TestimonySelector:
 
         for chunk_num, chunk in enumerate(chunks, 1):
             logger.info(f"Processing chunk {chunk_num}/{len(chunks)} ({len(chunk)} exchanges)")
-            selected = self._select_chunk(chunk, prompt, index.deponent.full_name, context)
+            selected = self._select_chunk(chunk, prompt, index.deponent.full_name, context, relevance_level)
             all_selected_ids.extend(selected)
             logger.info(f"Chunk {chunk_num}: selected {len(selected)} exchanges")
             if on_chunk_done:
@@ -110,7 +157,7 @@ class TestimonySelector:
 
     def _select_chunk(
         self, exchanges: List[QAExchange], prompt: str, deponent_name: str,
-        context: str = ""
+        context: str = "", relevance_level: int = DEFAULT_RELEVANCE_LEVEL
     ) -> List[int]:
         """Run LLM selection on a single chunk of exchanges."""
         # Format exchanges for LLM
@@ -118,9 +165,10 @@ class TestimonySelector:
 
         # Build prompt (instructions) and text (exchanges) separately
         # so LLMCaller formats them correctly for each provider
+        system_prompt = _build_system_prompt(relevance_level)
         context_block = f"\n\nCASE CONTEXT:\n{context}" if context else ""
         instructions = (
-            f"{SYSTEM_PROMPT}\n\n"
+            f"{system_prompt}\n\n"
             f"DEPONENT: {deponent_name}"
             f"{context_block}\n\n"
             f"USER'S REQUEST:\n{prompt}"

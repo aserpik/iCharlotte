@@ -132,6 +132,7 @@ def gather_case_data(file_number: str, report_type: str = "FSR",
         "prior_sections": prior_sections,
         "case_path": case_path,
         "output_dir": output_dir,
+        "report_output_dir": os.path.join(case_path, "STATUS"),
     }
 
     logger.info(f"Gathered data for {file_number}: {len(result['sections'])} sections")

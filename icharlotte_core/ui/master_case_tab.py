@@ -510,7 +510,9 @@ class MasterCaseTab(QWidget):
         self.table.setSortingEnabled(True)
         self.table.itemSelectionChanged.connect(self.on_case_selected)
         self.table.cellDoubleClicked.connect(self.on_case_double_clicked)
-        self.table.cellClicked.connect(self.on_cell_clicked)
+        # Right-click context menu for editing cells
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_table_context_menu)
         
         self.load_column_settings()
         self.table.horizontalHeader().sectionResized.connect(self.save_column_settings)
@@ -882,6 +884,16 @@ class MasterCaseTab(QWidget):
             self.case_title.setText("Select a Case")
 
     def refresh_data(self):
+        try:
+            self._refresh_data_inner()
+        except Exception as e:
+            from icharlotte_core.utils import log_event
+            import traceback
+            log_event(f"CRASH in refresh_data: {e}\n{traceback.format_exc()}", "error")
+
+    def _refresh_data_inner(self):
+        import sys
+        print("[DEBUG] refresh_data_inner START", file=sys.stderr, flush=True)
         # Visual Feedback
         if hasattr(self, 'refresh_btn'):
             self.refresh_btn.setText("Refreshed!")
@@ -889,8 +901,9 @@ class MasterCaseTab(QWidget):
             QTimer.singleShot(1000, lambda: self._reset_refresh_btn())
 
         self.table.setSortingEnabled(False)
+        self.table.blockSignals(True)
         self.table.setRowCount(0)
-        
+
         cases = self.db.get_all_cases()
         self.table.setRowCount(len(cases))
         
@@ -1108,6 +1121,7 @@ class MasterCaseTab(QWidget):
             else:
                 self.table.setItem(i, 6, QTableWidgetItem(""))
 
+        self.table.blockSignals(False)
         self.table.setSortingEnabled(True)
 
     def _reset_refresh_btn(self):
@@ -1128,6 +1142,14 @@ class MasterCaseTab(QWidget):
             self.table.setRowHidden(i, not match)
 
     def on_case_selected(self):
+        try:
+            self._on_case_selected_inner()
+        except Exception as e:
+            from icharlotte_core.utils import log_event
+            import traceback
+            log_event(f"CRASH in on_case_selected: {e}\n{traceback.format_exc()}", "error")
+
+    def _on_case_selected_inner(self):
         rows = self.table.selectionModel().selectedRows()
         if not rows:
             self.details_widget.setEnabled(False)
@@ -1174,6 +1196,14 @@ class MasterCaseTab(QWidget):
         self.refresh_details()
 
     def refresh_details(self):
+        try:
+            self._refresh_details_inner()
+        except Exception as e:
+            from icharlotte_core.utils import log_event
+            import traceback
+            log_event(f"CRASH in refresh_details: {e}\n{traceback.format_exc()}", "error")
+
+    def _refresh_details_inner(self):
         if not hasattr(self, 'current_file_number'): return
 
         # Get Case Info for Assigned Attorney
@@ -1348,7 +1378,12 @@ class MasterCaseTab(QWidget):
 
     def update_todo_color(self, tid, color):
         self.db.update_todo_color(tid, color)
-        # Refresh details to re-sort
+        # Defer refresh — the emitting TodoItemWidget is still on the call stack;
+        # refresh_details() calls todo_list.clear() which destroys it, causing
+        # an access-violation segfault when execution returns to the widget.
+        QTimer.singleShot(0, self._deferred_color_refresh)
+
+    def _deferred_color_refresh(self):
         self.refresh_details()
         self.refresh_data()
         self.restore_selection()
@@ -1559,31 +1594,70 @@ class MasterCaseTab(QWidget):
             return
 
         if self.main_window:
-            # Trigger switch in MainWindow
             if hasattr(self.main_window, 'load_case_by_number'):
                 self.main_window.load_case_by_number(file_number)
             else:
                 QMessageBox.information(self, "Info", f"Selected {file_number}. (Switching logic pending)")
 
-    def on_cell_clicked(self, row, col):
+    def _show_table_context_menu(self, pos):
+        """Show right-click context menu for table cells."""
+        item = self.table.itemAt(pos)
+        if not item:
+            return
+        row = item.row()
+        col = self.table.columnAt(pos.x())
+        file_item = self.table.item(row, 0)
+        if not file_item:
+            return
+        file_number = file_item.data(Qt.ItemDataRole.UserRole)
+        if not file_number:
+            return
+
+        menu = QMenu(self)
+
+        # Open case action
+        open_action = menu.addAction("Open Case")
+        open_action.triggered.connect(lambda: self._open_case(file_number))
+
+        # Open folder action
+        open_folder_action = menu.addAction("Open Folder")
+        open_folder_action.triggered.connect(lambda: self._open_case_folder(file_number))
+
+        # Edit cell action (columns 1-5 are editable)
+        col_names = {1: "Plaintiff Name", 2: "Assigned", 3: "Hearings", 4: "Trial Date", 5: "Last Report"}
+        if col in col_names:
+            menu.addSeparator()
+            edit_action = menu.addAction(f"Edit {col_names[col]}")
+            edit_action.triggered.connect(lambda: self._edit_cell(row, col))
+
+        menu.exec(self.table.viewport().mapToGlobal(pos))
+
+    def _open_case(self, file_number):
+        """Switch to a case in iCharlotte."""
+        if self.main_window and hasattr(self.main_window, 'load_case_by_number'):
+            self.main_window.load_case_by_number(file_number)
+
+    def _open_case_folder(self, file_number):
+        """Open case folder in File Explorer."""
+        case_path = get_case_path(file_number)
+        if case_path and os.path.exists(case_path):
+            try:
+                os.startfile(case_path)
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"Could not open folder: {e}")
+        else:
+            QMessageBox.warning(self, "Error", f"Folder not found for {file_number}")
+
+    def _edit_cell(self, row, col):
+        """Handle editing a cell's contents via right-click menu."""
         item = self.table.item(row, 0)
         if not item:
             return
         file_number = item.data(Qt.ItemDataRole.UserRole)
         if not file_number:
             return
-        
-        if col == 0: # File Number -> Open Folder
-            case_path = get_case_path(file_number)
-            if case_path and os.path.exists(case_path):
-                try:
-                    os.startfile(case_path)
-                except Exception as e:
-                    QMessageBox.warning(self, "Error", f"Could not open folder: {e}")
-            else:
-                QMessageBox.warning(self, "Error", f"Folder not found for {file_number}")
-                
-        elif col == 1: # Plaintiff Name -> Edit Text
+
+        if col == 1: # Plaintiff Name -> Edit Text
             col_item = self.table.item(row, col)
             current_name = col_item.text() if col_item else ""
             new_name, ok = QInputDialog.getText(self, "Edit Plaintiff", "Plaintiff Name:", text=current_name)
@@ -1591,7 +1665,7 @@ class MasterCaseTab(QWidget):
                 self.db.update_plaintiff(file_number, new_name)
                 if col_item:
                     col_item.setText(new_name)
-                
+
         elif col == 2: # Assigned -> Edit Text
             col_item = self.table.item(row, col)
             current_val = col_item.text() if col_item else ""
@@ -1602,19 +1676,18 @@ class MasterCaseTab(QWidget):
 
             new_val, ok = QInputDialog.getItem(self, "Edit Assigned", "Attorney Initials:", items, 0, True)
             if ok:
-                # User can type custom text in getItem if editable=True
                 self.db.update_assigned_attorney(file_number, new_val)
                 if col_item:
                     col_item.setText(new_val)
-                
+
         elif col == 3: # Hearings -> Edit Text
             from icharlotte_core.config import GEMINI_DATA_DIR
-            
+
             # Load current "other_hearings" from JSON
             json_path = os.path.join(GEMINI_DATA_DIR, f"{file_number}.json")
             current_val = ""
             vars_data = {}
-            
+
             if os.path.exists(json_path):
                 try:
                     with open(json_path, 'r', encoding='utf-8') as f:
@@ -1626,7 +1699,7 @@ class MasterCaseTab(QWidget):
                         elif isinstance(v, str):
                             current_val = v
                 except: pass
-            
+
             # If no other_hearings found in JSON, fall back to DB 'next_hearing_date'
             if not current_val:
                 case_info = self.db.get_case(file_number)
@@ -1635,18 +1708,18 @@ class MasterCaseTab(QWidget):
 
             # Show Dialog
             new_text, ok = QInputDialog.getMultiLineText(
-                self, 
-                "Edit Hearings", 
-                "Hearings (One per line, e.g. 'CMC 2/5/26'):", 
+                self,
+                "Edit Hearings",
+                "Hearings (One per line, e.g. 'CMC 2/5/26'):",
                 text=current_val
             )
-            
+
             if ok:
                 # Update DB 'next_hearing_date' for sorting/sync logic moved UP
                 parsed = parse_hearing_data(new_text)
                 today = datetime.datetime.now().date()
                 future = [h for h in parsed if h['date_obj'].date() >= today or h['date_obj'].year == 9999]
-                
+
                 new_db_date = ""
                 if future:
                     d = future[0]['date_sort']
@@ -1658,7 +1731,7 @@ class MasterCaseTab(QWidget):
                      vars_data["other_hearings"]["value"] = new_text
                 else:
                      vars_data["other_hearings"] = new_text
-                
+
                 # Sync next_hearing_date to JSON as well
                 if isinstance(vars_data.get("next_hearing_date"), dict):
                     vars_data["next_hearing_date"]["value"] = new_db_date
@@ -1671,7 +1744,7 @@ class MasterCaseTab(QWidget):
                         json.dump(vars_data, f, indent=4)
                 except Exception as e:
                     QMessageBox.warning(self, "Error", f"Could not save hearing data: {e}")
-                
+
                 self.db.update_hearing_date(file_number, new_db_date)
                 self.refresh_data_row(file_number)
 
@@ -1685,7 +1758,7 @@ class MasterCaseTab(QWidget):
                     if len(parts) == 3:
                         current_date = QDate(int(parts[2]), int(parts[0]), int(parts[1]))
                 except: pass
-                
+
             dialog = CalendarDialog(self, current_date)
             if dialog.exec() == QDialog.DialogCode.Accepted:
                 if dialog.cleared:
@@ -1694,9 +1767,8 @@ class MasterCaseTab(QWidget):
                     date_str = dialog.selected_date.toString("yyyy-MM-dd")
                     self.db.update_trial_date(file_number, date_str)
                 self.refresh_data_row(file_number)
-                
+
         elif col == 5: # Last Report -> Text/Date
-            # Allow text or date. Just use InputDialog for maximum flexibility as requested ("date / text")
             col_item = self.table.item(row, col)
             current_val = col_item.text() if col_item else ""
             new_val, ok = QInputDialog.getText(self, "Edit Last Report", "Date (YYYY-MM-DD) or Text:", text=current_val)

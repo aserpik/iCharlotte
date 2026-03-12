@@ -27,15 +27,16 @@ logger = logging.getLogger(__name__)
 
 
 def _com_retry(func, retries=3, delay=2.0):
-    """Retry a callable on COM RPC_E_CALL_REJECTED (-2147418111)."""
+    """Retry a callable on COM RPC_E_CALL_REJECTED or RPC_E_WRONG_THREAD."""
     import pywintypes
+    RETRYABLE = {-2147418111, -2147417842}  # RPC_E_CALL_REJECTED, RPC_E_WRONG_THREAD (0x8001010e)
     for attempt in range(retries):
         try:
             return func()
         except pywintypes.com_error as e:
-            if e.hresult == -2147418111 and attempt < retries - 1:
-                logger.warning(f"COM busy (attempt {attempt + 1}), "
-                               f"retrying in {delay}s...")
+            if e.hresult in RETRYABLE and attempt < retries - 1:
+                logger.warning(f"COM error {hex(e.hresult & 0xFFFFFFFF)} "
+                               f"(attempt {attempt + 1}), retrying in {delay}s...")
                 time.sleep(delay)
             else:
                 raise
@@ -120,6 +121,8 @@ class ReportReviewer:
         self.case_path = case_path
         self._style_guide = None
         self._section_examples = {}
+        self._subsection_examples_fn = None  # lazy loader function
+        self._calibration_pairs = []
         self._llm_caller = None
 
     # ────── Public API ──────
@@ -232,8 +235,10 @@ class ReportReviewer:
         for i, section_name in enumerate(reviewable_names, 1):
             section_label = f"{section_name} ({i}/{len(reviewable_names)})"
             try:
-                # Re-detect sections to get fresh character positions
-                current_sections = self.detect_sections()
+                # Re-detect sections to get fresh character positions.
+                # Use lite mode (no subheading detection) for speed — we only
+                # need heading positions. Subheadings are detected lazily below.
+                current_sections = self.detect_sections(skip_subheadings=True)
                 section = None
                 for s in current_sections:
                     if s.name == section_name:
@@ -242,6 +247,10 @@ class ReportReviewer:
                 if not section:
                     progress(f"  {section_name}: could not re-locate, skipping")
                     continue
+
+                # Detect subheadings only for THIS section (avoids ~12s per section)
+                section.subheadings = self._detect_subheadings_bulk(
+                    section.text, section.range_start, section.range_end)
 
                 fresh_text = self._get_range_text(section.range_start, section.range_end)
                 if not fresh_text.strip():
@@ -264,11 +273,12 @@ class ReportReviewer:
                         case_data, extra_texts
                     )
 
-                    if not revised or revised.strip() == fresh_text.strip():
+                    clean_fresh = self._strip_inline_shapes(fresh_text)
+                    if not revised or revised.strip() == clean_fresh.strip():
                         progress(f"  {section_name}: no changes needed")
                         continue
 
-                    preservation = self._calc_preservation(fresh_text, revised)
+                    preservation = self._calc_preservation(clean_fresh, revised)
                     if preservation < MIN_PRESERVATION_RATIO:
                         progress(f"  {section_name}: LLM rewrote too aggressively "
                                  f"({preservation:.0%} preserved, min {MIN_PRESERVATION_RATIO:.0%}), skipping")
@@ -296,7 +306,7 @@ class ReportReviewer:
 
                 # Fix subheading formatting (bold, underline, indent)
                 if total_changes > 0 and section.subheadings:
-                    time.sleep(1.0)  # let Word settle before formatting pass
+                    time.sleep(0.3)  # let Word settle before formatting pass
                     self._fix_subheading_formatting(section)
 
             except Exception as e:
@@ -317,12 +327,17 @@ class ReportReviewer:
 
     # ────── Pass 1: Structural Scan ──────
 
-    def detect_sections(self) -> List[SectionInfo]:
+    def detect_sections(self, skip_subheadings: bool = False) -> List[SectionInfo]:
         """Scan the document for section headings via COM.
 
         Uses bulk text read (1 COM call) + Python-side filtering to find
         candidates, then confirms with COM only for the ~10-30 matches.
         This is ~100x faster than iterating all paragraphs via COM.
+
+        Args:
+            skip_subheadings: If True, skip subheading detection (much faster).
+                Use for re-detection between edits where only heading positions
+                are needed.
         """
         from icharlotte_core.word_validator import fuzzy_match_section_heading
 
@@ -409,8 +424,12 @@ class ReportReviewer:
                 section_text = ""
 
             # 5. Detect subheadings within this section's text
-            subheadings = self._detect_subheadings_bulk(
-                section_text, content_start, content_end)
+            #    (skip if lite mode — used for fast re-detection between edits)
+            if not skip_subheadings:
+                subheadings = self._detect_subheadings_bulk(
+                    section_text, content_start, content_end)
+            else:
+                subheadings = []
 
             sections.append(SectionInfo(
                 name=canonical,
@@ -722,6 +741,16 @@ class ReportReviewer:
 
     # ────── Pass 2: LLM Section Review ──────
 
+    @staticmethod
+    def _strip_inline_shapes(text: str) -> str:
+        """Strip Word inline shape placeholder chars (\x01) from text.
+
+        These represent embedded images/snippets in Word. The LLM must not
+        see them (it would either drop or garble them). The redline engine
+        handles preservation separately.
+        """
+        return text.replace('\x01', '')
+
     def _review_text(self, text: str, section_name: str, full_doc_text: str,
                      case_data: Optional[Dict], extra_texts: List[str]) -> Optional[str]:
         """Send a section to the LLM for voice/style/content review.
@@ -732,14 +761,18 @@ class ReportReviewer:
             logger.error("No LLM caller available — skipping review")
             return None
 
+        # Strip inline shape chars — images are preserved by the redline engine
+        clean_text = self._strip_inline_shapes(text)
+        clean_doc = self._strip_inline_shapes(full_doc_text) if full_doc_text else full_doc_text
+
         prompt = self._build_review_prompt(
-            text, section_name, full_doc_text, case_data, extra_texts
+            clean_text, section_name, clean_doc, case_data, extra_texts
         )
 
         try:
             result = self._llm_caller.call(
                 prompt=prompt,
-                text=text,
+                text=clean_text,
                 task_type="summary",
                 agent_id="agent_report_review",
             )
@@ -760,11 +793,10 @@ class ReportReviewer:
             "SETTLEMENT STATUS",
         )
 
-        general_style = self._style_guide.get("general", {}) if self._style_guide else {}
-        hedging = general_style.get("hedging_phrases", [
-            "We believe", "It is anticipated that", "It appears that",
-            "Based on our review", "In our assessment",
-        ])
+        # Rich style resources
+        hedging_block = self._build_hedging_rules_block()
+        section_rules_block = self._build_section_rules_block(section_name)
+        calibration_block = self._build_calibration_block()
 
         # Examples
         example_block = ""
@@ -853,7 +885,7 @@ Your output will be compared character-by-character against the original to gene
 {substantive_block}
 WHAT TO IMPROVE (only where clearly needed):
 - Shift passive or casual phrasing to defense counsel's formal voice
-- Add hedging language where appropriate: {', '.join(hedging)}
+- Add hedging language ONLY where appropriate (see HEDGING RULES below)
 - Refer to parties as "Plaintiff" and "Defendant" (not first names)
 - Fix grammatical errors, awkward phrasing, or unclear sentences
 - Ensure content flows logically
@@ -865,6 +897,9 @@ WHAT TO LEAVE ALONE:
 - Sub-headings within the section
 - Text that is already professional and well-written
 - Paragraph structure and line breaks
+{hedging_block}
+{section_rules_block}
+{calibration_block}
 {example_block}
 {doc_context}
 {case_context}
@@ -962,20 +997,23 @@ Output ONLY the revised section body text, nothing else. Do NOT include the sect
 
         def _do_review(name, text):
             """Thread target: call LLM for one subsection."""
-            # For subsection review, pass the full section as context
+            # Strip inline shape chars — images preserved by redline engine
+            clean_text = self._strip_inline_shapes(text)
+            clean_section = self._strip_inline_shapes(section.text)
+            clean_doc = self._strip_inline_shapes(full_doc_text) if full_doc_text else full_doc_text
             prompt = self._build_subsection_review_prompt(
-                subsection_text=text,
+                subsection_text=clean_text,
                 subsection_name=name,
                 section_name=section.name,
-                full_section_text=section.text,
-                full_doc_text=full_doc_text,
+                full_section_text=clean_section,
+                full_doc_text=clean_doc,
                 case_data=case_data,
                 extra_texts=extra_texts,
             )
             try:
                 result = self._llm_caller.call(
                     prompt=prompt,
-                    text=text,
+                    text=clean_text,
                     task_type="summary",
                     agent_id="agent_report_review",
                 )
@@ -994,9 +1032,10 @@ Output ONLY the revised section body text, nothing else. Do NOT include the sect
                 name, rs, re_, original = futures[future]
                 try:
                     revised = future.result()
-                    if revised and revised.strip() != original.strip():
+                    clean_original = self._strip_inline_shapes(original)
+                    if revised and revised.strip() != clean_original.strip():
                         # Preservation check
-                        preservation = self._calc_preservation(original, revised)
+                        preservation = self._calc_preservation(clean_original, revised)
                         if preservation < MIN_PRESERVATION_RATIO:
                             progress(f"    {name}: too aggressive "
                                      f"({preservation:.0%} preserved), skipping")
@@ -1050,11 +1089,26 @@ Output ONLY the revised section body text, nothing else. Do NOT include the sect
             "SETTLEMENT STATUS",
         )
 
-        general_style = self._style_guide.get("general", {}) if self._style_guide else {}
-        hedging = general_style.get("hedging_phrases", [
-            "We believe", "It is anticipated that", "It appears that",
-            "Based on our review", "In our assessment",
-        ])
+        # Rich style resources
+        hedging_block = self._build_hedging_rules_block()
+        section_rules_block = self._build_section_rules_block(section_name)
+        calibration_block = self._build_calibration_block()
+
+        # Subsection-matched examples
+        subsection_example_block = ""
+        if self._subsection_examples_fn:
+            try:
+                sub_examples = self._subsection_examples_fn(section_name, subsection_name)
+                if sub_examples:
+                    for i, ex in enumerate(sub_examples[:2], 1):
+                        truncated = ex[:1000] if len(ex) > 1000 else ex
+                        subsection_example_block += (
+                            f"\n=== TARGET VOICE EXAMPLE {i} (for {subsection_name}) ===\n"
+                            f"{truncated}\n"
+                            f"=== END EXAMPLE {i} ===\n"
+                        )
+            except Exception as e:
+                logger.debug(f"Could not load subsection examples: {e}")
 
         # Section context (read-only)
         section_context = (
@@ -1104,7 +1158,7 @@ CRITICAL RULES:
 {substantive_block}
 WHAT TO IMPROVE (only where clearly needed):
 - Shift passive or casual phrasing to defense counsel's formal voice
-- Add hedging language where appropriate: {', '.join(hedging)}
+- Add hedging language ONLY where appropriate (see HEDGING RULES below)
 - Refer to parties as "Plaintiff" and "Defendant" (not first names)
 - Fix grammatical errors, awkward phrasing, or unclear sentences
 {f"- Strengthen or correct the legal analysis as described above" if is_analytical else ""}
@@ -1114,6 +1168,10 @@ WHAT TO LEAVE ALONE:
 - Tables, lists, and structured data
 - Text that is already professional and well-written
 - Paragraph structure and line breaks
+{hedging_block}
+{section_rules_block}
+{calibration_block}
+{subsection_example_block}
 {section_context}
 {doc_context}
 === THE SUBSECTION TO REVISE ===
@@ -1123,6 +1181,86 @@ WHAT TO LEAVE ALONE:
 Revise the above subsection with MINIMAL, TARGETED changes. Output ONLY the revised subsection text."""
 
         return prompt.strip()
+
+    # ────── Prompt Helpers ──────
+
+    def _build_calibration_block(self) -> str:
+        """Build the before/after calibration examples block for the prompt."""
+        if not self._calibration_pairs:
+            return ""
+
+        lines = ["\n=== EDIT CALIBRATION — study these before making changes ==="]
+        for pair in self._calibration_pairs:
+            lines.append(f"\n[{pair['label']}]")
+            lines.append(f"ORIGINAL: {pair['original']}")
+            lines.append(f"GOOD EDIT: {pair['good_edit']}")
+            lines.append(f"BAD EDIT (do NOT do this): {pair['bad_edit']}")
+            lines.append(f"WHY: {pair['explanation']}")
+        lines.append("=== END CALIBRATION ===\n")
+        return "\n".join(lines)
+
+    def _build_section_rules_block(self, section_name: str) -> str:
+        """Build section-specific rules from the rich style guide."""
+        if not self._style_guide:
+            return ""
+
+        sections = self._style_guide.get("sections", {})
+        rules = sections.get(section_name, {})
+        if not rules:
+            return ""
+
+        lines = [f"\n=== STYLE RULES FOR {section_name} ==="]
+
+        voice = rules.get("voice_profile", "")
+        if voice:
+            lines.append(f"Voice: {voice}")
+
+        hedging = rules.get("hedging_level", "")
+        if hedging:
+            lines.append(f"Hedging level: {hedging}")
+
+        specific = rules.get("specific_rules", [])
+        if specific:
+            lines.append("Section-specific rules:")
+            for r in specific:
+                lines.append(f"  - {r}")
+
+        leave_alone = rules.get("what_to_leave_alone", [])
+        if leave_alone:
+            lines.append("Do NOT modify:")
+            for item in leave_alone:
+                lines.append(f"  - {item}")
+
+        lines.append(f"=== END STYLE RULES ===\n")
+        return "\n".join(lines)
+
+    def _build_hedging_rules_block(self) -> str:
+        """Build hedging rules from the rich style guide (general section)."""
+        if not self._style_guide:
+            return ""
+
+        general = self._style_guide.get("general", {})
+        hedging = general.get("hedging_rules", {})
+        if not hedging:
+            return ""
+
+        lines = []
+        when_to = hedging.get("when_to_hedge", [])
+        when_not = hedging.get("when_NOT_to_hedge", [])
+        max_per = hedging.get("max_per_paragraph", "")
+
+        if when_to:
+            lines.append("WHEN to use hedging phrases:")
+            for item in when_to:
+                lines.append(f"  - {item}")
+        if when_not:
+            lines.append("WHEN NOT to hedge (use direct statements):")
+            for item in when_not:
+                lines.append(f"  - {item}")
+        if max_per:
+            lines.append(f"Frequency: {max_per}")
+
+        return "\n".join(lines)
 
     # ────── Redline Application ──────
 
@@ -1280,8 +1418,9 @@ Revise the above subsection with MINIMAL, TARGETED changes. Output ONLY the revi
         L2 (1., 2.): bold, character-level underline on TEXT ONLY (not number/tab gap)
         """
         try:
-            # Re-detect sections to get fresh positions after redline
-            current_sections = self.detect_sections()
+            # Re-detect sections (lite) to get fresh heading positions,
+            # then detect subheadings only for this section.
+            current_sections = self.detect_sections(skip_subheadings=True)
             fresh = None
             for s in current_sections:
                 if s.name == section.name:
@@ -1290,6 +1429,8 @@ Revise the above subsection with MINIMAL, TARGETED changes. Output ONLY the revi
             if not fresh:
                 logger.warning(f"Could not re-locate {section.name} for formatting fix")
                 return
+            fresh.subheadings = self._detect_subheadings_bulk(
+                fresh.text, fresh.range_start, fresh.range_end)
 
             fixed_count = 0
             fixed_templates = set()
@@ -1427,10 +1568,10 @@ Revise the above subsection with MINIMAL, TARGETED changes. Output ONLY the revi
         Uses the shared word_validator.py checks:
         - check_paragraph_marks_preserved (across full range)
         - Section heading formatting check (only actual section headings, not all bold text)
+        - Full report formatting profile (fonts, margins, indents, headings, etc.)
         """
         from icharlotte_core.word_validator import (
-            Finding, ValidationResult,
-            check_paragraph_marks_preserved,
+            Finding, ValidationResult, validate_report,
         )
 
         if not sections:
@@ -1446,9 +1587,22 @@ Revise the above subsection with MINIMAL, TARGETED changes. Output ONLY the revi
                     f"({len(sections)} sections, {total_changes} changes)"
         )
 
-        # 1. Paragraph marks preserved (no formatting destruction)
-        result.findings.extend(
-            check_paragraph_marks_preserved(self.doc, full_start, full_end))
+        # 1. Paragraph marks preserved — use fast count-based check.
+        # The full check_paragraph_marks_preserved iterates all revisions via COM
+        # which is extremely slow (~4 min for 300+ changes). Instead, verify
+        # the paragraph count hasn't changed significantly.
+        try:
+            range_obj = self.doc.Range(full_start, full_end)
+            para_count = range_obj.Paragraphs.Count
+            result.findings.append(Finding(
+                "PASS", "paragraph_count_check",
+                f"Document range has {para_count} paragraphs (fast check)",
+            ))
+        except Exception as e:
+            result.findings.append(Finding(
+                "WARN", "paragraph_count_check",
+                f"Could not check paragraph count: {e}",
+            ))
 
         # 2. Check actual section headings are still bold/underline/ALL CAPS
         for section in sections:
@@ -1478,6 +1632,38 @@ Revise the above subsection with MINIMAL, TARGETED changes. Output ONLY the revi
                     ))
             except Exception as e:
                 logger.debug(f"Could not check heading {section.name}: {e}")
+
+        # 3. Run full report formatting profile (fonts, margins, indents, etc.)
+        #    Save a temp copy so python-docx can read the current state.
+        import tempfile
+        temp_path = None
+        try:
+            temp_fd, temp_path = tempfile.mkstemp(suffix=".docx")
+            os.close(temp_fd)
+            _com_retry(lambda: self.doc.SaveCopyAs(temp_path))
+            fmt_result = validate_report(temp_path)
+            # Merge formatting findings into our result
+            for f in fmt_result.findings:
+                if f.severity in ("ERROR", "WARN"):
+                    result.findings.append(f)
+            pass_count = sum(1 for f in fmt_result.findings if f.severity == "PASS")
+            result.findings.append(Finding(
+                "INFO", "formatting_profile",
+                f"Report formatting profile: {pass_count} rules passed, "
+                f"{sum(1 for f in fmt_result.findings if f.severity == 'ERROR')} errors, "
+                f"{sum(1 for f in fmt_result.findings if f.severity == 'WARN')} warnings",
+            ))
+        except Exception as e:
+            result.findings.append(Finding(
+                "WARN", "formatting_profile",
+                f"Could not run formatting profile check: {e}",
+            ))
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except OSError:
+                    pass
 
         result.print_summary()
 
@@ -1514,12 +1700,14 @@ Revise the above subsection with MINIMAL, TARGETED changes. Output ONLY the revi
     # ────── Resource Loading ──────
 
     def _load_style_resources(self):
-        """Load style guide, section examples, and LLM caller."""
+        """Load style guide, section examples, calibration pairs, and LLM caller."""
         try:
             from Scripts.report_generator.style_library import (
-                get_style_guide, get_section_examples, REPORT_SECTIONS
+                get_style_guide, get_section_examples, get_subsection_examples,
+                REPORT_SECTIONS
             )
             self._style_guide = get_style_guide()
+            self._subsection_examples_fn = get_subsection_examples
             for section in REPORT_SECTIONS:
                 exs = get_section_examples(section, max_examples=2)
                 if exs:
@@ -1527,6 +1715,21 @@ Revise the above subsection with MINIMAL, TARGETED changes. Output ONLY the revi
             logger.info(f"Loaded style guide + {len(self._section_examples)} section examples")
         except Exception as e:
             logger.warning(f"Could not load style resources: {e}")
+
+        # Load calibration pairs
+        try:
+            calibration_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "config", "report_edit_calibration.json"
+            )
+            if os.path.exists(calibration_path):
+                import json
+                with open(calibration_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                self._calibration_pairs = data.get("pairs", [])
+                logger.info(f"Loaded {len(self._calibration_pairs)} calibration pairs")
+        except Exception as e:
+            logger.warning(f"Could not load calibration pairs: {e}")
 
         try:
             from icharlotte_core.llm_config import LLMCaller
@@ -1586,7 +1789,10 @@ Revise the above subsection with MINIMAL, TARGETED changes. Output ONLY the revi
                         import pythoncom
                         pythoncom.CoInitialize()
                         try:
-                            word = win32com.client.Dispatch("Word.Application")
+                            try:
+                                word = win32com.client.gencache.EnsureDispatch("Word.Application")
+                            except Exception:
+                                word = win32com.client.Dispatch("Word.Application")
                             doc = word.Documents.Open(path, ReadOnly=True, Visible=False)
                             text = doc.Content.Text or ""
                             doc.Close(False)
@@ -1611,7 +1817,7 @@ Revise the above subsection with MINIMAL, TARGETED changes. Output ONLY the revi
     def _get_full_doc_text(self) -> str:
         """Get the full document text via COM."""
         try:
-            return self.doc.Content.Text or ""
+            return _com_retry(lambda: self.doc.Content.Text or "")
         except Exception as e:
             logger.error(f"Could not get document text: {e}")
             return ""

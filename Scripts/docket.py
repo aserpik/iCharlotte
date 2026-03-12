@@ -751,9 +751,11 @@ def main():
                 fn = file_queue.pop(0)
                 log_event(f"Spawning agent for {fn}...")
                 try:
-                    spawn_args = [sys.executable, sys.argv[0], fn, "--headful"]
+                    spawn_args = [sys.executable, sys.argv[0], fn]
                     if is_headless:
                         spawn_args.append("--headless")
+                    else:
+                        spawn_args.append("--headful")
                     
                     if os.name == 'nt':
                         p = subprocess.Popen(spawn_args, creationflags=subprocess.CREATE_NO_WINDOW)

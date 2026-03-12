@@ -1,0 +1,272 @@
+======================================================================
+SILENT CRASH DETECTED (previous session)
+======================================================================
+Detection Time:   2026-03-06T16:54:15.037484
+Last Heartbeat:   2026-03-06T16:53:59.296382
+Previous PID:     33504
+Memory at death:  N/A MB RSS
+
+Last Checkpoints:
+  [2026-03-06T16:51:13.627799] Configuring Qt WebEngine
+  [2026-03-06T16:51:13.627920] Creating QApplication
+  [2026-03-06T16:51:13.695230] Creating MainWindow
+  [2026-03-06T16:51:13.695611] MainWindow.__init__ starting
+  [2026-03-06T16:51:13.858931] setup_ui starting - creating tabs
+  [2026-03-06T16:51:13.860896] Creating MasterCaseTab
+  [2026-03-06T16:51:15.208800] Creating ChatTab
+  [2026-03-06T16:51:15.494457] setup_ui complete - all tabs created
+  [2026-03-06T16:51:15.802060] Showing MainWindow
+  [2026-03-06T16:51:15.855331] Entering Qt event loop
+
+Context:
+  startup_file_number: None
+  startup_case_path: None
+  startup_tab: None
+  current_file_number: None
+  current_case_path: None
+
+----------------------------------------------------------------------
+STDERR (last 50 lines before crash):
+----------------------------------------------------------------------
+
+--- stderr.log ---
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-06T16:12:12.436516
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-06T16:13:34.736613
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-06T16:15:54.489522
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-06T16:20:24.734961
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-06T16:21:10.605966
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-06T16:21:21.986722
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-06T16:25:15.650595
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-06T16:29:11.197590
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-06T16:35:49.649907
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-06T16:37:44.729962
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-06T16:48:50.443016
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-06T16:51:13.573252
+============================================================
+[DEBUG] refresh_data_inner START
+--- stderr.log.fd2 ---
+
+    self._insert_result(td)
+
+    ~~~~~~~~~~~~~~~~~~~^^^^
+
+  File "C:\geminiterminal2\icharlotte_core\word_hotkey.py", line 1186, in _insert_result
+
+    raise Exception("No bookmark for range tracking")
+
+Exception: No bookmark for range tracking
+
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+
+
+----------------------------------------------------------------------
+FAULTHANDLER LOG (tail):
+----------------------------------------------------------------------
+
+============================================================
+Session start: 2026-03-06T15:56:35.120922
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:02:27.912716
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:03:11.170269
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:04:26.078633
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:06:30.371436
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:09:04.218360
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:10:51.718820
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:12:12.140537
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:13:34.736330
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:15:54.200721
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:20:24.416049
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:21:10.605592
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:21:21.986429
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:25:15.351831
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:29:11.196914
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:35:49.324893
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:37:44.729650
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:48:50.162193
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:51:13.278363
+============================================================
+
+============================================================
+Session start: 2026-03-06T16:54:15.036912
+============================================================
+
+
+----------------------------------------------------------------------
+WINDOWS ERROR REPORTING:
+----------------------------------------------------------------------
+TimeCreated : 3/6/2026 4:37:00 PM
+Message     : Faulting application name: python3.13.exe, version: 3.13.12150.1013, time stamp: 0x69823dc6
+              Faulting module name: Qt6Core.dll, version: 6.10.1.0, time stamp: 0x6915b375
+              Exception code: 0xc0000409
+              Fault offset: 0x000000000001be08
+              Faulting process id: 0x389C
+              Faulting application start time: 0x1DCADC9688279E6
+              Faulting application path: C:\Program 
+              Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\python3.13.exe
+              Faulting module path: C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Py
+              thon.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\PySide6\Qt6Core.dll
+              Report Id: 9175a71a-ddff-41eb-94e7-01059d998471
+              Faulting package full name: PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0
+              Faulting package-relative application ID: Python
+
+TimeCreated : 3/6/2026 4:16:38 PM
+Message     : Faulting application name: shellhost.exe, version: 10.0.26100.7920, time stamp: 0xb12b8f85
+              Faulting module name: Microsoft.UI.Xaml.dll, version: 3.1.6.0, time stamp: 0x97cdad17
+              Exception code: 0xc000027b
+              Fault offset: 0x00000000003a3385
+              Faulting process id: 0x4F5C
+              Faulting application start time: 0x1DCADC7A95979AD
+              Faulting application path: C:\WINDOWS\system32\shellhost.exe
+              Faulting module path: 
+              C:\WINDOWS\SystemApps\Microsoft.WindowsAppRuntime.CBS_8wekyb3d8bbwe\Microsoft.UI.Xaml.dll
+              Report Id: f7fa1d9d-0874-486c-91aa-46828c02fd08
+              Faulting package full name: 
+              Faulting package-relative application ID: 
+
+TimeCreated : 3/6/2026 1:18:52 PM
+Message     : Faulting application name: dwm.exe, version: 10.0.26100.7920, time stamp: 0x5188d5ef
+              Faulting module name: udwm.dll, version: 10.0.26100.7920, time stamp: 0xe52e2d2c
+              Exception code: 0xc00001ad
+              Fault offset: 0x00000000000894d8
+              Faulting process id: 0x69AC
+              Faulting application start time: 0x1DCADAED260E45A
+              Faulting application path: C:\WINDOWS\system32\dwm.exe
+              Faulting module path: C:\WINDOWS\SYSTEM32\udwm.dll
+              Report Id: d177843b-6586-47e3-aef1-ac7078baa08e
+              Faulting package full name: 
+              Faulting package-relative application ID: 
+
+TimeCreated : 3/6/2026 1:18:00 PM
+Message     : Faulting application name: dwm.exe, version: 10.0.26100.7920, time stamp: 0x5188d5ef
+              Faulting module name: udwm.dll, version: 10.0.26100.7920, time stamp: 0xe52e2d2c
+              Exception code: 0xc00001ad
+              Fault offset: 0x00000000000894d8
+              Faulting process id: 0x71C
+              Faulting application start time: 0x1DC

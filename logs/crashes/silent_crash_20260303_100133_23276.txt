@@ -1,0 +1,261 @@
+======================================================================
+SILENT CRASH DETECTED (previous session)
+======================================================================
+Detection Time:   2026-03-03T10:01:33.656153
+Last Heartbeat:   2026-03-03T10:01:02.254470
+Previous PID:     23276
+Memory at death:  N/A MB RSS
+
+Last Checkpoints:
+  [2026-03-02T15:46:31.808694] Showing MainWindow
+  [2026-03-02T15:46:31.875593] Entering Qt event loop
+  [2026-03-02T17:52:50.430017] Starting agent: med_record.py
+  [2026-03-02T17:52:50.482929] Starting agent: med_record.py
+  [2026-03-02T17:54:19.250791] Agent completed: med_record.py
+  [2026-03-02T17:54:39.674605] Agent completed: med_record.py
+  [2026-03-03T09:39:53.275302] Starting agent: med_record.py
+  [2026-03-03T09:39:53.327088] Starting agent: med_record.py
+  [2026-03-03T09:41:05.808015] Agent completed: med_record.py
+  [2026-03-03T09:41:39.842465] Agent completed: med_record.py
+
+Context:
+  startup_file_number: None
+  startup_case_path: None
+  startup_tab: None
+  current_file_number: None
+  current_case_path: None
+
+----------------------------------------------------------------------
+STDERR (last 50 lines before crash):
+----------------------------------------------------------------------
+
+--- stderr.log ---
+
+============================================================
+Stderr capture started: 2026-02-25T18:47:46.665100
+============================================================
+
+============================================================
+Stderr capture started: 2026-02-25T18:52:46.728780
+============================================================
+
+============================================================
+Stderr capture started: 2026-02-25T18:53:33.176129
+============================================================
+Exception in thread heartbeat:
+Traceback (most recent call last):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044, in _bootstrap_inner
+    self.run()
+    ~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte_core\app_crash_handler.py", line 515, in _beat
+    threading.Event().wait(0.1)
+    ~~~~~~~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 593, in __init__
+    self._cond = Condition(Lock())
+                 ~~~~~~~~~^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 297, in __init__
+    self._waiters = _deque()
+                    ~~~~~~^^
+MemoryError
+
+============================================================
+Stderr capture started: 2026-03-02T10:56:47.699329
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-02T15:46:28.215744
+============================================================
+[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START
+--- stderr.log.fd2 ---
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+[43832:44800:0302/095816.696:ERROR:device_event_log_impl.cc(202)] [09:58:10.409] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[43832:44800:0302/095816.926:ERROR:device_event_log_impl.cc(202)] [09:58:16.928] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[43832:44800:0302/095822.146:ERROR:device_event_log_impl.cc(202)] [09:58:22.148] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[43832:44800:0302/100841.753:ERROR:device_event_log_impl.cc(202)] [10:08:41.756] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[43832:44800:0302/101409.460:ERROR:device_event_log_impl.cc(202)] [10:14:09.461] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+[43832:44800:0302/101410.123:ERROR:device_event_log_impl.cc(202)] [10:14:10.122] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[43832:44800:0302/102644.215:ERROR:device_event_log_impl.cc(202)] [10:26:44.215] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[43832:44800:0302/102644.285:ERROR:device_event_log_impl.cc(202)] [10:26:44.285] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+[22564:6604:0302/122455.130:ERROR:device_event_log_impl.cc(202)] [12:24:55.090] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[22564:6604:0302/122455.564:ERROR:device_event_log_impl.cc(202)] [12:24:55.571] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[22564:6604:0302/122455.580:ERROR:device_event_log_impl.cc(202)] [12:24:55.588] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[22564:6604:0302/122457.849:ERROR:device_event_log_impl.cc(202)] [12:24:57.855] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[22564:6604:0302/122458.263:ERROR:device_event_log_impl.cc(202)] [12:24:58.264] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[22564:6604:0302/122458.796:ERROR:device_event_log_impl.cc(202)] [12:24:58.808] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[22564:6604:0302/122547.351:ERROR:device_event_log_impl.cc(202)] [12:25:47.352] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[22564:6604:0302/122547.465:ERROR:device_event_log_impl.cc(202)] [12:25:47.465] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+
+
+----------------------------------------------------------------------
+FAULTHANDLER LOG (tail):
+----------------------------------------------------------------------
+
+Current thread 0x00002cc8 (most recent call first):
+  File "C:\geminiterminal2\icharlotte_core\sent_items_monitor.py", line 377 in _poll_sent_items
+  File "C:\geminiterminal2\icharlotte_core\sent_items_monitor.py", line 319 in run
+
+Thread 0x000078a4 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 359 in wait
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\queue.py", line 199 in get
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_generic.py", line 57 in process
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x00003868 (most recent call first):
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_winkeyboard.py", line 563 in listen
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\__init__.py", line 294 in listen
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x0000af00 (most recent call first):
+  File "C:\geminiterminal2\icharlotte.py", line 2846 in <module>
+Windows fatal exception: code 0x800706ba
+
+Current thread 0x00002cc8 (most recent call first):
+  File "C:\geminiterminal2\icharlotte_core\sent_items_monitor.py", line 377 in _poll_sent_items
+  File "C:\geminiterminal2\icharlotte_core\sent_items_monitor.py", line 319 in run
+
+Thread 0x000078a4 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 359 in wait
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\queue.py", line 199 in get
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_generic.py", line 57 in process
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x00003868 (most recent call first):
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_winkeyboard.py", line 563 in listen
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\__init__.py", line 294 in listen
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x0000af00 (most recent call first):
+  File "C:\geminiterminal2\icharlotte.py", line 2846 in <module>
+Windows fatal exception: code 0x800706ba
+
+Current thread 0x00002cc8 (most recent call first):
+  File "C:\geminiterminal2\icharlotte_core\sent_items_monitor.py", line 377 in _poll_sent_items
+  File "C:\geminiterminal2\icharlotte_core\sent_items_monitor.py", line 319 in run
+
+Thread 0x000078a4 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 359 in wait
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\queue.py", line 199 in get
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_generic.py", line 57 in process
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x00003868 (most recent call first):
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_winkeyboard.py", line 563 in listen
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\__init__.py", line 294 in listen
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x0000af00 (most recent call first):
+  File "C:\geminiterminal2\icharlotte.py", line 2846 in <module>
+
+============================================================
+Session start: 2026-03-02T10:56:47.027851
+============================================================
+
+============================================================
+Session start: 2026-03-02T15:46:27.652047
+============================================================
+
+============================================================
+Session start: 2026-03-03T10:01:33.640149
+============================================================
+
+
+----------------------------------------------------------------------
+WINDOWS ERROR REPORTING:
+----------------------------------------------------------------------
+TimeCreated : 3/3/2026 10:01:05 AM
+Message     : Faulting application name: python3.13.exe, version: 3.13.12150.1013, time stamp: 0x69823dc6
+              Faulting module name: Qt6Core.dll, version: 6.10.1.0, time stamp: 0x6915b375
+              Exception code: 0xc0000409
+              Fault offset: 0x000000000001be08
+              Faulting process id: 0x5AEC
+              Faulting application start time: 0x1DCAA9EBCDDF20C
+              Faulting application path: C:\Program 
+              Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\python3.13.exe
+              Faulting module path: C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Py
+              thon.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\PySide6\Qt6Core.dll
+              Report Id: 6512d2d9-5dea-4704-a6f8-f25c6e75ea10
+              Faulting package full name: PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0
+              Faulting package-relative application ID: Python
+
+TimeCreated : 3/2/2026 10:28:42 AM
+Message     : Faulting application name: Sunshine.exe, version: 2025.924.23066.0, time stamp: 0x68d4170c
+              Faulting module name: KERNELBASE.dll, version: 10.0.26100.7920, time stamp: 0x0cc2a083
+              Exception code: 0x80000003
+              Fault offset: 0x0000000000118e12
+              Faulting process id: 0x6498
+              Faulting application start time: 0x1DCAA725E675374
+              Faulting application path: C:\Program Files\Sunshine\Sunshine.exe
+              Faulting module path: C:\WINDOWS\System32\KERNELBASE.dll
+              Report Id: cb0d99f8-4349-45c5-93c8-43a80e17f35f
+              Faulting package full name: 
+              Faulting package-relative application ID: 
+
+TimeCreated : 2/26/2026 3:29:59 PM
+Message     : Faulting application name: LenovoVantageService.exe, version: 4.2601.20.0, time stamp: 0xa953a323
+              Faulting module name: ntdll.dll, version: 10.0.26100.7920, time stamp: 0x01973ebf
+              Exception code: 0xc00000fd
+              Fault offset: 0x00028d7b
+              Faulting process id: 0x1658
+              Faulting application start time: 0x1DCA648343794D7
+              Faulting application path: C:\Program Files 
+              (x86)\Lenovo\VantageService\4.2601.20.0\LenovoVantageService.exe
+              Faulting module path: C:\WINDOWS\SYSTEM32\ntdll.dll
+              Report Id: 4a250fbb-9f8e-402e-86cd-b8e2c77b15b2
+              Faulting package full name: 
+              Faulting package-relative application ID: 
+
+TimeCreated : 2/26/2026 3:29:52 PM
+Message     : Faulting application name: node.exe, version: 20.18.0.0, time stamp: 0x66fe3688
+              Faulting module name: node.exe, version: 20.18.0.0, time stamp: 0x66fe3688
+              Exception code: 0x80000003
+              Fault offset: 0x0000000001130fb0
+              Faulting process id: 0x6EA8
+              Faulting application start time:

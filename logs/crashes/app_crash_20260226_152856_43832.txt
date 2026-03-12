@@ -1,0 +1,72 @@
+======================================================================
+iCharlotte Application Crash Report
+======================================================================
+
+Crash Time: 2026-02-26T15:28:56.060058
+Uptime: 74127.1 seconds
+Source: thread:heartbeat
+
+----------------------------------------------------------------------
+EXCEPTION
+----------------------------------------------------------------------
+Type: MemoryError
+Message: 
+
+Traceback:
+Traceback (most recent call last):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044, in _bootstrap_inner
+    self.run()
+    ~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte_core\app_crash_handler.py", line 515, in _beat
+    threading.Event().wait(0.1)
+    ~~~~~~~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 593, in __init__
+    self._cond = Condition(Lock())
+                 ~~~~~~~~~^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 297, in __init__
+    self._waiters = _deque()
+                    ~~~~~~^^
+MemoryError
+
+----------------------------------------------------------------------
+RECENT CHECKPOINTS
+----------------------------------------------------------------------
+  [2026-02-25T18:53:33.214716] Application starting
+  [2026-02-25T18:53:33.214762] Parsing command-line arguments
+  [2026-02-25T18:53:33.216554] Configuring Qt WebEngine
+  [2026-02-25T18:53:33.216622] Creating QApplication
+  [2026-02-25T18:53:33.262461] Creating MainWindow
+  [2026-02-25T18:53:33.262673] MainWindow.__init__ starting
+  [2026-02-25T18:53:33.358900] setup_ui starting - creating tabs
+  [2026-02-25T18:53:33.360144] Creating MasterCaseTab
+  [2026-02-25T18:53:34.009590] Creating ChatTab
+  [2026-02-25T18:53:34.349968] setup_ui complete - all tabs created
+  [2026-02-25T18:53:34.636077] Showing MainWindow
+  [2026-02-25T18:53:34.695479] Entering Qt event loop
+
+----------------------------------------------------------------------
+ADDITIONAL CONTEXT
+----------------------------------------------------------------------
+  startup_file_number: None
+  startup_case_path: None
+  startup_tab: None
+  current_file_number: None
+  current_case_path: None
+
+----------------------------------------------------------------------
+SYSTEM INFORMATION
+----------------------------------------------------------------------
+Python: 3.13.12
+Platform: Windows-11-10.0.26200-SP0
+PID: 43832
+
+----------------------------------------------------------------------
+QT STATE
+----------------------------------------------------------------------
+  app_name: python3
+  window_visible: True
+  window_size: 1335x800
+  file_number: 3800.233

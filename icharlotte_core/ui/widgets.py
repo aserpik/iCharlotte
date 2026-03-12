@@ -16,12 +16,14 @@ from ..utils import log_event
 
 # Import app crash handler for logging
 try:
-    from ..app_crash_handler import checkpoint as app_checkpoint, log_info, log_error
+    from ..app_crash_handler import checkpoint as app_checkpoint, log_info, log_error, log_warning, log_debug
 except ImportError:
     # Fallback if module not available
     def app_checkpoint(*args, **kwargs): pass
     def log_info(msg): pass
     def log_error(msg, exc_info=False): pass
+    def log_warning(msg): pass
+    def log_debug(msg): pass
 
 
 # =============================================================================
@@ -210,6 +212,7 @@ class PassProgressWidget(QWidget):
 
 class StatusWidget(QFrame):
     cancel_requested = Signal()
+    retry_requested = Signal()  # whole-task retry
     retry_pass_requested = Signal(str)  # pass_name
 
     def __init__(self, agent_name, details, parent=None):
@@ -220,6 +223,8 @@ class StatusWidget(QFrame):
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
         self.output_path = None
         self.is_finished = False
+        self.agent_name = agent_name
+        self.details = details
 
         layout = QVBoxLayout(self)
 
@@ -244,6 +249,13 @@ class StatusWidget(QFrame):
         self.toggle_log_btn.setFixedSize(80, 25)
         self.toggle_log_btn.clicked.connect(self.toggle_log)
         header_layout.addWidget(self.toggle_log_btn)
+
+        self.retry_btn = QPushButton("Retry")
+        self.retry_btn.setFixedSize(60, 25)
+        self.retry_btn.setStyleSheet("background-color: #FF9800; color: white; font-weight: bold;")
+        self.retry_btn.setVisible(False)
+        self.retry_btn.clicked.connect(self.retry_requested.emit)
+        header_layout.addWidget(self.retry_btn)
 
         self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.setFixedSize(60, 25)
@@ -314,6 +326,7 @@ class StatusWidget(QFrame):
     def set_finished(self, success=True):
         self.is_finished = True
         self.cancel_btn.setVisible(False)
+        self.retry_btn.setVisible(True)
         if success:
             self.progress_bar.setValue(100)
             self.status_text_label.setText("Completed Successfully.")
@@ -355,7 +368,11 @@ class StatusWidget(QFrame):
             "output_path": self.output_path,
             "is_finished": self.is_finished,
             "passes": passes_data,
-            "current_pass": self.pass_progress.current_pass
+            "current_pass": self.pass_progress.current_pass,
+            "retry_command": getattr(self, '_retry_command', None),
+            "retry_args": getattr(self, '_retry_args', None),
+            "retry_script_name": getattr(self, '_retry_script_name', None),
+            "retry_file_path": getattr(self, '_retry_file_path', None),
         }
 
     @classmethod
@@ -369,6 +386,10 @@ class StatusWidget(QFrame):
         widget.is_finished = data.get("is_finished", False)
         status_text = data.get("status_text", "Restored")
         widget.status_text_label.setText(status_text)
+
+        # All restored widgets have no running process — show retry, hide cancel
+        widget.cancel_btn.setVisible(False)
+        widget.retry_btn.setVisible(True)
 
         if widget.is_finished:
              widget.status_text_label.setStyleSheet(data.get("status_style", ""))
@@ -536,10 +557,21 @@ class AgentRunner(QObject):
         import time
         self.last_output_time = time.time()
 
-        # Log agent start
+        # Log agent start with memory info
         script_name = self.args[0] if self.args else "unknown"
-        app_checkpoint(f"Starting agent: {script_name}", file_number=self.file_number)
+        script_basename = os.path.basename(script_name) if self.args else "unknown"
+        app_checkpoint(f"Starting agent: {script_basename}", file_number=self.file_number)
         log_info(f"AgentRunner starting: {self.command} {' '.join(self.args)}")
+
+        # Log memory state at agent start (useful for detecting OOM-related crashes)
+        try:
+            import psutil
+            proc = psutil.Process(os.getpid())
+            mem = proc.memory_info()
+            child_count = len(proc.children())
+            log_info(f"Agent start state: RSS={mem.rss // 1024 // 1024}MB, child_processes={child_count}, agent={script_basename}")
+        except Exception:
+            pass
 
         self.process.start(self.command, self.args)
         self.watchdog_timer.start()
@@ -604,22 +636,40 @@ class AgentRunner(QObject):
     def handle_finished(self, exit_code, exit_status):
         """Handle process completion with detailed exit code interpretation."""
         try:
+            import time as _time
+
             # Stop the watchdog timer
             self.watchdog_timer.stop()
 
             success = (exit_code == 0 and exit_status == QProcess.ExitStatus.NormalExit)
             self.success = success
 
-            # Log detailed exit information for debugging
-            if not success:
+            script_name = self.args[0] if self.args else "unknown"
+            script_basename = os.path.basename(script_name) if self.args else "unknown"
+            elapsed = (_time.time() - self.last_output_time) if self.last_output_time else 0
+
+            if success:
+                # Log successful completions too — critical for debugging silent crashes
+                log_info(f"Agent completed OK: {script_basename} (file: {self.file_number}, elapsed_since_last_output: {elapsed:.1f}s)")
+                app_checkpoint(f"Agent completed: {script_basename}", file_number=self.file_number)
+            else:
                 exit_reason = self._interpret_exit_code(exit_code, exit_status)
                 error_msg = f"\n--- PROCESS FINISHED: {exit_reason} ---\n"
                 self.log_history.append(error_msg)
                 self.log_update.emit(error_msg)
 
                 # Log to app crash log
-                script_name = self.args[0] if self.args else "unknown"
-                log_error(f"Agent failed: {script_name} - {exit_reason} (file: {self.file_number})")
+                log_error(f"Agent failed: {script_basename} - {exit_reason} (exit_code={exit_code}, file: {self.file_number})")
+                app_checkpoint(f"Agent FAILED: {script_basename} - {exit_reason}", file_number=self.file_number)
+
+                # Log memory state at failure time
+                try:
+                    import psutil
+                    proc = psutil.Process(os.getpid())
+                    mem = proc.memory_info()
+                    log_warning(f"Memory at agent failure: RSS={mem.rss // 1024 // 1024}MB, VMS={mem.vms // 1024 // 1024}MB")
+                except Exception:
+                    pass
 
                 # Check crash logs directory for recent crash reports
                 crash_log_dir = os.path.join(
@@ -642,14 +692,25 @@ class AgentRunner(QObject):
                     except Exception:
                         pass
 
+            # Log count of still-running agents (helps detect cascading failures)
+            try:
+                from PySide6.QtCore import QProcess as _QP
+                if hasattr(self, 'process') and self.process:
+                    log_debug(f"Agent process state after finish: {self.process.state()}")
+            except Exception:
+                pass
+
             self.finished.emit(success)
             self.process.deleteLater()
         except Exception as e:
             # Log error but don't let it crash the app
             try:
-                print(f"Error in handle_finished: {e}")
-            except OSError:
-                pass
+                log_error(f"Error in handle_finished: {e}")
+            except Exception:
+                try:
+                    print(f"Error in handle_finished: {e}")
+                except OSError:
+                    pass
 
     def _interpret_exit_code(self, exit_code: int, exit_status) -> str:
         """Interpret exit code to provide helpful error message."""

@@ -122,6 +122,8 @@ class ResearchResult:
     statutes: List[StatuteResult] = field(default_factory=list)
     memo: str = ""
     verification: List[VerificationStatus] = field(default_factory=list)
+    requested_cases: List[str] = field(default_factory=list)
+    unfound_cases: List[str] = field(default_factory=list)
 
     def format_authority_block(self) -> str:
         """Format results as a [LEGAL AUTHORITY] block for insertion into documents.
@@ -141,7 +143,7 @@ class ResearchResult:
                 lines.append(entry)
                 # Include holding/snippet so LLM can cite specific propositions
                 if case.snippet:
-                    snippet_text = case.snippet[:500].strip()
+                    snippet_text = case.snippet.strip()
                     if snippet_text:
                         lines.append(f"    Holding: {snippet_text}")
 
@@ -156,6 +158,17 @@ class ResearchResult:
                     if stat_text:
                         lines.append(f"    Text: {stat_text}")
 
+        if self.unfound_cases:
+            lines.append("")
+            lines.append("UNFOUND CASES (DO NOT CITE):")
+            for case_name in self.unfound_cases:
+                lines.append(
+                    f"  *** WARNING: '{case_name}' was NOT FOUND in any legal "
+                    f"database. Do NOT cite this case. Do NOT fabricate a "
+                    f"citation for it. If the user asked you to cite this case, "
+                    f"you MUST state that it could not be verified. ***"
+                )
+
         if self.verification:
             flagged = [v for v in self.verification if v.status == "FLAGGED"]
             if flagged:
@@ -168,6 +181,10 @@ class ResearchResult:
         lines.append("[/LEGAL AUTHORITY]")
         return "\n".join(lines)
 
+    def get_known_case_names(self) -> List[str]:
+        """Return a list of all case names from the research results."""
+        return [c.name for c in self.cases]
+
     def to_dict(self) -> Dict[str, Any]:
         """Return a JSON-serializable dictionary."""
         return {
@@ -176,4 +193,6 @@ class ResearchResult:
             "statutes": [s.to_dict() for s in self.statutes],
             "memo": self.memo,
             "verification": [v.to_dict() for v in self.verification],
+            "requested_cases": self.requested_cases,
+            "unfound_cases": self.unfound_cases,
         }

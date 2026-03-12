@@ -335,7 +335,14 @@ class SentItemsMonitorWorker(QThread):
     def _poll_sent_items(self):
         """Check Sent Items for matching emails."""
         import win32com.client
+        import gc
 
+        # COM objects MUST be released on the same thread that created them.
+        # If they leak to the main thread's GC, we get 0x8001010e (RPC_E_WRONG_THREAD).
+        items = None
+        sent_folder = None
+        mapi = None
+        outlook = None
         try:
             outlook = win32com.client.Dispatch("Outlook.Application")
             mapi = outlook.GetNamespace("MAPI")
@@ -359,9 +366,16 @@ class SentItemsMonitorWorker(QThread):
                     self._process_email(item)
                 except Exception:
                     pass  # Continue processing other emails
+                finally:
+                    del item  # Release COM ref on this thread
 
         except Exception as e:
             self.error.emit(f"Outlook access error: {e}")
+        finally:
+            # Explicitly release all COM objects on THIS thread to prevent
+            # cross-thread GC releasing them on the main thread (crash 0x8001010e)
+            del items, sent_folder, mapi, outlook
+            gc.collect()  # Force GC on this thread while COM apartment is active
 
     def _process_email(self, item):
         """Process a single email item."""
