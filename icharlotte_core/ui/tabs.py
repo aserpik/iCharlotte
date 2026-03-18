@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QInputDialog, QMenu, QApplication, QToolButton, QScrollArea,
     QSizePolicy, QSlider
 )
-from PySide6.QtCore import Qt, Signal, QThread, QFileInfo, QTimer, QSettings
+from PySide6.QtCore import Qt, Signal, QThread, QFileInfo, QTimer, QSettings, QEvent
 from PySide6.QtGui import QTextCursor, QDragEnterEvent, QDropEvent, QAction, QPixmap
 
 from ..config import API_KEYS, SCRIPTS_DIR, GEMINI_DATA_DIR
@@ -117,6 +117,96 @@ class OCRRunner(QThread):
 
 
 # --- Chat System ---
+
+
+class ResizableListWidget(QListWidget):
+    """QListWidget that can be resized by dragging its bottom edge."""
+
+    HANDLE_HEIGHT = 8  # pixels from bottom edge that trigger resize
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._resizing = False
+        self._start_y = 0
+        self._start_height = 0
+        self.setMouseTracking(True)
+        self.viewport().setMouseTracking(True)
+        self.viewport().installEventFilter(self)
+        self.setFixedHeight(120)
+
+    def _in_handle_zone(self, widget_pos_y):
+        """Check if y position (in widget coordinates) is in the resize handle zone."""
+        return widget_pos_y >= self.height() - self.HANDLE_HEIGHT
+
+    def _viewport_to_widget_y(self, viewport_y):
+        """Convert viewport-local y to widget-local y."""
+        return viewport_y + self.viewport().y()
+
+    def eventFilter(self, obj, event):
+        """Intercept viewport mouse events for resize handling."""
+        if obj is not self.viewport():
+            return super().eventFilter(obj, event)
+
+        if event.type() == QEvent.Type.MouseMove:
+            if self._resizing:
+                delta = int(event.globalPosition().y() - self._start_y)
+                new_h = max(self.minimumHeight(), min(self.maximumHeight(), self._start_height + delta))
+                self.setFixedHeight(new_h)
+                return True
+            widget_y = self._viewport_to_widget_y(int(event.position().y()))
+            if self._in_handle_zone(widget_y):
+                self.setCursor(Qt.CursorShape.SizeVerCursor)
+            else:
+                self.unsetCursor()
+            return False
+
+        elif event.type() == QEvent.Type.MouseButtonPress:
+            if event.button() == Qt.MouseButton.LeftButton:
+                widget_y = self._viewport_to_widget_y(int(event.position().y()))
+                if self._in_handle_zone(widget_y):
+                    self._resizing = True
+                    self._start_y = event.globalPosition().y()
+                    self._start_height = self.height()
+                    return True
+            return False
+
+        elif event.type() == QEvent.Type.MouseButtonRelease:
+            if self._resizing:
+                self._resizing = False
+                return True
+            return False
+
+        return False
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self._in_handle_zone(int(event.position().y())):
+            self._resizing = True
+            self._start_y = event.globalPosition().y()
+            self._start_height = self.height()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._resizing:
+            delta = int(event.globalPosition().y() - self._start_y)
+            new_h = max(self.minimumHeight(), min(self.maximumHeight(), self._start_height + delta))
+            self.setFixedHeight(new_h)
+            event.accept()
+        else:
+            if self._in_handle_zone(int(event.position().y())):
+                self.setCursor(Qt.CursorShape.SizeVerCursor)
+            else:
+                self.unsetCursor()
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if self._resizing:
+            self._resizing = False
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
+
 
 class ChatTab(QWidget):
     """Enhanced chat tab with conversation management, streaming, and persistence."""
@@ -233,22 +323,13 @@ class ChatTab(QWidget):
         self.select_file_btn.clicked.connect(self.select_files)
         settings_layout.addWidget(self.select_file_btn)
 
-        self.file_list = QListWidget()
+        self.file_list = ResizableListWidget()
         self.file_list.setMinimumHeight(60)
         self.file_list.setMaximumHeight(400)
         self.file_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.file_list.customContextMenuRequested.connect(self.show_file_context_menu)
+        self.file_list.itemDoubleClicked.connect(self.open_file_from_list)
         settings_layout.addWidget(self.file_list)
-
-        # File list height slider
-        height_slider = QSlider(Qt.Orientation.Horizontal)
-        height_slider.setMinimum(60)
-        height_slider.setMaximum(400)
-        height_slider.setValue(120)
-        height_slider.setToolTip("Drag to resize file list height")
-        height_slider.valueChanged.connect(lambda v: self.file_list.setFixedHeight(v))
-        self.file_list.setFixedHeight(120)
-        settings_layout.addWidget(height_slider)
 
         # Select All / Deselect All / Clear Files buttons
         file_btn_layout = QHBoxLayout()
@@ -1638,6 +1719,12 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
         if dlg.exec():
             self.update_template_menu()
 
+    def open_file_from_list(self, item):
+        """Open a file from the attachment list with the system default application."""
+        path = item.data(Qt.ItemDataRole.UserRole)
+        if path and os.path.exists(path):
+            os.startfile(path)
+
     def show_file_context_menu(self, pos):
         """Show context menu for file list."""
         item = self.file_list.itemAt(pos)
@@ -1786,6 +1873,40 @@ class IndexTab(QWidget):
         middle_header.addWidget(self.search_input)
 
         middle_layout.addLayout(middle_header)
+
+        # Sensitivity slider + Re-analyze
+        sensitivity_layout = QHBoxLayout()
+        sensitivity_layout.setContentsMargins(4, 2, 4, 2)
+
+        sensitivity_label = QLabel("Separation:")
+        sensitivity_layout.addWidget(sensitivity_label)
+
+        broad_label = QLabel("Broad")
+        broad_label.setStyleSheet("color: #666; font-size: 11px;")
+        sensitivity_layout.addWidget(broad_label)
+
+        self.sensitivity_slider = QSlider(Qt.Orientation.Horizontal)
+        self.sensitivity_slider.setMinimum(1)
+        self.sensitivity_slider.setMaximum(3)
+        self.sensitivity_slider.setValue(2)
+        self.sensitivity_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.sensitivity_slider.setTickInterval(1)
+        self.sensitivity_slider.setPageStep(1)
+        self.sensitivity_slider.setFixedWidth(100)
+        sensitivity_layout.addWidget(self.sensitivity_slider)
+
+        fine_label = QLabel("Fine")
+        fine_label.setStyleSheet("color: #666; font-size: 11px;")
+        sensitivity_layout.addWidget(fine_label)
+
+        self.reanalyze_btn = QPushButton("Re-analyze")
+        self.reanalyze_btn.setToolTip("Re-run document separation with the selected sensitivity level")
+        self.reanalyze_btn.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold; padding: 6px 12px;")
+        self.reanalyze_btn.clicked.connect(self.on_reanalyze_clicked)
+        sensitivity_layout.addWidget(self.reanalyze_btn)
+
+        sensitivity_layout.addStretch()
+        middle_layout.addLayout(sensitivity_layout)
 
         self.doc_table = QTableWidget()
         self.doc_table.setColumnCount(6)
@@ -2182,6 +2303,11 @@ class IndexTab(QWidget):
             self.pdf_list.setCurrentItem(items[0])
             self.on_pdf_selected(items[0], None)
 
+        # Re-enable sensitivity controls
+        if hasattr(self, 'reanalyze_btn'):
+            self.reanalyze_btn.setEnabled(True)
+            self.sensitivity_slider.setEnabled(True)
+
     def filter_documents(self, text):
         text = text.lower()
         for row in range(self.doc_table.rowCount()):
@@ -2266,6 +2392,17 @@ class IndexTab(QWidget):
         self.doc_table.setCellWidget(row, 5, title_edit)
 
         return row
+
+    def on_reanalyze_clicked(self):
+        if not self.current_pdf_path:
+            return
+        sensitivity = self.sensitivity_slider.value()
+        # Disable controls while running
+        self.reanalyze_btn.setEnabled(False)
+        self.sensitivity_slider.setEnabled(False)
+        main_window = self.window()
+        if hasattr(main_window, 'run_separator_path'):
+            main_window.run_separator_path(self.current_pdf_path, sensitivity=sensitivity)
 
     def add_document_row(self):
         """Add a new document row that the user can fill in manually."""
