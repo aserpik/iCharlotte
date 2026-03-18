@@ -227,7 +227,7 @@ def call_gemini(prompt, model):
     except Exception as e:
         raise Exception(f"Gemini API error: {e}")
 
-def analyze_headers_chunk(headers_subset, start_page_num, next_id, prev_doc_context=None):
+def analyze_headers_chunk(headers_subset, start_page_num, next_id, prev_doc_context=None, sensitivity=2):
     """Analyzes a chunk of headers."""
     context_instruction = ""
     if prev_doc_context:
@@ -240,18 +240,43 @@ def analyze_headers_chunk(headers_subset, start_page_num, next_id, prev_doc_cont
     else:
         context_instruction = f"Start numbering new documents with ID {next_id}."
 
+    # Build rules based on sensitivity
+    if sensitivity == 1:  # Broad
+        rules = (
+            "Rules:\n"
+            "1. Return ONLY the list, one document per line.\n"
+            "2. Do not use markdown.\n"
+            "3. If a document continues to the end of this batch, set EndPage to the last page of this batch.\n"
+            "4. Provide a detailed and descriptive title for each document.\n"
+            "5. If you identify an Insurance Policy, group all its related parts (Declarations, Endorsements, Conditions, Exclusions, etc.) into a SINGLE document entry. Do not split it.\n"
+            "6. Group related documents together liberally. For example, a motion and its exhibits should be ONE entry. A letter and its attachments should be ONE entry. Only create separate entries for clearly distinct, unrelated documents.\n"
+        )
+    elif sensitivity == 3:  # Fine
+        rules = (
+            "Rules:\n"
+            "1. Return ONLY the list, one document per line.\n"
+            "2. Do not use markdown.\n"
+            "3. If a document continues to the end of this batch, set EndPage to the last page of this batch.\n"
+            "4. Provide a detailed and descriptive title for each document.\n"
+            "5. Be aggressive about identifying separate documents. Each exhibit, attachment, declaration, addendum, or sub-document should be its own entry. When in doubt, split rather than group.\n"
+        )
+    else:  # Default (2)
+        rules = (
+            "Rules:\n"
+            "1. Return ONLY the list, one document per line.\n"
+            "2. Do not use markdown.\n"
+            "3. If a document continues to the end of this batch, set EndPage to the last page of this batch.\n"
+            "4. Provide a detailed and descriptive title for each document.\n"
+            "5. If you identify an Insurance Policy, group all its related parts (Declarations, Endorsements, Conditions, Exclusions, etc.) into a SINGLE document entry. Do not split it.\n"
+        )
+
     prompt = (
         "I am processing a large PDF in batches. This batch contains headers from pages "
         f"{start_page_num} to {start_page_num + len(headers_subset) - 1}.\n"
         "Identify distinct legal or administrative documents.\n"
         "Format: ID|Title|Date|StartPage|EndPage\n"
         f"{context_instruction}\n"
-        "Rules:\n"
-        "1. Return ONLY the list, one document per line.\n"
-        "2. Do not use markdown.\n"
-        "3. If a document continues to the end of this batch, set EndPage to the last page of this batch.\n"
-        "4. Provide a detailed and descriptive title for each document.\n"
-        "5. If you identify an Insurance Policy, group all its related parts (Declarations, Endorsements, Conditions, Exclusions, etc.) into a SINGLE document entry. Do not split it.\n"
+        f"{rules}"
         "Example:\n"
         "1|Plaintiff's Complaint|2023-01-01|1|5\n"
         "2|Exhibit A|2023-01-02|6|10\n"
@@ -290,14 +315,14 @@ def analyze_headers_chunk(headers_subset, start_page_num, next_id, prev_doc_cont
                 pass
     return docs
 
-def analyze_headers(headers):
+def analyze_headers(headers, sensitivity=2):
     """Sends headers to AI to find boundaries, using chunking for large files."""
     all_docs = []
     chunk_size = 100 # Process 100 pages at a time
     total_pages = len(headers)
     next_id = 1
-    
-    logger.info(f"Analyzing {total_pages} pages in chunks of {chunk_size}...")
+
+    logger.info(f"Analyzing {total_pages} pages in chunks of {chunk_size}... (sensitivity={sensitivity})")
     
     for i in range(0, total_pages, chunk_size):
         chunk = headers[i : i + chunk_size]
@@ -310,7 +335,7 @@ def analyze_headers(headers):
         if all_docs:
             prev_context = all_docs[-1]
             
-        chunk_docs = analyze_headers_chunk(chunk, start_page, next_id, prev_context)
+        chunk_docs = analyze_headers_chunk(chunk, start_page, next_id, prev_context, sensitivity)
         
         if not chunk_docs:
             logger.warning(f"No documents found in batch {start_page}-{end_page_batch}")
@@ -403,7 +428,7 @@ def split_pdf_pages(pdf_path, output_folder, selection):
 
 # --- Modes ---
 
-def run_analysis(pdf_path, headless=False):
+def run_analysis(pdf_path, headless=False, sensitivity=2):
     if not os.path.exists(pdf_path):
         logger.error(f"File not found: {pdf_path}")
         return
@@ -414,7 +439,7 @@ def run_analysis(pdf_path, headless=False):
     headers = extract_headers(pdf_path)
     
     # 2. Analyze
-    docs = analyze_headers(headers)
+    docs = analyze_headers(headers, sensitivity)
     logger.info(f"identified {len(docs)} documents.")
     
     # 3. Create Index Document
@@ -727,13 +752,15 @@ def main():
     parser.add_argument("--interactive", help="Path to temp json for interactive mode")
     parser.add_argument("--original-pdf", help="Original PDF for interactive mode")
     parser.add_argument("--headless", action="store_true", help="Run without UI, output JSON path")
-    
+    parser.add_argument("--sensitivity", type=int, choices=[1, 2, 3], default=2,
+                        help="Document separation sensitivity: 1=Broad, 2=Default, 3=Fine")
+
     # We use parse_known_args to allow for loose argument handling if needed,
     # but standard parse_args is usually safer if we define everything.
     # However, to support "script.py file path with spaces", we need careful handling.
-    
+
     # Check if flags are present that indicate structured usage
-    structured_args = "--interactive" in sys.argv or "--headless" in sys.argv or "--original-pdf" in sys.argv
+    structured_args = "--interactive" in sys.argv or "--headless" in sys.argv or "--original-pdf" in sys.argv or "--sensitivity" in sys.argv or "--help" in sys.argv or "-h" in sys.argv
     
     if structured_args:
         args = parser.parse_args()
@@ -744,7 +771,7 @@ def main():
             path = " ".join(args.pdf_path) if isinstance(args.pdf_path, list) else args.pdf_path
             # Strip quotes
             path = path.strip().strip('"').strip("'")
-            run_analysis(path, headless=args.headless)
+            run_analysis(path, headless=args.headless, sensitivity=args.sensitivity)
         else:
              print("Usage: separate.py <pdf_path> [--headless]")
     else:
