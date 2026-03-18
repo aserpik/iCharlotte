@@ -1509,7 +1509,7 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'preview_pane') and self.preview_pane.isVisible():
                 self.preview_pane.clear()
 
-    def run_separator_path(self, path):
+    def run_separator_path(self, path, sensitivity=2):
         # Switch to Status Tab to show progress
         self.tabs.setCurrentIndex(1)
         
@@ -1517,7 +1517,7 @@ class MainWindow(QMainWindow):
         self.status_list_layout.insertWidget(0, status_widget)
         
         script_path = os.path.join(SCRIPTS_DIR, "separate.py")
-        args = [script_path, "--headless", path]
+        args = [script_path, "--headless", "--sensitivity", str(sensitivity), path]
         
         runner = AgentRunner(sys.executable, args, status_widget)
         self.agent_runners.append(runner)
@@ -1552,9 +1552,14 @@ class MainWindow(QMainWindow):
                         QMessageBox.critical(self, "Error", f"Failed to load separator result: {e}")
                 else:
                      log_event(f"Warning: Could not find JSON output from separator for {path}", "warning")
-            
+
             self.cleanup_runner(runner)
-            
+
+            # Re-enable sensitivity controls even on failure
+            if hasattr(self, 'index_tab') and hasattr(self.index_tab, 'reanalyze_btn'):
+                self.index_tab.reanalyze_btn.setEnabled(True)
+                self.index_tab.sensitivity_slider.setEnabled(True)
+
         runner.finished.connect(on_finished)
         runner.start()
 
