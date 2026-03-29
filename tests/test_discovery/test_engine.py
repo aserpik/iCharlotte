@@ -6,10 +6,15 @@ Covers:
 - TestDiscoveryEngineCustomMode: build_llm_prompt variants and generate_custom
 - TestDiscoveryEngineParseLLM: parse_llm_response delegation
 - TestDiscoveryEngineAdditional: prepare_additional with mocked SetTracker
+- TestEndToEndStandardMode: full pipeline generate → assemble → verify output
 """
 import os
+import shutil
+import tempfile
 import unittest
 from unittest.mock import patch, MagicMock
+
+from docx import Document
 
 from icharlotte_core.discovery.models import (
     CustomStyle,
@@ -22,6 +27,7 @@ from icharlotte_core.discovery.models import (
     SetTrackerResult,
 )
 from icharlotte_core.discovery.engine import DiscoveryEngine
+from icharlotte_core.discovery.assembler import DiscoveryAssembler
 
 # Path to the discovery template directory
 DISCOVERY_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "discovery")
@@ -33,6 +39,10 @@ NEGLIGENCE_SI_PATH = os.path.join(
 )
 DEFINED_TERMS_PATH = os.path.join(DISCOVERY_DIR, "DISCOVERY DEFINED TERMS.docx")
 TEMPLATES_AVAILABLE = os.path.isfile(NEGLIGENCE_SI_PATH) and os.path.isfile(DEFINED_TERMS_PATH)
+
+# Caption page for end-to-end assembly tests
+CAPTION_PAGE = os.path.join(DISCOVERY_DIR, "Caption Page (AS FM).docx")
+E2E_AVAILABLE = TEMPLATES_AVAILABLE and os.path.isfile(CAPTION_PAGE)
 
 # Reusable party fixtures
 PLAINTIFF = Party(
@@ -395,6 +405,91 @@ class TestDiscoveryEngineAdditional(unittest.TestCase):
         self.assertEqual(results[1].discovery_type, DiscoveryType.RPD)
         self.assertEqual(results[1].set_number, 3)
         self.assertEqual(results[1].previous_count, 30)
+
+
+# ---------------------------------------------------------------------------
+# TestEndToEndStandardMode
+# ---------------------------------------------------------------------------
+
+@unittest.skipUnless(E2E_AVAILABLE, "Template files or caption page not found in discovery/")
+class TestEndToEndStandardMode(unittest.TestCase):
+    """End-to-end tests: generate standard discovery -> assemble .docx -> verify output."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.engine = DiscoveryEngine(DISCOVERY_DIR)
+        cls.assembler = DiscoveryAssembler(CAPTION_PAGE)
+
+    def setUp(self):
+        self.tmp_dir = tempfile.mkdtemp(prefix="discovery_e2e_")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp_dir, ignore_errors=True)
+
+    def _extract_full_text(self, docx_path: str) -> str:
+        """Open a .docx and return all paragraph text joined by newlines."""
+        doc = Document(docx_path)
+        return "\n".join(p.text for p in doc.paragraphs)
+
+    def test_standard_si_full_pipeline(self):
+        """Generate standard SI -> assemble -> verify key content in .docx."""
+        # 1-3: Generate standard SI discovery
+        results = self.engine.generate_standard(
+            standard_type="negligence",
+            discovery_types=[DiscoveryType.SI],
+            directed_to=PLAINTIFF,
+            propounding_party=DEFENDANT,
+        )
+
+        # 4: Verify generation results
+        self.assertEqual(len(results), 1)
+        ds = results[0]
+        self.assertGreater(len(ds.requests), 50)
+
+        # 7: Assemble into .docx
+        output_path = os.path.join(self.tmp_dir, "SI_Set1.docx")
+        self.assembler.assemble(ds, output_path, attorney_name="Andrei Serpik")
+
+        # 8: Read back
+        self.assertTrue(os.path.isfile(output_path))
+        full_text = self._extract_full_text(output_path)
+
+        # 9-13: Verify content
+        self.assertIn("SPECIAL INTERROGATORY NO. 1:", full_text)
+        self.assertIn("PROPOUNDING PARTY", full_text)
+        self.assertIn("RESPONDING PARTY", full_text)
+        # >50 requests means total_count > 35 -> declaration required
+        self.assertIn("DECLARATION", full_text)
+        # CCP section for SI declaration of necessity
+        self.assertIn("2030.070", full_text)
+
+    def test_standard_rpd_full_pipeline(self):
+        """Generate standard RPD -> assemble -> verify key content, no declaration."""
+        # 1: Generate standard RPD discovery
+        results = self.engine.generate_standard(
+            standard_type="negligence",
+            discovery_types=[DiscoveryType.RPD],
+            directed_to=PLAINTIFF,
+            propounding_party=DEFENDANT,
+        )
+
+        self.assertEqual(len(results), 1)
+        ds = results[0]
+        self.assertGreater(len(ds.requests), 0)
+
+        # Assemble into .docx
+        output_path = os.path.join(self.tmp_dir, "RPD_Set1.docx")
+        self.assembler.assemble(ds, output_path, attorney_name="Andrei Serpik")
+
+        # Read back
+        self.assertTrue(os.path.isfile(output_path))
+        full_text = self._extract_full_text(output_path)
+
+        # Verify RPD header present
+        self.assertIn("REQUEST FOR PRODUCTION NO. 1:", full_text)
+
+        # RPDs never need a declaration, even with many requests
+        self.assertNotIn("DECLARATION", full_text)
 
 
 if __name__ == "__main__":
