@@ -20,6 +20,8 @@ from .templates import (
     substitute_variables,
 )
 
+from .set_tracker import SetTracker
+
 __all__ = [
     'PartyRole',
     'DiscoveryMode',
@@ -34,4 +36,5 @@ __all__ = [
     'TemplateLoader',
     'extract_requests_from_text',
     'substitute_variables',
+    'SetTracker',
 ]
