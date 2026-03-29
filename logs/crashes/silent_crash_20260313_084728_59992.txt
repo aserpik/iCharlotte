@@ -1,0 +1,265 @@
+======================================================================
+SILENT CRASH DETECTED (previous session)
+======================================================================
+Detection Time:   2026-03-13T08:47:28.443353
+Last Heartbeat:   2026-03-13T08:43:13.067783
+Previous PID:     59992
+Memory at death:  N/A MB RSS
+
+Last Checkpoints:
+  [2026-03-12T17:02:47.353526] Configuring Qt WebEngine
+  [2026-03-12T17:02:47.353650] Creating QApplication
+  [2026-03-12T17:02:47.448272] Creating MainWindow
+  [2026-03-12T17:02:47.448600] MainWindow.__init__ starting
+  [2026-03-12T17:02:47.883728] setup_ui starting - creating tabs
+  [2026-03-12T17:02:47.886619] Creating MasterCaseTab
+  [2026-03-12T17:02:49.602442] Creating ChatTab
+  [2026-03-12T17:02:49.919038] setup_ui complete - all tabs created
+  [2026-03-12T17:02:50.165814] Showing MainWindow
+  [2026-03-12T17:02:50.227154] Entering Qt event loop
+
+Context:
+  startup_file_number: None
+  startup_case_path: None
+  startup_tab: 4
+  current_file_number: None
+  current_case_path: None
+
+----------------------------------------------------------------------
+STDERR (last 50 lines before crash):
+----------------------------------------------------------------------
+
+--- stderr.log ---
+============================================================
+Stderr capture started: 2026-03-12T10:16:23.220498
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-12T10:20:49.750524
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-12T10:21:45.634086
+============================================================
+[DEBUG] refresh_data_inner STARTTraceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte_core\word_hotkey.py", line 1253, in _process_insertion_queue
+    self._insert_result(td)
+    ~~~~~~~~~~~~~~~~~~~^^^^
+  File "C:\geminiterminal2\icharlotte_core\word_hotkey.py", line 1363, in _insert_result
+    target_range = doc.Range(range_start, range_start)
+  File "C:\Users\ASERPI~1.DES\AppData\Local\Temp\gen_py\3.13\00020905-0000-0000-C000-000000000046x0x8x7\_Document.py", line 383, in Range
+    ret = self._oleobj_.InvokeTypes(2000, LCID, 1, (9, 0), ((16396, 17), (16396, 17)),Start
+    	, End)
+pywintypes.com_error: (-2147352567, 'Exception occurred.', (0, 'Microsoft Word', 'Value out of range', 'wdmain11.chm', 37376, -2146823680), None)
+
+============================================================
+Stderr capture started: 2026-03-12T11:43:40.754269
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-12T11:53:57.060880
+============================================================
+[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-12T15:20:31.983386
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-12T15:37:35.819119
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-12T15:41:40.765130
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-12T15:44:29.618076
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-12T17:02:47.293435
+============================================================
+[DEBUG] refresh_data_inner START
+--- stderr.log.fd2 ---
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+
+QThread: Destroyed while thread '' is still running
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+981+280 (frame: 450x783+981+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+981+280 (frame: 450x791+981+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+981+280 (frame: 450x801+981+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+981+280 (frame: 450x809+981+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+773+280 (frame: 450x783+773+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+773+280 (frame: 450x791+773+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+773+280 (frame: 450x801+773+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+773+280 (frame: 450x809+773+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+952+280 (frame: 450x783+952+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+952+280 (frame: 450x791+952+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+952+280 (frame: 450x801+952+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+952+280 (frame: 450x809+952+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte.py", line 17, in <module>
+    from icharlotte_core.bridge import register_custom_schemes
+  File "C:\geminiterminal2\icharlotte_core\bridge.py", line 3, in <module>
+    from PySide6.QtCore import QIODevice
+ModuleNotFoundError: No module named 'PySide6.QtCore'
+QThread: Destroyed while thread '' is still running
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+960+280 (frame: 450x783+960+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+960+280 (frame: 450x791+960+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+960+280 (frame: 450x801+960+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+960+280 (frame: 450x809+960+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+952+280 (frame: 450x783+952+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+952+280 (frame: 450x791+952+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+952+280 (frame: 450x801+952+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+952+280 (frame: 450x809+952+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+977+280 (frame: 450x783+977+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+977+280 (frame: 450x791+977+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+977+280 (frame: 450x801+977+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+977+280 (frame: 450x809+977+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+937+280 (frame: 450x783+937+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+937+280 (frame: 450x791+937+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+937+280 (frame: 450x801+937+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+937+280 (frame: 450x809+937+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+554+280 (frame: 450x783+554+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+554+280 (frame: 450x791+554+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+554+280 (frame: 450x801+554+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+554+280 (frame: 450x809+554+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+980+280 (frame: 450x783+980+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+980+280 (frame: 450x791+980+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+980+280 (frame: 450x801+980+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+980+280 (frame: 450x809+980+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+
+
+----------------------------------------------------------------------
+FAULTHANDLER LOG (tail):
+----------------------------------------------------------------------
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x0000a5d4 (most recent call first):
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_winkeyboard.py", line 563 in listen
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\__init__.py", line 294 in listen
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x0000d7c0 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 363 in wait
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 660 in wait
+  File "C:\geminiterminal2\icharlotte_core\app_crash_handler.py", line 515 in _beat
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x0000a718 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\__init__.py", line 1137 in flush
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\__init__.py", line 1155 in emit
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\__init__.py", line 1265 in emit
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\handlers.py", line 81 in emit
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\__init__.py", line 1027 in handle
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\__init__.py", line 1737 in callHandlers
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\__init__.py", line 1681 in handle
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\__init__.py", line 1665 in _log
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\__init__.py", line 1549 in error
+  File "C:\geminiterminal2\icharlotte_core\app_crash_handler.py", line 624 in log_error
+  File "C:\geminiterminal2\icharlotte_core\app_crash_handler.py", line 1058 in log_error
+  File "C:\geminiterminal2\icharlotte_core\utils.py", line 201 in log_event
+  File "C:\geminiterminal2\icharlotte_core\ui\master_case_tab.py", line 1837 in on_email_monitor_error
+  File "C:\geminiterminal2\icharlotte.py", line 2937 in <module>
+Windows fatal exception: code 0x800706ba
+
+Current thread 0x0000ac74 (most recent call first):
+  File "C:\geminiterminal2\icharlotte_core\sent_items_monitor.py", line 377 in _poll_sent_items
+  File "C:\geminiterminal2\icharlotte_core\sent_items_monitor.py", line 319 in run
+
+Thread 0x0000da58 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 359 in wait
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\queue.py", line 199 in get
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_generic.py", line 57 in process
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x0000a5d4 (most recent call first):
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_winkeyboard.py", line 563 in listen
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\__init__.py", line 294 in listen
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x0000d7c0 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 363 in wait
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 660 in wait
+  File "C:\geminiterminal2\icharlotte_core\app_crash_handler.py", line 515 in _beat
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x0000a718 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\__init__.py", line 1137 in flush
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\__init__.py", line 1155 in emit
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\__init__.py", line 1265 in emit
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\handlers.py", line 81 in emit
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\__init__.py", line 1027 in handle
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\__init__.py", line 1737 in callHandlers
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\__init__.py", line 1681 in handle
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\__init__.py", line 1665 in _log
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\logging\__init__.py", line 1549 in error
+  File "C:\geminiterminal2\icharlotte_core\app_crash_handler.py", line 624 in log_error
+  File "C:\geminiterminal2\icharlotte_core\app_crash_handler.py", line 1058 in log_error
+  File "C:\geminiterminal2\icharlotte_core\utils.py", line 201 in log_event
+  File "C:\geminiterminal2\icharlotte_core\ui\master_case_tab.py", line 1837 in on_email_monitor_error
+  File "C:\geminiterminal2\icharlotte.py", line 2937 in <module>
+
+============================================================
+Session start: 2026-03-13T08:47:28.442531
+============================================================
+
+
+----------------------------------------------------------------------
+WINDOWS ERROR REPORTING:
+----------------------------------------------------------------------
+TimeCreated : 3/12/2026 5:02:37 PM
+Message     : Faulting application name: python3.13.exe, version: 3.13.12150.1013, time stamp: 0x69823dc6
+              Faulting module name: Qt6Core.dll, version: 6.10.2.0, time stamp: 0x696e7645
+              Exception code: 0xc0000409
+              Fault offset: 0x000000000001bbd8
+              Faulting process id: 0x79B8
+              Faulting application start time: 0x1DCB271C6AC57E7
+              Faulting application path: C:\Program 
+              Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\python3.13.exe
+              Faulting module path: C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Py
+              thon.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\PySide6\Qt6Core.dll
+              Report Id: ed8008d7-c6fe-4437-b172-2a66208e5f9e
+              Faulting package full name: PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0
+              Faulting package-relative application ID: Python
+
+TimeCreated : 3/12/2026 3:44:25 PM
+Message     : Faulting application name: python3.13.exe, version: 3.13.12150.1013, time stamp: 0x69823dc6
+              Faulting module name: Qt6Core.dll, version: 6.10.2.0, time stamp: 0x696e7645
+              Exception code: 0xc0000409
+              Fault offset: 0x000000000001bbd8
+              Faulting process id: 0xA6A0
+              Faulting application start time: 0x1DCB271620B4A41
+              Faulting application path: C:\Program 
+              Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\python3.13.exe
+              Faulting module path: C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Py
+              thon.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\PySide6\Qt6Core.dll
+              Report Id: 212f21e2-0fd2-4d3b-b484-fc9a4a9aeeab
+              Faulting package full name: PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0
+              Faulting package-relative application ID: Python
+
+TimeCreated : 3/12/2026 3:41:36 PM
+Message     : Faulting application name: python3.13.exe, version: 3.13.12150.1013, time stamp: 0x69823dc6
+              Faulting module name: Qt6Core.dll, version: 6.10.2.0, time stamp: 0x696e7645
+              Exception code: 0xc0000409
+              Fault offset: 0x000000000001bbd8
+              Faulting process id: 0x5300
+              Faulting application start time: 0x1DCB270CE4252B5
+              Faulting application path: C:\Program 
+              Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\python3.13.exe
+              Faulting module path: C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Py
+              thon.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\PySide6\Qt6Core.dll
+              Report Id: 868594ff-3901-4ff5-a20e-8874369da6

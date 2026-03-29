@@ -29,6 +29,13 @@ SEPARATOR_STRIP = re.compile(r'^[\s,_\-]+')
 CNR_PATTERN = re.compile(r'\bCNR\b', re.IGNORECASE)
 REPLY_OBJECTION_PATTERN = re.compile(r'(reply|objection)', re.IGNORECASE)
 
+# Suffixes to strip from received record filenames when extracting facility names
+_RECORD_SUFFIX = re.compile(
+    r'[\s\-,_]*(medical|billing|meds|bills|records|radiology|imaging|films|'
+    r'CNR|CNX|2nd prod|3rd prod|\d+(?:st|nd|rd|th)\s+prod)\s*$',
+    re.IGNORECASE
+)
+
 # Facility names that are too generic — trigger first-page PDF extraction
 UNINFORMATIVE_FACILITY = {
     "pos", "file copy", "filecopy", "file_copy", "records", "unknown",
@@ -36,12 +43,27 @@ UNINFORMATIVE_FACILITY = {
     "radiology", "imaging", "films", "subpoena", "",
 }
 
-# Regex to find facility name after TO: / TO THE CUSTODIAN OF RECORDS on subpoena first page
-_TO_CUSTODIAN_PATTERN = re.compile(
-    r'TO(?:\s+THE)?\s*(?::|\s)\s*'
-    r'(?:CUSTODIAN\s+OF\s+RECORDS\s*(?:OF|FOR|,|:|\n)\s*)?'
-    r'([A-Z][A-Za-z0-9\s,.\-&\'()]+)',
+# Strict: requires "CUSTODIAN OF RECORDS" — most reliable
+# Uses [ \t] instead of \s in captured group to avoid spanning lines
+_CUSTODIAN_PATTERN = re.compile(
+    r'(?:TO\s+)?(?:THE\s+)?CUSTODIAN\s+OF\s+RECORDS\s*(?:OF|FOR|,|:|\n)\s*'
+    r'([A-Z][A-Za-z0-9 \t,.\-&\'()]+)',
     re.MULTILINE
+)
+
+# Loose fallback: "TO:" followed by a name — only used if strict fails
+_TO_COLON_PATTERN = re.compile(
+    r'^TO\s*:\s*([A-Z][A-Za-z0-9 \t,.\-&\'()]+)',
+    re.MULTILINE
+)
+
+# Phrases that indicate the captured text is legal boilerplate, not a facility name
+_BOILERPLATE_PHRASES = re.compile(
+    r'(?:records\s+are\s+to\s+be|produced\s+by|deposition\s+subpoena|'
+    r'item\s+\d|whichever\s+date|reasonable\s+costs|'
+    r'treatment\s+provided\s+to|medical\s+treatment\s+provided|'
+    r'business\s+records|you\s+are\s+ordered|produce\s+the)',
+    re.IGNORECASE
 )
 
 
@@ -68,7 +90,10 @@ def _extract_facility_from_pdf(pdf_path):
     if not text or len(text.strip()) < 20:
         return None
 
-    match = _TO_CUSTODIAN_PATTERN.search(text)
+    # Try strict pattern first (CUSTODIAN OF RECORDS), then loose fallback (TO:)
+    match = _CUSTODIAN_PATTERN.search(text)
+    if not match:
+        match = _TO_COLON_PATTERN.search(text)
     if not match:
         return None
 
@@ -83,7 +108,8 @@ def _extract_facility_from_pdf(pdf_path):
         # Stop at address-like lines (starts with digit) or legal boilerplate
         if re.match(r'^\d', line):
             break
-        if re.search(r'\b(YOU ARE|HEREBY|COMMANDED|ORDERED|PLEASE|ATTACHED)\b', line, re.IGNORECASE):
+        if re.search(r'\b(YOU ARE|HEREBY|COMMANDED|ORDERED|PLEASE|ATTACHED|'
+                     r'PRODUCE|BUSINESS RECORDS|SUBPOENA)\b', line, re.IGNORECASE):
             break
         facility_lines.append(line)
         # Facility names are typically 1-2 lines
@@ -97,6 +123,10 @@ def _extract_facility_from_pdf(pdf_path):
 
     # Reject if still too short or too generic
     if len(facility) < 3 or facility.lower() in UNINFORMATIVE_FACILITY:
+        return None
+
+    # Reject if the result looks like legal boilerplate rather than a facility name
+    if _BOILERPLATE_PHRASES.search(facility):
         return None
 
     return facility
@@ -237,6 +267,9 @@ class SubpoenaTrackerWorker(QThread):
         received = self._scan_received_records()
         file_index = self._build_file_index()
 
+        # --- Phase 2b: Fill missing facility names from received records ---
+        self._enrich_facilities_from_received(subpoenas, received)
+
         # --- Phase 3: Scan medical chronologies ---
         self.progress.emit("Reading medical chronologies...")
         chronologies, pages_map, non_subpoena_records = self._scan_medical_chronologies()
@@ -303,6 +336,59 @@ class SubpoenaTrackerWorker(QThread):
             return {}, False
 
         return subpoenas, True
+
+    def _enrich_facilities_from_received(self, subpoenas, received):
+        """Fill in uninformative facility names using received record filenames.
+
+        Received records often have the facility name in the filename (e.g.,
+        '62195-0002_ ALL STATE INSURANCE COMPANY.pdf') even when the issued
+        subpoena PDF is a scanned form without extractable text.
+
+        Scans ALL files in RECORDS/Subpoenaed/ (not just the single entry
+        stored in `received`) because the stored entry may be a CNR or other
+        file without the facility name.
+        """
+        # Collect sids that need enrichment
+        needs_facility = {sid for sid, data in subpoenas.items()
+                          if data["facility"].lower().strip() in UNINFORMATIVE_FACILITY}
+        if not needs_facility:
+            return
+
+        folder = _find_folder_ci(self.case_path, "RECORDS", "Subpoenaed")
+        if folder is None:
+            return
+
+        # Scan all files/dirs for matching sids with informative facility names
+        try:
+            for entry in os.scandir(folder):
+                if entry.is_file():
+                    self._try_enrich_from_filename(
+                        entry.name, needs_facility, subpoenas)
+                elif entry.is_dir():
+                    # Try directory name itself first (often has the facility name)
+                    self._try_enrich_from_filename(
+                        entry.name, needs_facility, subpoenas)
+                    try:
+                        for sub_entry in os.scandir(entry.path):
+                            self._try_enrich_from_filename(
+                                sub_entry.name, needs_facility, subpoenas)
+                    except OSError:
+                        pass
+        except OSError:
+            pass
+
+    def _try_enrich_from_filename(self, filename, needs_facility, subpoenas):
+        """Try to extract facility name from a single received record filename."""
+        if not needs_facility:
+            return
+        sid, _ = parse_subpoena_id(filename)
+        if sid not in needs_facility:
+            return
+        facility = self._extract_facility_from_received(filename)
+        if facility and facility.lower().strip() not in UNINFORMATIVE_FACILITY:
+            self.progress.emit(f"Facility from received records: {facility}")
+            subpoenas[sid]["facility"] = facility
+            needs_facility.discard(sid)
 
     # ---------------------------------------------------------------
     # Phase 2
@@ -754,18 +840,24 @@ class SubpoenaTrackerWorker(QThread):
         Handles patterns like:
           6900848-01_Deshawn Stampley_Healthpointe Medical Group, Inc Meds.pdf
           6900848-13 Bear Valley Community Hospital Meds CNR.pdf
+          62195-0002_ ALL STATE INSURANCE COMPANY-2nd prod.pdf
         """
         basename = os.path.splitext(filename)[0]
-        # Pattern 1: ID_Client Name_Facility
+        # Pattern 1: ID_Client Name_Facility  or  ID_ Facility
         parts = basename.split('_')
         if len(parts) >= 3:
-            return '_'.join(parts[2:]).strip()
-        # Pattern 2: ID Facility (after the first space-separated ID)
-        _, remainder = parse_subpoena_id(basename)
-        if remainder:
-            # Strip client name if present (e.g., "Deshawn Stampley_...")
-            return remainder.strip()
-        return basename
+            facility = '_'.join(parts[2:]).strip()
+        elif len(parts) == 2:
+            # ID_ Facility (no client name segment)
+            facility = parts[1].strip()
+        else:
+            # Pattern 2: ID Facility (after the first space-separated ID)
+            _, remainder = parse_subpoena_id(basename)
+            facility = remainder.strip() if remainder else basename
+
+        # Strip common record-type suffixes (medical, billing, CNR, etc.)
+        facility = _RECORD_SUFFIX.sub('', facility).strip()
+        return facility
 
     def _write_chron_dates(self, cell, chron_list):
         """Write chronology dates as hyperlinked entries, one per line."""

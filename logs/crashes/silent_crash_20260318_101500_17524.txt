@@ -1,0 +1,273 @@
+======================================================================
+SILENT CRASH DETECTED (previous session)
+======================================================================
+Detection Time:   2026-03-18T10:15:00.026245
+Last Heartbeat:   2026-03-18T10:14:48.376758
+Previous PID:     17524
+Memory at death:  N/A MB RSS
+
+Last Checkpoints:
+  [2026-03-17T15:08:02.501226] Agent completed: summarize_discovery.py
+  [2026-03-17T15:09:02.939939] Agent completed: summarize.py
+  [2026-03-17T15:13:16.779203] Agent completed: summarize.py
+  [2026-03-17T15:13:18.179424] Agent completed: summarize.py
+  [2026-03-17T16:37:30.269733] Starting agent: summarize.py
+  [2026-03-17T16:37:30.307185] Starting agent: summarize_discovery.py
+  [2026-03-17T16:37:32.603266] Agent completed: summarize_discovery.py
+  [2026-03-17T16:39:13.575786] Agent completed: summarize.py
+  [2026-03-18T08:55:11.734794] Starting agent: separate.py
+  [2026-03-18T08:56:37.222281] Agent completed: separate.py
+
+Context:
+  startup_file_number: None
+  startup_case_path: None
+  startup_tab: None
+  current_file_number: None
+  current_case_path: None
+
+----------------------------------------------------------------------
+STDERR (last 50 lines before crash):
+----------------------------------------------------------------------
+
+--- stderr.log ---
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-12T11:53:57.060880
+============================================================
+[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-12T15:20:31.983386
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-12T15:37:35.819119
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-12T15:41:40.765130
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-12T15:44:29.618076
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-12T17:02:47.293435
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-13T08:47:29.103472
+============================================================
+[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-13T14:57:46.418040
+============================================================
+[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-13T17:59:04.956504
+============================================================
+[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-17T10:05:52.954333
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-18T10:10:55.919268
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-18T10:12:52.748782
+============================================================
+[DEBUG] refresh_data_inner START
+--- stderr.log.fd2 ---
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+[DEBUG] refresh_data_inner START
+
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+
+
+----------------------------------------------------------------------
+FAULTHANDLER LOG (tail):
+----------------------------------------------------------------------
+Windows fatal exception: code 0x800706ba
+
+Current thread 0x00009c08 (most recent call first):
+  File "C:\geminiterminal2\icharlotte_core\sent_items_monitor.py", line 377 in _poll_sent_items
+  File "C:\geminiterminal2\icharlotte_core\sent_items_monitor.py", line 319 in run
+
+Thread 0x0000d960 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 359 in wait
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\queue.py", line 199 in get
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_generic.py", line 57 in process
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x0000f1c4 (most recent call first):
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_winkeyboard.py", line 563 in listen
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\__init__.py", line 294 in listen
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x0000dc40 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 363 in wait
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 660 in wait
+  File "C:\geminiterminal2\icharlotte_core\app_crash_handler.py", line 515 in _beat
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x00004c88 (most recent call first):
+  File "C:\geminiterminal2\icharlotte_core\utils.py", line 199 in log_event
+  File "C:\geminiterminal2\icharlotte_core\ui\master_case_tab.py", line 1837 in on_email_monitor_error
+  File "C:\geminiterminal2\icharlotte.py", line 2937 in <module>
+Windows fatal exception: code 0x800706ba
+
+Current thread 0x00009c08 (most recent call first):
+  File "C:\geminiterminal2\icharlotte_core\sent_items_monitor.py", line 377 in _poll_sent_items
+  File "C:\geminiterminal2\icharlotte_core\sent_items_monitor.py", line 319 in run
+
+Thread 0x0000d960 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 359 in wait
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\queue.py", line 199 in get
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_generic.py", line 57 in process
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x0000f1c4 (most recent call first):
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_winkeyboard.py", line 563 in listen
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\__init__.py", line 294 in listen
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x0000dc40 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 363 in wait
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 660 in wait
+  File "C:\geminiterminal2\icharlotte_core\app_crash_handler.py", line 515 in _beat
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x00004c88 (most recent call first):
+  File "C:\geminiterminal2\icharlotte.py", line 2937 in <module>
+
+============================================================
+Session start: 2026-03-17T10:05:52.100664
+============================================================
+
+============================================================
+Session start: 2026-03-18T10:10:55.567988
+============================================================
+
+============================================================
+Session start: 2026-03-18T10:12:52.421377
+============================================================
+
+============================================================
+Session start: 2026-03-18T10:15:00.025710
+============================================================
+
+
+----------------------------------------------------------------------
+WINDOWS ERROR REPORTING:
+----------------------------------------------------------------------
+TimeCreated : 3/16/2026 6:34:21 AM
+Message     : Faulting application name: svchost.exe_DiagTrack, version: 10.0.26100.7705, time stamp: 0x97e43917
+              Faulting module name: diagtrack.dll, version: 10.0.26100.7920, time stamp: 0xed51f33c
+              Exception code: 0xc0000409
+              Fault offset: 0x00000000001cc130
+              Faulting process id: 0xE278
+              Faulting application start time: 0x1DCB54995B1FF92
+              Faulting application path: C:\WINDOWS\System32\svchost.exe
+              Faulting module path: c:\windows\system32\diagtrack.dll
+              Report Id: a20873f7-6782-4b0e-bfb3-3d7c6134c9a0
+              Faulting package full name: 
+              Faulting package-relative application ID: 
+
+TimeCreated : 3/16/2026 6:32:53 AM
+Message     : Faulting application name: msedgewebview2.exe, version: 145.0.3800.97, time stamp: 0x69a9cdb8
+              Faulting module name: KERNELBASE.dll, version: 10.0.26100.7920, time stamp: 0x0cc2a083
+              Exception code: 0xe0000008
+              Fault offset: 0x00000000000c73fa
+              Faulting process id: 0xC6E0
+              Faulting application start time: 0x1DCB549548BFA56
+              Faulting application path: C:\Program Files 
+              (x86)\Microsoft\EdgeWebView\Application\145.0.3800.97\msedgewebview2.exe
+              Faulting module path: C:\WINDOWS\System32\KERNELBASE.dll
+              Report Id: a1e0fcf9-0c19-47cb-998a-c8e8fb51ef0c
+              Faulting package full name: 
+              Faulting package-relative application ID: 
+
+TimeCreated : 3/16/2026 6:32:53 AM
+Message     : Faulting application name: chrome.exe, version: 145.0.7632.160, time stamp: 0x69a61781
+              Faulting module name: KERNELBASE.dll, version: 10.0.26100.7920, time stamp: 0x0cc2a083
+              Exception code: 0xe0000008
+              Fault offset: 0x00000000000c73fa
+              Faulting process id: 0xE748
+              Faulting application start time: 0x1DCB3016FCB9782
+              Faulting application path: C:\Program Files\Google\Chrome\Application\chrome.exe
+              Faulting module path: C:\WINDOWS\System32\KERNELBASE.dll
+              Report Id: 3c4ec758-b94c-4613-a778-fb0ef4926b94
+              Faulting package full name: 
+              Faulting package-relative application ID: 
+
+TimeCreated : 3/13/2026 5:58:56 PM
+Message     : Faulting application name: python3.13.exe, version: 3.13.12150.1013, time stamp: 0x69823dc6
+              Faulting module name: Qt6Core.dll, version: 6.10.2.0, time stamp: 0x696e7645
+              Exception code: 0xc0000409
+              Fault offset: 0x000000000001bbd8
+              Faulting process id: 0x93B0
+              Faulting application start time: 0x1DCB33464FF83ED
+              Faulting application path: C:\Program 
+              Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\python3.13.exe
+              Faulting module path: C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData

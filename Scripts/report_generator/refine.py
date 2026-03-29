@@ -19,6 +19,15 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
 
+# Sections that bypass LLM refinement and use raw gathered content directly.
+# These sections already contain well-structured prose from their source agents.
+PASSTHROUGH_SECTIONS = {
+    "FACTUAL BACKGROUND",
+    "PROCEDURAL STATUS",
+    "DISCOVERY",
+    "INVESTIGATION",
+}
+
 # Placeholder text for sections without data (FSR reports)
 PLACEHOLDER_TEMPLATES = {
     "FACTUAL BACKGROUND": (
@@ -101,6 +110,12 @@ def refine_sections(gathered_data: Dict, llm_caller=None,
             refined[section_name] = PLACEHOLDER_TEMPLATES.get(
                 section_name, "This section will be updated in a subsequent report."
             )
+            continue
+
+        # Passthrough sections use raw content directly (no LLM rewriting)
+        if section_name in PASSTHROUGH_SECTIONS:
+            refined[section_name] = raw_content
+            logger.info(f"  {section_name}: passthrough ({len(raw_content)} chars)")
             continue
 
         prior = prior_sections.get(section_name, "")

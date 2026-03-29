@@ -184,62 +184,6 @@ class QuickPrompt:
 # Built-in legal prompts
 BUILTIN_PROMPTS = [
     QuickPrompt(
-        id='builtin_summary',
-        name='Summarize Document',
-        prompt='Provide a comprehensive summary of the attached document, highlighting key facts, dates, and parties involved.',
-        category='Summary',
-        is_builtin=True
-    ),
-    QuickPrompt(
-        id='builtin_liability',
-        name='Liability Analysis',
-        prompt='Analyze the attached documents for potential liability issues. Identify strengths and weaknesses of each party\'s position.',
-        category='Analysis',
-        is_builtin=True
-    ),
-    QuickPrompt(
-        id='builtin_timeline',
-        name='Timeline Extraction',
-        prompt='Extract all dates and events from the attached documents and present them in chronological order.',
-        category='Extraction',
-        is_builtin=True
-    ),
-    QuickPrompt(
-        id='builtin_deposition',
-        name='Deposition Summary',
-        prompt='Summarize the key testimony from this deposition, including admissions, contradictions, and notable statements.',
-        category='Summary',
-        is_builtin=True
-    ),
-    QuickPrompt(
-        id='builtin_interrogatory',
-        name='Interrogatory Responses',
-        prompt='Draft responses to the interrogatories in the attached document based on the case facts provided.',
-        category='Drafting',
-        is_builtin=True
-    ),
-    QuickPrompt(
-        id='builtin_discovery',
-        name='Discovery Analysis',
-        prompt='Review the attached discovery requests and identify any objectionable requests, overly broad requests, or requests that may be problematic to respond to.',
-        category='Analysis',
-        is_builtin=True
-    ),
-    QuickPrompt(
-        id='builtin_damages',
-        name='Damages Assessment',
-        prompt='Based on the attached documents, provide an assessment of potential damages including economic and non-economic damages.',
-        category='Analysis',
-        is_builtin=True
-    ),
-    QuickPrompt(
-        id='builtin_key_facts',
-        name='Key Facts Extraction',
-        prompt='Extract and list all key facts from the attached documents that are relevant to establishing liability or damages.',
-        category='Extraction',
-        is_builtin=True
-    ),
-    QuickPrompt(
         id='builtin_transcribe',
         name='Transcribe',
         prompt='Create a verbatim transcript of the audio in the uploaded document.',

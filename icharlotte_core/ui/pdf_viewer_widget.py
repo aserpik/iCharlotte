@@ -1,8 +1,9 @@
 """PDF Viewer widget with page tracking using pdf.js"""
 import os
+import time
 import tempfile
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox
-from PySide6.QtCore import QUrl, Signal, QTimer
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox, QPushButton
+from PySide6.QtCore import Qt, QUrl, Signal, QTimer
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings
 
@@ -20,6 +21,7 @@ class PdfViewerWidget(QWidget):
         self.current_pdf_path = None
         self._viewer_ready = False
         self._pending_pdf = None
+        self._nav_cooldown_until = 0  # Timestamp until which polling is suppressed
         self._setup_ui()
         self._start_page_polling()
 
@@ -38,10 +40,31 @@ class PdfViewerWidget(QWidget):
         self.page_spin = QSpinBox()
         self.page_spin.setMinimum(1)
         self.page_spin.setMaximum(1)
+        self.page_spin.setFocusPolicy(Qt.ClickFocus)  # Only focusable by click, not tab/programmatic
         self.page_spin.valueChanged.connect(self._on_spin_changed)
         info_layout.addWidget(self.page_spin)
 
         info_layout.addStretch()
+
+        # Zoom controls
+        self.zoom_out_btn = QPushButton("-")
+        self.zoom_out_btn.setFixedSize(28, 28)
+        self.zoom_out_btn.setToolTip("Zoom out")
+        self.zoom_out_btn.setStyleSheet("font-weight: bold; font-size: 14px;")
+        self.zoom_out_btn.clicked.connect(self._zoom_out)
+        info_layout.addWidget(self.zoom_out_btn)
+
+        self.zoom_label = QLabel("150%")
+        self.zoom_label.setStyleSheet("padding: 0 4px; min-width: 40px; text-align: center;")
+        info_layout.addWidget(self.zoom_label)
+
+        self.zoom_in_btn = QPushButton("+")
+        self.zoom_in_btn.setFixedSize(28, 28)
+        self.zoom_in_btn.setToolTip("Zoom in")
+        self.zoom_in_btn.setStyleSheet("font-weight: bold; font-size: 14px;")
+        self.zoom_in_btn.clicked.connect(self._zoom_in)
+        info_layout.addWidget(self.zoom_in_btn)
+
         layout.addLayout(info_layout)
 
         # PDF viewer (pdf.js embedded)
@@ -423,10 +446,44 @@ class PdfViewerWidget(QWidget):
 
         function getCurrentPage() { return currentPage; }
         function getTotalPages() { return totalPages; }
+        function getScale() { return scale; }
         function isReady() { return true; }
 
+        async function setScale(newScale) {
+            if (!pdfDoc || newScale < 0.25 || newScale > 5.0) return false;
+            // Remember current page so we can scroll back to it
+            const pageBefore = getCurrentPage();
+            scale = newScale;
+            // Re-render all currently rendered pages at new scale
+            const wasRendered = new Set(renderedPages);
+            // Resize all page placeholders
+            const firstPage = await pdfDoc.getPage(1);
+            const vp = firstPage.getViewport({ scale });
+            const pw = vp.width, ph = vp.height;
+            for (let i = 1; i <= totalPages; i++) {
+                const div = document.getElementById('page-' + i);
+                if (div) {
+                    div.style.width = pw + 'px';
+                    div.style.height = ph + 'px';
+                }
+            }
+            // Scroll back to the page we were on before resize
+            if (pageBefore >= 1 && pageBefore <= totalPages) {
+                const el = document.getElementById('page-' + pageBefore);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'instant', block: 'start' });
+                }
+            }
+            // Clear and re-render visible pages
+            for (const pn of wasRendered) {
+                unloadPage(pn);
+            }
+            await renderVisible();
+            return Math.round(scale * 100);
+        }
+
         window.pdfViewer = {
-            loadPdf, goToPage, getCurrentPage, getTotalPages, isReady,
+            loadPdf, goToPage, getCurrentPage, getTotalPages, getScale, setScale, isReady,
             getSelectedAnnotation, getPendingDelete
         };
     </script>
@@ -442,6 +499,9 @@ class PdfViewerWidget(QWidget):
     def _poll_current_page(self):
         """Query current page and pending annotation deletes from pdf.js."""
         if not self._viewer_ready:
+            return
+        # Skip polling during navigation cooldown to prevent race conditions
+        if time.time() < self._nav_cooldown_until:
             return
         self.web_view.page().runJavaScript(
             "window.pdfViewer ? window.pdfViewer.getCurrentPage() : 0",
@@ -460,12 +520,21 @@ class PdfViewerWidget(QWidget):
 
     def _on_page_result(self, page):
         """Handle page query result."""
-        if page and page != self.current_page and page > 0:
+        if page and page > 0:
+            page = int(page)
+            if page == self.current_page:
+                return
             self.current_page = page
             self.page_label.setText(f"Page: {page} / {self.total_pages}")
+            # Remember who has focus before touching the spin box
+            from PySide6.QtWidgets import QApplication
+            focused = QApplication.focusWidget()
             self.page_spin.blockSignals(True)
             self.page_spin.setValue(page)
             self.page_spin.blockSignals(False)
+            # Restore focus if the spin box stole it
+            if focused and focused is not QApplication.focusWidget():
+                focused.setFocus()
             self.pageChanged.emit(page)
 
     def _on_spin_changed(self, value):
@@ -501,24 +570,51 @@ class PdfViewerWidget(QWidget):
         url = QUrl.fromLocalFile(path).toString()
         # Escape single quotes in the URL for JavaScript
         url_escaped = url.replace("'", "\\'")
+        # loadPdf is async — runJavaScript can't await Promises.
+        # Just fire the call, then poll getTotalPages() until it's > 0.
         js = f"window.pdfViewer.loadPdf('{url_escaped}')"
-        self.web_view.page().runJavaScript(js, self._on_pdf_loaded)
+        self.web_view.page().runJavaScript(js)
+        self._load_poll_count = 0
+        QTimer.singleShot(500, self._poll_total_pages)
 
-    def _on_pdf_loaded(self, result):
-        """Handle PDF load result."""
-        if result and isinstance(result, dict) and result.get('success'):
-            self.total_pages = result.get('totalPages', 0)
-            self.page_spin.setMaximum(max(1, self.total_pages))
-            self.page_label.setText(f"Page: 1 / {self.total_pages}")
+    def _poll_total_pages(self):
+        """Poll getTotalPages() until the PDF is loaded."""
+        self._load_poll_count += 1
+        self.web_view.page().runJavaScript(
+            "window.pdfViewer ? window.pdfViewer.getTotalPages() : 0",
+            self._on_total_pages_result
+        )
+
+    def _on_total_pages_result(self, total):
+        """Handle getTotalPages poll result."""
+        if total and total > 0:
+            self.total_pages = total
+            self.page_spin.setMaximum(total)
+            self.page_label.setText(f"Page: 1 / {total}")
             self.current_page = 1
+            self.page_spin.blockSignals(True)
+            self.page_spin.setValue(1)
+            self.page_spin.blockSignals(False)
+        elif self._load_poll_count < 20:
+            # Still loading — retry (up to 10 seconds total)
+            QTimer.singleShot(500, self._poll_total_pages)
 
     def go_to_page(self, page_num):
         """Navigate to a specific page."""
         if not self._viewer_ready:
             return
+        if page_num < 1 or (self.total_pages and page_num > self.total_pages):
+            return
+        # Suppress polling for 1.5s to let the scroll settle
+        self._nav_cooldown_until = time.time() + 1.5
         js = f"window.pdfViewer.goToPage({page_num})"
         self.web_view.page().runJavaScript(js)
         self.current_page = page_num
+        # Update label and spin box immediately
+        self.page_label.setText(f"Page: {page_num} / {self.total_pages}")
+        self.page_spin.blockSignals(True)
+        self.page_spin.setValue(page_num)
+        self.page_spin.blockSignals(False)
 
     def get_current_page(self):
         """Get the current page number (cached value)."""
@@ -527,3 +623,43 @@ class PdfViewerWidget(QWidget):
     def get_total_pages(self):
         """Get the total number of pages."""
         return self.total_pages
+
+    def _zoom_in(self):
+        """Increase zoom level."""
+        if not self._viewer_ready:
+            return
+        self.web_view.page().runJavaScript(
+            "window.pdfViewer ? window.pdfViewer.getScale() : 1.5",
+            lambda s: self._apply_zoom(s + 0.25 if s else 1.75)
+        )
+
+    def _zoom_out(self):
+        """Decrease zoom level."""
+        if not self._viewer_ready:
+            return
+        self.web_view.page().runJavaScript(
+            "window.pdfViewer ? window.pdfViewer.getScale() : 1.5",
+            lambda s: self._apply_zoom(s - 0.25 if s else 1.25)
+        )
+
+    def _apply_zoom(self, new_scale):
+        """Apply a new zoom scale."""
+        new_scale = max(0.5, min(4.0, new_scale))
+        # Suppress page polling during zoom to avoid scroll conflicts
+        self._nav_cooldown_until = time.time() + 1.5
+        # setScale is async — fire it, then poll getScale() for the result
+        js = f"window.pdfViewer.setScale({new_scale})"
+        self.web_view.page().runJavaScript(js)
+        QTimer.singleShot(300, self._poll_zoom_result)
+
+    def _poll_zoom_result(self):
+        """Poll getScale() after zoom change."""
+        self.web_view.page().runJavaScript(
+            "window.pdfViewer ? Math.round(window.pdfViewer.getScale() * 100) : null",
+            self._on_zoom_result
+        )
+
+    def _on_zoom_result(self, pct):
+        """Update zoom label after scale change."""
+        if pct:
+            self.zoom_label.setText(f"{pct}%")

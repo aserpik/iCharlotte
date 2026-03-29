@@ -2921,6 +2921,7 @@ class EnhancedFileTreeWidget(QTreeWidget):
     item_moved = Signal(str, str)  # old_path, new_folder_path
     rename_requested = Signal(str, str)  # old_path, new_name
     folder_created = Signal(str)  # new_folder_path
+    tasks_column_clicked = Signal(object, int)  # item, column — emitted for column 1 clicks preserving selection
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -3059,6 +3060,24 @@ class EnhancedFileTreeWidget(QTreeWidget):
 
         item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
         self._editing_item = None
+
+    def mousePressEvent(self, event):
+        """Intercept clicks on the Queued Tasks column (1) to preserve multi-selection."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            pos = event.position().toPoint()
+            item = self.itemAt(pos)
+            if item:
+                # Determine which column was clicked
+                header = self.header()
+                x = pos.x() + self.horizontalScrollBar().value()
+                col = header.logicalIndexAt(x)
+                if col == 1:
+                    # Emit our custom signal and consume the event so Qt
+                    # doesn't change the selection
+                    self.tasks_column_clicked.emit(item, col)
+                    event.accept()
+                    return
+        super().mousePressEvent(event)
 
     def keyPressEvent(self, event):
         """Handle keyboard shortcuts including Delete key."""

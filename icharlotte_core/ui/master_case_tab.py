@@ -1172,11 +1172,11 @@ class MasterCaseTab(QWidget):
         
         # Load fields
         case = self.db.get_case(file_number)
-        
+
         # Set Dates in QDateEdit (Expects YYYY-MM-DD in DB)
         self.edit_hearing.blockSignals(True)
         self.edit_trial.blockSignals(True)
-        
+
         def set_qdate(widget, date_str):
             if date_str and "-" in date_str:
                 parts = date_str.split("-")
@@ -1184,8 +1184,34 @@ class MasterCaseTab(QWidget):
                     widget.setDate(QDate(int(parts[0]), int(parts[1]), int(parts[2])))
                     return
             widget.setDate(QDate(2000, 1, 1)) # Default "empty" state for our logic
-            
-        set_qdate(self.edit_hearing, case.get('next_hearing_date', ''))
+
+        # Get next hearing date - check DB first, then fall back to other_hearings in JSON
+        hearing_date_str = case.get('next_hearing_date', '')
+        if not hearing_date_str or (hearing_date_str and hearing_date_str.lower() == "none"):
+            # Try to derive from other_hearings in the JSON vars file
+            try:
+                from icharlotte_core.config import GEMINI_DATA_DIR
+                json_path = os.path.join(GEMINI_DATA_DIR, f"{file_number}.json")
+                if os.path.exists(json_path):
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        vars_data = json.load(f)
+                    # Check other_hearings or other_hearing
+                    v = vars_data.get("other_hearings") or vars_data.get("other_hearing")
+                    other_str = ""
+                    if isinstance(v, dict) and "value" in v:
+                        other_str = v["value"]
+                    elif isinstance(v, str):
+                        other_str = v
+                    if other_str:
+                        parsed = parse_hearing_data(other_str)
+                        today_dt = datetime.datetime.now().date()
+                        future = [h for h in parsed if h['date_obj'].date() >= today_dt and h['date_obj'].year != 9999]
+                        if future:
+                            hearing_date_str = future[0]['date_sort']
+            except Exception:
+                pass
+
+        set_qdate(self.edit_hearing, hearing_date_str)
         set_qdate(self.edit_trial, case.get('trial_date', ''))
         
         self.edit_hearing.blockSignals(False)

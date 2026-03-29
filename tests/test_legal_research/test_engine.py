@@ -27,7 +27,7 @@ class TestLegalResearchEngine(unittest.TestCase):
             "statute_queries": ["Civil Code section 1714"],
             "legal_doctrines": ["premises liability"],
         }
-        mock_search.return_value = (cases, statutes)
+        mock_search.return_value = (cases, statutes, [], [])
         mock_enrich.return_value = cases  # pass through
 
         def mock_llm(system, user):

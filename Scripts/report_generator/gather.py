@@ -182,15 +182,10 @@ def _process_variables_file(
     for var_key, section_name in section_var_map.items():
         content = variables.get(var_key, None)  # Use .get instead of .pop to keep in variables
         if content and len(content) > 50:
-            if section_name not in sections:
-                sections[section_name] = content
-                section_files[section_name] = filepath
-            else:
-                # Prepend complaint's prose version before raw docket data
-                sections[section_name] = (
-                    content + "\n\n--- Supplementary docket data ---\n\n"
-                    + sections[section_name]
-                )
+            # Use only the variable content — replaces any existing section data
+            # (e.g., docket text) so the report gets exactly this variable's prose
+            sections[section_name] = content
+            section_files[section_name] = filepath
 
     # Merge remaining variables into metadata (don't overwrite existing)
     skip_keys = {"variable", "value", "file_path", "caption",
@@ -486,6 +481,43 @@ def _is_new_content(section_name: str, section_files: Dict[str, str],
     return False
 
 
+def _extract_earliest_date(text: str) -> datetime:
+    """Extract the earliest date from text for chronological sorting."""
+    dates = []
+    # Match "January 8, 2019" style dates
+    for m in re.finditer(
+        r'(January|February|March|April|May|June|July|August|September|October|'
+        r'November|December)\s+(\d{1,2}),?\s+(\d{4})', text
+    ):
+        try:
+            d = datetime.strptime(f"{m.group(1)} {m.group(2)} {m.group(3)}", "%B %d %Y")
+            dates.append(d)
+        except ValueError:
+            pass
+    # Match MM/DD/YYYY
+    for m in re.finditer(r'(\d{1,2})/(\d{1,2})/(\d{4})', text):
+        try:
+            d = datetime(int(m.group(3)), int(m.group(1)), int(m.group(2)))
+            dates.append(d)
+        except ValueError:
+            pass
+    return min(dates) if dates else datetime.max
+
+
+def _clean_document_title(filename_title: str) -> str:
+    """Convert a filename-style title into a readable subheading."""
+    # Remove file extension
+    name = re.sub(r'\.\w{2,4}$', '', filename_title)
+    # Replace underscores with spaces
+    name = name.replace('_', ' ')
+    # Clean up multiple spaces
+    name = re.sub(r'\s+', ' ', name).strip()
+    # Title-case if it looks like a filename (all lowercase or has underscores)
+    if name == name.lower() or '_' in filename_title:
+        name = name.title()
+    return name
+
+
 def _ingest_ai_output(output_dir: str, sections: Dict[str, str],
                       section_files: Dict[str, str]):
     """
@@ -495,6 +527,9 @@ def _ingest_ai_output(output_dir: str, sections: Dict[str, str],
     Each block starts with a filename header, followed by "Generated on:" timestamp,
     then the summary text. Summaries mentioning IME, independent medical examination,
     or preliminary opinion(s) go to EXPERTS; all others go to INVESTIGATION.
+
+    Investigation blocks are sorted chronologically by the earliest date found
+    in each summary. Metadata and "Unclear Aspects" sections are stripped.
     """
     filepath = os.path.join(output_dir, "AI_OUTPUT.docx")
     if not os.path.exists(filepath):
@@ -510,6 +545,9 @@ def _ingest_ai_output(output_dir: str, sections: Dict[str, str],
     if not blocks:
         return
 
+    # Sort blocks chronologically by earliest date in their text
+    blocks.sort(key=lambda b: _extract_earliest_date(b[1]))
+
     for title, text in blocks:
         # Route based on keywords in title or first 200 chars of text
         search_text = title + " " + text[:200]
@@ -518,9 +556,10 @@ def _ingest_ai_output(output_dir: str, sections: Dict[str, str],
         else:
             target = "INVESTIGATION"
 
-        block_text = f"{title}\n\n{text}"
+        clean_title = _clean_document_title(title)
+        block_text = f"{clean_title}\n\n{text}"
         if target in sections:
-            sections[target] += f"\n\n--- Source: {title} ---\n\n{block_text}"
+            sections[target] += f"\n\n{block_text}"
         else:
             sections[target] = block_text
             section_files[target] = filepath
@@ -570,7 +609,17 @@ def _parse_ai_output_blocks(doc) -> List[Tuple[str, str]]:
         if content:
             blocks.append((current_title, content))
 
-    return blocks
+    # Strip metadata and "Unclear Aspects" sections from each block
+    cleaned = []
+    for title, text in blocks:
+        text = re.sub(
+            r'\n*(?:Unclear Aspects?|UNCLEAR ASPECTS?)[\s:]*\n.*$',
+            '', text, flags=re.DOTALL | re.IGNORECASE
+        ).strip()
+        if text:
+            cleaned.append((title, text))
+
+    return cleaned
 
 
 if __name__ == "__main__":

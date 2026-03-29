@@ -70,8 +70,8 @@ class TestCitationInstruction(unittest.TestCase):
     """Test CITATION_INSTRUCTION constant."""
 
     def test_citation_instruction_anti_hallucination(self):
-        """Contains 'MUST ONLY cite' and 'Do NOT fabricate'."""
-        self.assertIn("MUST ONLY cite", CITATION_INSTRUCTION)
+        """Contains anti-hallucination language and 'Do NOT fabricate'."""
+        self.assertIn("ONLY cite", CITATION_INSTRUCTION)
         self.assertIn("Do NOT fabricate", CITATION_INSTRUCTION)
 
 

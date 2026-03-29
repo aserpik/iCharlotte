@@ -413,7 +413,7 @@ def split_pdf_pages(pdf_path, output_folder, selection):
             except:
                  id_str = str(doc['id'])
                  
-            out_filename = f"{base_name} - {id_str} - {safe_title}.pdf"
+            out_filename = f"{id_str} - {safe_title}.pdf"
             out_path = os.path.join(output_folder, out_filename)
             
             with open(out_path, "wb") as f:

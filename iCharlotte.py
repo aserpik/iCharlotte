@@ -323,6 +323,8 @@ class DirectoryTreeWorker(QThread):
 
                 file_data = []
                 for f in files:
+                    if not self.running:
+                        break
                     if f.startswith('.') or f.startswith('~$'):
                         continue
                     path = os.path.join(root, f)
@@ -756,22 +758,23 @@ class MainWindow(QMainWindow):
         self.tree.folder_created.connect(lambda p: self._schedule_tree_refresh())
         self.tree.setHeaderLabels([
             "Category / File",
+            "Queued Tasks (Click to Add ➕)",
             "Size",
             "Date Modified",
-            "Queued Tasks (Click to Add ➕)",
             "Status"
         ])
         self.tree.setSortingEnabled(True)
         self.tree.setColumnWidth(0, 300)
-        self.tree.setColumnWidth(1, 70)
-        self.tree.setColumnWidth(2, 100)
-        self.tree.setColumnWidth(3, 200)
+        self.tree.setColumnWidth(1, 200)
+        self.tree.setColumnWidth(2, 70)
+        self.tree.setColumnWidth(3, 100)
         self.tree.setColumnWidth(4, 80)
         self.tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.tree.setAlternatingRowColors(True)
         self.tree.itemSelectionChanged.connect(self.on_tree_selection_changed)
         self.tree.itemDoubleClicked.connect(self.on_tree_double_click)
         self.tree.itemClicked.connect(self.on_tree_item_clicked)
+        self.tree.tasks_column_clicked.connect(self.on_tree_item_clicked)
         center_layout.addWidget(self.tree)
 
         btn_layout = QHBoxLayout()
@@ -1090,10 +1093,10 @@ class MainWindow(QMainWindow):
         self.tree.blockSignals(False)
 
     def on_tree_item_clicked(self, item, column):
-        if column == 3:  # Queued Tasks column (index 3)
+        if column == 1:  # Queued Tasks column (index 1)
             # Get click position relative to the tree's viewport
             pos = self.tree.visualItemRect(item).bottomLeft()
-            pos.setX(self.tree.columnViewportPosition(3))
+            pos.setX(self.tree.columnViewportPosition(1))
             global_pos = self.tree.viewport().mapToGlobal(pos)
 
             # Get all selected items (for multi-select support)
@@ -1212,8 +1215,8 @@ class MainWindow(QMainWindow):
     def update_item_tasks_ui(self, item):
         task_ids = item.data(0, Qt.ItemDataRole.UserRole + 2) or []
         if not task_ids:
-            item.setText(3, " [ + Add Tasks ]")
-            item.setForeground(3, Qt.GlobalColor.gray)
+            item.setText(1, " [ + Add Tasks ]")
+            item.setForeground(1, Qt.GlobalColor.gray)
             return
 
         # Create a visual string of short tags
@@ -1223,9 +1226,8 @@ class MainWindow(QMainWindow):
             if agent:
                 tags.append(f"[{agent['short']}]")
 
-        item.setText(3, " ".join(tags))
-        # Optional: set color for column 3 text
-        item.setForeground(3, Qt.GlobalColor.blue)
+        item.setText(1, " ".join(tags))
+        item.setForeground(1, Qt.GlobalColor.blue)
 
     def filter_tree(self, text):
         search_text = text.lower()
@@ -1490,7 +1492,7 @@ class MainWindow(QMainWindow):
             # Count only files (not directories)
             file_count = sum(1 for item in selected if item.data(0, Qt.ItemDataRole.UserRole + 1) == "file")
             if file_count > 0:
-                self.status_label.setText(f"{file_count} files selected - Click 'Queued Tasks' column to apply tasks to all")
+                self.status_label.setText(f"{file_count} files selected - Click 'Queued Tasks' column to apply tasks to all selected")
             # Clear preview for multi-selection
             if hasattr(self, 'preview_pane') and self.preview_pane.isVisible():
                 self.preview_pane.clear()
@@ -2521,11 +2523,11 @@ class MainWindow(QMainWindow):
                         item.setExpanded(False)
                     else:
                         item.setIcon(0, self._get_cached_icon(path))
-                        item.setText(1, entry.get('size_str', ''))
-                        
+                        item.setText(2, entry.get('size_str', ''))
+
                         # Convert cached date to standard format
                         date_str = format_date_to_mm_dd_yyyy(entry.get('date_str', ''))
-                        item.setText(2, date_str)
+                        item.setText(3, date_str)
                     
                     # Restore tasks
                     task_ids = entry.get('task_ids', [])
@@ -2549,8 +2551,8 @@ class MainWindow(QMainWindow):
                 entry = {
                     'path': path,
                     'type': item.data(0, Qt.ItemDataRole.UserRole + 1),
-                    'size_str': item.text(1),
-                    'date_str': item.text(2),
+                    'size_str': item.text(2),
+                    'date_str': item.text(3),
                     'task_ids': item.data(0, Qt.ItemDataRole.UserRole + 2)
                 }
                 data.append(entry)
@@ -2715,6 +2717,16 @@ class MainWindow(QMainWindow):
                 self.worker.disconnect()
             except:
                 pass
+            # CRITICAL: wait for the thread to actually finish before
+            # replacing self.worker.  Without this, the old QThread can be
+            # GC'd while its thread is still inside os.walk/emit, causing a
+            # C++ segfault ("QThread: Destroyed while thread is still running").
+            if self.worker.isRunning():
+                if not self.worker.wait(5000):  # 5 s max; Z: walk is I/O-bound
+                    log_warning("populate_tree: old worker did not stop within 5 s — detaching")
+                    # Keep a reference so it isn't destroyed while running
+                    self._old_worker = self.worker
+                    self._old_worker.finished.connect(self._old_worker.deleteLater)
 
         self.worker = DirectoryTreeWorker(self.case_path)
         # Use lambdas that capture generation to ignore stale callbacks after file switch
@@ -2782,8 +2794,8 @@ class MainWindow(QMainWindow):
 
                         f_item.setData(0, Qt.ItemDataRole.UserRole, file_path)
                         f_item.setData(0, Qt.ItemDataRole.UserRole + 1, "file")
-                        f_item.setText(1, size_str)
-                        f_item.setText(2, date_str)
+                        f_item.setText(2, size_str)
+                        f_item.setText(3, date_str)
                         f_item.setText(4, proc_status)
 
                         self.tree_item_map[file_path] = f_item
@@ -2791,8 +2803,8 @@ class MainWindow(QMainWindow):
                     else:
                         f_item = self.tree_item_map[file_path]
                         try:
-                            f_item.setText(1, size_str)
-                            f_item.setText(2, date_str)
+                            f_item.setText(2, size_str)
+                            f_item.setText(3, date_str)
                             f_item.setText(4, proc_status)
                         except RuntimeError:
                             log_warning(f"add_tree_batch: RuntimeError on existing item {file_path}")

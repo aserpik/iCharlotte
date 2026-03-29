@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QSizePolicy, QSlider
 )
 from PySide6.QtCore import Qt, Signal, QThread, QFileInfo, QTimer, QSettings, QEvent
-from PySide6.QtGui import QTextCursor, QDragEnterEvent, QDropEvent, QAction, QPixmap
+from PySide6.QtGui import QTextCursor, QDragEnterEvent, QDropEvent, QAction, QPixmap, QBrush
 
 from ..config import API_KEYS, SCRIPTS_DIR, GEMINI_DATA_DIR
 from ..utils import log_event, sanitize_filename, format_date_to_mm_dd_yyyy
@@ -848,12 +848,12 @@ class ChatTab(QWidget):
         final_path = path
         ext = os.path.splitext(path)[1].lower()
 
-        # PDF Check Logic
+        # PDF Check Logic — non-blocking OCR
+        needs_ocr = False
         if ext == ".pdf":
-            res = self.check_pdf_text(path)
-            if res is False:
-                return  # User cancelled or failed OCR
-            final_path = res
+            needs_ocr = self._check_pdf_needs_ocr(path)
+            if needs_ocr is None:
+                return  # User cancelled
 
         if final_path not in self.attached_files:
             self.attached_files.append(final_path)
@@ -883,6 +883,10 @@ class ChatTab(QWidget):
             # Persist the added file
             if self.persistence:
                 self.persistence.add_attached_file(final_path)
+
+            # Launch background OCR if needed (after file is attached)
+            if needs_ocr:
+                self._start_background_ocr(path, item)
 
     def _set_all_file_checks(self, state):
         """Set all file list items to the given check state."""
@@ -948,11 +952,11 @@ class ChatTab(QWidget):
             item.setData(Qt.ItemDataRole.UserRole, final_path)
             self.file_list.addItem(item)
 
-    def check_pdf_text(self, path):
-        """Checks if PDF has text. If not, asks to OCR. Returns (possibly updated) path or False."""
+    def _check_pdf_needs_ocr(self, path):
+        """Check if PDF needs OCR. Returns True (needs OCR), False (has text), or None (user cancelled)."""
         if not fitz:
-            return path # Assume OK if we can't check
-            
+            return False
+
         try:
             doc = fitz.open(path)
             has_text = False
@@ -961,84 +965,121 @@ class ChatTab(QWidget):
                     has_text = True
                     break
             doc.close()
-            
+
             if not has_text:
                 reply = QMessageBox.question(
-                    self, "OCR Needed", 
-                    f"The file '{os.path.basename(path)}' appears to be an image/scanned PDF.\nDo you want to OCR it before attaching?",
+                    self, "OCR Needed",
+                    f"The file '{os.path.basename(path)}' appears to be an image/scanned PDF.\n"
+                    f"Do you want to OCR it in the background?",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
                 )
                 if reply == QMessageBox.StandardButton.Yes:
-                    ocr_path = self.run_ocr(path)
-                    return ocr_path if ocr_path else False
+                    return True
                 elif reply == QMessageBox.StandardButton.Cancel:
-                    return False
+                    return None
                 else:
-                    return path # Attach anyway as is (user said No to OCR)
-            return path
+                    return False  # Attach as-is
+            return False
         except Exception as e:
             log_event(f"Error checking PDF: {e}", "error")
-            return path
+            return False
 
-    def run_ocr(self, path):
+    def _start_background_ocr(self, path, list_item):
+        """Launch OCR in background with status in the Status tab."""
+        from .widgets import StatusWidget
+
         script_path = os.path.join(SCRIPTS_DIR, "ocr.py")
         if not os.path.exists(script_path):
-            QMessageBox.critical(self, "Error", "ocr.py not found.")
-            return None
+            log_event("ocr.py not found — skipping background OCR", "error")
+            return
 
-        progress = QDialog(self)
-        progress.setWindowTitle("Running OCR...")
-        progress.setFixedSize(350, 120)
-        layout = QVBoxLayout(progress)
-        layout.addWidget(QLabel(f"Processing {os.path.basename(path)}..."))
-        
-        pbar = QProgressBar()
-        pbar.setRange(0, 100)
-        pbar.setValue(0)
-        layout.addWidget(pbar)
-        
-        btn_layout = QHBoxLayout()
-        cancel_btn = QPushButton("Cancel")
-        btn_layout.addStretch()
-        btn_layout.addWidget(cancel_btn)
-        layout.addLayout(btn_layout)
-        
+        # Mark the list item as pending OCR
+        basename = os.path.basename(path)
+        list_item.setText(f"{basename} (OCR in progress...)")
+        list_item.setForeground(Qt.GlobalColor.gray)
+
+        # Create status widget in the Status tab
+        status_widget = StatusWidget("OCR", f"Processing {basename}")
+
+        main_window = self.window()
+        if hasattr(main_window, 'status_list_layout'):
+            main_window.status_list_layout.insertWidget(0, status_widget)
+
+        # Create and start the OCR runner
         runner = OCRRunner(script_path, path)
-        self.current_ocr_runner = runner # Keep reference
-        
-        # Connect progress signal
-        runner.progress.connect(pbar.setValue)
-        
-        # State container to capture result from signal
-        ocr_result = {"success": False, "final_path": path}
 
-        def on_finished(success, message, final_path):
-            ocr_result["success"] = success
-            ocr_result["final_path"] = final_path
-            if progress.isVisible():
-                if success:
-                    progress.accept()
-                else:
-                    if "terminated" not in message.lower():
-                        QMessageBox.critical(self, "Error", f"OCR Failed: {message}")
-                    progress.reject()
-        
-        def on_cancel():
-            runner.terminate()
-            runner.wait()
-            progress.reject()
-            log_event(f"OCR Cancelled by user: {path}", "warning")
+        # Keep references so they don't get GC'd
+        if not hasattr(self, '_ocr_runners'):
+            self._ocr_runners = []
+        self._ocr_runners.append(runner)
 
-        cancel_btn.clicked.connect(on_cancel)
-        runner.finished.connect(on_finished)
-        
+        # Connect signals
+        runner.progress.connect(lambda pct: status_widget.update_progress(pct, f"OCR {pct}%"))
+        runner.finished.connect(lambda success, message, final_path:
+            self._on_background_ocr_finished(success, message, final_path, path, list_item, status_widget, runner))
+
+        # Connect cancel
+        status_widget.cancel_requested.connect(lambda: self._cancel_background_ocr(runner, list_item, path, status_widget))
+
         runner.start()
-        res = progress.exec()
-        
-        if res == QDialog.DialogCode.Accepted and ocr_result["success"]:
-            QMessageBox.information(self, "Success", f"OCR Completed successfully.")
-            return ocr_result["final_path"]
-        return None
+        log_event(f"Background OCR started: {path}", "info")
+
+    def _on_background_ocr_finished(self, success, message, final_path, original_path, list_item, status_widget, runner):
+        """Handle background OCR completion — swap the attachment path."""
+        basename = os.path.basename(original_path)
+
+        if success and final_path and final_path != original_path:
+            # Update the attachment list entry
+            list_item.setText(os.path.basename(final_path))
+            list_item.setForeground(QBrush())  # Reset to theme default
+            list_item.setToolTip(final_path)
+            list_item.setData(Qt.ItemDataRole.UserRole, final_path)
+
+            # Update internal tracking
+            if original_path in self.attached_files:
+                idx = self.attached_files.index(original_path)
+                self.attached_files[idx] = final_path
+
+            # Update persistence
+            if self.persistence:
+                self.persistence.remove_attached_file(original_path)
+                self.persistence.add_attached_file(final_path)
+
+            status_widget.set_output_file(final_path)
+            status_widget.set_finished(True)
+            status_widget.append_log(f"OCR completed: {final_path}\n")
+            log_event(f"Background OCR completed: {original_path} → {final_path}", "info")
+        elif success:
+            # OCR succeeded but path didn't change (text was added in-place)
+            list_item.setText(basename)
+            list_item.setForeground(QBrush())  # Reset to theme default
+            status_widget.set_finished(True)
+            status_widget.append_log(f"OCR completed: {original_path}\n")
+            log_event(f"Background OCR completed (in-place): {original_path}", "info")
+        else:
+            # OCR failed — leave the original file attached
+            list_item.setText(f"{basename} (OCR failed)")
+            list_item.setForeground(Qt.GlobalColor.red)
+            status_widget.set_finished(False)
+            status_widget.append_log(f"OCR failed: {message}\n")
+            log_event(f"Background OCR failed: {original_path} — {message}", "error")
+
+        # Clean up runner reference
+        if hasattr(self, '_ocr_runners') and runner in self._ocr_runners:
+            self._ocr_runners.remove(runner)
+
+    def _cancel_background_ocr(self, runner, list_item, original_path, status_widget):
+        """Cancel a running background OCR."""
+        runner.terminate()
+        runner.wait()
+        basename = os.path.basename(original_path)
+        list_item.setText(basename)
+        list_item.setForeground(QBrush())  # Reset to theme default
+        status_widget.set_finished(False)
+        status_widget.append_log("OCR cancelled by user.\n")
+        log_event(f"Background OCR cancelled: {original_path}", "warning")
+        if hasattr(self, '_ocr_runners') and runner in self._ocr_runners:
+            self._ocr_runners.remove(runner)
 
     # Drag and Drop
     def dragEnterEvent(self, event: QDragEnterEvent):
@@ -2795,7 +2836,7 @@ class IndexTab(QWidget):
                     safe_title = sanitize_filename(doc['title'])
                     if len(safe_title) > 50: safe_title = safe_title[:50]
                     
-                    out_name = f"{source_name} - {doc['id']} - {safe_title}.pdf"
+                    out_name = f"{doc['id']} - {safe_title}.pdf"
                     out_path = os.path.join(output_folder, out_name)
                     
                     with open(out_path, "wb") as f:

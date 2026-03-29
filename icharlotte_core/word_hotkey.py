@@ -109,6 +109,58 @@ DEFAULT_OUTLOOK_PROMPTS = [
     {"name": "Add Clarity", "prompt": "Improve clarity and structure of this email. Ensure requests and next steps are clearly stated."},
 ]
 
+# Default Word system prompt (non-redline)
+DEFAULT_WORD_SYSTEM_PROMPT = (
+    "You are a helpful writing assistant for Microsoft Word documents. "
+    "Follow the user's instructions precisely. Output only the requested "
+    "text without any preamble or explanation.\n\n"
+    "VOICE & TONE RULE: When writing within an existing document, you MUST "
+    "match the voice, tone, person (first/second/third), tense, and style "
+    "of the surrounding text. If the document uses first-person plural "
+    '("we believe", "our client"), you must continue in first-person plural. '
+    "Do NOT switch to a detached, analytical, third-person voice unless the "
+    "document itself is written that way.\n\n"
+    "ATTACHMENT RULE: Attached files are REFERENCE MATERIAL — use them for "
+    "facts, details, and context to inform your writing. Do NOT summarize, "
+    "describe, or analyze the attachment. Do NOT write instructions or action "
+    "items about the attachment. Instead, draw from its content naturally as "
+    "a source while writing prose in the voice of the document you are editing.\n\n"
+    "CONTEXTUAL WRITING RULE: When asked to complete, continue, or fill in "
+    "text within an existing document, you are writing AS THE AUTHOR of that "
+    "document. Read the surrounding text carefully to understand the author's "
+    "perspective, arguments, and style, then continue seamlessly as if you "
+    "were that author.\n\n"
+    "FORMAT RULES (strict defaults — override ONLY if the user explicitly "
+    "asks for headings, bullet points, numbered lists, or other structure):\n"
+    "- Always write in plain narrative prose. No headings (#, ##, ###), "
+    "no bullet points, no numbered lists, no markdown formatting.\n"
+    "- Use **bold** sparingly and only when the user asks for emphasis.\n"
+    "- Do not use code blocks or HTML.\n\n"
+    "CONTINUATION RULE: When the user asks you to finish a sentence, "
+    "fill in a blank, or continue from a specific point, output ONLY "
+    "the new text that comes after the existing content. Do NOT repeat "
+    "any part of the preceding sentence, paragraph, or context that was "
+    "provided to you. Start exactly where the existing text leaves off.\n\n"
+    "ELABORATION RULE: The user's prompt is a DIRECTIVE describing what "
+    "to write — it is NOT the text itself. You must compose original, "
+    "substantive, detailed prose that develops the ideas the user described. "
+    "NEVER copy, parrot, or lightly rephrase the user's instruction as your "
+    "output. If the user says 'argue that X caused Y', write a full legal "
+    "argument with reasoning and supporting points — do not just restate "
+    "'X caused Y'."
+)
+
+# Default Word system prompt (redline mode)
+DEFAULT_WORD_REDLINE_SYSTEM_PROMPT = (
+    "You are a helpful writing assistant operating in REDLINE MODE. "
+    "Your output will be diffed against the original text to produce "
+    "Track Changes in Microsoft Word. You MUST preserve unchanged text "
+    "EXACTLY as written — same words, same order, same punctuation. "
+    "Only modify the specific parts that need changing per the user's "
+    "instructions. Output only the requested text without any preamble, "
+    "explanation, or markdown formatting unless specifically asked."
+)
+
 # Email-specific system prompt
 EMAIL_SYSTEM_PROMPT = (
     "You are a helpful email writing assistant. Follow the user's instructions precisely. "
@@ -176,6 +228,91 @@ def detect_active_app_context() -> tuple:
     except Exception as e:
         logger.error(f"COM error detecting app context: {type(e).__name__}: {e}", exc_info=True)
         return APP_CONTEXT_UNKNOWN, None
+
+
+def _get_word_app_from_hwnd(hwnd):
+    """Get Word.Application and Document COM objects from a specific window handle.
+
+    When multiple Word instances (processes) are running,
+    GetActiveObject("Word.Application") returns whichever instance is
+    registered in the Running Object Table — not necessarily the one the
+    user is working in.  This function uses AccessibleObjectFromWindow
+    with OBJID_NATIVEOM to get the native Office COM object directly from
+    the foreground window, guaranteeing we get the correct instance.
+
+    Returns (Word.Application, Document) tuple, or (None, None) on failure.
+    The Document is the specific document displayed in the target window,
+    which may differ from ActiveDocument when multiple docs are open.
+    """
+    if not hwnd:
+        return None
+
+    # Step 1: Find the _WwG child window (Word's document editing surface).
+    # AccessibleObjectFromWindow needs this specific child, not the top-level
+    # OpusApp window.
+    child_hwnd = [None]
+
+    def _find_wwg(h, _):
+        try:
+            if win32gui.GetClassName(h) == '_WwG':
+                child_hwnd[0] = h
+                return False  # stop enumeration
+        except Exception:
+            pass
+        return True
+
+    try:
+        win32gui.EnumChildWindows(hwnd, _find_wwg, None)
+    except Exception:
+        pass  # EnumChildWindows raises pywintypes.error when callback returns False
+
+    if not child_hwnd[0]:
+        return None, None
+
+    # Step 2: Use AccessibleObjectFromWindow to get the native COM object.
+    try:
+        # Define IID_IDispatch GUID for ctypes
+        class _GUID(ctypes.Structure):
+            _fields_ = [("Data1", ctypes.c_ulong), ("Data2", ctypes.c_ushort),
+                        ("Data3", ctypes.c_ushort), ("Data4", ctypes.c_byte * 8)]
+
+        IID_IDispatch = _GUID(
+            0x00020400, 0x0000, 0x0000,
+            (ctypes.c_byte * 8)(0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46),
+        )
+        OBJID_NATIVEOM = ctypes.c_long(-16)  # 0xFFFFFFF0
+
+        ptr = ctypes.c_void_p()
+        hr = ctypes.oledll.oleacc.AccessibleObjectFromWindow(
+            child_hwnd[0],
+            OBJID_NATIVEOM,
+            ctypes.byref(IID_IDispatch),
+            ctypes.byref(ptr),
+        )
+
+        if hr == 0 and ptr.value:
+            # Convert raw IDispatch pointer → pythoncom PyIDispatch → win32com
+            py_unk = pythoncom.ObjectFromAddress(ptr.value)
+            py_disp = py_unk.QueryInterface(pythoncom.IID_IDispatch)
+            window_obj = win32com.client.Dispatch(py_disp)
+            word_app = window_obj.Application
+            # Get the document for THIS specific window, not ActiveDocument
+            # (which may be a different doc in the same Word instance)
+            try:
+                doc = window_obj.Document
+            except Exception:
+                doc = word_app.ActiveDocument
+            try:
+                doc_name = doc.Name if doc else "?"
+            except Exception:
+                doc_name = "?"
+            print(f"[_get_word_app_from_hwnd] Got Word.Application from hwnd {hwnd} "
+                  f"(Document: {doc_name})")
+            return word_app, doc
+    except Exception as e:
+        print(f"[_get_word_app_from_hwnd] AccessibleObjectFromWindow failed: {e}")
+
+    return None, None
 
 
 def detect_case_from_document() -> tuple:
@@ -996,7 +1133,7 @@ class TaskLLMWorkerThread(QThread):
             settings = {
                 'temperature': 0.7,
                 'top_p': 0.95,
-                'max_tokens': -1,
+                'max_tokens': 32768,
                 'stream': False,
                 'thinking_level': 'None',
             }
@@ -2060,7 +2197,11 @@ class AttachmentArea(QFrame):
         for file_path, text in self._attachments.items():
             if text:
                 name = os.path.basename(file_path)
-                blocks.append(f"\n\n=== ATTACHED FILE: {name} ===\n{text}")
+                blocks.append(
+                    f"\n\n=== REFERENCE MATERIAL (attached file: {name}) ===\n"
+                    f"Use the content below as a factual source. Do NOT summarize or "
+                    f"describe this document — draw from it naturally.\n\n{text}"
+                )
         return "".join(blocks)
 
     def clear(self):
@@ -2113,6 +2254,8 @@ class WordLLMPopup(QDialog):
         self.outlook_prompts_path = os.path.join(GEMINI_DATA_DIR, "outlook_llm_prompts.json")
         self.format_settings_path = os.path.join(GEMINI_DATA_DIR, "word_format_settings.json")
         self.model_settings_path = os.path.join(GEMINI_DATA_DIR, "word_model_settings.json")
+        self.system_prompt_path = os.path.join(GEMINI_DATA_DIR, "word_system_prompt.json")
+        self._custom_system_prompt = self._load_custom_system_prompt()  # User override or ""
         self.prompts = []  # Word prompts
         self.outlook_prompts = []  # Outlook/email prompts
         self.custom_format_settings = {}  # Custom format settings
@@ -2323,6 +2466,9 @@ class WordLLMPopup(QDialog):
 
         # Create Case Variables tab
         self._setup_case_variables_tab()
+
+        # Create System Prompt tab
+        self._setup_system_prompt_tab()
 
         # Status label (shared across tabs)
         self.status_label = QLabel("")
@@ -2549,6 +2695,116 @@ class WordLLMPopup(QDialog):
         case_layout.addWidget(scroll)
 
         self.tab_widget.addTab(case_tab, "Case Variables")
+
+    def _setup_system_prompt_tab(self):
+        """Setup the System Prompt tab for viewing/editing the system prompt."""
+        sp_tab = QWidget()
+        sp_layout = QVBoxLayout(sp_tab)
+        sp_layout.setContentsMargins(10, 10, 10, 10)
+        sp_layout.setSpacing(8)
+
+        # Description
+        desc_label = QLabel(
+            "Edit the system prompt sent to the AI model. "
+            "This controls how the AI behaves when processing your text."
+        )
+        desc_label.setWordWrap(True)
+        desc_label.setStyleSheet("color: #a6adc8; font-size: 11px; font-style: italic;")
+        sp_layout.addWidget(desc_label)
+
+        # System prompt text editor
+        self.system_prompt_edit = QTextEdit()
+        self.system_prompt_edit.setPlaceholderText("System prompt will appear here...")
+        self.system_prompt_edit.setMinimumHeight(150)
+        # Show custom prompt if set, otherwise show the default
+        display_prompt = self._custom_system_prompt or DEFAULT_WORD_SYSTEM_PROMPT
+        self.system_prompt_edit.setPlainText(display_prompt)
+        sp_layout.addWidget(self.system_prompt_edit)
+
+        # Status label for save confirmation
+        self.sp_status_label = QLabel("")
+        self.sp_status_label.setStyleSheet("color: #a6e3a1; font-size: 11px; font-style: italic;")
+        sp_layout.addWidget(self.sp_status_label)
+
+        # Button row
+        btn_row = QHBoxLayout()
+
+        save_sp_btn = QPushButton("Save")
+        save_sp_btn.setFixedWidth(80)
+        save_sp_btn.setToolTip("Save custom system prompt (persists across sessions)")
+        save_sp_btn.clicked.connect(self._save_system_prompt_from_ui)
+        btn_row.addWidget(save_sp_btn)
+
+        reset_sp_btn = QPushButton("Reset to Default")
+        reset_sp_btn.setFixedWidth(120)
+        reset_sp_btn.setObjectName("deleteBtn")
+        reset_sp_btn.setToolTip("Restore the default system prompt")
+        reset_sp_btn.clicked.connect(self._reset_system_prompt)
+        btn_row.addWidget(reset_sp_btn)
+
+        btn_row.addStretch()
+        sp_layout.addLayout(btn_row)
+
+        sp_layout.addStretch()
+        self.tab_widget.addTab(sp_tab, "System Prompt")
+
+    def _get_custom_system_prompt(self) -> str:
+        """Return the custom system prompt if set, or empty string for default."""
+        return self._custom_system_prompt or ""
+
+    def _load_custom_system_prompt(self) -> str:
+        """Load custom system prompt from disk. Returns empty string if none saved."""
+        if os.path.exists(self.system_prompt_path):
+            try:
+                with open(self.system_prompt_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    return data.get("system_prompt", "")
+            except Exception as e:
+                print(f"Error loading custom system prompt: {e}")
+        return ""
+
+    def _save_system_prompt_from_ui(self):
+        """Save the system prompt from the UI editor to disk."""
+        text = self.system_prompt_edit.toPlainText().strip()
+        if not text:
+            self.sp_status_label.setText("System prompt cannot be empty.")
+            self.sp_status_label.setStyleSheet("color: #f38ba8; font-size: 11px; font-style: italic;")
+            return
+
+        # If it matches the default exactly, clear the custom override
+        if text == DEFAULT_WORD_SYSTEM_PROMPT:
+            self._custom_system_prompt = ""
+            self._delete_custom_system_prompt_file()
+            self.sp_status_label.setText("Using default system prompt (no custom override).")
+            self.sp_status_label.setStyleSheet("color: #a6e3a1; font-size: 11px; font-style: italic;")
+            return
+
+        self._custom_system_prompt = text
+        try:
+            os.makedirs(os.path.dirname(self.system_prompt_path), exist_ok=True)
+            with open(self.system_prompt_path, 'w', encoding='utf-8') as f:
+                json.dump({"system_prompt": text}, f, indent=2)
+            self.sp_status_label.setText("Custom system prompt saved.")
+            self.sp_status_label.setStyleSheet("color: #a6e3a1; font-size: 11px; font-style: italic;")
+        except Exception as e:
+            self.sp_status_label.setText(f"Error saving: {e}")
+            self.sp_status_label.setStyleSheet("color: #f38ba8; font-size: 11px; font-style: italic;")
+
+    def _reset_system_prompt(self):
+        """Reset system prompt to the default."""
+        self._custom_system_prompt = ""
+        self._delete_custom_system_prompt_file()
+        self.system_prompt_edit.setPlainText(DEFAULT_WORD_SYSTEM_PROMPT)
+        self.sp_status_label.setText("System prompt reset to default.")
+        self.sp_status_label.setStyleSheet("color: #a6e3a1; font-size: 11px; font-style: italic;")
+
+    def _delete_custom_system_prompt_file(self):
+        """Remove the custom system prompt file if it exists."""
+        try:
+            if os.path.exists(self.system_prompt_path):
+                os.remove(self.system_prompt_path)
+        except Exception as e:
+            print(f"Error removing custom system prompt file: {e}")
 
     def _populate_case_variables(self):
         """Populate the Case Variables tab with detected case info."""
@@ -3253,9 +3509,21 @@ class WordLLMPopup(QDialog):
                 return
 
             # Default: Word context
-            # Check if Word is running with a document open
+            # Derive word from the pre-captured document's Application to
+            # avoid multi-instance mismatch (GetActiveObject may return a
+            # different Word process than the one the user was working in).
             QApplication.processEvents()  # Keep UI responsive
-            word = self._get_word_app()
+            word = None
+            if self._original_document:
+                try:
+                    _ = self._original_document.Name  # test if COM ref is alive
+                    word = self._original_document.Application
+                    print(f"[_do_execute] Using Word from pre-captured document: {self._original_document.Name}")
+                except Exception as e:
+                    print(f"[_do_execute] Pre-captured document stale ({e}), falling back to _get_word_app")
+                    self._original_document = None
+            if not word:
+                word = self._get_word_app()
             QApplication.processEvents()  # Keep UI responsive
 
             if not word:
@@ -3306,14 +3574,61 @@ class WordLLMPopup(QDialog):
                 # Get all document text for context
                 all_text = self._get_all_document_text()
                 if all_text:
-                    # Build prompt with full document context but mark selected text
-                    full_prompt = (
-                        f"{prompt}\n\n"
-                        f"=== FULL DOCUMENT (for context) ===\n{all_text}\n\n"
-                        f"=== SELECTED TEXT TO PROCESS ===\n{selected_text}\n\n"
-                        f"Process only the SELECTED TEXT above according to the instructions. "
-                        f"Use the full document for context but output only the processed version of the selected text."
+                    # Detect if the selection is a placeholder/blank
+                    stripped = selected_text.strip()
+                    is_placeholder = (
+                        not stripped
+                        or all(c in '_—–-. ' for c in stripped)
+                        or len(stripped) <= 3
                     )
+
+                    if is_placeholder:
+                        # Extract surrounding context to show what comes before/after
+                        placeholder_pos = all_text.find(selected_text.strip())
+                        context_before = ""
+                        context_after = ""
+                        if placeholder_pos >= 0:
+                            # Grab ~300 chars before and after for context
+                            start = max(0, placeholder_pos - 300)
+                            end = min(len(all_text), placeholder_pos + len(selected_text.strip()) + 300)
+                            context_before = all_text[start:placeholder_pos].strip()
+                            after_start = placeholder_pos + len(selected_text.strip())
+                            context_after = all_text[after_start:end].strip()
+
+                        # Placeholder/blank: instruct AI to write replacement prose
+                        full_prompt = (
+                            f"=== USER DIRECTIVE (describes what to write — NOT the text itself) ===\n"
+                            f"{prompt}\n\n"
+                            f"=== FULL DOCUMENT ===\n{all_text}\n\n"
+                            f"=== IMMEDIATE CONTEXT ===\n"
+                            f"Text BEFORE the blank: \"{context_before[-200:]}\"\n"
+                            f"[___BLANK TO FILL___]\n"
+                            f"Text AFTER the blank: \"{context_after[:200]}\"\n\n"
+                            f"CRITICAL INSTRUCTIONS:\n"
+                            f"- The USER DIRECTIVE above tells you WHAT to write about — it is "
+                            f"NOT the text to insert. You must compose original, substantive "
+                            f"prose that develops the ideas described. NEVER copy or rephrase "
+                            f"the user's instruction as your output.\n"
+                            f"- Your output will be INSERTED DIRECTLY into the document at "
+                            f"the position of the blank shown above.\n"
+                            f"- Write ACTUAL PROSE that flows naturally from the text before "
+                            f"the blank and connects to the text after it.\n"
+                            f"- You are ghostwriting as the document's author. Match their "
+                            f"voice, tone, and person (e.g., if they write \"we\", you write \"we\").\n"
+                            f"- Do NOT write instructions, action items, task descriptions, "
+                            f"or summaries. Write the actual words that belong in the document.\n"
+                            f"- Output ONLY the replacement text — no preamble, no explanation."
+                        )
+                    else:
+                        # Normal selection: process/transform the selected text
+                        full_prompt = (
+                            f"{prompt}\n\n"
+                            f"=== FULL DOCUMENT (for context) ===\n{all_text}\n\n"
+                            f"=== SELECTED TEXT TO PROCESS ===\n{selected_text}\n\n"
+                            f"Apply the user's instructions to the SELECTED TEXT above. "
+                            f"Use the full document for context and to match the writing style. "
+                            f"Output only the processed version of the selected text."
+                        )
                     self.status_label.setText("Processing with full document context...")
                 else:
                     # Fallback to just selected text
@@ -3324,11 +3639,40 @@ class WordLLMPopup(QDialog):
                 full_prompt = f"{prompt}\n\nText to process:\n{selected_text}"
                 self.status_label.setText("Processing selected text...")
             elif use_all_text:
-                # No selection but use all text - process entire document
+                # No selection but use all text — cursor-only mode
                 all_text = self._get_all_document_text()
                 if all_text:
-                    full_prompt = f"{prompt}\n\nText to process:\n{all_text}"
-                    self.status_label.setText("Processing entire document...")
+                    # Use pre-captured cursor position to show context around cursor
+                    cursor_pos = self._original_range_start
+                    if cursor_pos is not None and cursor_pos <= len(all_text):
+                        context_before = all_text[:cursor_pos].strip()
+                        context_after = all_text[cursor_pos:].strip()
+                        full_prompt = (
+                            f"=== USER DIRECTIVE (describes what to write — NOT the text itself) ===\n"
+                            f"{prompt}\n\n"
+                            f"=== FULL DOCUMENT ===\n{all_text}\n\n"
+                            f"=== CURSOR POSITION ===\n"
+                            f"Text BEFORE cursor: \"{context_before[-300:]}\"\n"
+                            f"[___CURSOR IS HERE___]\n"
+                            f"Text AFTER cursor: \"{context_after[:300]}\"\n\n"
+                            f"CRITICAL INSTRUCTIONS:\n"
+                            f"- The USER DIRECTIVE above tells you WHAT to write about — it is "
+                            f"NOT the text to insert. You must compose original, substantive "
+                            f"prose that develops the ideas described. NEVER copy or rephrase "
+                            f"the user's instruction as your output.\n"
+                            f"- Your output will be INSERTED DIRECTLY into the document at "
+                            f"the cursor position shown above.\n"
+                            f"- Write ACTUAL PROSE that flows naturally from the text before "
+                            f"the cursor and connects to the text after it.\n"
+                            f"- You are ghostwriting as the document's author. Match their "
+                            f"voice, tone, and person (e.g., if they write \"we\", you write \"we\").\n"
+                            f"- Do NOT write instructions, action items, task descriptions, "
+                            f"or summaries. Write the actual words that belong in the document.\n"
+                            f"- Output ONLY the text to insert — no preamble, no explanation."
+                        )
+                    else:
+                        full_prompt = f"{prompt}\n\nDocument text:\n{all_text}"
+                    self.status_label.setText("Processing with full document context...")
                 else:
                     full_prompt = prompt
                     self.status_label.setText("Processing prompt...")
@@ -3367,34 +3711,12 @@ class WordLLMPopup(QDialog):
             provider, model_id = self._get_selected_model()
             print(f"[DEBUG] Selected model: {provider}/{model_id}")
 
-            # Build system prompt (same logic as _default_llm_call)
+            # Build system prompt — use custom override if set, else defaults
+            custom_sp = self._get_custom_system_prompt()
             if self._redline_mode_active:
-                system_prompt = (
-                    "You are a helpful writing assistant operating in REDLINE MODE. "
-                    "Your output will be diffed against the original text to produce "
-                    "Track Changes in Microsoft Word. You MUST preserve unchanged text "
-                    "EXACTLY as written — same words, same order, same punctuation. "
-                    "Only modify the specific parts that need changing per the user's "
-                    "instructions. Output only the requested text without any preamble, "
-                    "explanation, or markdown formatting unless specifically asked."
-                )
+                system_prompt = custom_sp if custom_sp else DEFAULT_WORD_REDLINE_SYSTEM_PROMPT
             else:
-                system_prompt = (
-                    "You are a helpful writing assistant for Microsoft Word documents. "
-                    "Follow the user's instructions precisely. Output only the requested "
-                    "text without any preamble or explanation.\n\n"
-                    "FORMAT RULES (strict defaults — override ONLY if the user explicitly "
-                    "asks for headings, bullet points, numbered lists, or other structure):\n"
-                    "- Always write in plain narrative prose. No headings (#, ##, ###), "
-                    "no bullet points, no numbered lists, no markdown formatting.\n"
-                    "- Use **bold** sparingly and only when the user asks for emphasis.\n"
-                    "- Do not use code blocks or HTML.\n\n"
-                    "CONTINUATION RULE: When the user asks you to finish a sentence, "
-                    "fill in a blank, or continue from a specific point, output ONLY "
-                    "the new text that comes after the existing content. Do NOT repeat "
-                    "any part of the preceding sentence, paragraph, or context that was "
-                    "provided to you. Start exactly where the existing text leaves off."
-                )
+                system_prompt = custom_sp if custom_sp else DEFAULT_WORD_SYSTEM_PROMPT
 
             task_data = TaskData(
                 document_name=self._original_document_name or "",
@@ -3932,7 +4254,7 @@ class WordLLMPopup(QDialog):
             except Exception:
                 print("WARNING: Could not unlock Word UI - user may need to restart Word")
 
-    def _capture_initial_document(self):
+    def _capture_initial_document(self, fg_hwnd=None):
         """Capture the active document and selection at Win+V time.
 
         Called from _show_popup BEFORE the popup steals focus, so
@@ -3941,14 +4263,35 @@ class WordLLMPopup(QDialog):
         later used by _get_word_selection_internal to ensure the result
         goes back to the correct document even if the user switches to
         a different document while typing their prompt.
+
+        When multiple Word processes are running, GetActiveObject may
+        return the wrong instance.  If *fg_hwnd* is provided, we use
+        AccessibleObjectFromWindow to get the Word.Application directly
+        from the foreground window, guaranteeing the correct instance.
         """
         try:
-            word = self._get_word_app()
+            # Prefer getting Word from the foreground window handle — this
+            # is immune to the ROT returning the wrong Word process AND
+            # gets the correct document even when multiple docs are open.
+            word = None
+            doc = None
+            if fg_hwnd:
+                word, doc = _get_word_app_from_hwnd(fg_hwnd)
+            if not word:
+                word = self._get_word_app()
             if not word:
                 return
 
-            doc = word.ActiveDocument
+            if not doc:
+                doc = word.ActiveDocument
             if doc:
+                # Activate the document so word.Selection refers to it
+                # (important when _get_word_app_from_hwnd found a doc that
+                # isn't currently ActiveDocument in its Word instance)
+                try:
+                    doc.Activate()
+                except Exception:
+                    pass
                 self._original_document = doc
                 self._original_document_name = doc.Name
                 print(f"[Win+V] Pre-captured document at hotkey time: {self._original_document_name}")
@@ -3979,12 +4322,15 @@ class WordLLMPopup(QDialog):
 
             # If we pre-captured the document at Win+V time, activate it now
             # so that word.Selection refers to the correct document's selection.
-            # This is the key fix for the "output goes to wrong document" bug:
-            # the user may have switched to a different document while typing
-            # their prompt, so word.ActiveDocument would be wrong.
+            # IMPORTANT: Also override `word` with the document's own Application
+            # so that word.Selection is guaranteed to be in the same Word process
+            # as the document.  Without this, GetActiveObject may have returned a
+            # different Word instance, and word.Selection would read from/write to
+            # the wrong document.
             if self._original_document is not None:
                 try:
                     _ = self._original_document.Name  # test if COM ref alive
+                    word = self._original_document.Application  # same process as doc
                     self._original_document.Activate()
                     print(f"Activated pre-captured document: {self._original_document_name}")
                 except Exception as e:
@@ -4091,21 +4437,56 @@ class WordLLMPopup(QDialog):
             return "", False
 
     def _get_all_document_text(self) -> str:
-        """Get all text from the active Word document."""
-        try:
-            word = self._get_word_app()
-            if not word:
-                return ""
+        """Get all text from the pre-captured Word document.
 
-            # Try to get the active document's content
-            try:
-                doc = word.ActiveDocument
-                if doc:
-                    # Get all text from the document
-                    content = doc.Content.Text
-                    return content.strip() if content else ""
-            except Exception as e:
-                print(f"Error getting document content: {e}")
+        Uses self._original_document (captured at Win+V time) to ensure
+        we always read from the document the user was editing, not
+        whatever Word considers ActiveDocument at call time.
+        """
+        try:
+            doc = None
+
+            # 1. Prefer the pre-captured document (correct even with multiple docs open)
+            if self._original_document is not None:
+                try:
+                    _ = self._original_document.Name  # test if COM ref alive
+                    doc = self._original_document
+                    print(f"[_get_all_document_text] Using pre-captured document: {doc.Name}")
+                except Exception as e:
+                    print(f"[_get_all_document_text] Pre-captured document stale ({e}), falling back")
+                    self._original_document = None
+
+            # 2. Fallback: try to find by name
+            if doc is None and self._original_document_name:
+                try:
+                    word = self._get_word_app()
+                    if word:
+                        for i in range(1, word.Documents.Count + 1):
+                            candidate = word.Documents.Item(i)
+                            if candidate.Name == self._original_document_name:
+                                doc = candidate
+                                print(f"[_get_all_document_text] Found document by name: {doc.Name}")
+                                break
+                except Exception as e:
+                    print(f"[_get_all_document_text] Name-based lookup failed: {e}")
+
+            # 3. Last resort: ActiveDocument
+            if doc is None:
+                try:
+                    word = self._get_word_app()
+                    if word:
+                        doc = word.ActiveDocument
+                        if doc:
+                            print(f"[_get_all_document_text] WARNING: Falling back to ActiveDocument: {doc.Name}")
+                except Exception as e:
+                    print(f"[_get_all_document_text] ActiveDocument fallback failed: {e}")
+
+            if doc:
+                content = doc.Content.Text
+                # Return WITHOUT stripping — cursor positions from Word Range
+                # are character offsets into this string, and .strip() would
+                # shift them.  Callers that need trimmed text can strip locally.
+                return content if content else ""
 
             return ""
         except Exception as e:
@@ -4814,39 +5195,17 @@ class WordLLMPopup(QDialog):
             settings = {
                 'temperature': 0.7,
                 'top_p': 0.95,
-                'max_tokens': -1,
+                'max_tokens': 32768,
                 'stream': False,
                 'thinking_level': 'None'
             }
 
-            # Use redline-aware system prompt when redline mode is active
+            # Use custom system prompt if set, else defaults
+            custom_sp = self._get_custom_system_prompt()
             if self._redline_mode_active:
-                system_prompt = (
-                    "You are a helpful writing assistant operating in REDLINE MODE. "
-                    "Your output will be diffed against the original text to produce "
-                    "Track Changes in Microsoft Word. You MUST preserve unchanged text "
-                    "EXACTLY as written — same words, same order, same punctuation. "
-                    "Only modify the specific parts that need changing per the user's "
-                    "instructions. Output only the requested text without any preamble, "
-                    "explanation, or markdown formatting unless specifically asked."
-                )
+                system_prompt = custom_sp if custom_sp else DEFAULT_WORD_REDLINE_SYSTEM_PROMPT
             else:
-                system_prompt = (
-                    "You are a helpful writing assistant for Microsoft Word documents. "
-                    "Follow the user's instructions precisely. Output only the requested "
-                    "text without any preamble or explanation.\n\n"
-                    "FORMAT RULES (strict defaults — override ONLY if the user explicitly "
-                    "asks for headings, bullet points, numbered lists, or other structure):\n"
-                    "- Always write in plain narrative prose. No headings (#, ##, ###), "
-                    "no bullet points, no numbered lists, no markdown formatting.\n"
-                    "- Use **bold** sparingly and only when the user asks for emphasis.\n"
-                    "- Do not use code blocks or HTML.\n\n"
-                    "CONTINUATION RULE: When the user asks you to finish a sentence, "
-                    "fill in a blank, or continue from a specific point, output ONLY "
-                    "the new text that comes after the existing content. Do NOT repeat "
-                    "any part of the preceding sentence, paragraph, or context that was "
-                    "provided to you. Start exactly where the existing text leaves off."
-                )
+                system_prompt = custom_sp if custom_sp else DEFAULT_WORD_SYSTEM_PROMPT
 
             print(f"Calling LLMHandler.generate...")
             result = LLMHandler.generate(
@@ -5108,7 +5467,7 @@ class WordLLMPopup(QDialog):
             settings = {
                 'temperature': 0.7,
                 'top_p': 0.95,
-                'max_tokens': -1,
+                'max_tokens': 32768,
                 'stream': False,
                 'thinking_level': 'None'
             }
@@ -5393,6 +5752,14 @@ class WordHotkeyManager:
             logger.debug(f"_show_popup called. popup={self.popup}, visible={self.popup.isVisible() if self.popup else 'N/A'}")
 
             if self.popup is None or not self.popup.isVisible():
+                # Capture foreground hwnd IMMEDIATELY — before any popup
+                # creation or COM calls that might shift focus.
+                fg_hwnd = None
+                try:
+                    fg_hwnd = win32gui.GetForegroundWindow() if HAS_WIN32 else None
+                except Exception:
+                    pass
+
                 # Detect active application context BEFORE creating popup
                 app_context, inspector = detect_active_app_context()
                 logger.debug(f"_show_popup: app_context={app_context}")
@@ -5401,7 +5768,7 @@ class WordHotkeyManager:
                 if app_context == APP_CONTEXT_UNKNOWN:
                     # Log what the foreground window actually is for debugging
                     try:
-                        hwnd = win32gui.GetForegroundWindow()
+                        hwnd = fg_hwnd or win32gui.GetForegroundWindow()
                         cls = win32gui.GetClassName(hwnd) if hwnd else "None"
                         title = win32gui.GetWindowText(hwnd)[:60] if hwnd else "None"
                         logger.debug(f"Win+V pressed but neither Word nor Outlook compose is active (fg={cls}, title={title})")
@@ -5429,7 +5796,7 @@ class WordHotkeyManager:
                 # to another Word document while typing a prompt causes the
                 # result to be inserted into the wrong document.
                 if app_context == APP_CONTEXT_WORD:
-                    self.popup._capture_initial_document()
+                    self.popup._capture_initial_document(fg_hwnd=fg_hwnd)
 
                 self.popup.show()
 
