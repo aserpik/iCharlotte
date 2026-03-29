@@ -14,6 +14,12 @@ from .models import (
     generate_abbreviation,
 )
 
+from .templates import (
+    TemplateLoader,
+    extract_requests_from_text,
+    substitute_variables,
+)
+
 __all__ = [
     'PartyRole',
     'DiscoveryMode',
@@ -25,4 +31,7 @@ __all__ = [
     'SetTrackerResult',
     'number_to_word',
     'generate_abbreviation',
+    'TemplateLoader',
+    'extract_requests_from_text',
+    'substitute_variables',
 ]
