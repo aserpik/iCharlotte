@@ -571,26 +571,39 @@ class PropoundTab(QWidget):
 
             # Seed from plaintiffs / defendants
             self.parties = []
+            client_name = manager.get_value(self.file_number, "client_name") or ""
+            if isinstance(client_name, list):
+                client_name = client_name[0] if client_name else ""
+            client_name = str(client_name).strip().lower()
+
             plaintiffs = manager.get_value(self.file_number, "plaintiffs")
             if isinstance(plaintiffs, list):
                 for name in plaintiffs:
+                    n = str(name).strip()
+                    is_client = client_name and client_name in n.lower()
                     self.parties.append(Party(
-                        name=str(name), role=PartyRole.PLAINTIFF, is_our_client=False,
+                        name=n, role=PartyRole.PLAINTIFF, is_our_client=is_client,
                     ))
             elif isinstance(plaintiffs, str) and plaintiffs.strip():
+                n = plaintiffs.strip()
+                is_client = client_name and client_name in n.lower()
                 self.parties.append(Party(
-                    name=plaintiffs.strip(), role=PartyRole.PLAINTIFF, is_our_client=False,
+                    name=n, role=PartyRole.PLAINTIFF, is_our_client=is_client,
                 ))
 
             defendants = manager.get_value(self.file_number, "defendants")
             if isinstance(defendants, list):
                 for name in defendants:
+                    n = str(name).strip()
+                    is_client = client_name and client_name in n.lower()
                     self.parties.append(Party(
-                        name=str(name), role=PartyRole.DEFENDANT, is_our_client=False,
+                        name=n, role=PartyRole.DEFENDANT, is_our_client=is_client,
                     ))
             elif isinstance(defendants, str) and defendants.strip():
+                n = defendants.strip()
+                is_client = client_name and client_name in n.lower()
                 self.parties.append(Party(
-                    name=defendants.strip(), role=PartyRole.DEFENDANT, is_our_client=False,
+                    name=n, role=PartyRole.DEFENDANT, is_our_client=is_client,
                 ))
 
             self._regenerate_abbreviations()
