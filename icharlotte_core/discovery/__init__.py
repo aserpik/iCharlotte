@@ -23,6 +23,7 @@ from .templates import (
 from .set_tracker import SetTracker
 from .declaration import generate_declaration
 from .assembler import DiscoveryAssembler
+from .engine import DiscoveryEngine
 
 __all__ = [
     'PartyRole',
@@ -41,4 +42,5 @@ __all__ = [
     'SetTracker',
     'generate_declaration',
     'DiscoveryAssembler',
+    'DiscoveryEngine',
 ]
