@@ -7,7 +7,6 @@ dataclasses for parties, requests, sets, and tracker results.
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import List, Optional
-import re
 
 
 # ---------------------------------------------------------------------------
