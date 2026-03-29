@@ -76,7 +76,9 @@ from icharlotte_core.ui.master_case_tab import MasterCaseTab
 from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.ui.templates_resources_tab import TemplatesResourcesTab
 from icharlotte_core.ui.deposition_tab import DepositionTab
+from icharlotte_core.ui.discovery_tab import DiscoveryTab
 from icharlotte_core.word_hotkey import init_word_hotkey, stop_word_hotkey
+from icharlotte_core.ui.zoom_handler import ZoomEventFilter
 from icharlotte_core.app_crash_handler import (
     install_crash_handler, checkpoint, add_context,
     log_info, log_warning, log_error, log_debug, safe_slot
@@ -854,6 +856,12 @@ class MainWindow(QMainWindow):
         if self.file_number:
             self.deposition_tab.load_case(self.file_number)
 
+        # --- Tab: Discovery ---
+        self.discovery_tab = DiscoveryTab()
+        self.tabs.addTab(self.discovery_tab, "Discovery")
+        if self.file_number:
+            self.discovery_tab.load_case(self.file_number)
+
         # --- Tab: Liability & Exposure ---
         self.liability_tab = LiabilityExposureTab()
         self.tabs.addTab(self.liability_tab, "Liability & Exposure")
@@ -942,11 +950,28 @@ class MainWindow(QMainWindow):
         self.prompts_btn.clicked.connect(self.manage_prompts)
         self.corner_layout.addWidget(self.prompts_btn)
 
-        # Settings button (secondary)
-        self.settings_btn = QPushButton("Settings")
-        self.settings_btn.setStyleSheet(secondary_btn_style)
-        self.settings_btn.clicked.connect(self.open_settings_dialog)
+        # Settings button with dropdown menu
+        self.settings_btn = QToolButton()
+        self.settings_btn.setText("Settings ▾")
+        self.settings_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.settings_btn.setStyleSheet(secondary_btn_style.replace("QPushButton", "QToolButton") + """
+            QToolButton::menu-indicator { image: none; }
+        """)
+        self.settings_menu = QMenu(self)
+        self.settings_menu.addAction("LLM Settings", self.open_settings_dialog)
+        self.settings_menu.addSeparator()
+        self.email_monitor_action = self.settings_menu.addAction("Email Monitor")
+        self.email_monitor_action.setCheckable(True)
+        self.docket_refresh_action = self.settings_menu.addAction("Auto Docket Refresh")
+        self.docket_refresh_action.setCheckable(True)
+        self.settings_btn.setMenu(self.settings_menu)
         self.corner_layout.addWidget(self.settings_btn)
+
+        # Wire settings actions to master_case_tab's toggle methods
+        self.master_tab.email_monitor_action = self.email_monitor_action
+        self.master_tab.docket_refresh_action = self.docket_refresh_action
+        self.email_monitor_action.toggled.connect(self.master_tab.toggle_email_monitor)
+        self.docket_refresh_action.toggled.connect(self.master_tab.toggle_docket_refresh)
 
         # Restart button (red - danger)
         self.restart_btn = QPushButton("Restart")
@@ -957,6 +982,11 @@ class MainWindow(QMainWindow):
         self.corner_layout.addWidget(self.restart_btn)
 
         self.tabs.setCornerWidget(self.corner_widget, Qt.Corner.TopRightCorner)
+
+        # Ctrl+Scroll zoom for all tabs (skips PDF viewers)
+        self._zoom_filter = ZoomEventFilter(self.tabs, self)
+        QApplication.instance().installEventFilter(self._zoom_filter)
+
         checkpoint("setup_ui complete - all tabs created")
 
     def setup_view_menu(self):
@@ -1342,6 +1372,8 @@ class MainWindow(QMainWindow):
                     self.email_tab.perform_search()
                 if hasattr(self, 'email_update_tab'):
                     self.email_update_tab.on_case_changed(new_file_num)
+                if hasattr(self, 'discovery_tab'):
+                    self.discovery_tab.load_case(new_file_num)
 
                 log_event(f"Switched to case {new_file_num}")
             else:
@@ -1400,6 +1432,8 @@ class MainWindow(QMainWindow):
                 self.email_update_tab.on_case_changed(file_number)
             if hasattr(self, 'deposition_tab'):
                 self.deposition_tab.load_case(file_number)
+            if hasattr(self, 'discovery_tab'):
+                self.discovery_tab.load_case(file_number)
 
             log_event(f"Switched to case {self.file_number}")
         else:
