@@ -21,6 +21,7 @@ from .templates import (
 )
 
 from .set_tracker import SetTracker
+from .declaration import generate_declaration
 
 __all__ = [
     'PartyRole',
@@ -37,4 +38,5 @@ __all__ = [
     'extract_requests_from_text',
     'substitute_variables',
     'SetTracker',
+    'generate_declaration',
 ]
