@@ -185,8 +185,13 @@ class TestParty(unittest.TestCase):
     def test_formal_description(self):
         p = Party(name="John Smith", role=PartyRole.PLAINTIFF, is_our_client=True)
         desc = p.formal_description
-        self.assertIn("John Smith", desc)
-        self.assertIn("Plaintiff", desc)
+        # California convention: role precedes uppercased name
+        self.assertEqual(desc, "Plaintiff, JOHN SMITH")
+
+    def test_formal_description_defendant(self):
+        p = Party(name="Servitek Electric, Inc.", role=PartyRole.DEFENDANT, is_our_client=False)
+        desc = p.formal_description
+        self.assertEqual(desc, "Defendant, SERVITEK ELECTRIC, INC.")
 
     def test_to_dict_from_dict_roundtrip(self):
         p = Party(name="Acme Corp", role=PartyRole.DEFENDANT, is_our_client=False, abbreviation="Acme")

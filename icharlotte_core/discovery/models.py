@@ -220,8 +220,8 @@ class Party:
 
     @property
     def formal_description(self) -> str:
-        """Formal description for document headings (e.g. 'John Smith, Plaintiff')."""
-        return f"{self.name}, {self.role_label}"
+        """Formal description for document headings (e.g. 'Defendant, SERVITEK ELECTRIC, INC.')."""
+        return f"{self.role_label}, {self.name.upper()}"
 
     def to_dict(self) -> dict:
         return {
@@ -234,8 +234,8 @@ class Party:
     @classmethod
     def from_dict(cls, data: dict) -> 'Party':
         return cls(
-            name=data.get('name', ''),
-            role=PartyRole(data.get('role', 'plaintiff')),
+            name=data["name"],
+            role=PartyRole(data["role"]),
             is_our_client=data.get('is_our_client', False),
             abbreviation=data.get('abbreviation', ''),
         )
