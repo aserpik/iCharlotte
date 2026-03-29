@@ -6,6 +6,7 @@ prompt, generate button) and right-pane editor shell (toolbar, document
 sub-tabs, empty state).
 """
 
+import logging
 import os
 from typing import Dict, List, Optional
 
@@ -14,17 +15,23 @@ from PySide6.QtWidgets import (
     QComboBox, QRadioButton, QButtonGroup, QCheckBox, QTextEdit,
     QPushButton, QListWidgetItem, QMenu, QScrollArea, QGroupBox,
     QDialog, QLineEdit, QFormLayout, QDialogButtonBox, QSizePolicy,
+    QPlainTextEdit,
 )
 from PySide6.QtCore import Qt, QTimer, Signal, QFileInfo
 from PySide6.QtGui import QDragEnterEvent, QDropEvent, QAction
 
 from icharlotte_core.ui.tabs import ResizableListWidget
-from icharlotte_core.llm import ModelFetcher
+from icharlotte_core.llm import LLMWorker, ModelFetcher
 from icharlotte_core.config import API_KEYS
 from icharlotte_core.discovery.models import (
     Party, PartyRole, DiscoveryMode, DiscoveryType, CustomStyle,
-    generate_abbreviation,
+    DiscoverySet, generate_abbreviation,
 )
+from icharlotte_core.discovery.engine import DiscoveryEngine
+from icharlotte_core.discovery.assembler import DiscoveryAssembler
+from icharlotte_core.discovery.templates import extract_requests_from_text
+
+logger = logging.getLogger(__name__)
 
 try:
     import fitz  # PyMuPDF
@@ -120,6 +127,7 @@ class PropoundTab(QWidget):
         self.parties: List[Party] = []
         self.cached_models: Dict[str, list] = {}
         self.fetcher: Optional[ModelFetcher] = None
+        self.generated_sets: List[DiscoverySet] = []
 
         self._build_ui()
         self._connect_signals()
@@ -776,17 +784,358 @@ class PropoundTab(QWidget):
         self._load_parties_from_case()
 
     # ------------------------------------------------------------------
-    # Stubs (wired in Task 8)
+    # Case path resolution
+    # ------------------------------------------------------------------
+
+    @property
+    def case_path(self) -> Optional[str]:
+        """Resolve the physical case folder for the current file_number."""
+        if not self.file_number:
+            return None
+        try:
+            from icharlotte_core.utils import get_case_path
+            return get_case_path(self.file_number)
+        except Exception:
+            return None
+
+    # ------------------------------------------------------------------
+    # Generate, LLM, display, and save
     # ------------------------------------------------------------------
 
     def _on_generate(self):
-        pass
+        """Generate discovery based on current mode and settings."""
+        # 1. Gather inputs
+        mode = self._current_mode()
+        disc_types = self.selected_discovery_types()
+        directed_to = self._get_directed_to_party()
+        our_client = self._get_our_client()
+
+        # 2. Validate
+        if not disc_types:
+            self.status_label.setText("Select at least one discovery type.")
+            return
+        if directed_to is None:
+            self.status_label.setText("Select the party discovery is directed to.")
+            return
+        if our_client is None:
+            self.status_label.setText(
+                "Mark one party as 'Our client' (right-click party to edit)."
+            )
+            return
+
+        # 3. Create engine
+        discovery_dir = os.path.join(os.getcwd(), "discovery")
+        engine = DiscoveryEngine(discovery_dir)
+
+        # 4. Build variables
+        # For standard negligence, defendant is typically the responding party
+        defendant = None
+        for p in self.parties:
+            if p.role == PartyRole.DEFENDANT:
+                defendant = p
+                break
+
+        variables = {
+            "responding_party_name": directed_to.name,
+            "propounding_party_name": our_client.name,
+            "defendant_name": defendant.name if defendant else directed_to.name,
+        }
+
+        # 5. Disable generate button, show status
+        self.generate_btn.setEnabled(False)
+        self.status_label.setText("Generating...")
+
+        # 6. Branch by mode
+        if mode == DiscoveryMode.INITIAL_STANDARD:
+            try:
+                results = engine.generate_standard(
+                    standard_type="negligence",
+                    discovery_types=disc_types,
+                    directed_to=directed_to,
+                    propounding_party=our_client,
+                    variables=variables,
+                )
+                self._display_results(results)
+            except Exception as e:
+                logger.exception("Standard generation failed")
+                self.status_label.setText(f"Error: {e}")
+            finally:
+                self.generate_btn.setEnabled(True)
+
+        elif mode == DiscoveryMode.INITIAL_CUSTOM:
+            custom_style = self._current_custom_style()
+            user_prompt = self.prompt_edit.toPlainText().strip()
+
+            if not user_prompt:
+                self.status_label.setText("Enter instructions in the prompt box.")
+                self.generate_btn.setEnabled(True)
+                return
+
+            context_text = self.read_files_content()
+
+            try:
+                results = engine.generate_custom(
+                    custom_style=custom_style,
+                    standard_type="negligence",
+                    discovery_types=disc_types,
+                    directed_to=directed_to,
+                    propounding_party=our_client,
+                    user_instructions=user_prompt,
+                    context_text=context_text,
+                    variables=variables,
+                )
+                self.generated_sets = results
+
+                # For each DiscoverySet, build LLM prompt and run in background
+                for ds in results:
+                    # Determine start number for LLM-generated requests
+                    start_number = len(ds.requests) + 1 + ds.previous_count
+
+                    # Build the standard requests text for reference
+                    standard_text = ds.plain_text() if ds.requests else ""
+
+                    prompt = engine.build_llm_prompt(
+                        discovery_type=ds.discovery_type,
+                        user_instructions=user_prompt,
+                        custom_style=custom_style,
+                        context_text=context_text,
+                        start_number=start_number,
+                        standard_requests_text=standard_text,
+                    )
+                    self._run_llm(prompt, ds, custom_style)
+            except Exception as e:
+                logger.exception("Custom generation failed")
+                self.status_label.setText(f"Error: {e}")
+                self.generate_btn.setEnabled(True)
+
+        elif mode == DiscoveryMode.ADDITIONAL:
+            user_prompt = self.prompt_edit.toPlainText().strip()
+            if not user_prompt:
+                self.status_label.setText("Enter instructions in the prompt box.")
+                self.generate_btn.setEnabled(True)
+                return
+
+            cp = self.case_path
+            if not cp or not os.path.isdir(cp):
+                self.status_label.setText("Could not resolve case folder for this file number.")
+                self.generate_btn.setEnabled(True)
+                return
+
+            context_text = self.read_files_content()
+
+            try:
+                results = engine.prepare_additional(
+                    case_path=cp,
+                    discovery_types=disc_types,
+                    directed_to=directed_to,
+                    propounding_party=our_client,
+                )
+                self.generated_sets = results
+
+                for ds in results:
+                    start_number = ds.previous_count + 1
+
+                    prompt = engine.build_llm_prompt(
+                        discovery_type=ds.discovery_type,
+                        user_instructions=user_prompt,
+                        custom_style=CustomStyle.CUSTOM_ONLY,
+                        context_text=context_text,
+                        start_number=start_number,
+                    )
+                    self._run_llm(prompt, ds)
+            except Exception as e:
+                logger.exception("Additional generation failed")
+                self.status_label.setText(f"Error: {e}")
+                self.generate_btn.setEnabled(True)
+
+    def _get_directed_to_party(self) -> Optional[Party]:
+        """Return the selected 'directed to' party from the combo box."""
+        idx = self.party_combo.currentIndex()
+        if 0 <= idx < len(self.parties):
+            return self.parties[idx]
+        return None
+
+    def _get_our_client(self) -> Optional[Party]:
+        """Return the party marked as 'our client', or None."""
+        for p in self.parties:
+            if p.is_our_client:
+                return p
+        return None
+
+    # ------------------------------------------------------------------
+    # LLM worker
+    # ------------------------------------------------------------------
+
+    def _run_llm(self, prompt: str, discovery_set: DiscoverySet,
+                 custom_style: Optional[CustomStyle] = None):
+        """Kick off an LLM worker thread for a single DiscoverySet."""
+        provider = self.provider_combo.currentText()
+        model = self.model_combo.currentText()
+
+        worker = LLMWorker(
+            provider=provider,
+            model=model,
+            system="You are a California litigation attorney.",
+            user=prompt,
+            files=[],
+            settings={"stream": False},
+        )
+
+        # Store custom_style on the worker so the finished handler can check it
+        worker._ds = discovery_set
+        worker._custom_style = custom_style
+
+        worker.finished.connect(
+            lambda text, _ds=discovery_set, _cs=custom_style: self._on_llm_finished(text, _ds, _cs)
+        )
+        worker.error.connect(self._on_llm_error)
+
+        # Store a reference so the worker isn't garbage collected
+        if not hasattr(self, "_llm_workers"):
+            self._llm_workers = []
+        self._llm_workers.append(worker)
+
+        worker.start()
+
+    def _on_llm_finished(self, response_text: str, discovery_set: DiscoverySet,
+                         custom_style: Optional[CustomStyle] = None):
+        """Handle LLM completion for a DiscoverySet."""
+        parsed = extract_requests_from_text(response_text, discovery_set.discovery_type)
+
+        if custom_style == CustomStyle.STANDARD_PLUS_CUSTOM and discovery_set.requests:
+            # Extend: renumber the new requests to continue from the existing ones
+            offset = len(discovery_set.requests) + discovery_set.previous_count
+            for req in parsed:
+                req.number = offset + parsed.index(req) + 1
+            discovery_set.requests.extend(parsed)
+        else:
+            # Replace: use parsed requests directly
+            discovery_set.requests = parsed
+
+        self._display_results(self.generated_sets)
+        self.generate_btn.setEnabled(True)
+        self.status_label.setText(
+            f"Generated {len(discovery_set.requests)} requests for "
+            f"{discovery_set.discovery_type.abbreviation}, "
+            f"Set {discovery_set.set_word}."
+        )
+
+    def _on_llm_error(self, error_msg: str):
+        """Handle LLM error."""
+        self.generate_btn.setEnabled(True)
+        self.status_label.setText(f"LLM Error: {error_msg}")
+        logger.error("LLM error during discovery generation: %s", error_msg)
+
+    # ------------------------------------------------------------------
+    # Display results
+    # ------------------------------------------------------------------
+
+    def _display_results(self, results: List[DiscoverySet]):
+        """Display generated discovery sets in the right-pane tabs."""
+        self.generated_sets = results
+
+        # Clear existing tabs
+        self.doc_tabs.clear()
+
+        if not results:
+            self.doc_tabs.hide()
+            self.empty_label.show()
+            return
+
+        # Hide empty state, show tabs + save buttons
+        self.empty_label.hide()
+        self.doc_tabs.show()
+
+        for ds in results:
+            editor = QPlainTextEdit()
+            editor.setPlainText(ds.plain_text())
+            editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+
+            # Build tab label: e.g. "SI(1) tPltf"
+            directed_abbr = ds.directed_to.abbreviation or ds.directed_to.name.split()[0]
+            tab_label = f"{ds.discovery_type.abbreviation}({ds.set_number}) t{directed_abbr}"
+            self.doc_tabs.addTab(editor, tab_label)
+
+        # Update status
+        total_requests = sum(len(ds.requests) for ds in results)
+        set_count = len(results)
+        self.status_label.setText(
+            f"{total_requests} requests across {set_count} "
+            f"{'set' if set_count == 1 else 'sets'}."
+        )
+
+    # ------------------------------------------------------------------
+    # Save
+    # ------------------------------------------------------------------
 
     def _save_current(self):
-        pass
+        """Save the currently visible discovery set tab as a .docx."""
+        idx = self.doc_tabs.currentIndex()
+        if idx < 0 or idx >= len(self.generated_sets):
+            self.status_label.setText("No document to save.")
+            return
+
+        ds = self.generated_sets[idx]
+        editor = self.doc_tabs.widget(idx)
+        if isinstance(editor, QPlainTextEdit):
+            plain_text = editor.toPlainText()
+        else:
+            plain_text = ds.plain_text()
+
+        self._save_discovery_set(ds, plain_text)
 
     def _save_all(self):
-        pass
+        """Save all generated discovery sets as .docx files."""
+        if not self.generated_sets:
+            self.status_label.setText("No documents to save.")
+            return
+
+        saved = []
+        for idx, ds in enumerate(self.generated_sets):
+            editor = self.doc_tabs.widget(idx)
+            if isinstance(editor, QPlainTextEdit):
+                plain_text = editor.toPlainText()
+            else:
+                plain_text = ds.plain_text()
+            result = self._save_discovery_set(ds, plain_text)
+            if result:
+                saved.append(result)
+
+        if saved:
+            self.status_label.setText(
+                f"Saved {len(saved)} file{'s' if len(saved) != 1 else ''}: "
+                f"{', '.join(os.path.basename(s) for s in saved)}"
+            )
+
+    def _save_discovery_set(self, ds: DiscoverySet, plain_text: str) -> Optional[str]:
+        """Save a single DiscoverySet to a .docx file. Returns the output path or None."""
+        cp = self.case_path
+        if not cp or not os.path.isdir(cp):
+            self.status_label.setText("Could not resolve case folder.")
+            return None
+
+        caption_path = DiscoveryAssembler.find_caption_page(cp)
+        if not caption_path:
+            self.status_label.setText("No caption page found in case folder.")
+            return None
+
+        output_dir = os.path.join(cp, "NOTES", "AI OUTPUT", "DISCOVERY REQUESTS")
+        output_path = os.path.join(output_dir, ds.filename)
+
+        try:
+            assembler = DiscoveryAssembler(caption_path)
+            assembler.assemble_from_plain_text(
+                plain_text=plain_text,
+                discovery_set=ds,
+                output_path=output_path,
+            )
+            self.status_label.setText(f"Saved: {ds.filename}")
+            logger.info("Saved discovery document: %s", output_path)
+            return output_path
+        except Exception as e:
+            logger.exception("Failed to save discovery set")
+            self.status_label.setText(f"Save error: {e}")
+            return None
 
 
 # ---------------------------------------------------------------------------
