@@ -365,13 +365,11 @@ class TestAssembleSectionHeading(unittest.TestCase):
                 break
 
         self.assertIsNotNone(heading_para, "Section heading not found in document")
-        # The style "Center Double Bold Und" handles centering — check style name
-        style_name = heading_para.style.name if heading_para.style else ""
-        is_centered = (
-            heading_para.alignment == WD_ALIGN_PARAGRAPH.CENTER
-            or "center" in style_name.lower()
-        )
-        self.assertTrue(is_centered, f"Heading should be centered, got style={style_name}")
+        # Verify the heading has bold+underline formatting
+        has_bold = any(run.bold for run in heading_para.runs if run.text.strip())
+        has_underline = any(run.underline for run in heading_para.runs if run.text.strip())
+        self.assertTrue(has_bold, "Section heading should be bold")
+        self.assertTrue(has_underline, "Section heading should be underlined")
 
 
 if __name__ == "__main__":
