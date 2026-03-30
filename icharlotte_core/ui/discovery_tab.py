@@ -333,11 +333,13 @@ class PropoundTab(QWidget):
 
         self.save_btn = QPushButton("Save as .docx")
         self.save_all_btn = QPushButton("Save All")
+        self.clear_btn = QPushButton("Clear")
         self.status_label = QLabel("")
         self.status_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         toolbar.addWidget(self.save_btn)
         toolbar.addWidget(self.save_all_btn)
+        toolbar.addWidget(self.clear_btn)
         toolbar.addWidget(self.status_label)
 
         parent_layout.addLayout(toolbar)
@@ -383,6 +385,7 @@ class PropoundTab(QWidget):
         self.generate_btn.clicked.connect(self._on_generate)
         self.save_btn.clicked.connect(self._save_current)
         self.save_all_btn.clicked.connect(self._save_all)
+        self.clear_btn.clicked.connect(self._clear_editor)
 
         # Kick off initial model fetch
         self._update_models(self.provider_combo.currentText())
@@ -1076,6 +1079,14 @@ class PropoundTab(QWidget):
             f"{total_requests} requests across {set_count} "
             f"{'set' if set_count == 1 else 'sets'}."
         )
+
+    def _clear_editor(self):
+        """Clear the right-pane editor, resetting to empty state."""
+        self.generated_sets = []
+        self.doc_tabs.clear()
+        self.doc_tabs.hide()
+        self.empty_label.show()
+        self.status_label.setText("")
 
     # ------------------------------------------------------------------
     # Save
