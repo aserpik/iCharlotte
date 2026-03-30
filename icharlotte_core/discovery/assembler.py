@@ -3,16 +3,18 @@ Document assembler for the discovery generation pipeline.
 
 Renders DiscoverySet objects into formatted .docx files by appending
 content after a caption page template.  Uses the template's built-in
-styles (Body Double, Center Double Bold Und, etc.) for double-spaced
-legal document formatting.
+styles (Body Double, Center Double Bold Und, Discovery No., etc.) for
+double-spaced legal document formatting.
 """
 import os
 from datetime import date
 from typing import Optional
 
 from docx import Document as DocxDocument
-from docx.shared import Pt
+from docx.shared import Pt, Inches, Emu
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
 
 from .models import DiscoverySet, DiscoveryType, number_to_word
 from .declaration import generate_declaration
@@ -20,34 +22,37 @@ from .templates import extract_requests_from_text
 
 
 # ---------------------------------------------------------------------------
-# Style constants — these are pre-defined in the caption page template
+# Style constants — pre-defined in the caption page template
 # ---------------------------------------------------------------------------
-STYLE_BODY_DOUBLE = "Body Double"               # Standard double-spaced body text
-STYLE_CENTER_DOUBLE = "Center Double"            # Centered double-spaced
+STYLE_BODY_DOUBLE = "Body Double"                   # Double-spaced, 0.5" first-line indent
+STYLE_CENTER_DOUBLE = "Center Double"               # Centered double-spaced
 STYLE_CENTER_DOUBLE_BOLD_UND = "Center Double Bold Und"  # Centered bold underline
-STYLE_FLUSH_LEFT_DOUBLE = "Flush Left Double"    # Left-aligned double-spaced
-STYLE_DOUBLE_SPACING = "Double Spacing"          # Generic double-spaced
+STYLE_FLUSH_LEFT_DOUBLE = "Flush Left Double"        # Left-aligned double-spaced, no indent
+STYLE_DISCOVERY_NO = "Discovery No."                 # Request headers (no indent, bold underline)
 
 
-# ---------------------------------------------------------------------------
-# Formatting helpers
-# ---------------------------------------------------------------------------
+def _safe_style(doc, preferred, fallback=STYLE_BODY_DOUBLE):
+    """Return the preferred style if it exists, otherwise fallback."""
+    try:
+        return doc.styles[preferred]
+    except KeyError:
+        try:
+            return doc.styles[fallback]
+        except KeyError:
+            return None
 
-def _add_styled_paragraph(doc, text="", style_name=STYLE_BODY_DOUBLE,
-                          bold=False, underline=False):
-    """Add a paragraph using a named template style.
 
-    Falls back to manual formatting if the style is not found.
-    Returns the paragraph.
+def _add_para(doc, text="", style_name=STYLE_BODY_DOUBLE,
+              bold=False, underline=False):
+    """Add a double-spaced paragraph using a named template style.
+
+    Uses the template's built-in styles which already have correct
+    line spacing, indentation, and font settings.
     """
     para = doc.add_paragraph()
-
-    # Try to apply the named style
-    try:
-        para.style = doc.styles[style_name]
-    except KeyError:
-        # Style not in template — fall back to manual double-spacing
-        para.paragraph_format.line_spacing = Pt(24)
+    style = _safe_style(doc, style_name)
+    if style:
+        para.style = style
 
     if text:
         run = para.add_run(text)
@@ -57,13 +62,7 @@ def _add_styled_paragraph(doc, text="", style_name=STYLE_BODY_DOUBLE,
             run.bold = True
         if underline:
             run.underline = True
-
     return para
-
-
-def _add_empty_line(doc):
-    """Add a blank double-spaced paragraph."""
-    _add_styled_paragraph(doc, "")
 
 
 # ---------------------------------------------------------------------------
@@ -71,15 +70,7 @@ def _add_empty_line(doc):
 # ---------------------------------------------------------------------------
 
 class DiscoveryAssembler:
-    """Assembles DiscoverySet objects into formatted .docx files.
-
-    Parameters
-    ----------
-    caption_page_path : str
-        Path to a .docx caption page template.  The assembler opens this
-        file, preserves its styles and formatting, then appends discovery
-        content after the existing caption.
-    """
+    """Assembles DiscoverySet objects into formatted .docx files."""
 
     def __init__(self, caption_page_path: str):
         if not os.path.isfile(caption_page_path):
@@ -98,58 +89,56 @@ class DiscoveryAssembler:
         firm_name: str = "Bordin Semmer LLP",
         date_str: str = "",
     ) -> str:
-        """Render a DiscoverySet into a formatted .docx file.
-
-        Opens the caption page template, replaces the document title
-        placeholder in the caption table, then appends all discovery
-        sections in order.  Creates the output directory if needed.
-
-        Returns the output_path on success.
-        """
+        """Render a DiscoverySet into a formatted .docx file."""
         ds = discovery_set
         if not date_str:
             date_str = date.today().strftime("%B %d, %Y")
 
         doc = DocxDocument(self.caption_page_path)
 
-        # --- (a) Replace "CAPTION PAGE" placeholder in caption table ---
-        self._replace_caption_title(doc, ds)
+        # Build the document title
+        title = self._build_title(ds)
 
-        # --- (b) Propounding / Responding party block ---
+        # (1) Replace "CAPTION PAGE" in caption table, or insert title if empty
+        self._set_caption_title(doc, title)
+
+        # (2) Propounding / Responding party block (indented)
         self._insert_party_block(doc, ds)
 
-        # --- (c) Preamble paragraph ---
-        _add_empty_line(doc)
+        # (3) Preamble
+        _add_para(doc, "")
         preamble = self._build_preamble(ds)
-        _add_styled_paragraph(doc, preamble, STYLE_FLUSH_LEFT_DOUBLE)
+        _add_para(doc, preamble, STYLE_FLUSH_LEFT_DOUBLE)
 
-        # --- (d) Instructions to Answering Party ---
+        # (4) Instructions
         if ds.instructions_block:
-            _add_empty_line(doc)
+            _add_para(doc, "")
             self._insert_instructions(doc, ds.instructions_block)
 
-        # --- (e) Definitions block ---
+        # (4b) Definitions
         if ds.definitions_block:
-            _add_empty_line(doc)
+            _add_para(doc, "")
             self._insert_definitions(doc, ds.definitions_block)
 
-        # --- (f) Section heading ---
-        _add_empty_line(doc)
-        heading_text = f"{ds.discovery_type.section_heading}, SET {ds.set_word.upper()}"
-        _add_styled_paragraph(doc, heading_text, STYLE_CENTER_DOUBLE_BOLD_UND,
-                              bold=True, underline=True)
+        # (5) Section heading (centered, bold, underline)
+        _add_para(doc, "")
+        heading = f"{ds.discovery_type.section_heading}, SET {ds.set_word.upper()}"
+        p = _add_para(doc, heading, STYLE_CENTER_DOUBLE_BOLD_UND, bold=True, underline=True)
+        # Ensure first_line_indent is 0 for centered headings
+        p.paragraph_format.first_line_indent = Inches(0)
 
-        # --- (g) Numbered discovery requests ---
-        _add_empty_line(doc)
+        # (6) Requests — NO extra blank lines between them
         self._insert_requests(doc, ds)
 
-        # --- (h) Signature block ---
-        _add_empty_line(doc)
+        # (7) Signature block
         self._insert_signature_block(doc, ds, attorney_name, firm_name, date_str)
 
-        # --- (i) Declaration (if needed) ---
+        # (8) Declaration (if needed)
         if ds.needs_declaration:
             self._insert_declaration(doc, ds, attorney_name, firm_name, date_str)
+
+        # (9) Footer — document title
+        self._set_footer(doc, title)
 
         # Ensure output directory exists
         output_dir = os.path.dirname(output_path)
@@ -183,31 +172,23 @@ class DiscoveryAssembler:
         """Search a case folder for a .docx with 'caption page' in the filename."""
         if not os.path.isdir(case_path):
             return None
-
         for entry in os.listdir(case_path):
             if entry.lower().endswith(".docx") and "caption page" in entry.lower():
                 return os.path.join(case_path, entry)
-
-        # Also check one level of subdirectories
+        # Check one level of subdirectories
         for entry in os.listdir(case_path):
             subdir = os.path.join(case_path, entry)
             if os.path.isdir(subdir):
                 for sub_entry in os.listdir(subdir):
-                    if (
-                        sub_entry.lower().endswith(".docx")
-                        and "caption page" in sub_entry.lower()
-                    ):
+                    if sub_entry.lower().endswith(".docx") and "caption page" in sub_entry.lower():
                         return os.path.join(subdir, sub_entry)
-
         return None
 
     # -- private helpers ----------------------------------------------------
 
-    def _replace_caption_title(self, doc, ds: DiscoverySet):
-        """Replace the 'CAPTION PAGE' placeholder in the caption table
-        with the actual document title (e.g., 'DEFENDANT ...'S SPECIAL
-        INTERROGATORIES TO PLAINTIFF ..., SET ONE')."""
-        title = ds.discovery_type.document_title_template.format(
+    def _build_title(self, ds: DiscoverySet) -> str:
+        """Build the full document title."""
+        return ds.discovery_type.document_title_template.format(
             propounding=f"DEFENDANT {ds.propounding_party.name.upper()}",
             responding=(
                 f"{ds.directed_to.role_label.upper()} "
@@ -216,13 +197,20 @@ class DiscoveryAssembler:
             set_word=ds.set_word.upper(),
         )
 
-        # Search through all tables for "CAPTION PAGE" text and replace it
+    def _set_caption_title(self, doc, title: str):
+        """Set the document title in the caption page table.
+
+        Strategy:
+        1. Look for "CAPTION PAGE" placeholder text and replace it
+        2. If not found, look for the right column of the caption table
+           (table with 3 columns, cell [0,2]) and insert title there
+        """
+        # Strategy 1: Replace "CAPTION PAGE" text
         for table in doc.tables:
             for row in table.rows:
                 for cell in row.cells:
                     for para in cell.paragraphs:
                         if "CAPTION PAGE" in para.text.upper():
-                            # Clear existing runs and insert title
                             for run in para.runs:
                                 run.text = ""
                             if para.runs:
@@ -235,155 +223,194 @@ class DiscoveryAssembler:
                                 run.underline = True
                                 run.font.name = "Times New Roman"
                                 run.font.size = Pt(12)
-                            return  # Only replace the first match
+                            return
+
+        # Strategy 2: Find the 3-column caption table, insert into right cell
+        for table in doc.tables:
+            if len(table.columns) >= 3:
+                cell = table.rows[0].cells[2]
+                # Find an empty paragraph or the paragraph after "Case No."
+                target_para = None
+                for para in cell.paragraphs:
+                    if not para.text.strip():
+                        target_para = para
+                        continue
+                    if "case no" in para.text.lower():
+                        # Title goes AFTER the case number lines — keep looking
+                        target_para = None
+                        continue
+
+                # Insert title after case number block
+                # Find the right position: after dept/assignment line, before complaint filed
+                for i, para in enumerate(cell.paragraphs):
+                    text_lower = para.text.strip().lower()
+                    if text_lower.startswith("(assigned") or text_lower.startswith("dept"):
+                        # Insert title after this paragraph
+                        # Add a blank line then the title
+                        if i + 1 < len(cell.paragraphs):
+                            target_para = cell.paragraphs[i + 1]
+                        break
+
+                if target_para is not None and not target_para.text.strip():
+                    # Clear and set the title
+                    for run in target_para.runs:
+                        run.text = ""
+                    run = target_para.add_run(title)
+                    run.bold = True
+                    run.underline = True
+                    run.font.name = "Times New Roman"
+                    run.font.size = Pt(12)
+                    return
+
+                # Last resort: add title as new paragraph in the cell
+                para = cell.add_paragraph()
+                run = para.add_run(title)
+                run.bold = True
+                run.underline = True
+                run.font.name = "Times New Roman"
+                run.font.size = Pt(12)
+                return
 
     def _insert_party_block(self, doc, ds: DiscoverySet):
-        """Insert propounding/responding party identification block."""
-        _add_empty_line(doc)
-        _add_empty_line(doc)
-        _add_styled_paragraph(
-            doc,
+        """Insert propounding/responding party block.
+
+        Uses the same indent as the sample: left=2400300 EMU (~2.62"),
+        first_line_indent=-1943100 EMU (hanging) — this creates the
+        tab-aligned layout where labels and values align via tabs.
+        """
+        LEFT_INDENT = Emu(2400300)
+        HANGING_INDENT = Emu(-1943100)
+
+        _add_para(doc, "")
+
+        for text in [
             f"PROPOUNDING PARTY:\t{ds.propounding_party.formal_description}",
-            STYLE_BODY_DOUBLE,
-        )
-        _add_styled_paragraph(
-            doc,
             f"RESPONDING PARTY:\t{ds.directed_to.formal_description}",
-            STYLE_FLUSH_LEFT_DOUBLE,
-        )
-        _add_styled_paragraph(
-            doc,
             f"SET NO.:\t{ds.set_word.upper()} ({ds.set_number})",
-            STYLE_FLUSH_LEFT_DOUBLE,
-        )
+        ]:
+            p = _add_para(doc, text, STYLE_FLUSH_LEFT_DOUBLE)
+            p.paragraph_format.left_indent = LEFT_INDENT
+            p.paragraph_format.first_line_indent = HANGING_INDENT
 
     def _insert_instructions(self, doc, instructions_block: str):
-        """Insert the instructions to answering party block."""
+        """Insert the instructions block."""
         lines = instructions_block.strip().split("\n")
         for line in lines:
             stripped = line.strip()
             if not stripped:
-                _add_empty_line(doc)
                 continue
             if "INSTRUCTIONS TO ANSWERING PARTY" in stripped.upper():
-                _add_styled_paragraph(
-                    doc, stripped, STYLE_CENTER_DOUBLE_BOLD_UND,
-                    bold=True, underline=True,
-                )
+                p = _add_para(doc, stripped, STYLE_BODY_DOUBLE, bold=True, underline=True)
+                p.paragraph_format.first_line_indent = Inches(0)
             else:
-                _add_styled_paragraph(doc, stripped, STYLE_BODY_DOUBLE)
+                _add_para(doc, stripped, STYLE_BODY_DOUBLE)
 
     def _insert_definitions(self, doc, definitions_block: str):
         """Insert the definitions block."""
-        lines = definitions_block.strip().split("\n")
-        for line in lines:
+        for line in definitions_block.strip().split("\n"):
             stripped = line.strip()
             if not stripped:
-                _add_empty_line(doc)
                 continue
             if stripped.upper() in ("DEFINITIONS", "DEFINED TERMS"):
-                _add_styled_paragraph(
-                    doc, stripped, STYLE_CENTER_DOUBLE_BOLD_UND,
-                    bold=True, underline=True,
-                )
+                p = _add_para(doc, stripped, STYLE_CENTER_DOUBLE_BOLD_UND,
+                              bold=True, underline=True)
+                p.paragraph_format.first_line_indent = Inches(0)
             else:
-                _add_styled_paragraph(doc, stripped, STYLE_BODY_DOUBLE)
+                _add_para(doc, stripped, STYLE_BODY_DOUBLE)
 
     def _insert_requests(self, doc, ds: DiscoverySet):
-        """Insert numbered discovery requests with inline definitions."""
+        """Insert numbered discovery requests with NO extra blank lines.
+
+        Request headers use "Discovery No." style (no indent, bold underline).
+        Request body and definitions use "Body Double" style (0.5" first-line indent).
+        """
         for req in ds.requests:
-            # Request header (bold + underline)
-            header = ds.discovery_type.request_header_template.format(
-                number=req.number
-            )
-            # Add colon if not already present
+            # Request header — "Discovery No." style (no 0.5" indent)
+            header = ds.discovery_type.request_header_template.format(number=req.number)
             if not header.endswith(":"):
                 header += ":"
-            _add_styled_paragraph(doc, header, STYLE_BODY_DOUBLE,
-                                  bold=True, underline=True)
+            _add_para(doc, header, STYLE_DISCOVERY_NO, bold=True, underline=True)
 
-            # Request body
-            _add_styled_paragraph(doc, req.text, STYLE_BODY_DOUBLE)
+            # Request body text
+            _add_para(doc, req.text, STYLE_BODY_DOUBLE)
 
-            # Inline definitions
+            # Inline definitions (directly after, no blank line)
             for defn in req.definitions:
-                _add_styled_paragraph(doc, defn, STYLE_BODY_DOUBLE)
-
-            # Visual separator between requests
-            _add_empty_line(doc)
+                _add_para(doc, defn, STYLE_BODY_DOUBLE)
 
     def _insert_signature_block(self, doc, ds: DiscoverySet, attorney_name: str,
                                 firm_name: str, date_str: str):
         """Insert the signature block."""
         # /// filler lines
         for _ in range(3):
-            _add_styled_paragraph(doc, "///", STYLE_BODY_DOUBLE)
+            p = _add_para(doc, "///", STYLE_BODY_DOUBLE)
+            p.paragraph_format.first_line_indent = Inches(0)
 
-        _add_empty_line(doc)
-        _add_styled_paragraph(
-            doc,
-            f"Dated:  {date_str}\t      {firm_name.upper()}",
-            STYLE_BODY_DOUBLE,
-        )
-        _add_empty_line(doc)
-        _add_empty_line(doc)
-        _add_styled_paragraph(
-            doc, f"By:\t______________________________",
-            STYLE_FLUSH_LEFT_DOUBLE,
-        )
+        _add_para(doc, f"Dated:  {date_str}\t      {firm_name.upper()}",
+                  STYLE_FLUSH_LEFT_DOUBLE)
+        _add_para(doc, "")
+        _add_para(doc, "")
+        _add_para(doc, f"By:\t______________________________", STYLE_FLUSH_LEFT_DOUBLE)
         if attorney_name:
-            _add_styled_paragraph(doc, f"\t\t{attorney_name}", STYLE_FLUSH_LEFT_DOUBLE)
-        _add_styled_paragraph(
-            doc,
-            f"Attorneys for {ds.propounding_party.role_label},",
-            STYLE_FLUSH_LEFT_DOUBLE,
-        )
-        _add_styled_paragraph(
-            doc, ds.propounding_party.name.upper(),
-            STYLE_FLUSH_LEFT_DOUBLE,
-        )
+            _add_para(doc, f"\t\t{attorney_name}", STYLE_FLUSH_LEFT_DOUBLE)
+        _add_para(doc, f"Attorneys for {ds.propounding_party.role_label},",
+                  STYLE_FLUSH_LEFT_DOUBLE)
+        _add_para(doc, ds.propounding_party.name.upper(), STYLE_FLUSH_LEFT_DOUBLE)
 
     def _insert_declaration(self, doc, ds: DiscoverySet, attorney_name: str,
                             firm_name: str, date_str: str):
-        """Insert the CCP declaration of necessity (page break before)."""
+        """Insert CCP declaration with page break before."""
         decl_text = generate_declaration(ds, attorney_name, firm_name)
         if not decl_text:
             return
-
         decl_text = decl_text.replace("{date}", date_str)
 
-        # Page break before declaration
-        from docx.oxml.ns import qn
-        from docx.oxml import OxmlElement
-
+        # Page break
         page_break_para = doc.add_paragraph()
         run = page_break_para.add_run()
         br = OxmlElement("w:br")
         br.set(qn("w:type"), "page")
         run._element.append(br)
 
-        # Parse declaration lines
-        lines = decl_text.split("\n")
-        for i, line in enumerate(lines):
+        for i, line in enumerate(decl_text.split("\n")):
             stripped = line.strip()
-
             if not stripped:
-                _add_empty_line(doc)
+                _add_para(doc, "")
                 continue
-
             if i == 0 and stripped.startswith("DECLARATION"):
-                _add_styled_paragraph(
-                    doc, stripped, STYLE_CENTER_DOUBLE_BOLD_UND,
-                    bold=True, underline=True,
-                )
+                p = _add_para(doc, stripped, STYLE_CENTER_DOUBLE_BOLD_UND,
+                              bold=True, underline=True)
+                p.paragraph_format.first_line_indent = Inches(0)
             elif stripped.startswith("____"):
-                _add_styled_paragraph(doc, stripped, STYLE_FLUSH_LEFT_DOUBLE)
+                _add_para(doc, stripped, STYLE_FLUSH_LEFT_DOUBLE)
             else:
-                _add_styled_paragraph(doc, stripped, STYLE_BODY_DOUBLE)
+                _add_para(doc, stripped, STYLE_BODY_DOUBLE)
+
+    def _set_footer(self, doc, title: str):
+        """Set the document title in the footer of all sections."""
+        for section in doc.sections:
+            footer = section.footer
+            footer.is_linked_to_previous = False
+
+            # Clear existing footer content
+            for para in footer.paragraphs:
+                for run in para.runs:
+                    run.text = ""
+
+            # Set the title in the first footer paragraph
+            if footer.paragraphs:
+                para = footer.paragraphs[0]
+            else:
+                para = footer.add_paragraph()
+
+            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = para.add_run(title)
+            run.font.name = "Times New Roman"
+            run.font.size = Pt(10)
 
     @staticmethod
     def _build_preamble(ds: DiscoverySet) -> str:
-        """Return the statutory preamble text for the discovery type."""
+        """Return the statutory preamble text."""
         prop_role = ds.propounding_party.role_label
         prop_name = ds.propounding_party.name.upper()
         resp_role = ds.directed_to.role_label
