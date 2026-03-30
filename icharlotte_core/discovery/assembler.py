@@ -2,9 +2,9 @@
 Document assembler for the discovery generation pipeline.
 
 Renders DiscoverySet objects into formatted .docx files by appending
-content after a caption page template.  Handles document title, party
-blocks, preamble, instructions, definitions, numbered requests, signature
-block, and CCP declaration of necessity.
+content after a caption page template.  Uses the template's built-in
+styles (Body Double, Center Double Bold Und, etc.) for double-spaced
+legal document formatting.
 """
 import os
 from datetime import date
@@ -20,39 +20,50 @@ from .templates import extract_requests_from_text
 
 
 # ---------------------------------------------------------------------------
+# Style constants — these are pre-defined in the caption page template
+# ---------------------------------------------------------------------------
+STYLE_BODY_DOUBLE = "Body Double"               # Standard double-spaced body text
+STYLE_CENTER_DOUBLE = "Center Double"            # Centered double-spaced
+STYLE_CENTER_DOUBLE_BOLD_UND = "Center Double Bold Und"  # Centered bold underline
+STYLE_FLUSH_LEFT_DOUBLE = "Flush Left Double"    # Left-aligned double-spaced
+STYLE_DOUBLE_SPACING = "Double Spacing"          # Generic double-spaced
+
+
+# ---------------------------------------------------------------------------
 # Formatting helpers
 # ---------------------------------------------------------------------------
 
-def _add_paragraph(doc, text="", bold=False, underline=False, centered=False,
-                   space_after=None, space_before=None, first_line_indent=None):
-    """Add a paragraph with Times New Roman 12pt formatting.
+def _add_styled_paragraph(doc, text="", style_name=STYLE_BODY_DOUBLE,
+                          bold=False, underline=False):
+    """Add a paragraph using a named template style.
 
-    Returns the paragraph so callers can further customise it.
+    Falls back to manual formatting if the style is not found.
+    Returns the paragraph.
     """
     para = doc.add_paragraph()
-    if centered:
-        para.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-    if space_after is not None:
-        para.paragraph_format.space_after = space_after
-    if space_before is not None:
-        para.paragraph_format.space_before = space_before
-    if first_line_indent is not None:
-        para.paragraph_format.first_line_indent = first_line_indent
+    # Try to apply the named style
+    try:
+        para.style = doc.styles[style_name]
+    except KeyError:
+        # Style not in template — fall back to manual double-spacing
+        para.paragraph_format.line_spacing = Pt(24)
 
     if text:
         run = para.add_run(text)
         run.font.name = "Times New Roman"
         run.font.size = Pt(12)
-        run.bold = bold
-        run.underline = underline
+        if bold:
+            run.bold = True
+        if underline:
+            run.underline = True
 
     return para
 
 
 def _add_empty_line(doc):
-    """Add a blank paragraph (visual spacer)."""
-    _add_paragraph(doc, "")
+    """Add a blank double-spaced paragraph."""
+    _add_styled_paragraph(doc, "")
 
 
 # ---------------------------------------------------------------------------
@@ -89,9 +100,9 @@ class DiscoveryAssembler:
     ) -> str:
         """Render a DiscoverySet into a formatted .docx file.
 
-        Opens the caption page template, inserts the document title, then
-        appends all discovery sections in order.  Creates the output
-        directory if needed.
+        Opens the caption page template, replaces the document title
+        placeholder in the caption table, then appends all discovery
+        sections in order.  Creates the output directory if needed.
 
         Returns the output_path on success.
         """
@@ -101,16 +112,16 @@ class DiscoveryAssembler:
 
         doc = DocxDocument(self.caption_page_path)
 
-        # --- (a) Document title (after caption) ---
-        self._insert_document_title(doc, ds)
+        # --- (a) Replace "CAPTION PAGE" placeholder in caption table ---
+        self._replace_caption_title(doc, ds)
 
         # --- (b) Propounding / Responding party block ---
         self._insert_party_block(doc, ds)
 
         # --- (c) Preamble paragraph ---
-        preamble = self._build_preamble(ds)
         _add_empty_line(doc)
-        _add_paragraph(doc, preamble)
+        preamble = self._build_preamble(ds)
+        _add_styled_paragraph(doc, preamble, STYLE_FLUSH_LEFT_DOUBLE)
 
         # --- (d) Instructions to Answering Party ---
         if ds.instructions_block:
@@ -125,7 +136,8 @@ class DiscoveryAssembler:
         # --- (f) Section heading ---
         _add_empty_line(doc)
         heading_text = f"{ds.discovery_type.section_heading}, SET {ds.set_word.upper()}"
-        _add_paragraph(doc, heading_text, bold=True, underline=True, centered=True)
+        _add_styled_paragraph(doc, heading_text, STYLE_CENTER_DOUBLE_BOLD_UND,
+                              bold=True, underline=True)
 
         # --- (g) Numbered discovery requests ---
         _add_empty_line(doc)
@@ -133,7 +145,7 @@ class DiscoveryAssembler:
 
         # --- (h) Signature block ---
         _add_empty_line(doc)
-        self._insert_signature_block(doc, attorney_name, firm_name, date_str)
+        self._insert_signature_block(doc, ds, attorney_name, firm_name, date_str)
 
         # --- (i) Declaration (if needed) ---
         if ds.needs_declaration:
@@ -156,12 +168,7 @@ class DiscoveryAssembler:
         firm_name: str = "Bordin Semmer LLP",
         date_str: str = "",
     ) -> str:
-        """Re-parse plain text into requests, update the set, and assemble.
-
-        Uses ``extract_requests_from_text`` to parse *plain_text* into
-        DiscoveryRequest objects, replaces discovery_set.requests, then
-        delegates to :meth:`assemble`.
-        """
+        """Re-parse plain text into requests, update the set, and assemble."""
         requests = extract_requests_from_text(plain_text, discovery_set.discovery_type)
         discovery_set.requests = requests
         return self.assemble(
@@ -173,10 +180,7 @@ class DiscoveryAssembler:
 
     @staticmethod
     def find_caption_page(case_path: str) -> Optional[str]:
-        """Search a case folder for a .docx with 'caption page' in the filename.
-
-        Returns the full path if found, otherwise None.
-        """
+        """Search a case folder for a .docx with 'caption page' in the filename."""
         if not os.path.isdir(case_path):
             return None
 
@@ -199,36 +203,58 @@ class DiscoveryAssembler:
 
     # -- private helpers ----------------------------------------------------
 
-    def _insert_document_title(self, doc, ds: DiscoverySet):
-        """Insert the document title after the caption page content."""
-        propounding_label = ds.propounding_party.formal_description
-        responding_label = ds.directed_to.formal_description
-
-        # Use the propounding party's name for the title (uppercase)
-        propounding_name = ds.propounding_party.name.upper()
-        responding_name = ds.directed_to.name.upper()
-
+    def _replace_caption_title(self, doc, ds: DiscoverySet):
+        """Replace the 'CAPTION PAGE' placeholder in the caption table
+        with the actual document title (e.g., 'DEFENDANT ...'S SPECIAL
+        INTERROGATORIES TO PLAINTIFF ..., SET ONE')."""
         title = ds.discovery_type.document_title_template.format(
-            propounding=propounding_name,
-            responding=responding_name,
+            propounding=f"DEFENDANT {ds.propounding_party.name.upper()}",
+            responding=(
+                f"{ds.directed_to.role_label.upper()} "
+                f"{ds.directed_to.name.upper()}"
+            ),
             set_word=ds.set_word.upper(),
         )
 
-        _add_empty_line(doc)
-        _add_paragraph(doc, title, bold=True, underline=True, centered=True)
+        # Search through all tables for "CAPTION PAGE" text and replace it
+        for table in doc.tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    for para in cell.paragraphs:
+                        if "CAPTION PAGE" in para.text.upper():
+                            # Clear existing runs and insert title
+                            for run in para.runs:
+                                run.text = ""
+                            if para.runs:
+                                para.runs[0].text = title
+                                para.runs[0].bold = True
+                                para.runs[0].underline = True
+                            else:
+                                run = para.add_run(title)
+                                run.bold = True
+                                run.underline = True
+                                run.font.name = "Times New Roman"
+                                run.font.size = Pt(12)
+                            return  # Only replace the first match
 
     def _insert_party_block(self, doc, ds: DiscoverySet):
         """Insert propounding/responding party identification block."""
         _add_empty_line(doc)
-        _add_paragraph(
+        _add_empty_line(doc)
+        _add_styled_paragraph(
             doc,
-            f"PROPOUNDING PARTY: {ds.propounding_party.formal_description}",
-            bold=True,
+            f"PROPOUNDING PARTY:\t{ds.propounding_party.formal_description}",
+            STYLE_BODY_DOUBLE,
         )
-        _add_paragraph(
+        _add_styled_paragraph(
             doc,
-            f"RESPONDING PARTY: {ds.directed_to.formal_description}",
-            bold=True,
+            f"RESPONDING PARTY:\t{ds.directed_to.formal_description}",
+            STYLE_FLUSH_LEFT_DOUBLE,
+        )
+        _add_styled_paragraph(
+            doc,
+            f"SET NO.:\t{ds.set_word.upper()} ({ds.set_number})",
+            STYLE_FLUSH_LEFT_DOUBLE,
         )
 
     def _insert_instructions(self, doc, instructions_block: str):
@@ -239,13 +265,13 @@ class DiscoveryAssembler:
             if not stripped:
                 _add_empty_line(doc)
                 continue
-            # Check if this is the heading line
             if "INSTRUCTIONS TO ANSWERING PARTY" in stripped.upper():
-                _add_paragraph(
-                    doc, stripped, bold=True, underline=True, centered=True,
+                _add_styled_paragraph(
+                    doc, stripped, STYLE_CENTER_DOUBLE_BOLD_UND,
+                    bold=True, underline=True,
                 )
             else:
-                _add_paragraph(doc, stripped)
+                _add_styled_paragraph(doc, stripped, STYLE_BODY_DOUBLE)
 
     def _insert_definitions(self, doc, definitions_block: str):
         """Insert the definitions block."""
@@ -255,13 +281,13 @@ class DiscoveryAssembler:
             if not stripped:
                 _add_empty_line(doc)
                 continue
-            # Check if this is the heading line
             if stripped.upper() in ("DEFINITIONS", "DEFINED TERMS"):
-                _add_paragraph(
-                    doc, stripped, bold=True, underline=True, centered=True,
+                _add_styled_paragraph(
+                    doc, stripped, STYLE_CENTER_DOUBLE_BOLD_UND,
+                    bold=True, underline=True,
                 )
             else:
-                _add_paragraph(doc, stripped)
+                _add_styled_paragraph(doc, stripped, STYLE_BODY_DOUBLE)
 
     def _insert_requests(self, doc, ds: DiscoverySet):
         """Insert numbered discovery requests with inline definitions."""
@@ -269,40 +295,53 @@ class DiscoveryAssembler:
             # Request header (bold + underline)
             header = ds.discovery_type.request_header_template.format(
                 number=req.number
-            ) + ":"
-            _add_paragraph(doc, header, bold=True, underline=True)
-            _add_empty_line(doc)
+            )
+            # Add colon if not already present
+            if not header.endswith(":"):
+                header += ":"
+            _add_styled_paragraph(doc, header, STYLE_BODY_DOUBLE,
+                                  bold=True, underline=True)
 
-            # Request body (indented via tab)
-            _add_paragraph(doc, f"\t{req.text}")
+            # Request body
+            _add_styled_paragraph(doc, req.text, STYLE_BODY_DOUBLE)
 
             # Inline definitions
             for defn in req.definitions:
-                _add_empty_line(doc)
-                _add_paragraph(doc, f"\t{defn}")
+                _add_styled_paragraph(doc, defn, STYLE_BODY_DOUBLE)
 
             # Visual separator between requests
             _add_empty_line(doc)
 
-    def _insert_signature_block(self, doc, attorney_name: str, firm_name: str,
-                                date_str: str):
-        """Insert the signature block with firm name, attorney, and date."""
+    def _insert_signature_block(self, doc, ds: DiscoverySet, attorney_name: str,
+                                firm_name: str, date_str: str):
+        """Insert the signature block."""
         # /// filler lines
         for _ in range(3):
-            _add_paragraph(doc, "///", centered=True)
+            _add_styled_paragraph(doc, "///", STYLE_BODY_DOUBLE)
 
         _add_empty_line(doc)
-        _add_paragraph(doc, f"Dated: {date_str}")
+        _add_styled_paragraph(
+            doc,
+            f"Dated:  {date_str}\t      {firm_name.upper()}",
+            STYLE_BODY_DOUBLE,
+        )
         _add_empty_line(doc)
-
-        # Firm name and attorney on the right side
-        _add_paragraph(doc, firm_name, bold=True)
         _add_empty_line(doc)
-        _add_empty_line(doc)
-        _add_paragraph(doc, "____________________________")
-        _add_paragraph(doc, attorney_name)
+        _add_styled_paragraph(
+            doc, f"By:\t______________________________",
+            STYLE_FLUSH_LEFT_DOUBLE,
+        )
         if attorney_name:
-            _add_paragraph(doc, f"Attorneys for {firm_name}")
+            _add_styled_paragraph(doc, f"\t\t{attorney_name}", STYLE_FLUSH_LEFT_DOUBLE)
+        _add_styled_paragraph(
+            doc,
+            f"Attorneys for {ds.propounding_party.role_label},",
+            STYLE_FLUSH_LEFT_DOUBLE,
+        )
+        _add_styled_paragraph(
+            doc, ds.propounding_party.name.upper(),
+            STYLE_FLUSH_LEFT_DOUBLE,
+        )
 
     def _insert_declaration(self, doc, ds: DiscoverySet, attorney_name: str,
                             firm_name: str, date_str: str):
@@ -311,7 +350,6 @@ class DiscoveryAssembler:
         if not decl_text:
             return
 
-        # Replace the {date} placeholder with the actual date
         decl_text = decl_text.replace("{date}", date_str)
 
         # Page break before declaration
@@ -333,47 +371,61 @@ class DiscoveryAssembler:
                 _add_empty_line(doc)
                 continue
 
-            # Title line (first non-empty line — bold + underline + centered)
             if i == 0 and stripped.startswith("DECLARATION"):
-                _add_paragraph(
-                    doc, stripped, bold=True, underline=True, centered=True,
+                _add_styled_paragraph(
+                    doc, stripped, STYLE_CENTER_DOUBLE_BOLD_UND,
+                    bold=True, underline=True,
                 )
             elif stripped.startswith("____"):
-                # Signature line
-                _add_paragraph(doc, stripped)
+                _add_styled_paragraph(doc, stripped, STYLE_FLUSH_LEFT_DOUBLE)
             else:
-                _add_paragraph(doc, stripped)
+                _add_styled_paragraph(doc, stripped, STYLE_BODY_DOUBLE)
 
     @staticmethod
     def _build_preamble(ds: DiscoverySet) -> str:
-        """Return the statutory preamble text for the discovery type.
-
-        Each type cites the relevant CCP section and identifies
-        propounding/responding parties.
-        """
-        prop_name = ds.propounding_party.name
-        resp_name = ds.directed_to.name
+        """Return the statutory preamble text for the discovery type."""
+        prop_role = ds.propounding_party.role_label
+        prop_name = ds.propounding_party.name.upper()
         resp_role = ds.directed_to.role_label
+        resp_name = ds.directed_to.name.upper()
+        set_word = number_to_word(ds.set_number)
 
         if ds.discovery_type == DiscoveryType.SI:
             return (
-                f"Pursuant to CCP \u00a72030.030, {prop_name} hereby propounds "
-                f"the following Special Interrogatories to {resp_role}, "
-                f"{resp_name}, and requests that they be answered under oath "
-                f"within thirty (30) days of service."
+                f"TO {resp_role.upper()} {resp_name} AND "
+                f"ATTORNEYS OF RECORD:\n"
+                f"\tPursuant to California Code of Civil Procedure \u00a72030.030, "
+                f"{prop_role}, {prop_name} "
+                f'("Propounding Party" or "{prop_role}"), hereby '
+                f"propounds to {resp_role}, {resp_name} "
+                f'("{resp_role}" or "Responding Party"), the following '
+                f"{set_word} Set of Special Interrogatories, "
+                f"each of which shall be answered fully, separately, in writing, "
+                f"under oath, and within thirty (30) days as required by law."
             )
         elif ds.discovery_type == DiscoveryType.RPD:
             return (
-                f"Demand is hereby made by {prop_name} pursuant to CCP "
-                f"\u00a72031.010 et seq. that {resp_role}, {resp_name}, produce "
-                f"and permit inspection and copying of the following documents "
-                f"and tangible things within thirty (30) days of service."
+                f"TO {resp_role.upper()} {resp_name} AND "
+                f"ATTORNEYS OF RECORD:\n"
+                f"\tDemand is hereby made by {prop_role}, "
+                f"{prop_name} "
+                f'("Propounding Party" or "{prop_role}"), pursuant to '
+                f"Code of Civil Procedure section 2031.010, et seq., that "
+                f"{resp_role}, {resp_name} "
+                f'("{resp_role}" or "Responding Party"), produce and permit '
+                f"inspection, photographing, and photocopying of the documents "
+                f"and/or inspection, photographing, testing, and sampling of "
+                f"other tangible things described herein."
             )
         elif ds.discovery_type == DiscoveryType.RFA:
             return (
-                f"Pursuant to CCP \u00a72033.010, {prop_name} hereby requests "
-                f"that {resp_role}, {resp_name}, admit the truth of the "
-                f"following matters within thirty (30) days of service."
+                f"TO {resp_role.upper()} {resp_name} AND "
+                f"ATTORNEYS OF RECORD:\n"
+                f"\tPursuant to California Code of Civil Procedure \u00a72033.010, "
+                f"{prop_role}, {prop_name} "
+                f'("Propounding Party" or "{prop_role}"), hereby '
+                f"requests that {resp_role}, {resp_name} "
+                f'("{resp_role}" or "Responding Party"), admit the truth of '
+                f"the following matters within thirty (30) days as required by law."
             )
-        else:
-            return ""
+        return ""

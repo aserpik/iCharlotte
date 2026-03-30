@@ -284,10 +284,10 @@ class DiscoverySet:
 
     @property
     def filename(self) -> str:
-        """Suggested filename for the generated document."""
+        """Suggested filename using standard convention: SI(1) tPltf.docx"""
         abbr = self.discovery_type.abbreviation
         directed_abbr = self.directed_to.abbreviation or self.directed_to.name.split()[0]
-        return f"{abbr}_Set_{self.set_word}_to_{directed_abbr}.docx"
+        return f"{abbr}({self.set_number}) t{directed_abbr}.docx"
 
     def plain_text(self) -> str:
         """Render requests as plain text (for preview or clipboard)."""
