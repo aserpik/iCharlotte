@@ -186,34 +186,59 @@ class DiscoveryAssembler:
     def _set_caption_title(self, doc, title: str):
         """Set the document title in the caption table.
 
-        Looks for "CAPTION PAGE" placeholder text and replaces it,
-        or finds the right column of the 3-column table and inserts there.
+        Searches ALL paragraphs in the document XML (including nested tables)
+        for "CAPTION PAGE" text and replaces it. The caption page template
+        may use nested tables, so python-docx's table.cells won't find it —
+        we search the raw XML instead.
+
         Title is BOLD but NOT underlined (matching sample).
         """
-        # Strategy 1: Replace "CAPTION PAGE" text
-        for table in doc.tables:
-            for row in table.rows:
-                for cell in row.cells:
-                    for para in cell.paragraphs:
-                        if "CAPTION PAGE" in para.text.upper():
-                            for run in para.runs:
-                                run.text = ""
-                            if para.runs:
-                                para.runs[0].text = title
-                                para.runs[0].bold = True
-                                para.runs[0].underline = False
-                            else:
-                                run = para.add_run(title)
-                                run.bold = True
-                                run.font.name = "Times New Roman"
-                                run.font.size = Pt(12)
-                            return
+        W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        W_T = f"{{{W_NS}}}t"
+        W_P = f"{{{W_NS}}}p"
+        W_R = f"{{{W_NS}}}r"
 
-        # Strategy 2: Find 3-column table, insert into right cell
+        # Search ALL w:t elements in the document body for "CAPTION PAGE"
+        for t_elem in doc.element.body.iter(W_T):
+            if t_elem.text and "CAPTION PAGE" in t_elem.text.upper():
+                # Found it — find the parent paragraph
+                para_elem = t_elem.getparent()
+                while para_elem is not None and para_elem.tag != W_P:
+                    para_elem = para_elem.getparent()
+                if para_elem is None:
+                    continue
+
+                # Clear ALL runs in this paragraph
+                for run_elem in list(para_elem.iter(W_R)):
+                    para_elem.remove(run_elem)
+
+                # Add a new run with the title text
+                new_run = OxmlElement("w:r")
+                # Run properties: bold, no underline, Times New Roman 12pt
+                rPr = OxmlElement("w:rPr")
+                rPr.append(OxmlElement("w:b"))
+                rFonts = OxmlElement("w:rFonts")
+                rFonts.set(qn("w:ascii"), "Times New Roman")
+                rFonts.set(qn("w:hAnsi"), "Times New Roman")
+                rPr.append(rFonts)
+                sz = OxmlElement("w:sz")
+                sz.set(qn("w:val"), "24")  # 12pt = 24 half-points
+                rPr.append(sz)
+                szCs = OxmlElement("w:szCs")
+                szCs.set(qn("w:val"), "24")
+                rPr.append(szCs)
+                new_run.append(rPr)
+                new_t = OxmlElement("w:t")
+                new_t.text = title
+                new_t.set(qn("xml:space"), "preserve")
+                new_run.append(new_t)
+                para_elem.append(new_run)
+                return
+
+        # Fallback: find 3-column table, insert into right cell
         for table in doc.tables:
             if len(table.columns) >= 3:
                 cell = table.rows[0].cells[2]
-                # Add title paragraph into the cell
                 para = cell.add_paragraph()
                 run = para.add_run(title)
                 run.bold = True
