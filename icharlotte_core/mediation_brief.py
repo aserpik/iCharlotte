@@ -186,7 +186,7 @@ FORMATTING RULES:
 
     # Compile-time regexes for section text parsing
     _SUBSECTION_RE = re.compile(r'^SUBSECTION:\s*(.+)$', re.MULTILINE)
-    _DEPO_CITE_RE = re.compile(r'\([A-Z][A-Za-z\'\- ]+ Depo Trns\., at p\. \d+:\d+\.\)')
+    _DEPO_CITE_RE = re.compile(r'\([A-Z][A-Za-z\'\- ]+ Depo Trns\., at p\. \d+:\d+[\-\d]*\.\)')
 
     def __init__(self):
         self._sample_dir: str = SAMPLE_BRIEFS_DIR
