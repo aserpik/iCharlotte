@@ -213,17 +213,17 @@ _DEFAULT_VERIFICATION = (
     "{verifier_name}"
 )
 
-DEFAULT_FI_OBJECTIONS = (
+_DEFAULT_FI_OBJECTIONS = (
     "Responding Party objects to this Interrogatory on the grounds that it is compound, calls for "
     "speculation, and is vague, ambiguous, uncertain and overbroad. Responding Party objects to this "
     "request to the extent this interrogatory violates the attorney-client or work-product privilege."
 )
 
-DEFAULT_FI_1_1_RESPONSE = (
+_DEFAULT_FI_1_1_RESPONSE = (
     "Responding Party and its attorneys of record, {firm_name}, {firm_address}; {firm_phone}."
 )
 
-DEFAULT_FI_15_1_RESPONSE = (
+_DEFAULT_FI_15_1_RESPONSE = (
     "Responding Party filed a General Denial pursuant to California Code of Civil Procedure § 431.30. "
     "At the time the Answer was filed, Responding Party had insufficient information to admit or deny "
     "specific factual allegations and therefore filed a General Denial. The affirmative defenses set "
@@ -232,7 +232,7 @@ DEFAULT_FI_15_1_RESPONSE = (
     "amend its Answer and affirmative defenses as additional information is obtained."
 )
 
-DEFAULT_FI_16_RESPONSE = (
+_DEFAULT_FI_16_RESPONSE = (
     "Pursuant to Instruction 2(d), Responding Party objects to this interrogatory to the extent it "
     "seeks information beyond what is required by the applicable form. Propounding Party has had a "
     "full and fair opportunity to conduct a deposition of Responding Party and/or its representatives "
@@ -308,10 +308,10 @@ class ResponseRules:
     # ------------------------------------------------------------------
     # Fixed FI responses
     # ------------------------------------------------------------------
-    fi_objections: str = field(default_factory=lambda: DEFAULT_FI_OBJECTIONS)
-    fi_1_1_response: str = field(default_factory=lambda: DEFAULT_FI_1_1_RESPONSE)
-    fi_15_1_response: str = field(default_factory=lambda: DEFAULT_FI_15_1_RESPONSE)
-    fi_16_response: str = field(default_factory=lambda: DEFAULT_FI_16_RESPONSE)
+    fi_objections: str = field(default_factory=lambda: _DEFAULT_FI_OBJECTIONS)
+    fi_1_1_response: str = field(default_factory=lambda: _DEFAULT_FI_1_1_RESPONSE)
+    fi_15_1_response: str = field(default_factory=lambda: _DEFAULT_FI_15_1_RESPONSE)
+    fi_16_response: str = field(default_factory=lambda: _DEFAULT_FI_16_RESPONSE)
 
     # ------------------------------------------------------------------
     # User-defined extensions
@@ -345,6 +345,7 @@ class ResponseRules:
 
     def save_to_json(self, path: str) -> None:
         """Serialize this instance to a JSON file at *path*."""
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
         with open(path, "w", encoding="utf-8") as fh:
             json.dump(self.to_dict(), fh, indent=2, ensure_ascii=False)
 

@@ -72,8 +72,10 @@ class TestResponseRules(unittest.TestCase):
         self.assertTrue(len(rules.general_objections_rpd) > 100)
 
     def test_verification_template_exists(self):
+        """Verification template contains {verifier_name} and {document_title} placeholders."""
         rules = ResponseRules()
         self.assertIn("{document_title}", rules.verification_template)
+        self.assertIn("{verifier_name}", rules.verification_template)
 
 
 if __name__ == "__main__":
