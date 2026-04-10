@@ -131,6 +131,9 @@ class MediationBriefGenerator:
     # Style and formatting constants
     # ------------------------------------------------------------------
 
+    # Sections whose content affects the Introduction — regenerate it when any of these change.
+    _INTRO_TRIGGERS = {"liability", "damages", "statement_of_facts", "conclusion"}
+
     STYLE_GUIDE = """
 STYLE AND TONE GUIDE:
 - Write as a senior defense litigation attorney addressing a mediator
@@ -936,6 +939,107 @@ FORMATTING RULES:
                 self.sections[section_name] = result
 
         self.is_active = True
+
+    # ------------------------------------------------------------------
+    # Conversational refinement
+    # ------------------------------------------------------------------
+
+    def _parse_routing_response(self, response: str) -> List[str]:
+        """Parse the LLM routing response into a list of valid section names.
+
+        Args:
+            response: Raw string returned by the routing LLM call.
+
+        Returns:
+            A list of canonical section names (those present in SECTION_ORDER).
+            Returns an empty list when the response is "none" or contains no
+            recognisable section names.
+        """
+        cleaned = response.strip().lower()
+        if cleaned == "none":
+            return []
+        parts = [p.strip() for p in cleaned.split(",")]
+        return [p for p in parts if p in SECTION_ORDER]
+
+    def route_refinement(self, user_message: str) -> List[str]:
+        """Ask the LLM which sections of the brief need to be updated.
+
+        Loads the routing prompt, asks the LLM to identify which sections are
+        affected by *user_message*, and returns the parsed list.  An empty list
+        means the message is not a brief refinement request.
+
+        Args:
+            user_message: The user's chat message.
+
+        Returns:
+            List of canonical section names to regenerate (may be empty).
+        """
+        routing_prompt = self._get_section_prompt("routing")
+        full_prompt = f"{routing_prompt}\n\nUser message: {user_message}"
+
+        caller = LLMCaller()
+        result = caller.call(
+            prompt=full_prompt,
+            text="",
+            agent_id="agent_mediation_brief",
+        )
+
+        if not result:
+            logger.warning("route_refinement: LLM returned no response")
+            return []
+
+        return self._parse_routing_response(result)
+
+    def refine_sections(
+        self,
+        section_names: List[str],
+        instruction: str,
+        progress_callback=None,
+    ) -> List[str]:
+        """Regenerate the specified sections with a refinement instruction.
+
+        When any of the regenerated sections is an _INTRO_TRIGGERS member,
+        the Introduction is also regenerated afterwards (without the user's
+        instruction — it simply rebuilds itself based on the updated sections).
+
+        Args:
+            section_names: Canonical names of the sections to regenerate.
+            instruction:   Refinement instruction applied to the requested sections.
+            progress_callback: Optional callable ``(section_name,)`` called after
+                each section is regenerated.
+
+        Returns:
+            List of all section names that were regenerated (including
+            "introduction" if it was triggered automatically).
+        """
+        # Build the regeneration list, adding introduction at the end if needed
+        to_regenerate = list(section_names)
+        if any(s in self._INTRO_TRIGGERS for s in section_names):
+            if "introduction" not in to_regenerate:
+                to_regenerate.append("introduction")
+            else:
+                # Ensure introduction is always last
+                to_regenerate.remove("introduction")
+                to_regenerate.append("introduction")
+
+        regenerated: List[str] = []
+        for section_name in to_regenerate:
+            # Apply instruction only to the sections the user asked about;
+            # introduction regenerates purely from context, no user instruction.
+            if section_name == "introduction" and section_name not in section_names:
+                section_instruction = ""
+            else:
+                section_instruction = instruction
+
+            result = self.generate_section(section_name, refinement_instruction=section_instruction)
+            if result:
+                self.sections[section_name] = result
+                regenerated.append(section_name)
+
+            if progress_callback is not None:
+                progress_callback(section_name)
+
+        return regenerated
 
     def reset(self) -> None:
         """Clear all generated state, resetting the generator to its initial condition."""

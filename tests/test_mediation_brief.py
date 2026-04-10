@@ -399,5 +399,53 @@ class TestPipeline(unittest.TestCase):
         self.assertEqual(len(section_complete_calls), 0)
 
 
+class TestRefinement(unittest.TestCase):
+
+    def test_route_sections_parses_comma_list(self):
+        from icharlotte_core.mediation_brief import MediationBriefGenerator
+        gen = MediationBriefGenerator()
+        result = gen._parse_routing_response("damages,liability")
+        self.assertEqual(result, ["damages", "liability"])
+
+    def test_route_sections_handles_none(self):
+        from icharlotte_core.mediation_brief import MediationBriefGenerator
+        gen = MediationBriefGenerator()
+        result = gen._parse_routing_response("none")
+        self.assertEqual(result, [])
+
+    def test_route_sections_filters_invalid(self):
+        from icharlotte_core.mediation_brief import MediationBriefGenerator
+        gen = MediationBriefGenerator()
+        result = gen._parse_routing_response("damages,invalid_section,liability")
+        self.assertEqual(result, ["damages", "liability"])
+
+    def test_refine_regenerates_introduction_when_liability_changes(self):
+        from icharlotte_core.mediation_brief import MediationBriefGenerator
+        gen = MediationBriefGenerator()
+        gen.sections = {
+            "introduction": "Old intro",
+            "statement_of_facts": "Facts",
+            "procedural_status": "Status",
+            "liability": "Old liability",
+            "damages": "Old damages",
+            "settlement_position": "Settlement",
+            "conclusion": "Conclusion",
+        }
+        gen.planning_output = "Planning"
+        gen.document_content = "Doc"
+        gen._style_cache = {"sections": {}}
+        gen.is_active = True
+        call_log = []
+        def mock_generate(section_name, refinement_instruction=""):
+            call_log.append(section_name)
+            return f"New {section_name}"
+        with patch.object(gen, 'generate_section', side_effect=mock_generate):
+            gen.refine_sections(["liability"], "Make it stronger")
+        self.assertIn("liability", call_log)
+        self.assertIn("introduction", call_log)
+        self.assertEqual(gen.sections["liability"], "New liability")
+        self.assertEqual(gen.sections["introduction"], "New introduction")
+
+
 if __name__ == '__main__':
     unittest.main()
