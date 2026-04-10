@@ -1,0 +1,583 @@
+{
+  "version": "1.0",
+  "default_provider": "Gemini",
+  "tasks": {
+    "general": {
+      "name": "general",
+      "model_sequence": [
+        {
+          "provider": "Gemini",
+          "model": "gemini-3.1-flash-lite-preview",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-3-flash-preview",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-2.5-pro",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "OpenAI",
+          "model": "gpt-4o",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        }
+      ],
+      "max_retries": 3,
+      "timeout_seconds": 120
+    },
+    "extraction": {
+      "name": "extraction",
+      "model_sequence": [
+        {
+          "provider": "Gemini",
+          "model": "gemini-3-pro-preview",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-3.1-flash-lite-preview",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-3-flash-preview",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Claude",
+          "model": "claude-sonnet-4-20250514",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "OpenAI",
+          "model": "gpt-4o",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        }
+      ],
+      "max_retries": 3,
+      "timeout_seconds": 180
+    },
+    "summary": {
+      "name": "summary",
+      "model_sequence": [
+        {
+          "provider": "Gemini",
+          "model": "gemini-3-pro-preview",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-3.1-pro-preview",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-3.1-flash-lite-preview",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-3-flash-preview",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "OpenAI",
+          "model": "gpt-4o",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        }
+      ],
+      "max_retries": 3,
+      "timeout_seconds": 180
+    },
+    "cross_check": {
+      "name": "cross_check",
+      "model_sequence": [
+        {
+          "provider": "Gemini",
+          "model": "gemini-3.1-flash-lite-preview",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-3-flash-preview",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-2.5-flash",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "OpenAI",
+          "model": "gpt-4o-mini",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        }
+      ],
+      "max_retries": 2,
+      "timeout_seconds": 90
+    },
+    "classification": {
+      "name": "classification",
+      "model_sequence": [
+        {
+          "provider": "Gemini",
+          "model": "gemini-3.1-flash-lite-preview",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-3-flash-preview",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-2.5-flash",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "OpenAI",
+          "model": "gpt-4o-mini",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        }
+      ],
+      "max_retries": 2,
+      "timeout_seconds": 60
+    },
+    "quick": {
+      "name": "quick",
+      "model_sequence": [
+        {
+          "provider": "Gemini",
+          "model": "gemini-3.1-flash-lite-preview",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-3-flash-preview",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-2.5-flash",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "OpenAI",
+          "model": "gpt-4o-mini",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        }
+      ],
+      "max_retries": 2,
+      "timeout_seconds": 60
+    }
+  },
+  "agents": {
+    "agent_separate": {
+      "agent_id": "agent_separate",
+      "display_name": "Separate",
+      "description": "PDF separation and document indexing",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "agent_summarize": {
+      "agent_id": "agent_summarize",
+      "display_name": "Summarize",
+      "description": "Document summarization with verification",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "agent_sum_disc": {
+      "agent_id": "agent_sum_disc",
+      "display_name": "Summarize Discovery",
+      "description": "Discovery response extraction and summarization",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "agent_sum_depo": {
+      "agent_id": "agent_sum_depo",
+      "display_name": "Summarize Deposition",
+      "description": "Deposition transcript analysis",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "agent_med_rec": {
+      "agent_id": "agent_med_rec",
+      "display_name": "Medical Records",
+      "description": "Medical record processing",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "agent_med_chron": {
+      "agent_id": "agent_med_chron",
+      "display_name": "Medical Chronology",
+      "description": "Medical chronology generation",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "agent_organize": {
+      "agent_id": "agent_organize",
+      "display_name": "Organize",
+      "description": "Document organization and categorization",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "agent_timeline": {
+      "agent_id": "agent_timeline",
+      "display_name": "Timeline",
+      "description": "Date and event extraction for timelines",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "agent_contradict": {
+      "agent_id": "agent_contradict",
+      "display_name": "Contradictions",
+      "description": "Detect factual contradictions across documents",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "agent_docket": {
+      "agent_id": "agent_docket",
+      "display_name": "Docket",
+      "description": "Docket download and processing",
+      "model_sequence": [
+        {
+          "provider": "Gemini",
+          "model": "gemini-3.1-flash-lite-preview",
+          "max_tokens": -1,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-3-flash-preview",
+          "max_tokens": -1,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        }
+      ],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": false
+    },
+    "agent_complaint": {
+      "agent_id": "agent_complaint",
+      "display_name": "Complaint",
+      "description": "Complaint document analysis",
+      "model_sequence": [
+        {
+          "provider": "Gemini",
+          "model": "gemini-3.1-flash-lite-preview",
+          "max_tokens": -1,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-3-flash-preview",
+          "max_tokens": -1,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        }
+      ],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": false
+    },
+    "agent_discovery_gen": {
+      "agent_id": "agent_discovery_gen",
+      "display_name": "Discovery Generator",
+      "description": "Generate discovery requests",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "agent_subpoena": {
+      "agent_id": "agent_subpoena",
+      "display_name": "Subpoena Tracker",
+      "description": "Subpoena tracking and analysis",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "agent_liability": {
+      "agent_id": "agent_liability",
+      "display_name": "Liability Script",
+      "description": "Liability analysis script",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "agent_exposure": {
+      "agent_id": "agent_exposure",
+      "display_name": "Exposure",
+      "description": "Exposure calculation and analysis",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "func_chat": {
+      "agent_id": "func_chat",
+      "display_name": "Chat Tab",
+      "description": "Interactive AI chat",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "func_email_intelligence": {
+      "agent_id": "func_email_intelligence",
+      "display_name": "Email Intelligence",
+      "description": "AI-powered email analysis",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "func_email_compose": {
+      "agent_id": "func_email_compose",
+      "display_name": "Email Compose",
+      "description": "AI-powered email composition",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "func_liability_tab": {
+      "agent_id": "func_liability_tab",
+      "display_name": "Liability Tab",
+      "description": "Liability and exposure analysis tab",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "func_sent_monitor": {
+      "agent_id": "func_sent_monitor",
+      "display_name": "Sent Items Monitor",
+      "description": "Monitor sent emails for todos",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "func_attachment_classifier": {
+      "agent_id": "func_attachment_classifier",
+      "display_name": "Attachment Classifier",
+      "description": "Classify legal document attachments",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "agent_depo_extract": {
+      "agent_id": "agent_depo_extract",
+      "display_name": "Depo Extract",
+      "description": "Deposition testimony extraction by topic",
+      "model_sequence": [
+        {
+          "provider": "Gemini",
+          "model": "gemini-3-pro-preview",
+          "max_tokens": -1,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "high"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-3.1-flash-lite-preview",
+          "max_tokens": -1,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-3-flash-preview",
+          "max_tokens": -1,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        }
+      ],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": false
+    },
+    "agent_report_review": {
+      "agent_id": "agent_report_review",
+      "display_name": "Report Review",
+      "description": "Review and redline junior associate litigation reports for voice, style, and completeness",
+      "model_sequence": [
+        {
+          "provider": "Gemini",
+          "model": "gemini-3-pro-preview",
+          "max_tokens": -1,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-3.1-flash-lite-preview",
+          "max_tokens": -1,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "low"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-3-flash-preview",
+          "max_tokens": -1,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "low"
+        }
+      ],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": false
+    },
+    "agent_mediation_brief": {
+      "agent_id": "agent_mediation_brief",
+      "display_name": "Mediation Brief",
+      "description": "Generate comprehensive defense mediation briefs from case documents",
+      "model_sequence": [
+        {
+          "provider": "Gemini",
+          "model": "gemini-3-pro-preview",
+          "max_tokens": -1,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-3.1-flash-lite-preview",
+          "max_tokens": -1,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
+          "model": "gemini-3-flash-preview",
+          "max_tokens": -1,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        }
+      ],
+      "max_retries": 3,
+      "timeout_seconds": 300,
+      "use_default": false
+    }
+  }
+}

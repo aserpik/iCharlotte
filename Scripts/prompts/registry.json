@@ -1,0 +1,292 @@
+{
+  "prompts": {
+    "summarize:summary": {
+      "agent": "summarize",
+      "pass_name": "summary",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-01-29T08:28:04.087005",
+          "description": "Migrated from legacy location",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "summarize:cross_check": {
+      "agent": "summarize",
+      "pass_name": "cross_check",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-01-29T08:28:04.096316",
+          "description": "Migrated from legacy location",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "discovery:extraction": {
+      "agent": "discovery",
+      "pass_name": "extraction",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-01-29T08:28:04.103797",
+          "description": "Migrated from legacy location",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "discovery:cross_check": {
+      "agent": "discovery",
+      "pass_name": "cross_check",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-01-29T08:28:04.106936",
+          "description": "Migrated from legacy location",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "deposition:summary": {
+      "agent": "deposition",
+      "pass_name": "summary",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-01-29T08:28:04.111915",
+          "description": "Migrated from legacy location",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "deposition:extraction": {
+      "agent": "deposition",
+      "pass_name": "extraction",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-01-29T08:28:04.116110",
+          "description": "Migrated from legacy location",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "deposition:cross_check": {
+      "agent": "deposition",
+      "pass_name": "cross_check",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-01-29T08:28:04.122152",
+          "description": "Migrated from legacy location",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "timeline:extraction": {
+      "agent": "timeline",
+      "pass_name": "extraction",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-01-29T08:28:04.126705",
+          "description": "Migrated from legacy location",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "contradiction:detection": {
+      "agent": "contradiction",
+      "pass_name": "detection",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-01-29T08:28:04.131894",
+          "description": "Migrated from legacy location",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "mediation_brief:planning": {
+      "agent": "mediation_brief",
+      "pass_name": "planning",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-10T12:00:00.000000",
+          "description": "Initial mediation brief planning pass",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "mediation_brief:statement_of_facts": {
+      "agent": "mediation_brief",
+      "pass_name": "statement_of_facts",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-10T12:00:00.000000",
+          "description": "Initial statement of facts section",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "mediation_brief:procedural_status": {
+      "agent": "mediation_brief",
+      "pass_name": "procedural_status",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-10T12:00:00.000000",
+          "description": "Initial procedural status section",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "mediation_brief:liability": {
+      "agent": "mediation_brief",
+      "pass_name": "liability",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-10T12:00:00.000000",
+          "description": "Initial liability section",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "mediation_brief:damages": {
+      "agent": "mediation_brief",
+      "pass_name": "damages",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-10T12:00:00.000000",
+          "description": "Initial damages section",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "mediation_brief:settlement_position": {
+      "agent": "mediation_brief",
+      "pass_name": "settlement_position",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-10T12:00:00.000000",
+          "description": "Initial settlement position section",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "mediation_brief:conclusion": {
+      "agent": "mediation_brief",
+      "pass_name": "conclusion",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-10T12:00:00.000000",
+          "description": "Initial conclusion section",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "mediation_brief:introduction": {
+      "agent": "mediation_brief",
+      "pass_name": "introduction",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-10T12:00:00.000000",
+          "description": "Initial introduction section",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "mediation_brief:routing": {
+      "agent": "mediation_brief",
+      "pass_name": "routing",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-10T12:00:00.000000",
+          "description": "Initial refinement routing",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    }
+  }
+}

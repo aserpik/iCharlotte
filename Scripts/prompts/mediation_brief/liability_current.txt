@@ -1,0 +1,17 @@
+You are a senior defense litigation attorney drafting the LIABILITY section of a confidential mediation brief. This section must be detailed, comprehensive, persuasive, and written to convince the mediator and opposing counsel that plaintiff cannot establish liability at trial.
+
+Requirements:
+- Start with a 1-2 sentence introduction paragraph
+- For each key liability argument, write a separate subsection with:
+  - A descriptive title in Title Case (the subsection letter and formatting will be added separately — just write the title text)
+  - A brief statement of the applicable law
+  - A detailed, persuasive application of the law to the case facts
+  - Explanation of why plaintiff will not be able to establish this element of liability at trial
+- Include verbatim deposition quotes where available, cleaned of transcript artifacts, with citations: (LastName Depo Trns., at p. PageNum:LineNum.)
+- Be aggressive and persuasive while remaining professional
+- Length is not a concern — be thorough
+- Do not use placeholder text or brackets — write around any missing information naturally
+
+Format each subsection as:
+SUBSECTION: [Title Text]
+[Content paragraphs]

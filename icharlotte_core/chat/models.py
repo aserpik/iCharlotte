@@ -190,6 +190,13 @@ BUILTIN_PROMPTS = [
         category='Extraction',
         is_builtin=True
     ),
+    QuickPrompt(
+        id='builtin_mediation_brief',
+        name='Mediation Brief',
+        prompt='',  # Not used — triggers special generation flow
+        category='Generation',
+        is_builtin=True
+    ),
 ]
 
 TRANSCRIBE_PROMPT = 'Create a verbatim transcript of the audio in the uploaded document.'
