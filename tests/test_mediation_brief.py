@@ -264,5 +264,140 @@ class TestWordAssembly(unittest.TestCase):
             self.assertIn("introduction", all_text.lower())
 
 
+class TestPipeline(unittest.TestCase):
+
+    def test_generate_all_sections_order(self):
+        from icharlotte_core.mediation_brief import MediationBriefGenerator, GENERATION_ORDER
+        gen = MediationBriefGenerator()
+        gen.document_content = "Test document content"
+        gen._style_cache = {"sections": {}}
+        call_order = []
+        def mock_generate(section_name, refinement_instruction=""):
+            call_order.append(section_name)
+            return f"Generated {section_name}"
+        with patch.object(gen, 'generate_section', side_effect=mock_generate):
+            with patch.object(gen, 'run_planning_pass', return_value="Planning output"):
+                gen.generate_all_sections()
+        self.assertEqual(call_order, GENERATION_ORDER)
+        self.assertEqual(gen.sections["introduction"], "Generated introduction")
+        self.assertEqual(gen.sections["conclusion"], "Generated conclusion")
+
+    def test_pipeline_sets_active_flag(self):
+        from icharlotte_core.mediation_brief import MediationBriefGenerator
+        gen = MediationBriefGenerator()
+        gen.document_content = "Test doc"
+        gen._style_cache = {"sections": {}}
+        with patch.object(gen, 'generate_section', return_value="text"):
+            with patch.object(gen, 'run_planning_pass', return_value="plan"):
+                gen.generate_all_sections()
+        self.assertTrue(gen.is_active)
+
+    def test_generate_all_sections_progress_callback(self):
+        from icharlotte_core.mediation_brief import MediationBriefGenerator, GENERATION_ORDER
+        gen = MediationBriefGenerator()
+        gen.document_content = "Test doc"
+        gen._style_cache = {"sections": {}}
+        calls = []
+        def progress(section_name, index, total):
+            calls.append((section_name, index, total))
+        with patch.object(gen, 'generate_section', return_value="text"):
+            with patch.object(gen, 'run_planning_pass', return_value="plan"):
+                gen.generate_all_sections(progress_callback=progress)
+        # Should be called once for planning + once per section
+        expected_total = len(GENERATION_ORDER) + 1
+        self.assertEqual(len(calls), expected_total)
+        # First call is planning at index 0
+        self.assertEqual(calls[0], ("planning", 0, expected_total))
+        # Remaining calls are sections at indices 1..N
+        for i, section_name in enumerate(GENERATION_ORDER, start=1):
+            self.assertEqual(calls[i], (section_name, i, expected_total))
+
+    def test_reset_clears_state(self):
+        from icharlotte_core.mediation_brief import MediationBriefGenerator
+        gen = MediationBriefGenerator()
+        gen.sections = {"introduction": "some text"}
+        gen.planning_output = "some planning"
+        gen.document_content = "some content"
+        gen.caption_template_path = "/some/path.docx"
+        gen.is_active = True
+        gen.reset()
+        self.assertEqual(gen.sections, {})
+        self.assertEqual(gen.planning_output, "")
+        self.assertEqual(gen.document_content, "")
+        self.assertIsNone(gen.caption_template_path)
+        self.assertFalse(gen.is_active)
+
+    def test_worker_emits_signals(self):
+        from icharlotte_core.mediation_brief import MediationBriefGenerator, MediationBriefWorker, GENERATION_ORDER
+        import sys
+        # PySide6 requires a QApplication to exist for QThread
+        try:
+            from PySide6.QtWidgets import QApplication
+            app = QApplication.instance() or QApplication(sys.argv)
+        except Exception:
+            self.skipTest("PySide6 QApplication not available")
+
+        gen = MediationBriefGenerator()
+        gen.document_content = "Test doc"
+        gen._style_cache = {"sections": {}}
+
+        section_started_calls = []
+        section_complete_calls = []
+        all_complete_calls = []
+        error_calls = []
+
+        with patch.object(gen, 'generate_section', return_value="Generated text"):
+            with patch.object(gen, 'run_planning_pass', return_value="Planning output"):
+                worker = MediationBriefWorker(gen)
+                worker.section_started.connect(lambda name, idx, total: section_started_calls.append((name, idx, total)))
+                worker.section_complete.connect(lambda name, text: section_complete_calls.append((name, text)))
+                worker.all_complete.connect(lambda d: all_complete_calls.append(d))
+                worker.error.connect(lambda msg: error_calls.append(msg))
+                worker.run()  # run synchronously in test
+
+        self.assertEqual(len(error_calls), 0)
+        self.assertEqual(len(all_complete_calls), 1)
+        result_dict = all_complete_calls[0]
+        for section in GENERATION_ORDER:
+            self.assertIn(section, result_dict)
+        self.assertEqual(len(section_complete_calls), len(GENERATION_ORDER))
+        self.assertTrue(gen.is_active)
+
+    def test_worker_stop_requested(self):
+        from icharlotte_core.mediation_brief import MediationBriefGenerator, MediationBriefWorker
+        import sys
+        try:
+            from PySide6.QtWidgets import QApplication
+            app = QApplication.instance() or QApplication(sys.argv)
+        except Exception:
+            self.skipTest("PySide6 QApplication not available")
+
+        gen = MediationBriefGenerator()
+        gen.document_content = "Test doc"
+        gen._style_cache = {"sections": {}}
+
+        all_complete_calls = []
+        error_calls = []
+        section_complete_calls = []
+
+        call_count = [0]
+        def mock_generate(section_name, refinement_instruction=""):
+            call_count[0] += 1
+            return "text"
+
+        with patch.object(gen, 'generate_section', side_effect=mock_generate):
+            with patch.object(gen, 'run_planning_pass', return_value="plan"):
+                worker = MediationBriefWorker(gen)
+                worker.all_complete.connect(lambda d: all_complete_calls.append(d))
+                worker.error.connect(lambda msg: error_calls.append(msg))
+                worker.section_complete.connect(lambda name, text: section_complete_calls.append(name))
+                worker.request_stop()
+                worker.run()
+
+        # After stop requested, no sections should be generated
+        self.assertEqual(call_count[0], 0)
+        self.assertEqual(len(section_complete_calls), 0)
+
+
 if __name__ == '__main__':
     unittest.main()

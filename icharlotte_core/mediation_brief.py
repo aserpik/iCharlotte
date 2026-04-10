@@ -905,3 +905,105 @@ FORMATTING RULES:
             result.print_summary()
         except Exception as e:
             logger.warning("Validation skipped: %s", e)
+
+    # ------------------------------------------------------------------
+    # Pipeline orchestration
+    # ------------------------------------------------------------------
+
+    def generate_all_sections(self, progress_callback=None) -> None:
+        """Run the full generation pipeline: planning pass then all sections.
+
+        Calls ``run_planning_pass()`` first (step 0), then iterates through
+        ``GENERATION_ORDER`` generating each section in sequence.
+
+        Args:
+            progress_callback: Optional callable ``(section_name, index, total)``
+                called before each step (including the planning pass at index 0).
+        """
+        total = len(GENERATION_ORDER) + 1  # +1 for planning pass
+
+        # Step 0: planning pass
+        if progress_callback is not None:
+            progress_callback("planning", 0, total)
+        self.run_planning_pass()
+
+        # Steps 1..N: generate each section
+        for i, section_name in enumerate(GENERATION_ORDER, start=1):
+            if progress_callback is not None:
+                progress_callback(section_name, i, total)
+            result = self.generate_section(section_name)
+            if result:
+                self.sections[section_name] = result
+
+        self.is_active = True
+
+    def reset(self) -> None:
+        """Clear all generated state, resetting the generator to its initial condition."""
+        self.sections = {}
+        self.planning_output = ""
+        self.document_content = ""
+        self.caption_template_path = None
+        self.is_active = False
+
+
+# ---------------------------------------------------------------------------
+# Background worker
+# ---------------------------------------------------------------------------
+
+from PySide6.QtCore import QThread, Signal  # noqa: E402 (import after class definition)
+
+
+class MediationBriefWorker(QThread):
+    """QThread worker that runs the full mediation brief generation pipeline.
+
+    Emits granular signals so a UI can display live progress.
+
+    Signals:
+        section_started(str, int, int): section_name, index, total — emitted
+            before each step (including planning pass at index 0).
+        section_complete(str, str): section_name, section_text — emitted after
+            each section (not emitted for the planning pass).
+        all_complete(dict): mapping of section_name → text for all sections,
+            emitted when generation finishes successfully.
+        error(str): error message emitted if an unhandled exception occurs.
+    """
+
+    section_started = Signal(str, int, int)
+    section_complete = Signal(str, str)
+    all_complete = Signal(dict)
+    error = Signal(str)
+
+    def __init__(self, generator: MediationBriefGenerator, parent=None):
+        super().__init__(parent)
+        self._generator = generator
+        self._stop_requested: bool = False
+
+    def request_stop(self) -> None:
+        """Request that the worker stop after the current step."""
+        self._stop_requested = True
+
+    def run(self) -> None:
+        """Execute the generation pipeline, emitting signals at each step."""
+        try:
+            total = len(GENERATION_ORDER) + 1
+
+            # Step 0: planning pass
+            self.section_started.emit("planning", 0, total)
+            self._generator.run_planning_pass()
+
+            # Steps 1..N: generate each section
+            for i, section_name in enumerate(GENERATION_ORDER, start=1):
+                if self._stop_requested:
+                    break
+                self.section_started.emit(section_name, i, total)
+                result = self._generator.generate_section(section_name)
+                if result:
+                    self._generator.sections[section_name] = result
+                    self.section_complete.emit(section_name, result)
+
+            self._generator.is_active = True
+            self.all_complete.emit(dict(self._generator.sections))
+
+        except Exception as exc:
+            logger.exception("MediationBriefWorker: unhandled error")
+            self.error.emit(str(exc))
