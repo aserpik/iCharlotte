@@ -24,6 +24,7 @@ NoteTaker/dist/
 !Templates/litigation_report.docx
 *.json
 !config/report_reference_profile.json
+!config/response_rules_default.json
 !NoteTaker/package.json
 !NoteTaker/tsconfig.json
 !NoteTaker/electron.vite.config.ts
