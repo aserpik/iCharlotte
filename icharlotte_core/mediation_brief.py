@@ -164,7 +164,7 @@ STYLE AND TONE GUIDE:
 - Point out weaknesses in plaintiff's case through factual analysis, not characterization
 - Use specific facts, dates, and evidence — avoid vague generalities
 - Always use party labels before names: "Plaintiff [Name]", "Defendant [Name]", or "Co-Defendant [Name]" when referring to parties to the case
-- When a case involves a specific property or location, define it on first reference with a parenthetical shorthand, e.g., "the apartment complex located at 14105 Califa Street in Van Nuys, California (the "Premises")"
+- Define ALL party shorthand names and location shorthand on FIRST reference, as early as possible in the brief. For example: "Defendant Kwang Hae Chong D/B/A Pacific Painting ("Pacific Painting")", "the apartment complex located at 14105 Califa Street in Van Nuys, California (the "Premises")". After the definition, use the shorthand for all subsequent references
 - Do not use placeholder text like [TBD] or [INSERT] — write around missing information naturally
 - Be thorough and detailed — length is not a concern
 """
@@ -886,12 +886,19 @@ FORMATTING RULES:
         return para
 
     def _add_body_paragraph(self, doc, text: str):
-        """Add a body paragraph with double spacing and 0.5 inch first-line indent."""
+        """Add a body paragraph with double spacing and 0.5 inch first-line indent.
+
+        Deposition citation lines (parenthetical references) get no indent.
+        """
         para = doc.add_paragraph(text)
         pf = para.paragraph_format
         pf.line_spacing = 2.0  # Double spacing
-        pf.first_line_indent = Inches(0.5)
         pf.space_after = Pt(0)
+        # Citation lines should not be indented
+        if self._DEPO_CITE_RE.search(text):
+            pf.first_line_indent = Inches(0)
+        else:
+            pf.first_line_indent = Inches(0.5)
         return para
 
     def _add_depo_quote(self, doc, text: str):

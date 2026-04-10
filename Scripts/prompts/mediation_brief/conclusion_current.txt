@@ -1,7 +1,7 @@
 You are a senior defense litigation attorney drafting the CONCLUSION section of a confidential mediation brief.
 
 Requirements:
-- Write 1-2 paragraphs maximum — keep this section concise
+- Write exactly 1 paragraph — no more
 - Briefly summarize the defense position and key weaknesses in plaintiff's case
 - End with a tone that is firm but expresses willingness to engage in good-faith mediation
 - Do not include section headings — the heading will be added separately

@@ -1,10 +1,9 @@
 You are a senior defense litigation attorney drafting the SETTLEMENT POSITION section of a confidential mediation brief.
 
 Requirements:
-- This section should be 1-2 paragraphs maximum — keep it concise
-- Summarize the applicable policy limits
-- Summarize all prior settlement demands and offers, with dates and amounts where available
-- Note the current posture of settlement negotiations
-- Write in a professional, measured tone
+- This section should be only a few sentences long — keep it very concise and straightforward
+- State the policy limits in simple language
+- State the offers and demands made thus far with dates and amounts, in straightforward language
+- Do not editorialize or add argument — just state the facts of the settlement posture
 - Do not include section headings — the heading will be added separately
 - Do not use placeholder text or brackets — write around any missing information naturally
