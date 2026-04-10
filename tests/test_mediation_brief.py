@@ -140,5 +140,56 @@ class TestCaptionHandling(unittest.TestCase):
             self.assertEqual(len(sig_paras), 0)
 
 
+class TestSectionGeneration(unittest.TestCase):
+
+    def test_build_section_prompt_includes_planning_output(self):
+        from icharlotte_core.mediation_brief import MediationBriefGenerator
+        gen = MediationBriefGenerator()
+        gen.planning_output = "KEY FACTS:\n- Accident on Jan 1, 2025"
+        gen.sections = {}
+        gen.document_content = "Document text here"
+        gen._style_cache = {"sections": {}}
+        prompt = gen._build_section_prompt("statement_of_facts")
+        self.assertIn("Accident on Jan 1, 2025", prompt)
+
+    def test_build_section_prompt_includes_prior_sections(self):
+        from icharlotte_core.mediation_brief import MediationBriefGenerator
+        gen = MediationBriefGenerator()
+        gen.planning_output = "Planning data"
+        gen.sections = {
+            "statement_of_facts": "The plaintiff was injured on Main St.",
+            "procedural_status": "Trial is set for June 2027.",
+        }
+        gen.document_content = "Doc text"
+        gen._style_cache = {"sections": {}}
+        prompt = gen._build_section_prompt("liability")
+        self.assertIn("injured on Main St", prompt)
+        self.assertIn("Trial is set for June 2027", prompt)
+
+    def test_build_introduction_prompt_includes_all_sections(self):
+        from icharlotte_core.mediation_brief import MediationBriefGenerator
+        gen = MediationBriefGenerator()
+        gen.planning_output = "Planning data"
+        gen.sections = {
+            "statement_of_facts": "Facts text",
+            "procedural_status": "Status text",
+            "liability": "Liability text",
+            "damages": "Damages text",
+            "settlement_position": "Settlement text",
+            "conclusion": "Conclusion text",
+        }
+        gen.document_content = "Doc text"
+        gen._style_cache = {"sections": {}}
+        prompt = gen._build_section_prompt("introduction")
+        self.assertIn("Liability text", prompt)
+        self.assertIn("Damages text", prompt)
+        self.assertIn("Conclusion text", prompt)
+
+    def test_generation_order(self):
+        from icharlotte_core.mediation_brief import GENERATION_ORDER
+        self.assertEqual(GENERATION_ORDER[-1], "introduction")
+        self.assertEqual(len(GENERATION_ORDER), 7)
+
+
 if __name__ == '__main__':
     unittest.main()

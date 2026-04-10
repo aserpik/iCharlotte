@@ -19,6 +19,9 @@ from docx import Document as DocxDocument
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 
+from icharlotte_core.llm_config import LLMCaller
+from icharlotte_core.prompt_manager import get_prompt_manager
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -120,6 +123,33 @@ CACHE_PATH = os.path.join(PROMPTS_DIR, "style_cache.json")
 
 class MediationBriefGenerator:
     """Generates mediation briefs by extracting style from samples and calling LLM."""
+
+    # ------------------------------------------------------------------
+    # Style and formatting constants
+    # ------------------------------------------------------------------
+
+    STYLE_GUIDE = """
+STYLE AND TONE GUIDE:
+- Write as a senior defense litigation attorney addressing a mediator
+- Tone: professional, authoritative, persuasive, and firm
+- Use active voice and strong declarative statements
+- Avoid hedging or weak qualifiers ("perhaps", "might", "it could be argued")
+- Present defense arguments as the clear and logical reading of the evidence
+- When discussing plaintiff's position, highlight inconsistencies and weaknesses
+- Use specific facts, dates, and evidence — avoid vague generalities
+- When including deposition quotes, clean them of transcript artifacts (line numbers, dashes, extra characters) but keep them verbatim
+- Citation format for deposition quotes: (LastName Depo Trns., at p. PageNum:LineNum.)
+- Do not use placeholder text like [TBD] or [INSERT] — write around missing information naturally
+- Be thorough and detailed — length is not a concern
+"""
+
+    FORMATTING_RULES = """
+FORMATTING RULES:
+- Do NOT include level-one section headings (roman numerals) — they are added by the system
+- For the LIABILITY and DAMAGES sections: mark each subsection with "SUBSECTION: Title Text" on its own line, followed by the content paragraphs. The system will convert these to properly formatted level-two headings.
+- For deposition quotes: put the quote on its own paragraph, preceded by a blank line. Follow with the citation on the same paragraph: (LastName Depo Trns., at p. PageNum:LineNum.)
+- Write in plain text. Do not use markdown formatting (no **, ##, etc.)
+"""
 
     def __init__(self):
         self._sample_dir: str = SAMPLE_BRIEFS_DIR
@@ -325,6 +355,162 @@ class MediationBriefGenerator:
             "sections": data.get("sections", {}),
         }
         return self._style_cache.get("sections", {})
+
+    # ------------------------------------------------------------------
+    # LLM prompt construction and generation
+    # ------------------------------------------------------------------
+
+    def _get_section_prompt(self, section_name: str) -> str:
+        """Load the main prompt for *section_name* from the Workbench (PromptManager).
+
+        Falls back to reading the file directly from PROMPTS_DIR if the
+        PromptManager returns nothing.  Returns an empty string if neither
+        source has a prompt for this section.
+        """
+        pm = get_prompt_manager()
+        prompt = pm.get_prompt("mediation_brief", section_name)
+        if prompt:
+            return prompt
+
+        # Direct file fallback
+        fallback_path = os.path.join(PROMPTS_DIR, f"{section_name}_current.txt")
+        if os.path.isfile(fallback_path):
+            with open(fallback_path, "r", encoding="utf-8") as fh:
+                return fh.read()
+
+        logger.warning("No prompt found for section %r", section_name)
+        return ""
+
+    def _build_system_prompt(self, section_name: str) -> str:
+        """Return the hard-coded system prompt for the given section.
+
+        Combines the style guide, formatting rules, and a defense attorney
+        persona statement.
+        """
+        persona = (
+            "You are a senior defense litigation attorney with decades of trial experience. "
+            "You are writing a confidential mediation brief on behalf of the defendant. "
+            "Your goal is to present the strongest possible defense position to the mediator, "
+            "supported by the evidence and the facts of the case."
+        )
+        return f"{persona}\n{self.STYLE_GUIDE}\n{self.FORMATTING_RULES}"
+
+    def _build_section_prompt(self, section_name: str, refinement_instruction: str = "") -> str:
+        """Build the full prompt for *section_name*.
+
+        Assembles:
+        1. Main prompt loaded from the Workbench.
+        2. Optional refinement instruction.
+        3. Style excerpt from cached samples (first excerpt, truncated at 10 000 chars).
+        4. Planning pass output.
+        5. Previously generated sections — ALL sections when writing the
+           introduction; only sections that precede *section_name* in
+           GENERATION_ORDER otherwise.
+        """
+        parts: List[str] = []
+
+        # 1. Main section prompt
+        main_prompt = self._get_section_prompt(section_name)
+        if main_prompt:
+            parts.append(main_prompt)
+
+        # 2. Refinement instruction
+        if refinement_instruction:
+            parts.append(f"\nREFINEMENT INSTRUCTION:\n{refinement_instruction}")
+
+        # 3. Style excerpt
+        excerpts = self.get_style_excerpts()
+        section_excerpts = excerpts.get(section_name, [])
+        if section_excerpts:
+            excerpt = section_excerpts[0][:10000]
+            parts.append(
+                f"\nSTYLE REFERENCE — example from a prior mediation brief "
+                f"(use only as a stylistic guide):\n{excerpt}"
+            )
+
+        # 4. Planning pass output
+        if self.planning_output:
+            parts.append(f"\nPLANNING ANALYSIS:\n{self.planning_output}")
+
+        # 5. Previously generated sections
+        if section_name == "introduction":
+            # Introduction is written last — include every other section
+            prior_sections = {
+                s: self.sections[s]
+                for s in SECTION_ORDER
+                if s != "introduction" and s in self.sections
+            }
+        else:
+            # Include all sections that were generated before this one
+            current_index = GENERATION_ORDER.index(section_name) if section_name in GENERATION_ORDER else -1
+            prior_names = GENERATION_ORDER[:current_index] if current_index > 0 else []
+            prior_sections = {s: self.sections[s] for s in prior_names if s in self.sections}
+
+        if prior_sections:
+            prior_text = "\n\n".join(
+                f"[{s.upper().replace('_', ' ')}]\n{body}"
+                for s, body in prior_sections.items()
+            )
+            parts.append(f"\nPREVIOUSLY DRAFTED SECTIONS (for context and consistency):\n{prior_text}")
+
+        return "\n".join(parts)
+
+    def generate_section(self, section_name: str, refinement_instruction: str = "") -> Optional[str]:
+        """Generate content for *section_name* using the LLM.
+
+        Calls LLMCaller with the section-specific system prompt and the
+        assembled section prompt, using the document content as the text
+        body.  Stores the result in ``self.sections[section_name]`` and
+        returns it.  Returns None if the LLM call fails.
+        """
+        system_prompt = self._build_system_prompt(section_name)
+        section_prompt = self._build_section_prompt(section_name, refinement_instruction)
+
+        caller = LLMCaller()
+        # Pass system prompt prepended to the section prompt so the caller
+        # receives both in the user-visible prompt parameter.
+        full_prompt = f"{system_prompt}\n\n{section_prompt}"
+
+        result = caller.call(
+            prompt=full_prompt,
+            text=self.document_content,
+            agent_id="agent_mediation_brief",
+        )
+
+        if result:
+            self.sections[section_name] = result
+            logger.info("Generated section %r (%d chars)", section_name, len(result))
+        else:
+            logger.error("LLM returned no content for section %r", section_name)
+
+        return result
+
+    def run_planning_pass(self) -> Optional[str]:
+        """Run the planning pass over the document content.
+
+        Loads the planning prompt, calls the LLM, stores the output in
+        ``self.planning_output``, and returns it.  Returns None if the
+        LLM call fails.
+        """
+        planning_prompt = self._get_section_prompt("planning")
+        if not planning_prompt:
+            logger.warning("Planning prompt not found — skipping planning pass")
+            return None
+
+        caller = LLMCaller()
+        result = caller.call(
+            prompt=planning_prompt,
+            text=self.document_content,
+            agent_id="agent_mediation_brief",
+        )
+
+        if result:
+            self.planning_output = result
+            logger.info("Planning pass complete (%d chars)", len(result))
+        else:
+            logger.error("Planning pass: LLM returned no content")
+
+        return result
 
     # ------------------------------------------------------------------
     # Caption template handling
