@@ -180,7 +180,7 @@ FORMATTING RULES:
   A. No, I was looking at my phone at the time.
   DEPO_QUOTE_END
   (Smith Depo Trns., at p. 45:12.)
-- Clean deposition quotes of transcript artifacts (line numbers, dashes, extra characters) but keep the testimony verbatim
+- Clean deposition quotes of transcript artifacts (line numbers, extra characters) but keep the testimony verbatim. Do NOT remove dashes (--) from testimony — keep them as-is
 - Write in plain text. Do not use markdown formatting (no **, ##, etc.)
 """
 
@@ -643,16 +643,17 @@ FORMATTING RULES:
     def _replace_caption_page_footers(self, doc) -> None:
         """Replace the pleading title in ALL footers with the mediation brief title.
 
-        Finds the paragraph in each footer that contains the pleading title
-        (which may be "CAPTION PAGE", "[PLEADING TITLE]", or a previous
-        pleading name like "DEFENDANT'S ANSWER TO...") and replaces it.
-
-        Skips paragraphs that contain only page numbers (digits).
+        Footer text is often inside tables within the footer, so we search
+        ALL w:t elements in the footer XML (not just paragraphs). Any
+        non-numeric text that isn't a page number gets its parent paragraph
+        replaced with the brief title.
         """
         W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
         W_T = f"{{{W_NS}}}t"
         W_R = f"{{{W_NS}}}r"
         W_P = f"{{{W_NS}}}p"
+
+        _SKIP_TEXTS = {"", "page", "of"}  # common page number labels
 
         for section in doc.sections:
             for footer in (
@@ -662,15 +663,26 @@ FORMATTING RULES:
             ):
                 if footer is None:
                     continue
-                for para in footer.paragraphs:
-                    text = para.text.strip()
-                    # Skip empty or page-number-only paragraphs
-                    if not text or text.isdigit():
+                # Track which paragraphs we've already replaced
+                replaced_paras = set()
+                for t_elem in list(footer._element.iter(W_T)):
+                    if t_elem.text is None:
                         continue
-                    # This paragraph has the pleading title — replace it
-                    para_elem = para._element
+                    text = t_elem.text.strip()
+                    # Skip page numbers and empty text
+                    if not text or text.isdigit() or text.lower() in _SKIP_TEXTS:
+                        continue
+                    # Find the parent paragraph
+                    para_elem = t_elem.getparent()
+                    while para_elem is not None and para_elem.tag != W_P:
+                        para_elem = para_elem.getparent()
+                    if para_elem is None or id(para_elem) in replaced_paras:
+                        continue
+                    replaced_paras.add(id(para_elem))
+                    # Clear all runs in this paragraph
                     for run_elem in list(para_elem.iter(W_R)):
                         para_elem.remove(run_elem)
+                    # Add the brief title
                     para_elem.append(_make_bold_run("DEFENDANT'S "))
                     para_elem.append(_make_bold_run("CONFIDENTIAL", underline=True))
                     para_elem.append(_make_bold_run(" MEDIATION BRIEF"))
@@ -883,10 +895,11 @@ FORMATTING RULES:
         return para
 
     def _add_depo_quote(self, doc, text: str):
-        """Add deposition quote lines — single-spaced, each line indented 0.5 inches.
+        """Add deposition quote lines — single-spaced, Q/A with hanging indent.
 
-        The text may contain multiple lines (Q./A. exchanges) followed by a citation.
-        Each line becomes its own paragraph for proper single-spacing.
+        Q. and A. lines get a 1.0" left indent with 0.5" hanging indent so the
+        letter is at 0.5" and the testimony text starts at 1.0". The citation
+        line (parenthetical) is NOT indented — it sits at the left margin.
         """
         lines = text.split("\n")
         first_para = None
@@ -894,16 +907,40 @@ FORMATTING RULES:
             line = line.strip()
             if not line:
                 continue
-            para = doc.add_paragraph(line)
+
+            is_citation = self._DEPO_CITE_RE.search(line)
+            is_qa = line.startswith("Q.") or line.startswith("A.")
+
+            para = doc.add_paragraph()
             pf = para.paragraph_format
-            pf.left_indent = Inches(0.5)
             pf.line_spacing = 1.0  # Single spacing
             pf.space_before = Pt(0)
             pf.space_after = Pt(0)
+
+            if is_citation:
+                # Citation line — no indent (left margin)
+                para.add_run(line)
+            elif is_qa:
+                # Q./A. line — letter at 0.5", text at 1.0" via hanging indent + tab
+                pf.left_indent = Inches(1.0)
+                pf.first_line_indent = Inches(-0.5)
+                self._add_tab_stop(para, position_inches=1.0)
+                # Split into letter and testimony
+                letter = line[:2]  # "Q." or "A."
+                testimony = line[2:].strip()
+                para.add_run(letter)
+                para.add_run("\t")
+                para.add_run(testimony)
+            else:
+                # Continuation line — indented at 0.5"
+                pf.left_indent = Inches(0.5)
+                para.add_run(line)
+
             if first_para is None:
                 pf.space_before = Pt(6)
                 first_para = para
-        # Add a little spacing after the last quote line
+
+        # Add spacing after the last line
         if first_para:
             para.paragraph_format.space_after = Pt(6)
         return first_para
