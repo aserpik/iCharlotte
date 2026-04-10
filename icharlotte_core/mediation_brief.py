@@ -164,7 +164,7 @@ STYLE AND TONE GUIDE:
 - Point out weaknesses in plaintiff's case through factual analysis, not characterization
 - Use specific facts, dates, and evidence — avoid vague generalities
 - Always use party labels before names: "Plaintiff [Name]", "Defendant [Name]", or "Co-Defendant [Name]" when referring to parties to the case
-- Define ALL party shorthand names and location shorthand on FIRST reference, as early as possible in the brief. For example: "Defendant Kwang Hae Chong D/B/A Pacific Painting ("Pacific Painting")", "the apartment complex located at 14105 Califa Street in Van Nuys, California (the "Premises")". After the definition, use the shorthand for all subsequent references
+- Define ALL party shorthand names and location shorthand on FIRST reference, as early as possible in the brief. For example: "Defendant Kwang Hae Chong D/B/A Pacific Painting ("Pacific Painting")", "the apartment complex located at 14105 Califa Street in Van Nuys, California (the "Premises")". After the definition, use ONLY the shorthand for all subsequent references. IMPORTANT: Do NOT re-define a term that was already defined in a prior section. Each definition should appear exactly ONCE in the entire brief — in whichever section first mentions that party or location
 - Do not use placeholder text like [TBD] or [INSERT] — write around missing information naturally
 - Be thorough and detailed — length is not a concern
 """
@@ -925,7 +925,9 @@ FORMATTING RULES:
             pf.space_after = Pt(0)
 
             if is_citation:
-                # Citation line — no indent (left margin)
+                # Citation line — no indent, double-spaced so there's
+                # a visible gap between the last Q/A line and the citation
+                pf.line_spacing = 2.0
                 para.add_run(line)
             elif is_qa:
                 # Q./A. line — letter at 0.5", text at 1.0" via hanging indent + tab
