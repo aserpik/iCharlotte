@@ -88,6 +88,7 @@ def build_parse_prompt(document_text: str) -> str:
 Return a JSON object with these fields:
 - "discovery_type": the discovery type — one of "FI" (Form Interrogatories), "SI" (Special Interrogatories), "RFA" (Requests for Admission), "RPD" (Requests for Production)
 - "propounding_party": the full name of the propounding party (e.g., "Plaintiff JOHN DOE")
+- "responding_party": the full name of the responding party / party the discovery is directed to (e.g., "Defendant ACME CORP")
 - "set_number": integer (1, 2, etc.)
 - "case_number": the case number (e.g., "23STCV12345")
 - "requests": array of objects, each with:
@@ -107,7 +108,7 @@ _SET_WORDS = {
     6: "SIX", 7: "SEVEN", 8: "EIGHT", 9: "NINE", 10: "TEN",
 }
 
-def parse_llm_response(llm_json: str, our_client_name: str) -> ParsedDiscovery:
+def parse_llm_response(llm_json: str, our_client_name: str = "") -> ParsedDiscovery:
     text = llm_json.strip()
     if text.startswith("```"):
         text = re.sub(r'^```(?:json)?\s*', '', text)
@@ -136,7 +137,7 @@ def parse_llm_response(llm_json: str, our_client_name: str) -> ParsedDiscovery:
     return ParsedDiscovery(
         discovery_type=data.get("discovery_type", ""),
         propounding_party=data.get("propounding_party", ""),
-        responding_party=our_client_name,
+        responding_party=data.get("responding_party", "") or our_client_name,
         set_number=set_number,
         set_word=set_word,
         case_number=data.get("case_number", ""),
