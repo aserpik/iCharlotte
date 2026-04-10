@@ -11,9 +11,13 @@ import json
 import logging
 import os
 import re
+import shutil
 from typing import Dict, List, Optional
 
 import fitz  # PyMuPDF
+from docx import Document as DocxDocument
+from docx.oxml.ns import qn
+from docx.oxml import OxmlElement
 
 logger = logging.getLogger(__name__)
 
@@ -321,3 +325,179 @@ class MediationBriefGenerator:
             "sections": data.get("sections", {}),
         }
         return self._style_cache.get("sections", {})
+
+    # ------------------------------------------------------------------
+    # Caption template handling
+    # ------------------------------------------------------------------
+
+    # XML namespace constants for Word document XML
+    _W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    _W_T = f"{{{_W_NS}}}t"
+    _W_P = f"{{{_W_NS}}}p"
+    _W_R = f"{{{_W_NS}}}r"
+
+    # Signature block indicator phrases (case-insensitive search)
+    _SIGNATURE_INDICATORS = [
+        "By:",
+        "DATED:",
+        "Respectfully submitted",
+        "State Bar No.",
+        "Attorney for",
+        "Counsel for",
+    ]
+
+    def find_caption_template(self, folder: str) -> Optional[str]:
+        """Search *folder* for a .docx file with "caption" in its name.
+
+        Returns the full path to the first match (case-insensitive), or None
+        if no matching file is found.
+        """
+        if not os.path.isdir(folder):
+            return None
+        for entry in os.listdir(folder):
+            if entry.lower().endswith(".docx") and "caption" in entry.lower():
+                return os.path.join(folder, entry)
+        return None
+
+    def prepare_caption_template(self, caption_path: str, output_path: str) -> list:
+        """Copy *caption_path* to *output_path*, process it, and return extracted
+        signature paragraph elements.
+
+        Processing steps:
+        1. Copy original file to output_path (never modify the original).
+        2. Replace "CAPTION PAGE" text in body and footers with the styled
+           "DEFENDANT'S CONFIDENTIAL MEDIATION BRIEF" title.
+        3. Extract (and remove) any trailing signature block paragraphs.
+        4. Save the modified document.
+
+        Returns a list of extracted signature paragraph elements (may be empty).
+        """
+        shutil.copy2(caption_path, output_path)
+        doc = DocxDocument(output_path)
+
+        self._replace_caption_page_body(doc)
+        self._replace_caption_page_footers(doc)
+        sig_elements = self._extract_signature_block(doc)
+
+        doc.save(output_path)
+        return sig_elements
+
+    def _replace_caption_page_body(self, doc) -> None:
+        """Search ALL w:t elements in the document body XML for "CAPTION PAGE"
+        (including text inside nested tables) and replace the containing paragraph
+        with three styled runs:
+          - "DEFENDANT'S " (bold)
+          - "CONFIDENTIAL" (bold + underline)
+          - " MEDIATION BRIEF" (bold)
+
+        Uses raw XML iteration because caption templates typically use nested
+        table layouts where doc.paragraphs won't find the text.
+        """
+        W_T = self._W_T
+        W_P = self._W_P
+        W_R = self._W_R
+
+        for t_elem in doc.element.body.iter(W_T):
+            if t_elem.text and "CAPTION PAGE" in t_elem.text.upper():
+                # Walk up to the enclosing w:p
+                para_elem = t_elem.getparent()
+                while para_elem is not None and para_elem.tag != W_P:
+                    para_elem = para_elem.getparent()
+                if para_elem is None:
+                    continue
+
+                # Remove all existing runs from this paragraph
+                for run_elem in list(para_elem.iter(W_R)):
+                    parent = run_elem.getparent()
+                    if parent is not None:
+                        parent.remove(run_elem)
+
+                # Helper to build a bold run element
+                def _bold_run(text: str, underline: bool = False) -> OxmlElement:
+                    run = OxmlElement("w:r")
+                    rPr = OxmlElement("w:rPr")
+                    rPr.append(OxmlElement("w:b"))
+                    if underline:
+                        u_elem = OxmlElement("w:u")
+                        u_elem.set(qn("w:val"), "single")
+                        rPr.append(u_elem)
+                    run.append(rPr)
+                    t = OxmlElement("w:t")
+                    t.text = text
+                    t.set(qn("xml:space"), "preserve")
+                    run.append(t)
+                    return run
+
+                para_elem.append(_bold_run("DEFENDANT'S "))
+                para_elem.append(_bold_run("CONFIDENTIAL", underline=True))
+                para_elem.append(_bold_run(" MEDIATION BRIEF"))
+                return  # Only replace the first occurrence
+
+    def _replace_caption_page_footers(self, doc) -> None:
+        """Iterate all section footers and replace "CAPTION PAGE" paragraphs
+        with the same three-run styled title as in the body replacement.
+        """
+        for section in doc.sections:
+            for footer in (
+                section.footer,
+                section.even_page_footer,
+                section.first_page_footer,
+            ):
+                if footer is None:
+                    continue
+                for para in footer.paragraphs:
+                    if "CAPTION PAGE" in para.text.upper():
+                        # Clear existing runs
+                        for run in list(para.runs):
+                            run._element.getparent().remove(run._element)
+                        # Add styled runs
+                        r1 = para.add_run("DEFENDANT'S ")
+                        r1.bold = True
+                        r2 = para.add_run("CONFIDENTIAL")
+                        r2.bold = True
+                        r2.underline = True
+                        r3 = para.add_run(" MEDIATION BRIEF")
+                        r3.bold = True
+
+    def _extract_signature_block(self, doc) -> list:
+        """Scan backwards through the last 15 paragraphs looking for signature
+        block indicators.  When found, extract all paragraphs from that point
+        to the end of the document, remove them from the body, and return the
+        extracted paragraph objects.
+
+        Returns a list of Paragraph objects (may be empty if no signature block
+        is detected).  The elements are removed from the document body so they
+        can be re-inserted elsewhere in the assembled brief.
+        """
+        indicators = self._SIGNATURE_INDICATORS
+        all_paras = doc.paragraphs
+
+        # Search the last 15 paragraphs for a signature indicator
+        search_paras = all_paras[-15:] if len(all_paras) > 15 else all_paras
+        sig_start_index = None
+
+        for i, para in enumerate(search_paras):
+            text = para.text
+            for indicator in indicators:
+                if indicator.lower() in text.lower():
+                    # Map back to index in the full paragraph list
+                    offset = len(all_paras) - len(search_paras)
+                    sig_start_index = offset + i
+                    break
+            if sig_start_index is not None:
+                break
+
+        if sig_start_index is None:
+            return []
+
+        # Collect paragraphs from sig_start_index to end
+        sig_paras = list(all_paras[sig_start_index:])
+
+        # Remove them from the document body in reverse order to preserve indices
+        for para in reversed(sig_paras):
+            para_elem = para._element
+            parent = para_elem.getparent()
+            if parent is not None:
+                parent.remove(para_elem)
+
+        return sig_paras
