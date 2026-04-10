@@ -121,6 +121,27 @@ CACHE_PATH = os.path.join(PROMPTS_DIR, "style_cache.json")
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _make_bold_run(text: str, underline: bool = False):
+    """Build an OxmlElement w:r with bold (and optionally underline)."""
+    run = OxmlElement("w:r")
+    rPr = OxmlElement("w:rPr")
+    rPr.append(OxmlElement("w:b"))
+    if underline:
+        u_elem = OxmlElement("w:u")
+        u_elem.set(qn("w:val"), "single")
+        rPr.append(u_elem)
+    run.append(rPr)
+    t = OxmlElement("w:t")
+    t.text = text
+    t.set(qn("xml:space"), "preserve")
+    run.append(t)
+    return run
+
+
+# ---------------------------------------------------------------------------
 # MediationBriefGenerator
 # ---------------------------------------------------------------------------
 
@@ -137,14 +158,13 @@ class MediationBriefGenerator:
     STYLE_GUIDE = """
 STYLE AND TONE GUIDE:
 - Write as a senior defense litigation attorney addressing a mediator
-- Tone: professional, authoritative, persuasive, and firm
+- Tone: professional, authoritative, and persuasive — but NOT overly argumentative or inflammatory. Avoid hyperbolic language like "exorbitant payout", "highly questionable", "transparent attempt". Let the facts speak for themselves. The goal is to educate and persuade, not to attack.
 - Use active voice and strong declarative statements
-- Avoid hedging or weak qualifiers ("perhaps", "might", "it could be argued")
 - Present defense arguments as the clear and logical reading of the evidence
-- When discussing plaintiff's position, highlight inconsistencies and weaknesses
+- Point out weaknesses in plaintiff's case through factual analysis, not characterization
 - Use specific facts, dates, and evidence — avoid vague generalities
-- When including deposition quotes, clean them of transcript artifacts (line numbers, dashes, extra characters) but keep them verbatim
-- Citation format for deposition quotes: (LastName Depo Trns., at p. PageNum:LineNum.)
+- Always use party labels before names: "Plaintiff [Name]", "Defendant [Name]", or "Co-Defendant [Name]" when referring to parties to the case
+- When a case involves a specific property or location, define it on first reference with a parenthetical shorthand, e.g., "the apartment complex located at 14105 Califa Street in Van Nuys, California (the "Premises")"
 - Do not use placeholder text like [TBD] or [INSERT] — write around missing information naturally
 - Be thorough and detailed — length is not a concern
 """
@@ -153,7 +173,14 @@ STYLE AND TONE GUIDE:
 FORMATTING RULES:
 - Do NOT include level-one section headings (roman numerals) — they are added by the system
 - For the LIABILITY and DAMAGES sections: mark each subsection with "SUBSECTION: Title Text" on its own line, followed by the content paragraphs. The system will convert these to properly formatted level-two headings.
-- For deposition quotes: put the quote on its own paragraph, preceded by a blank line. Follow with the citation on the same paragraph: (LastName Depo Trns., at p. PageNum:LineNum.)
+- For deposition quotes: format them as Q&A exchanges. Start each quote block on a new line with "DEPO_QUOTE_START" on its own line, then include the verbatim Q&A with "Q." preceding questions and "A." preceding answers, then end with "DEPO_QUOTE_END" on its own line, followed by the citation on the next line in this format: (LastName Depo Trns., at p. PageNum:LineNum.)
+  Example:
+  DEPO_QUOTE_START
+  Q. Were you paying attention to where you were walking?
+  A. No, I was looking at my phone at the time.
+  DEPO_QUOTE_END
+  (Smith Depo Trns., at p. 45:12.)
+- Clean deposition quotes of transcript artifacts (line numbers, dashes, extra characters) but keep the testimony verbatim
 - Write in plain text. Do not use markdown formatting (no **, ##, etc.)
 """
 
@@ -608,31 +635,25 @@ FORMATTING RULES:
                     if parent is not None:
                         parent.remove(run_elem)
 
-                # Helper to build a bold run element
-                def _bold_run(text: str, underline: bool = False) -> OxmlElement:
-                    run = OxmlElement("w:r")
-                    rPr = OxmlElement("w:rPr")
-                    rPr.append(OxmlElement("w:b"))
-                    if underline:
-                        u_elem = OxmlElement("w:u")
-                        u_elem.set(qn("w:val"), "single")
-                        rPr.append(u_elem)
-                    run.append(rPr)
-                    t = OxmlElement("w:t")
-                    t.text = text
-                    t.set(qn("xml:space"), "preserve")
-                    run.append(t)
-                    return run
-
-                para_elem.append(_bold_run("DEFENDANT'S "))
-                para_elem.append(_bold_run("CONFIDENTIAL", underline=True))
-                para_elem.append(_bold_run(" MEDIATION BRIEF"))
+                para_elem.append(_make_bold_run("DEFENDANT'S "))
+                para_elem.append(_make_bold_run("CONFIDENTIAL", underline=True))
+                para_elem.append(_make_bold_run(" MEDIATION BRIEF"))
                 return  # Only replace the first occurrence
 
     def _replace_caption_page_footers(self, doc) -> None:
-        """Iterate all section footers and replace "CAPTION PAGE" paragraphs
-        with the same three-run styled title as in the body replacement.
+        """Replace the pleading title in ALL footers with the mediation brief title.
+
+        Finds the paragraph in each footer that contains the pleading title
+        (which may be "CAPTION PAGE", "[PLEADING TITLE]", or a previous
+        pleading name like "DEFENDANT'S ANSWER TO...") and replaces it.
+
+        Skips paragraphs that contain only page numbers (digits).
         """
+        W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        W_T = f"{{{W_NS}}}t"
+        W_R = f"{{{W_NS}}}r"
+        W_P = f"{{{W_NS}}}p"
+
         for section in doc.sections:
             for footer in (
                 section.footer,
@@ -642,18 +663,17 @@ FORMATTING RULES:
                 if footer is None:
                     continue
                 for para in footer.paragraphs:
-                    if "CAPTION PAGE" in para.text.upper():
-                        # Clear existing runs
-                        for run in list(para.runs):
-                            run._element.getparent().remove(run._element)
-                        # Add styled runs
-                        r1 = para.add_run("DEFENDANT'S ")
-                        r1.bold = True
-                        r2 = para.add_run("CONFIDENTIAL")
-                        r2.bold = True
-                        r2.underline = True
-                        r3 = para.add_run(" MEDIATION BRIEF")
-                        r3.bold = True
+                    text = para.text.strip()
+                    # Skip empty or page-number-only paragraphs
+                    if not text or text.isdigit():
+                        continue
+                    # This paragraph has the pleading title — replace it
+                    para_elem = para._element
+                    for run_elem in list(para_elem.iter(W_R)):
+                        para_elem.remove(run_elem)
+                    para_elem.append(_make_bold_run("DEFENDANT'S "))
+                    para_elem.append(_make_bold_run("CONFIDENTIAL", underline=True))
+                    para_elem.append(_make_bold_run(" MEDIATION BRIEF"))
 
     def _extract_signature_block(self, doc) -> list:
         """Scan backwards through the last 15 paragraphs looking for signature
@@ -705,39 +725,79 @@ FORMATTING RULES:
     def _parse_section_text(self, text: str, section_name: str) -> List[Dict]:
         """Parse LLM output into structured elements.
 
-        Splits *text* on double-newlines into paragraphs, then classifies each
-        paragraph as one of:
+        Handles three element types:
           - ``"l2_heading"``  — line matching ``^SUBSECTION: <title>``
-          - ``"depo_quote"``  — paragraph containing a deposition citation
+          - ``"depo_quote"``  — block between DEPO_QUOTE_START/END markers,
+            or (legacy) a paragraph containing a deposition citation
           - ``"body"``        — everything else
-
-        When a SUBSECTION line also has additional content on the same line
-        (after the heading text), a separate body element is emitted for it.
 
         Returns a list of dicts with keys ``"type"`` and ``"text"``.
         """
         elements: List[Dict] = []
-        paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+        lines = text.split("\n")
 
-        for para in paragraphs:
-            subsection_match = self._SUBSECTION_RE.match(para)
-            if subsection_match:
-                heading_text = subsection_match.group(1).strip()
-                # Check if SUBSECTION: line has inline content after it
-                # (i.e., there is more text on the same line beyond the title)
-                # The regex captures everything after "SUBSECTION: " on that line.
-                # If the paragraph has additional lines after the SUBSECTION line,
-                # emit them as a body element.
-                elements.append({"type": "l2_heading", "text": heading_text})
-                # Remainder: lines in the same paragraph after the SUBSECTION line
-                remainder_lines = para[subsection_match.end():].strip()
-                if remainder_lines:
-                    elements.append({"type": "body", "text": remainder_lines})
-            elif self._DEPO_CITE_RE.search(para):
-                elements.append({"type": "depo_quote", "text": para})
-            else:
-                elements.append({"type": "body", "text": para})
+        i = 0
+        current_body = []
 
+        def _flush_body():
+            """Emit accumulated body lines as body paragraph(s)."""
+            if current_body:
+                body_text = "\n".join(current_body).strip()
+                if body_text:
+                    # Split on double-newlines into separate paragraphs
+                    for para in body_text.split("\n\n"):
+                        para = para.strip()
+                        if para:
+                            elements.append({"type": "body", "text": para})
+                current_body.clear()
+
+        while i < len(lines):
+            line = lines[i]
+            stripped = line.strip()
+
+            # SUBSECTION heading
+            sub_match = self._SUBSECTION_RE.match(stripped)
+            if sub_match:
+                _flush_body()
+                elements.append({"type": "l2_heading", "text": sub_match.group(1).strip()})
+                i += 1
+                continue
+
+            # DEPO_QUOTE_START block
+            if stripped == "DEPO_QUOTE_START":
+                _flush_body()
+                i += 1
+                quote_lines = []
+                while i < len(lines) and lines[i].strip() != "DEPO_QUOTE_END":
+                    quote_lines.append(lines[i].strip())
+                    i += 1
+                if i < len(lines):
+                    i += 1  # skip DEPO_QUOTE_END
+                # Next non-empty line should be the citation
+                citation = ""
+                while i < len(lines) and not lines[i].strip():
+                    i += 1
+                if i < len(lines) and self._DEPO_CITE_RE.search(lines[i]):
+                    citation = lines[i].strip()
+                    i += 1
+                quote_text = "\n".join(quote_lines)
+                if citation:
+                    quote_text += "\n" + citation
+                elements.append({"type": "depo_quote", "text": quote_text})
+                continue
+
+            # Legacy: paragraph with depo citation (no DEPO_QUOTE_START/END)
+            if self._DEPO_CITE_RE.search(stripped):
+                _flush_body()
+                elements.append({"type": "depo_quote", "text": stripped})
+                i += 1
+                continue
+
+            # Regular body line
+            current_body.append(line)
+            i += 1
+
+        _flush_body()
         return elements
 
     # ------------------------------------------------------------------
@@ -764,8 +824,9 @@ FORMATTING RULES:
         pf = para.paragraph_format
         pf.left_indent = Inches(0.5)
         pf.first_line_indent = Inches(-0.5)
+        pf.line_spacing = 2.0  # Double spacing
         pf.space_before = Pt(12)
-        pf.space_after = Pt(6)
+        pf.space_after = Pt(0)
         self._add_tab_stop(para, position_inches=0.5)
 
         # Run 1: roman numeral — bold only
@@ -785,15 +846,18 @@ FORMATTING RULES:
     def _add_l2_heading(self, doc, letter: str, title: str):
         """Add a level-2 subsection heading formatted as ``A.     Title Text``.
 
-        Same hanging indent pattern as L1 headings.
+        Letter at 0.5" indent, title at 1.0" indent (0.5" after the letter).
+        Uses left_indent=1.0" with hanging indent back to 0.5" for the letter,
+        and a tab stop at 1.0" for the title.
         """
         para = doc.add_paragraph()
         pf = para.paragraph_format
-        pf.left_indent = Inches(0.5)
+        pf.left_indent = Inches(1.0)
         pf.first_line_indent = Inches(-0.5)
+        pf.line_spacing = 2.0  # Double spacing
         pf.space_before = Pt(10)
-        pf.space_after = Pt(4)
-        self._add_tab_stop(para, position_inches=0.5)
+        pf.space_after = Pt(0)
+        self._add_tab_stop(para, position_inches=1.0)
 
         # Run 1: letter — bold only
         r1 = para.add_run(f"{letter}.")
@@ -810,19 +874,39 @@ FORMATTING RULES:
         return para
 
     def _add_body_paragraph(self, doc, text: str):
-        """Add a normal body paragraph with space_after=6pt."""
+        """Add a body paragraph with double spacing and 0.5 inch first-line indent."""
         para = doc.add_paragraph(text)
-        para.paragraph_format.space_after = Pt(6)
+        pf = para.paragraph_format
+        pf.line_spacing = 2.0  # Double spacing
+        pf.first_line_indent = Inches(0.5)
+        pf.space_after = Pt(0)
         return para
 
     def _add_depo_quote(self, doc, text: str):
-        """Add a deposition quote paragraph with left indent and spacing."""
-        para = doc.add_paragraph(text)
-        pf = para.paragraph_format
-        pf.left_indent = Inches(0.5)
-        pf.space_before = Pt(6)
-        pf.space_after = Pt(6)
-        return para
+        """Add deposition quote lines — single-spaced, each line indented 0.5 inches.
+
+        The text may contain multiple lines (Q./A. exchanges) followed by a citation.
+        Each line becomes its own paragraph for proper single-spacing.
+        """
+        lines = text.split("\n")
+        first_para = None
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            para = doc.add_paragraph(line)
+            pf = para.paragraph_format
+            pf.left_indent = Inches(0.5)
+            pf.line_spacing = 1.0  # Single spacing
+            pf.space_before = Pt(0)
+            pf.space_after = Pt(0)
+            if first_para is None:
+                pf.space_before = Pt(6)
+                first_para = para
+        # Add a little spacing after the last quote line
+        if first_para:
+            para.paragraph_format.space_after = Pt(6)
+        return first_para
 
     # ------------------------------------------------------------------
     # Document assembly
