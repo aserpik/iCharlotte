@@ -15,7 +15,7 @@ import shutil
 from typing import Dict, List, Optional
 
 from docx.shared import Inches, Pt
-from docx.enum.text import WD_TAB_ALIGNMENT
+from docx.enum.text import WD_BREAK
 
 import fitz  # PyMuPDF
 from docx import Document as DocxDocument
@@ -159,7 +159,7 @@ FORMATTING RULES:
 
     # Compile-time regexes for section text parsing
     _SUBSECTION_RE = re.compile(r'^SUBSECTION:\s*(.+)$', re.MULTILINE)
-    _DEPO_CITE_RE = re.compile(r'\([A-Z][a-z]+ Depo Trns\., at p\. \d+:\d+\.\)')
+    _DEPO_CITE_RE = re.compile(r'\([A-Z][A-Za-z\'\- ]+ Depo Trns\., at p\. \d+:\d+\.\)')
 
     def __init__(self):
         self._sample_dir: str = SAMPLE_BRIEFS_DIR
@@ -861,9 +861,7 @@ FORMATTING RULES:
         # Step 3: Page break after caption
         page_break_para = doc.add_paragraph()
         run = page_break_para.add_run()
-        run.add_break(
-            __import__("docx.enum.text", fromlist=["WD_BREAK"]).WD_BREAK.PAGE
-        )
+        run.add_break(WD_BREAK.PAGE)
 
         # Step 4: Add each section
         letter_seq = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -1055,6 +1053,70 @@ FORMATTING RULES:
 # ---------------------------------------------------------------------------
 
 from PySide6.QtCore import QThread, Signal  # noqa: E402 (import after class definition)
+
+
+class RoutingWorker(QThread):
+    """Background worker that routes a refinement message to section names.
+
+    Runs the LLM routing call off the UI thread.
+
+    Signals:
+        result(list): list of section names to regenerate, or empty list
+        error(str): error message
+    """
+    result = Signal(list)
+    error = Signal(str)
+
+    def __init__(self, generator: MediationBriefGenerator, user_message: str, parent=None):
+        super().__init__(parent)
+        self._generator = generator
+        self._user_message = user_message
+
+    def run(self):
+        try:
+            sections = self._generator.route_refinement(self._user_message)
+            self.result.emit(sections)
+        except Exception as exc:
+            logger.exception("RoutingWorker: unhandled error")
+            self.error.emit(str(exc))
+
+
+class RefinementWorker(QThread):
+    """Background worker for regenerating specific sections.
+
+    Signals:
+        section_complete(str, str): section_name, section_text
+        all_complete(list): list of regenerated section names
+        error(str): error message
+    """
+    section_complete = Signal(str, str)
+    all_complete = Signal(list)
+    error = Signal(str)
+
+    def __init__(self, generator: MediationBriefGenerator, section_names: list,
+                 instruction: str, parent=None):
+        super().__init__(parent)
+        self._generator = generator
+        self._section_names = section_names
+        self._instruction = instruction
+        self._stop_requested = False
+
+    def request_stop(self):
+        self._stop_requested = True
+
+    def run(self):
+        try:
+            regenerated = self._generator.refine_sections(
+                self._section_names, self._instruction,
+            )
+            for name in regenerated:
+                if self._stop_requested:
+                    return
+                self.section_complete.emit(name, self._generator.sections[name])
+            self.all_complete.emit(regenerated)
+        except Exception as exc:
+            logger.exception("RefinementWorker: unhandled error")
+            self.error.emit(str(exc))
 
 
 class MediationBriefWorker(QThread):

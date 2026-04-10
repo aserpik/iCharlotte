@@ -29,7 +29,10 @@ from .chat_widgets import (
     MessageWidget, SearchResultsWidget, get_theme, THEMES
 )
 from ..chat import ChatPersistence, TokenCounter, Message, Conversation, BUILTIN_PROMPTS, TRANSCRIBE_PROMPT
-from ..mediation_brief import MediationBriefGenerator, MediationBriefWorker, SECTION_HEADINGS
+from ..mediation_brief import (
+    MediationBriefGenerator, MediationBriefWorker, RefinementWorker,
+    RoutingWorker, SECTION_HEADINGS,
+)
 
 try:
     import fitz  # PyMuPDF
@@ -1228,10 +1231,8 @@ class ChatTab(QWidget):
                 and (not self.med_brief_worker or not self.med_brief_worker.isRunning())):
             user_text = self.chat_input.toPlainText().strip()
             if user_text:
-                sections = self.med_brief_generator.route_refinement(user_text)
-                if sections:
-                    self._start_brief_refinement(user_text, sections)
-                    return
+                self._route_brief_refinement(user_text)
+                return
         # --- End mediation brief check ---
 
         # Warn if no case is loaded (messages won't persist)
@@ -2023,12 +2024,34 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
         self.send_btn.setEnabled(True)
         self.chat_history.append(f"<b style='color:red'>Generation error: {error_msg}</b>")
 
+    def _route_brief_refinement(self, user_text: str):
+        """Route a refinement message asynchronously (off UI thread)."""
+        self.chat_history.append(f"<b>You:</b> {user_text}")
+        self.chat_input.clear()
+        self.send_btn.setEnabled(False)
+        self.chat_history.append("<i>Routing...</i>")
+
+        self._pending_refinement_text = user_text
+        worker = RoutingWorker(self.med_brief_generator, user_text, parent=self)
+        worker.result.connect(self._on_routing_result)
+        worker.error.connect(self._on_brief_error)
+        self.med_brief_worker = worker
+        worker.start()
+
+    def _on_routing_result(self, sections: list):
+        """Handle routing worker result — start refinement or pass to normal chat."""
+        if sections:
+            self._start_brief_refinement(self._pending_refinement_text, sections)
+        else:
+            # Not a brief refinement — re-enable send and let user know
+            self.send_btn.setEnabled(True)
+            self.chat_history.append(
+                "<i>Message not related to the brief. Send again to chat normally, "
+                "or type a brief refinement instruction.</i>"
+            )
+
     def _start_brief_refinement(self, instruction: str, section_names: list):
         """Regenerate specified sections with user's instruction."""
-        self.chat_input.clear()
-        self.chat_history.append(f"<b>You:</b> {instruction}")
-        self.chat_history.append("")
-
         section_display = ", ".join(
             SECTION_HEADINGS.get(s, ("", s))[1] for s in section_names
         )
@@ -2036,32 +2059,11 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
         self.send_btn.setEnabled(False)
 
         gen = self.med_brief_generator
-
-        class _RefinementWorker(QThread):
-            section_done = Signal(str, str)
-            all_done = Signal(list)
-            error = Signal(str)
-
-            def __init__(self, gen, sections, instruction, parent=None):
-                super().__init__(parent)
-                self.gen = gen
-                self._sections = sections
-                self._instruction = instruction
-
-            def run(self):
-                try:
-                    regenerated = self.gen.refine_sections(
-                        self._sections, self._instruction,
-                    )
-                    for name in regenerated:
-                        self.section_done.emit(name, self.gen.sections[name])
-                    self.all_done.emit(regenerated)
-                except Exception as e:
-                    self.error.emit(str(e))
-
-        worker = _RefinementWorker(gen, section_names, instruction, parent=self)
-        worker.section_done.connect(self._on_brief_section_complete)
-        worker.all_done.connect(lambda regenerated: self._on_brief_all_complete(gen.sections))
+        worker = RefinementWorker(gen, section_names, instruction, parent=self)
+        worker.section_complete.connect(self._on_brief_section_complete)
+        worker.all_complete.connect(
+            lambda regenerated: self._on_brief_all_complete(gen.sections)
+        )
         worker.error.connect(self._on_brief_error)
         self.med_brief_worker = worker
         worker.start()
