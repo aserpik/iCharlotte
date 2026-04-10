@@ -21,6 +21,7 @@ app = QApplication.instance() or QApplication(sys.argv)
 from icharlotte_core.ui.discovery_tab import (
     DiscoveryTab, PropoundTab, PartyEditDialog,
 )
+from icharlotte_core.ui.respond_tab import RespondTab
 from icharlotte_core.discovery.models import (
     Party, PartyRole, DiscoveryMode, DiscoveryType, CustomStyle,
     generate_abbreviation,
@@ -30,26 +31,31 @@ from icharlotte_core.discovery.models import (
 class TestDiscoveryTabCreation(unittest.TestCase):
     """Verify DiscoveryTab and sub-tabs can be constructed."""
 
+    @patch("icharlotte_core.ui.respond_tab.ModelFetcher")
     @patch("icharlotte_core.ui.discovery_tab.ModelFetcher")
-    def test_discovery_tab_creates(self, mock_fetcher_cls):
+    def test_discovery_tab_creates(self, mock_propound_fetcher, mock_respond_fetcher):
         """DiscoveryTab and its PropoundTab sub-tab should instantiate."""
-        # Mock ModelFetcher so no real API calls happen
-        mock_fetcher = MagicMock()
-        mock_fetcher.isRunning.return_value = False
-        mock_fetcher_cls.return_value = mock_fetcher
+        for m in [mock_propound_fetcher, mock_respond_fetcher]:
+            inst = MagicMock()
+            inst.isRunning.return_value = False
+            m.return_value = inst
 
         tab = DiscoveryTab()
         self.assertIsInstance(tab.propound_tab, PropoundTab)
+        self.assertIsInstance(tab.respond_tab, RespondTab)
 
+    @patch("icharlotte_core.ui.respond_tab.ModelFetcher")
     @patch("icharlotte_core.ui.discovery_tab.ModelFetcher")
-    def test_load_case_delegates(self, mock_fetcher_cls):
-        mock_fetcher = MagicMock()
-        mock_fetcher.isRunning.return_value = False
-        mock_fetcher_cls.return_value = mock_fetcher
+    def test_load_case_delegates(self, mock_propound_fetcher, mock_respond_fetcher):
+        for m in [mock_propound_fetcher, mock_respond_fetcher]:
+            inst = MagicMock()
+            inst.isRunning.return_value = False
+            m.return_value = inst
 
         tab = DiscoveryTab()
         tab.load_case("9999.001")
         self.assertEqual(tab.propound_tab.file_number, "9999.001")
+        self.assertEqual(tab.respond_tab.file_number, "9999.001")
 
 
 class TestPropoundTabVisibility(unittest.TestCase):

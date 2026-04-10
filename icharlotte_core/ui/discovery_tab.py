@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QDialog, QLineEdit, QFormLayout, QDialogButtonBox, QSizePolicy,
     QPlainTextEdit,
 )
-from PySide6.QtCore import Qt, QTimer, Signal, QFileInfo
+from PySide6.QtCore import Qt, QTimer, Signal, QFileInfo, Slot
 from PySide6.QtGui import QDragEnterEvent, QDropEvent, QAction
 
 from icharlotte_core.ui.tabs import ResizableListWidget
@@ -128,6 +128,12 @@ class PropoundTab(QWidget):
         self.cached_models: Dict[str, list] = {}
         self.fetcher: Optional[ModelFetcher] = None
         self.generated_sets: List[DiscoverySet] = []
+
+        # Debounce timer for prompt auto-save
+        self._prompt_save_timer = QTimer(self)
+        self._prompt_save_timer.setSingleShot(True)
+        self._prompt_save_timer.setInterval(800)
+        self._prompt_save_timer.timeout.connect(self._save_prompt)
 
         self._build_ui()
         self._connect_signals()
@@ -387,6 +393,9 @@ class PropoundTab(QWidget):
         self.save_all_btn.clicked.connect(self._save_all)
         self.clear_btn.clicked.connect(self._clear_editor)
 
+        # Auto-save prompt on edits (debounced)
+        self.prompt_edit.textChanged.connect(self._prompt_save_timer.start)
+
         # Kick off initial model fetch
         self._update_models(self.provider_combo.currentText())
 
@@ -583,13 +592,13 @@ class PropoundTab(QWidget):
             if isinstance(plaintiffs, list):
                 for name in plaintiffs:
                     n = str(name).strip()
-                    is_client = client_name and client_name in n.lower()
+                    is_client = bool(client_name and client_name in n.lower())
                     self.parties.append(Party(
                         name=n, role=PartyRole.PLAINTIFF, is_our_client=is_client,
                     ))
             elif isinstance(plaintiffs, str) and plaintiffs.strip():
                 n = plaintiffs.strip()
-                is_client = client_name and client_name in n.lower()
+                is_client = bool(client_name and client_name in n.lower())
                 self.parties.append(Party(
                     name=n, role=PartyRole.PLAINTIFF, is_our_client=is_client,
                 ))
@@ -598,13 +607,13 @@ class PropoundTab(QWidget):
             if isinstance(defendants, list):
                 for name in defendants:
                     n = str(name).strip()
-                    is_client = client_name and client_name in n.lower()
+                    is_client = bool(client_name and client_name in n.lower())
                     self.parties.append(Party(
                         name=n, role=PartyRole.DEFENDANT, is_our_client=is_client,
                     ))
             elif isinstance(defendants, str) and defendants.strip():
                 n = defendants.strip()
-                is_client = client_name and client_name in n.lower()
+                is_client = bool(client_name and client_name in n.lower())
                 self.parties.append(Party(
                     name=n, role=PartyRole.DEFENDANT, is_our_client=is_client,
                 ))
@@ -656,6 +665,7 @@ class PropoundTab(QWidget):
         item.setCheckState(Qt.CheckState.Checked)
         item.setToolTip(path)
         self.doc_list.addItem(item)
+        self._save_documents()
 
     def _on_doc_context_menu(self, pos):
         item = self.doc_list.itemAt(pos)
@@ -669,6 +679,7 @@ class PropoundTab(QWidget):
         if action == remove_action:
             row = self.doc_list.row(item)
             self.doc_list.takeItem(row)
+            self._save_documents()
 
     def read_files_content(self) -> str:
         """Read text from all checked documents in the list.
@@ -796,8 +807,188 @@ class PropoundTab(QWidget):
 
     def load_case(self, file_number: str):
         """Load case data — called when the active case changes."""
+        # Save current case state before switching
+        if self.file_number and self.file_number != file_number:
+            self._save_state()
+
+        # Clear all UI state
+        self._clear_state()
+
         self.file_number = file_number
         self._load_parties_from_case()
+        self._load_state()
+
+    def _clear_state(self):
+        """Clear all UI state (documents, prompt, output) for a case switch."""
+        self.doc_list.clear()
+        self.prompt_edit.blockSignals(True)
+        self.prompt_edit.clear()
+        self.prompt_edit.blockSignals(False)
+        self.generated_sets = []
+        self.doc_tabs.clear()
+        self.doc_tabs.hide()
+        self.empty_label.show()
+        self.status_label.setText("")
+
+    # ------------------------------------------------------------------
+    # Session persistence (per-case)
+    # ------------------------------------------------------------------
+
+    def _get_manager(self):
+        """Return a CaseDataManager instance, or None on error."""
+        try:
+            from Scripts.case_data_manager import CaseDataManager
+            return CaseDataManager()
+        except Exception as e:
+            logger.warning("CaseDataManager unavailable: %s", e)
+            return None
+
+    def _save_state(self):
+        """Persist documents, prompt, and output for the current case."""
+        self._save_documents()
+        self._save_prompt()
+        self._save_output()
+
+    def _load_state(self):
+        """Restore documents, prompt, and output for the current case."""
+        self._load_documents()
+        self._load_prompt()
+        self._load_output()
+
+    def _save_documents(self):
+        """Persist the document list to CaseDataManager."""
+        if not self.file_number:
+            return
+        manager = self._get_manager()
+        if not manager:
+            return
+        docs = []
+        for i in range(self.doc_list.count()):
+            item = self.doc_list.item(i)
+            path = item.data(Qt.ItemDataRole.UserRole)
+            checked = item.checkState() == Qt.CheckState.Checked
+            if path:
+                docs.append({"path": path, "checked": checked})
+        try:
+            manager.save_variable(
+                self.file_number, "discovery_documents", docs,
+                source="discovery_tab", auto_tag=False,
+            )
+        except Exception as e:
+            logger.warning("Failed to save discovery documents: %s", e)
+
+    def _load_documents(self):
+        """Restore the document list from CaseDataManager."""
+        if not self.file_number:
+            return
+        manager = self._get_manager()
+        if not manager:
+            return
+        try:
+            docs = manager.get_value(self.file_number, "discovery_documents")
+            if not docs or not isinstance(docs, list):
+                return
+            for entry in docs:
+                path = entry.get("path", "") if isinstance(entry, dict) else str(entry)
+                if not path or not os.path.isfile(path):
+                    continue
+                item = QListWidgetItem(os.path.basename(path))
+                item.setData(Qt.ItemDataRole.UserRole, path)
+                item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                checked = entry.get("checked", True) if isinstance(entry, dict) else True
+                item.setCheckState(
+                    Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
+                )
+                item.setToolTip(path)
+                self.doc_list.addItem(item)
+        except Exception as e:
+            logger.warning("Failed to load discovery documents: %s", e)
+
+    @Slot()
+    def _save_prompt(self):
+        """Persist the prompt text to CaseDataManager."""
+        if not self.file_number:
+            return
+        manager = self._get_manager()
+        if not manager:
+            return
+        try:
+            manager.save_variable(
+                self.file_number, "discovery_prompt",
+                self.prompt_edit.toPlainText(),
+                source="discovery_tab", auto_tag=False,
+            )
+        except Exception as e:
+            logger.warning("Failed to save discovery prompt: %s", e)
+
+    def _load_prompt(self):
+        """Restore the prompt text from CaseDataManager."""
+        if not self.file_number:
+            return
+        manager = self._get_manager()
+        if not manager:
+            return
+        try:
+            text = manager.get_value(self.file_number, "discovery_prompt")
+            if text and isinstance(text, str):
+                self.prompt_edit.blockSignals(True)
+                self.prompt_edit.setPlainText(text)
+                self.prompt_edit.blockSignals(False)
+        except Exception as e:
+            logger.warning("Failed to load discovery prompt: %s", e)
+
+    def _save_output(self):
+        """Persist the editor output tabs to CaseDataManager."""
+        if not self.file_number:
+            return
+        manager = self._get_manager()
+        if not manager:
+            return
+        tabs_data = []
+        for i in range(self.doc_tabs.count()):
+            editor = self.doc_tabs.widget(i)
+            label = self.doc_tabs.tabText(i)
+            text = ""
+            if isinstance(editor, QPlainTextEdit):
+                text = editor.toPlainText()
+            tabs_data.append({"label": label, "text": text})
+        try:
+            manager.save_variable(
+                self.file_number, "discovery_output", tabs_data,
+                source="discovery_tab", auto_tag=False,
+            )
+        except Exception as e:
+            logger.warning("Failed to save discovery output: %s", e)
+
+    def _load_output(self):
+        """Restore the editor output tabs from CaseDataManager."""
+        if not self.file_number:
+            return
+        manager = self._get_manager()
+        if not manager:
+            return
+        try:
+            tabs_data = manager.get_value(self.file_number, "discovery_output")
+            if not tabs_data or not isinstance(tabs_data, list):
+                return
+            has_content = any(
+                t.get("text", "").strip() for t in tabs_data if isinstance(t, dict)
+            )
+            if not has_content:
+                return
+            self.empty_label.hide()
+            self.doc_tabs.show()
+            for entry in tabs_data:
+                if not isinstance(entry, dict):
+                    continue
+                label = entry.get("label", "")
+                text = entry.get("text", "")
+                editor = QPlainTextEdit()
+                editor.setPlainText(text)
+                editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+                self.doc_tabs.addTab(editor, label)
+        except Exception as e:
+            logger.warning("Failed to load discovery output: %s", e)
 
     # ------------------------------------------------------------------
     # Case path resolution
@@ -1079,6 +1270,7 @@ class PropoundTab(QWidget):
             f"{total_requests} requests across {set_count} "
             f"{'set' if set_count == 1 else 'sets'}."
         )
+        self._save_output()
 
     def _clear_editor(self):
         """Clear the right-pane editor, resetting to empty state."""
@@ -1087,6 +1279,7 @@ class PropoundTab(QWidget):
         self.doc_tabs.hide()
         self.empty_label.show()
         self.status_label.setText("")
+        self._save_output()
 
     # ------------------------------------------------------------------
     # Save
@@ -1182,12 +1375,12 @@ class DiscoveryTab(QWidget):
         self.propound_tab = PropoundTab()
         self.tabs.addTab(self.propound_tab, "Propound")
 
-        # Respond sub-tab (placeholder)
-        respond_placeholder = QLabel("Respond tab \u2014 coming soon")
-        respond_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        respond_placeholder.setStyleSheet("color: #888; font-size: 14px;")
-        self.tabs.addTab(respond_placeholder, "Respond")
+        # Respond sub-tab (lazy import to avoid circular dependency)
+        from icharlotte_core.ui.respond_tab import RespondTab
+        self.respond_tab = RespondTab()
+        self.tabs.addTab(self.respond_tab, "Respond")
 
     def load_case(self, file_number: str):
-        """Delegate to PropoundTab."""
+        """Delegate to both sub-tabs."""
         self.propound_tab.load_case(file_number)
+        self.respond_tab.load_case(file_number)
