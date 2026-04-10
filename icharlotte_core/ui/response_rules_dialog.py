@@ -252,22 +252,15 @@ class ResponseRulesDialog(QDialog):
         self.rb_si_moderate.setChecked(rules.si_response_style == "moderate")
         self.rb_si_detailed.setChecked(rules.si_response_style == "detailed")
 
-        # RFA posture — model values: cautious, cooperative, deny_all; 'balanced' is dialog-only alias
-        self.rb_rfa_cautious.setChecked(rules.rfa_default_posture in ("cautious", "deny_all"))
+        # RFA posture
+        self.rb_rfa_cautious.setChecked(rules.rfa_default_posture == "cautious")
         self.rb_rfa_balanced.setChecked(rules.rfa_default_posture == "balanced")
         self.rb_rfa_cooperative.setChecked(rules.rfa_default_posture == "cooperative")
 
-        # RPD posture — model values: context_dependent, produce_all, withhold_pending_protective
-        # Dialog adds 'unable_to_comply' and 'will_comply' as aliases
-        self.rb_rpd_unable.setChecked(
-            rules.rpd_default_posture in ("context_dependent", "unable_to_comply")
-        )
-        self.rb_rpd_comply.setChecked(
-            rules.rpd_default_posture in ("produce_all", "will_comply")
-        )
-        self.rb_rpd_context.setChecked(
-            rules.rpd_default_posture == "withhold_pending_protective"
-        )
+        # RPD posture
+        self.rb_rpd_unable.setChecked(rules.rpd_default_posture == "unable_to_comply")
+        self.rb_rpd_comply.setChecked(rules.rpd_default_posture == "will_comply")
+        self.rb_rpd_context.setChecked(rules.rpd_default_posture == "context_dependent")
 
         # Boilerplate fields
         self.waiver_edit.setPlainText(rules.waiver_language)
@@ -317,7 +310,7 @@ class ResponseRulesDialog(QDialog):
         if self.rb_rpd_comply.isChecked():
             rpd_posture = "will_comply"
         elif self.rb_rpd_context.isChecked():
-            rpd_posture = "withhold_pending_protective"
+            rpd_posture = "context_dependent"
         else:
             rpd_posture = "unable_to_comply"
 
