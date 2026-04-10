@@ -29,6 +29,7 @@ from .chat_widgets import (
     MessageWidget, SearchResultsWidget, get_theme, THEMES
 )
 from ..chat import ChatPersistence, TokenCounter, Message, Conversation, BUILTIN_PROMPTS, TRANSCRIBE_PROMPT
+from ..mediation_brief import MediationBriefGenerator, MediationBriefWorker, SECTION_HEADINGS
 
 try:
     import fitz  # PyMuPDF
@@ -235,6 +236,10 @@ class ChatTab(QWidget):
         self.stream_start_pos = 0
         self.stream_start_time = None
         self.worker = None
+
+        # Mediation brief state
+        self.med_brief_generator = None
+        self.med_brief_worker = None
 
         # Theme
         self.theme = 'light'
@@ -488,6 +493,13 @@ class ChatTab(QWidget):
 
         if self.fetcher is not None and self.fetcher.isRunning():
             self.fetcher.wait(1000)
+
+        # Clear mediation brief state
+        self.med_brief_generator = None
+        if self.med_brief_worker and self.med_brief_worker.isRunning():
+            self.med_brief_worker.request_stop()
+            self.med_brief_worker.wait(1000)
+        self.med_brief_worker = None
 
         # Clear attached files from previous case (without persisting)
         self._clear_files_no_persist()
@@ -1211,6 +1223,17 @@ class ChatTab(QWidget):
 
     def send_message(self):
         """Send a message with streaming support."""
+        # --- Mediation brief refinement mode ---
+        if (self.med_brief_generator and self.med_brief_generator.is_active
+                and (not self.med_brief_worker or not self.med_brief_worker.isRunning())):
+            user_text = self.chat_input.toPlainText().strip()
+            if user_text:
+                sections = self.med_brief_generator.route_refinement(user_text)
+                if sections:
+                    self._start_brief_refinement(user_text, sections)
+                    return
+        # --- End mediation brief check ---
+
         # Warn if no case is loaded (messages won't persist)
         if not self.persistence or not self.current_conversation_id:
             reply = QMessageBox.warning(
@@ -1723,9 +1746,17 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
 
         # Built-in prompts
         for prompt in BUILTIN_PROMPTS:
+            if prompt.id == 'builtin_mediation_brief':
+                continue  # Handled separately below
             action = QAction(prompt.name, self)
             action.triggered.connect(lambda checked, p=prompt: self.insert_template(p.prompt))
             menu.addAction(action)
+
+        # Mediation Brief (special — triggers generation, not text insert)
+        menu.addSeparator()
+        med_brief_action = QAction("Mediation Brief", self)
+        med_brief_action.triggered.connect(self._on_mediation_brief_selected)
+        menu.addAction(med_brief_action)
 
         # Custom prompts (if persistence available)
         if self.persistence:
@@ -1831,6 +1862,209 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
         self.conversation_history = []
         self.current_conversation_id = None
         self.current_conversation = None
+
+    # --- Mediation Brief Integration ---
+
+    def _on_mediation_brief_selected(self):
+        """Handle Mediation Brief template selection — show confirmation dialog."""
+        checked_files = []
+        for i in range(self.file_list.count()):
+            item = self.file_list.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                path = item.data(Qt.ItemDataRole.UserRole)
+                if path:
+                    checked_files.append(os.path.basename(path))
+
+        if not checked_files:
+            QMessageBox.warning(
+                self, "No Documents",
+                "Please select documents in the file list before generating a mediation brief."
+            )
+            return
+
+        case_name = self.file_number or "Unknown Case"
+        file_list_text = "\n".join(f"  - {f}" for f in checked_files[:15])
+        if len(checked_files) > 15:
+            file_list_text += f"\n  ... and {len(checked_files) - 15} more"
+
+        msg = (
+            f"Generate a Mediation Brief for case {case_name}?\n\n"
+            f"Documents ({len(checked_files)}):\n{file_list_text}\n\n"
+            "This will generate a comprehensive brief section-by-section. "
+            "The process may take several minutes."
+        )
+
+        reply = QMessageBox.question(
+            self, "Generate Mediation Brief", msg,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+
+        if reply == QMessageBox.StandardButton.Yes:
+            self._start_mediation_brief_generation()
+
+    def _start_mediation_brief_generation(self):
+        """Start the mediation brief generation pipeline."""
+        main_win = self.window()
+        case_path = getattr(main_win, 'case_path', None)
+        parent_folder = os.path.dirname(case_path) if case_path else None
+
+        generator = MediationBriefGenerator()
+
+        caption_path = None
+        if parent_folder:
+            caption_path = generator.find_caption_template(parent_folder)
+
+        if not caption_path:
+            search_loc = parent_folder or ""
+            caption_path, _ = QFileDialog.getOpenFileName(
+                self,
+                f"No caption template found in {search_loc}. Select one:",
+                search_loc,
+                "Word Documents (*.docx)"
+            )
+            if not caption_path:
+                return
+
+        generator.caption_template_path = caption_path
+        generator.document_content = self.read_files_content()
+
+        if not generator.document_content.strip():
+            QMessageBox.warning(
+                self, "No Content",
+                "Could not read any content from the selected documents."
+            )
+            return
+
+        generator.get_style_excerpts()
+        self.med_brief_generator = generator
+
+        self.chat_history.append("<b>Mediation Brief Generator</b>")
+        self.chat_history.append("<i>Starting generation...</i>")
+        self.chat_history.append("")
+
+        self.send_btn.setEnabled(False)
+
+        self.med_brief_worker = MediationBriefWorker(generator, parent=self)
+        self.med_brief_worker.section_started.connect(self._on_brief_section_started)
+        self.med_brief_worker.section_complete.connect(self._on_brief_section_complete)
+        self.med_brief_worker.all_complete.connect(self._on_brief_all_complete)
+        self.med_brief_worker.error.connect(self._on_brief_error)
+        self.med_brief_worker.start()
+
+    def _on_brief_section_started(self, section_name: str, index: int, total: int):
+        """Display progress when a section starts generating."""
+        if section_name == "planning":
+            self.chat_history.append("<i>Analyzing documents...</i>")
+        else:
+            heading = SECTION_HEADINGS.get(section_name, ("", section_name.upper()))
+            display = f"{heading[0]}. {heading[1]}" if heading[0] else section_name
+            self.chat_history.append(f"<i>Generating {display} ({index} of {total - 1})...</i>")
+
+    def _on_brief_section_complete(self, section_name: str, text: str):
+        """Display completed section text in chat."""
+        heading = SECTION_HEADINGS.get(section_name)
+        if heading:
+            self.chat_history.append(
+                f"<br><b>{heading[0]}.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{heading[1]}</b>"
+            )
+
+        try:
+            html = markdown.markdown(text, extensions=['fenced_code', 'tables'])
+        except Exception:
+            html = text.replace('\n', '<br>')
+        self.chat_history.append(html)
+        self.chat_history.append("<hr>")
+        self.chat_history.ensureCursorVisible()
+
+    def _on_brief_all_complete(self, sections: dict):
+        """Handle completion of all sections — assemble document and save."""
+        self.send_btn.setEnabled(True)
+        self.chat_history.append("<b>All sections generated. Assembling document...</b>")
+
+        gen = self.med_brief_generator
+        main_win = self.window()
+        case_path = getattr(main_win, 'case_path', None)
+        default_dir = os.path.dirname(case_path) if case_path else ""
+        default_name = os.path.join(default_dir, "Defendant's Confidential Mediation Brief.docx")
+
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_output = os.path.join(tmpdir, "mediation_brief.docx")
+            try:
+                gen.assemble_document(gen.caption_template_path, temp_output)
+            except Exception as e:
+                self.chat_history.append(f"<b style='color:red'>Assembly error: {e}</b>")
+                return
+
+            save_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Save Mediation Brief",
+                default_name,
+                "Word Documents (*.docx)"
+            )
+            if save_path:
+                shutil.copy2(temp_output, save_path)
+                self.chat_history.append(f"<b>Mediation brief saved to:</b> {save_path}")
+            else:
+                self.chat_history.append(
+                    "<i>Save cancelled. You can refine sections and save later.</i>"
+                )
+
+        self.chat_history.append("")
+        self.chat_history.append(
+            "<i>You can now refine the brief by typing instructions "
+            "(e.g., 'make the Damages section more aggressive'). "
+            "Or send a normal message to exit brief mode.</i>"
+        )
+
+    def _on_brief_error(self, error_msg: str):
+        """Handle generation error."""
+        self.send_btn.setEnabled(True)
+        self.chat_history.append(f"<b style='color:red'>Generation error: {error_msg}</b>")
+
+    def _start_brief_refinement(self, instruction: str, section_names: list):
+        """Regenerate specified sections with user's instruction."""
+        self.chat_input.clear()
+        self.chat_history.append(f"<b>You:</b> {instruction}")
+        self.chat_history.append("")
+
+        section_display = ", ".join(
+            SECTION_HEADINGS.get(s, ("", s))[1] for s in section_names
+        )
+        self.chat_history.append(f"<i>Regenerating: {section_display}...</i>")
+        self.send_btn.setEnabled(False)
+
+        gen = self.med_brief_generator
+
+        class _RefinementWorker(QThread):
+            section_done = Signal(str, str)
+            all_done = Signal(list)
+            error = Signal(str)
+
+            def __init__(self, gen, sections, instruction, parent=None):
+                super().__init__(parent)
+                self.gen = gen
+                self._sections = sections
+                self._instruction = instruction
+
+            def run(self):
+                try:
+                    regenerated = self.gen.refine_sections(
+                        self._sections, self._instruction,
+                    )
+                    for name in regenerated:
+                        self.section_done.emit(name, self.gen.sections[name])
+                    self.all_done.emit(regenerated)
+                except Exception as e:
+                    self.error.emit(str(e))
+
+        worker = _RefinementWorker(gen, section_names, instruction, parent=self)
+        worker.section_done.connect(self._on_brief_section_complete)
+        worker.all_done.connect(lambda regenerated: self._on_brief_all_complete(gen.sections))
+        worker.error.connect(self._on_brief_error)
+        self.med_brief_worker = worker
+        worker.start()
 
 class IndexTab(QWidget):
     def __init__(self, parent=None):
