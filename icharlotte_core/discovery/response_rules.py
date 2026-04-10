@@ -233,14 +233,17 @@ _DEFAULT_FI_15_1_RESPONSE = (
 )
 
 _DEFAULT_FI_16_RESPONSE = (
-    "Pursuant to Instruction 2(d), Responding Party objects to this interrogatory to the extent it "
-    "seeks information beyond what is required by the applicable form. Propounding Party has had a "
+    "This interrogatory relates to the Section 16.0 series regarding physical, mental, or emotional "
+    "injuries. Responding Party objects to this interrogatory to the extent it seeks information "
+    "beyond what is required by the applicable form and to the extent it seeks information protected "
+    "by the attorney-client privilege or the work-product doctrine. Subject to and without waiving "
+    "the foregoing objections, Responding Party responds as follows: Propounding Party has had a "
     "full and fair opportunity to conduct a deposition of Responding Party and/or its representatives "
     "and/or agents. Responding Party has produced and/or will produce all medical records in its "
     "possession, custody, or control. An Independent Medical Examination (IME) has been and/or may "
     "be scheduled in this matter, and Responding Party reserves all rights with respect thereto. "
-    "Medical records responsive to this interrogatory have been and/or will be produced through "
-    "discovery."
+    "Medical records responsive to this Section 16.0 interrogatory have been and/or will be produced "
+    "through discovery."
 )
 
 
