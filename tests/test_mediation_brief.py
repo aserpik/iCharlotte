@@ -191,5 +191,78 @@ class TestSectionGeneration(unittest.TestCase):
         self.assertEqual(len(GENERATION_ORDER), 7)
 
 
+class TestTextParsing(unittest.TestCase):
+
+    def test_parse_body_paragraphs(self):
+        from icharlotte_core.mediation_brief import MediationBriefGenerator
+        gen = MediationBriefGenerator()
+        text = "First paragraph of the section.\n\nSecond paragraph here."
+        elements = gen._parse_section_text(text, "statement_of_facts")
+        body_elements = [e for e in elements if e["type"] == "body"]
+        self.assertEqual(len(body_elements), 2)
+        self.assertIn("First paragraph", body_elements[0]["text"])
+
+    def test_parse_subsection_headings(self):
+        from icharlotte_core.mediation_brief import MediationBriefGenerator
+        gen = MediationBriefGenerator()
+        text = (
+            "Introduction paragraph.\n\n"
+            "SUBSECTION: Defendant Owed No Duty Of Care\n"
+            "Content under first subsection.\n\n"
+            "SUBSECTION: Plaintiff Was Comparatively At Fault\n"
+            "Content under second subsection.\n"
+        )
+        elements = gen._parse_section_text(text, "liability")
+        headings = [e for e in elements if e["type"] == "l2_heading"]
+        self.assertEqual(len(headings), 2)
+        self.assertEqual(headings[0]["text"], "Defendant Owed No Duty Of Care")
+        self.assertEqual(headings[1]["text"], "Plaintiff Was Comparatively At Fault")
+
+    def test_parse_deposition_quotes(self):
+        from icharlotte_core.mediation_brief import MediationBriefGenerator
+        gen = MediationBriefGenerator()
+        text = (
+            "The plaintiff testified as follows:\n\n"
+            "I was not paying attention to the road at the time of the accident. "
+            "(Smith Depo Trns., at p. 45:12.)\n\n"
+            "This admission is significant."
+        )
+        elements = gen._parse_section_text(text, "liability")
+        quotes = [e for e in elements if e["type"] == "depo_quote"]
+        self.assertEqual(len(quotes), 1)
+        self.assertIn("not paying attention", quotes[0]["text"])
+
+
+class TestWordAssembly(unittest.TestCase):
+
+    def test_assemble_creates_docx(self):
+        from docx import Document
+        from icharlotte_core.mediation_brief import MediationBriefGenerator
+        gen = MediationBriefGenerator()
+        gen.sections = {
+            "introduction": "This is the introduction.",
+            "statement_of_facts": "These are the facts.",
+            "procedural_status": "Trial is set for June 2027.",
+            "liability": "SUBSECTION: No Duty\nDefendant owed no duty.",
+            "damages": "SUBSECTION: No Causation\nNo evidence of causation.",
+            "settlement_position": "Policy limits are $1M.",
+            "conclusion": "We will prevail at trial.",
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            caption = Document()
+            caption.add_paragraph("LAW FIRM")
+            caption.add_paragraph("CAPTION PAGE")
+            caption_path = os.path.join(tmpdir, "caption.docx")
+            caption.save(caption_path)
+            output_path = os.path.join(tmpdir, "brief.docx")
+            gen.assemble_document(caption_path, output_path)
+            self.assertTrue(os.path.exists(output_path))
+            doc = Document(output_path)
+            all_text = "\n".join(p.text for p in doc.paragraphs)
+            self.assertIn("INTRODUCTION", all_text)
+            self.assertIn("STATEMENT OF FACTS", all_text)
+            self.assertIn("introduction", all_text.lower())
+
+
 if __name__ == '__main__':
     unittest.main()

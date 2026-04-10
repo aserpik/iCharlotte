@@ -14,6 +14,9 @@ import re
 import shutil
 from typing import Dict, List, Optional
 
+from docx.shared import Inches, Pt
+from docx.enum.text import WD_TAB_ALIGNMENT
+
 import fitz  # PyMuPDF
 from docx import Document as DocxDocument
 from docx.oxml.ns import qn
@@ -150,6 +153,10 @@ FORMATTING RULES:
 - For deposition quotes: put the quote on its own paragraph, preceded by a blank line. Follow with the citation on the same paragraph: (LastName Depo Trns., at p. PageNum:LineNum.)
 - Write in plain text. Do not use markdown formatting (no **, ##, etc.)
 """
+
+    # Compile-time regexes for section text parsing
+    _SUBSECTION_RE = re.compile(r'^SUBSECTION:\s*(.+)$', re.MULTILINE)
+    _DEPO_CITE_RE = re.compile(r'\([A-Z][a-z]+ Depo Trns\., at p\. \d+:\d+\.\)')
 
     def __init__(self):
         self._sample_dir: str = SAMPLE_BRIEFS_DIR
@@ -687,3 +694,214 @@ FORMATTING RULES:
                 parent.remove(para_elem)
 
         return sig_paras
+
+    # ------------------------------------------------------------------
+    # Section text parsing
+    # ------------------------------------------------------------------
+
+    def _parse_section_text(self, text: str, section_name: str) -> List[Dict]:
+        """Parse LLM output into structured elements.
+
+        Splits *text* on double-newlines into paragraphs, then classifies each
+        paragraph as one of:
+          - ``"l2_heading"``  — line matching ``^SUBSECTION: <title>``
+          - ``"depo_quote"``  — paragraph containing a deposition citation
+          - ``"body"``        — everything else
+
+        When a SUBSECTION line also has additional content on the same line
+        (after the heading text), a separate body element is emitted for it.
+
+        Returns a list of dicts with keys ``"type"`` and ``"text"``.
+        """
+        elements: List[Dict] = []
+        paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+
+        for para in paragraphs:
+            subsection_match = self._SUBSECTION_RE.match(para)
+            if subsection_match:
+                heading_text = subsection_match.group(1).strip()
+                # Check if SUBSECTION: line has inline content after it
+                # (i.e., there is more text on the same line beyond the title)
+                # The regex captures everything after "SUBSECTION: " on that line.
+                # If the paragraph has additional lines after the SUBSECTION line,
+                # emit them as a body element.
+                elements.append({"type": "l2_heading", "text": heading_text})
+                # Remainder: lines in the same paragraph after the SUBSECTION line
+                remainder_lines = para[subsection_match.end():].strip()
+                if remainder_lines:
+                    elements.append({"type": "body", "text": remainder_lines})
+            elif self._DEPO_CITE_RE.search(para):
+                elements.append({"type": "depo_quote", "text": para})
+            else:
+                elements.append({"type": "body", "text": para})
+
+        return elements
+
+    # ------------------------------------------------------------------
+    # Word document formatting helpers
+    # ------------------------------------------------------------------
+
+    def _add_tab_stop(self, para, position_inches: float = 0.5) -> None:
+        """Add a left-aligned tab stop at *position_inches* to *para*."""
+        pPr = para._element.get_or_add_pPr()
+        tabs = OxmlElement("w:tabs")
+        tab = OxmlElement("w:tab")
+        tab.set(qn("w:val"), "left")
+        tab.set(qn("w:pos"), str(int(position_inches * 1440)))  # twips
+        tabs.append(tab)
+        pPr.append(tabs)
+
+    def _add_l1_heading(self, doc, roman: str, title: str):
+        """Add a level-1 section heading formatted as ``I.     INTRODUCTION``.
+
+        Uses a hanging indent (left=0.5", hanging=0.5") with a tab stop at 0.5"
+        so the title text aligns neatly after the roman numeral.
+        """
+        para = doc.add_paragraph()
+        pf = para.paragraph_format
+        pf.left_indent = Inches(0.5)
+        pf.first_line_indent = Inches(-0.5)
+        pf.space_before = Pt(12)
+        pf.space_after = Pt(6)
+        self._add_tab_stop(para, position_inches=0.5)
+
+        # Run 1: roman numeral — bold only
+        r1 = para.add_run(f"{roman}.")
+        r1.bold = True
+
+        # Tab character
+        para.add_run("\t")
+
+        # Run 2: title — bold + underline
+        r2 = para.add_run(title)
+        r2.bold = True
+        r2.underline = True
+
+        return para
+
+    def _add_l2_heading(self, doc, letter: str, title: str):
+        """Add a level-2 subsection heading formatted as ``A.     Title Text``.
+
+        Same hanging indent pattern as L1 headings.
+        """
+        para = doc.add_paragraph()
+        pf = para.paragraph_format
+        pf.left_indent = Inches(0.5)
+        pf.first_line_indent = Inches(-0.5)
+        pf.space_before = Pt(10)
+        pf.space_after = Pt(4)
+        self._add_tab_stop(para, position_inches=0.5)
+
+        # Run 1: letter — bold only
+        r1 = para.add_run(f"{letter}.")
+        r1.bold = True
+
+        # Tab character
+        para.add_run("\t")
+
+        # Run 2: title — bold + underline
+        r2 = para.add_run(title)
+        r2.bold = True
+        r2.underline = True
+
+        return para
+
+    def _add_body_paragraph(self, doc, text: str):
+        """Add a normal body paragraph with space_after=6pt."""
+        para = doc.add_paragraph(text)
+        para.paragraph_format.space_after = Pt(6)
+        return para
+
+    def _add_depo_quote(self, doc, text: str):
+        """Add a deposition quote paragraph with left indent and spacing."""
+        para = doc.add_paragraph(text)
+        pf = para.paragraph_format
+        pf.left_indent = Inches(0.5)
+        pf.space_before = Pt(6)
+        pf.space_after = Pt(6)
+        return para
+
+    # ------------------------------------------------------------------
+    # Document assembly
+    # ------------------------------------------------------------------
+
+    def assemble_document(
+        self,
+        caption_path: str,
+        output_path: str,
+        signature_paragraphs: Optional[list] = None,
+    ) -> None:
+        """Assemble the full mediation brief Word document.
+
+        Steps:
+        1. Call ``prepare_caption_template()`` to copy and process the caption.
+        2. Open the processed document.
+        3. Add a page break after the caption content.
+        4. For each section in SECTION_ORDER, add L1 heading and body elements.
+        5. Append the signature block if present.
+        6. Save and validate.
+
+        Args:
+            caption_path: Path to the source caption .docx file.
+            output_path: Destination path for the assembled brief.
+            signature_paragraphs: Pre-extracted signature paragraph elements.
+                If None, they are extracted from the caption template automatically.
+        """
+        # Step 1: Prepare caption (copies to output_path, extracts signature)
+        extracted_sig = self.prepare_caption_template(caption_path, output_path)
+        if signature_paragraphs is None:
+            signature_paragraphs = extracted_sig
+
+        # Step 2: Open the processed document
+        doc = DocxDocument(output_path)
+
+        # Step 3: Page break after caption
+        page_break_para = doc.add_paragraph()
+        run = page_break_para.add_run()
+        run.add_break(
+            __import__("docx.enum.text", fromlist=["WD_BREAK"]).WD_BREAK.PAGE
+        )
+
+        # Step 4: Add each section
+        letter_seq = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+        for section_name in SECTION_ORDER:
+            roman, heading_title = SECTION_HEADINGS[section_name]
+            self._add_l1_heading(doc, roman, heading_title)
+
+            section_text = self.sections.get(section_name, "")
+            if not section_text:
+                continue
+
+            elements = self._parse_section_text(section_text, section_name)
+            letter_counter = 0  # resets per section
+
+            for elem in elements:
+                etype = elem["type"]
+                etext = elem["text"]
+
+                if etype == "l2_heading":
+                    letter = letter_seq[letter_counter % len(letter_seq)]
+                    self._add_l2_heading(doc, letter, etext)
+                    letter_counter += 1
+                elif etype == "depo_quote":
+                    self._add_depo_quote(doc, etext)
+                else:
+                    self._add_body_paragraph(doc, etext)
+
+        # Step 5: Append signature block
+        if signature_paragraphs:
+            for sig_para in signature_paragraphs:
+                doc.element.body.append(sig_para._element)
+
+        # Step 6: Save
+        doc.save(output_path)
+        logger.info("Assembled mediation brief saved to %s", output_path)
+
+        # Validate (best-effort)
+        try:
+            from icharlotte_core.word_validator import validate_report
+            result = validate_report(output_path)
+            result.print_summary()
+        except Exception as e:
+            logger.warning("Validation skipped: %s", e)
