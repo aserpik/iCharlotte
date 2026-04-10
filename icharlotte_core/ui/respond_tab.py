@@ -689,7 +689,11 @@ class RespondTab(QWidget):
             f"INTERROGATORIES:\n{requests_text}\n\n"
         )
         if context_text:
-            prompt += f"CASE CONTEXT:\n{context_text}\n\n"
+            max_ctx = 800_000
+            ctx = context_text[:max_ctx]
+            if len(context_text) > max_ctx:
+                ctx += "\n\n[Context truncated due to length]"
+            prompt += f"CASE CONTEXT:\n{ctx}\n\n"
         if self.rules.custom_instructions:
             prompt += f"ADDITIONAL INSTRUCTIONS:\n{self.rules.custom_instructions}\n"
 
@@ -754,35 +758,81 @@ class RespondTab(QWidget):
         """Launch a single LLM call for SI/RFA/RPD response drafting."""
         disc_type = parsed.discovery_type.upper()
 
-        # Build prompt based on discovery type
-        prompt_parts = []
-        for req in parsed.requests:
-            if disc_type == "SI":
-                prompt_parts.append(
-                    build_si_prompt(req.text, context_text, self.rules)
-                )
-            elif disc_type == "RFA":
-                prompt_parts.append(
-                    build_rfa_prompt(req.text, context_text, self.rules)
-                )
-            elif disc_type == "RPD":
-                prompt_parts.append(
-                    build_rpd_prompt(req.text, context_text, self.rules)
-                )
+        # Truncate context to avoid exceeding token limits.
+        # ~4 chars per token; leave room for instructions + requests.
+        max_context_chars = 800_000
+        truncated_context = context_text[:max_context_chars]
+        if len(context_text) > max_context_chars:
+            truncated_context += "\n\n[Context truncated due to length]"
 
-        # Build combined prompt
-        combined = (
-            f"Draft substantive responses for ALL of the following "
-            f"{len(parsed.requests)} requests. "
-            f"For each one, format as:\n"
-            f"RESPONSE {parsed.requests[0].number if parsed.requests else '1'}-style number: "
-            f"[your response]\n\n"
+        # Build type-specific drafting instructions (included ONCE)
+        if disc_type == "SI":
+            from icharlotte_core.discovery.response_drafter import _SI_STYLE_INSTRUCTIONS
+            style = _SI_STYLE_INSTRUCTIONS.get(
+                self.rules.si_response_style, _SI_STYLE_INSTRUCTIONS["moderate"]
+            )
+            type_instruction = (
+                f"DRAFTING INSTRUCTION: {style}\n"
+                "Draft substantive responses only — objections are handled separately.\n"
+                "Write only the factual, responsive answer for each interrogatory."
+            )
+        elif disc_type == "RFA":
+            from icharlotte_core.discovery.response_drafter import _RFA_POSTURE_INSTRUCTIONS
+            posture = _RFA_POSTURE_INSTRUCTIONS.get(
+                self.rules.rfa_default_posture, _RFA_POSTURE_INSTRUCTIONS["cautious"]
+            )
+            type_instruction = (
+                "For each Request for Admission, respond with EXACTLY one of:\n"
+                '- "Admit"\n'
+                '- "Deny"\n'
+                '- "After a reasonable inquiry concerning the matter in this request, '
+                "the information known or readily obtainable to Responding Party is "
+                'insufficient to enable Responding Party to admit the matter."\n\n'
+                f"POSTURE: {posture}"
+            )
+        elif disc_type == "RPD":
+            from icharlotte_core.discovery.response_drafter import _RPD_POSTURE_INSTRUCTIONS
+            posture = _RPD_POSTURE_INSTRUCTIONS.get(
+                self.rules.rpd_default_posture, _RPD_POSTURE_INSTRUCTIONS["context_dependent"]
+            )
+            type_instruction = (
+                "For each Request for Production, respond with EXACTLY one of:\n"
+                '- "Responding Party will comply with this request and produce all '
+                "non-privileged documents in Responding Party's possession, custody "
+                "and control that Responding Party understands to be responsive to this "
+                "Request. Responding Party identifies and refers to the documents "
+                'produced concurrently herewith."\n'
+                '- "Upon a diligent search and reasonable inquiry made in an effort to '
+                "locate the item(s) requested, Responding Party is unable to comply "
+                "with this request at this time because the documents responsive to "
+                "this request, if they exist, are not in the possession, custody or "
+                'control of Responding Party."\n\n'
+                f"POSTURE: {posture}"
+            )
+        else:
+            type_instruction = "Draft substantive responses."
+
+        # Build combined prompt: instructions + context (ONCE) + requests (listed)
+        requests_listing = "\n\n".join(
+            f"REQUEST NO. {req.number}:\n{req.text}"
+            for req in parsed.requests
         )
 
-        for i, req in enumerate(parsed.requests):
-            combined += f"\n--- Request {req.number} ---\n"
-            combined += prompt_parts[i] if i < len(prompt_parts) else req.text
-            combined += "\n"
+        combined = (
+            "You are a California civil litigation defense attorney.\n\n"
+            f"{type_instruction}\n\n"
+            f"Format your output as:\n"
+            f"RESPONSE {parsed.requests[0].number if parsed.requests else '1'}: "
+            f"[your response]\n"
+            f"RESPONSE {parsed.requests[1].number if len(parsed.requests) > 1 else '2'}: "
+            f"[your response]\n"
+            f"... and so on for all {len(parsed.requests)} requests.\n\n"
+            f"CASE CONTEXT:\n{truncated_context}\n\n"
+            f"REQUESTS TO RESPOND TO:\n{requests_listing}\n"
+        )
+
+        if self.rules.custom_instructions:
+            combined += f"\nADDITIONAL INSTRUCTIONS:\n{self.rules.custom_instructions}\n"
 
         provider = self.provider_combo.currentText()
         model = self.model_combo.currentText()
