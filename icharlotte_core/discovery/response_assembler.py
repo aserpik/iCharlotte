@@ -464,14 +464,14 @@ class ResponseAssembler:
             )
 
             # Objections + waiver on the same paragraph (waiver follows objections inline)
-            if obj_part and waiver:
+            if obj_part:
                 _add_para(doc, f"{obj_part} {waiver}", STYLE_BODY_DOUBLE)
-            elif obj_part:
-                _add_para(doc, obj_part, STYLE_BODY_DOUBLE)
+            else:
+                # No separate objections found — insert waiver as its own paragraph
+                _add_para(doc, waiver, STYLE_BODY_DOUBLE)
 
-            # Substantive response — new paragraph, first line indented 0.5"
+            # Substantive response — new paragraph with explicit 0.5" first-line indent
             if subst_part:
-                # Split substantive into sub-paragraphs if needed
                 sub_paras = [s.strip() for s in subst_part.split("\n\n") if s.strip()]
                 for i, sp in enumerate(sub_paras):
                     if i == len(sub_paras) - 1 and reservation:
@@ -479,8 +479,10 @@ class ResponseAssembler:
                         p = _add_para(doc, f"{sp} {reservation}", STYLE_BODY_DOUBLE)
                     else:
                         p = _add_para(doc, sp, STYLE_BODY_DOUBLE)
+                    # Ensure first line indent on the first substantive paragraph
+                    if i == 0:
+                        p.paragraph_format.first_line_indent = Inches(0.5)
             elif reservation:
-                # No substantive, just reservation
                 _add_para(doc, reservation, STYLE_BODY_DOUBLE)
 
     def _insert_verification(
@@ -531,53 +533,65 @@ class ResponseAssembler:
     ):
         """Split response body into (objections_part, substantive_part).
 
-        The plain-text response may contain the waiver and reservation
-        language inline.  Strip those out so they can be re-inserted
-        with the correct formatting (waiver inline after objections,
-        reservation inline after substantive).
+        Splits on the waiver boundary ("Subject to and without waiving...")
+        so that the assembler can re-insert waiver/reservation with
+        correct inline formatting.  Returns (objections, substantive)
+        with the waiver and reservation text stripped out.
         """
         text = resp_text.strip()
 
-        # Remove waiver language if present in the text
-        if waiver and waiver in text:
-            text = text.replace(waiver, "").strip()
-
-        # Remove reservation language if present in the text
+        # Remove reservation language if present (we re-insert it later)
         if reservation and reservation in text:
             text = text.replace(reservation, "").strip()
 
-        # Try to split on "Subject to and without waiving" boundary
-        # — everything before is objections, everything after is substantive
+        # Split on the waiver marker — everything before is objections,
+        # everything after is substantive.  Do NOT remove waiver first,
+        # because we need it as the split point.
         waiver_marker = "Subject to and without waiving"
         idx = text.find(waiver_marker)
         if idx > 0:
             obj_part = text[:idx].strip()
-            subst_part = text[idx:].strip()
-            # The substantive part may start with the waiver text we need to strip
-            if subst_part.startswith(waiver_marker):
-                # Find the end of the waiver sentence (ends with ":")
-                colon_idx = subst_part.find(":")
-                if colon_idx >= 0:
-                    subst_part = subst_part[colon_idx + 1:].strip()
-                else:
-                    subst_part = subst_part[len(waiver_marker):].strip()
+            remainder = text[idx:].strip()
+            # Strip the waiver sentence itself from the remainder
+            # The waiver ends with ":"
+            colon_idx = remainder.find(":")
+            if colon_idx >= 0:
+                subst_part = remainder[colon_idx + 1:].strip()
+            else:
+                subst_part = remainder[len(waiver):].strip() if waiver else remainder
+            return obj_part, subst_part
+
+        # Also try splitting if waiver was already on its own line
+        if waiver and waiver in text:
+            parts = text.split(waiver, 1)
+            obj_part = parts[0].strip()
+            subst_part = parts[1].strip() if len(parts) > 1 else ""
             return obj_part, subst_part
 
         # No clear split — treat entire text as substantive
         return "", text
 
     def _set_footer(self, doc, title: str):
-        """Set the document title in the footer of all sections."""
+        """Set the document title in the footer of all sections.
+
+        Removes ALL existing footer content (including [PLEADING TITLE]
+        or any other placeholder text) by deleting paragraph XML elements,
+        then inserts a single centered paragraph with the title.
+        """
+        W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        W_P = f"{{{W_NS}}}p"
+
         for section in doc.sections:
             footer = section.footer
             footer.is_linked_to_previous = False
-            # Clear ALL existing footer content (including [PLEADING TITLE])
-            for para in list(footer.paragraphs):
-                para.clear()
-            if footer.paragraphs:
-                para = footer.paragraphs[0]
-            else:
-                para = footer.add_paragraph()
+
+            # Remove ALL paragraph elements from the footer XML
+            ftr_elem = footer._element
+            for p_elem in list(ftr_elem.iter(W_P)):
+                ftr_elem.remove(p_elem)
+
+            # Add a single new paragraph with the title
+            para = footer.add_paragraph()
             para.alignment = WD_ALIGN_PARAGRAPH.CENTER
             run = para.add_run(title)
             run.font.name = "Times New Roman"
