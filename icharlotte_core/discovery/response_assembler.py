@@ -585,13 +585,23 @@ class ResponseAssembler:
             footer = section.footer
             footer.is_linked_to_previous = False
 
-            # Remove ALL paragraph elements from the footer XML
-            ftr_elem = footer._element
-            for p_elem in list(ftr_elem.iter(W_P)):
-                ftr_elem.remove(p_elem)
+            # Clear all text from every paragraph in the footer
+            # (handles [PLEADING TITLE] and any other placeholder text)
+            for para in footer.paragraphs:
+                for run in para.runs:
+                    run.text = ""
+                # Also clear any direct text nodes in the paragraph XML
+                for t_elem in list(para._element.iter(f"{{{W_NS}}}t")):
+                    t_elem.text = ""
 
-            # Add a single new paragraph with the title
-            para = footer.add_paragraph()
+            # Use the first paragraph if it exists, otherwise add one
+            if footer.paragraphs:
+                para = footer.paragraphs[0]
+                # Clear any leftover runs
+                for run in list(para.runs):
+                    run._element.getparent().remove(run._element)
+            else:
+                para = footer.add_paragraph()
             para.alignment = WD_ALIGN_PARAGRAPH.CENTER
             run = para.add_run(title)
             run.font.name = "Times New Roman"
