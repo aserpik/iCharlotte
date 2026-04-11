@@ -135,6 +135,12 @@ class PropoundTab(QWidget):
         self._prompt_save_timer.setInterval(800)
         self._prompt_save_timer.timeout.connect(self._save_prompt)
 
+        # Debounce timer for output auto-save
+        self._output_save_timer = QTimer(self)
+        self._output_save_timer.setSingleShot(True)
+        self._output_save_timer.setInterval(800)
+        self._output_save_timer.timeout.connect(self._save_output)
+
         self._build_ui()
         self._connect_signals()
         # Apply initial visibility rules
@@ -986,6 +992,7 @@ class PropoundTab(QWidget):
                 editor = QPlainTextEdit()
                 editor.setPlainText(text)
                 editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+                editor.textChanged.connect(self._output_save_timer.start)
                 self.doc_tabs.addTab(editor, label)
         except Exception as e:
             logger.warning("Failed to load discovery output: %s", e)
@@ -1257,6 +1264,7 @@ class PropoundTab(QWidget):
             editor = QPlainTextEdit()
             editor.setPlainText(ds.plain_text())
             editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+            editor.textChanged.connect(self._output_save_timer.start)
 
             # Build tab label: e.g. "SI(1) tPltf"
             directed_abbr = ds.directed_to.abbreviation or ds.directed_to.name.split()[0]
@@ -1384,3 +1392,10 @@ class DiscoveryTab(QWidget):
         """Delegate to both sub-tabs."""
         self.propound_tab.load_case(file_number)
         self.respond_tab.load_case(file_number)
+
+    def save_state(self):
+        """Save state for both sub-tabs (called on app close)."""
+        if self.propound_tab.file_number:
+            self.propound_tab._save_state()
+        if self.respond_tab.file_number:
+            self.respond_tab._save_state()

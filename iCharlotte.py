@@ -3,6 +3,21 @@ import os
 import argparse
 import ctypes
 
+# Workaround: WMI queries hang indefinitely on some Windows machines.
+# platform.system(), platform.platform(), etc. all call _wmi_query internally.
+# Pre-populate the caches and disable _wmi_query before any library imports.
+import platform as _platform_mod
+_platform_mod._uname_cache = _platform_mod.uname_result(
+    system='Windows',
+    node=os.environ.get('COMPUTERNAME', ''),
+    release='11',
+    version='10.0.26200',
+    machine=os.environ.get('PROCESSOR_ARCHITECTURE', 'AMD64'),
+)
+_platform_mod.win32_ver = lambda *a, **kw: ('11', '10.0.26200', '', 'Multiprocessor Free')
+_orig_wmi_query = getattr(_platform_mod, '_wmi_query', None)
+_platform_mod._wmi_query = lambda *a, **kw: (_ for _ in ()).throw(OSError('WMI disabled'))
+
 # Set Windows App User Model ID BEFORE any Qt imports for proper taskbar icon
 try:
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('iCharlotte.LegalSuite.1')
@@ -47,9 +62,9 @@ except ImportError:
 try:
     import keyboard
     KEYBOARD_AVAILABLE = True
-except ImportError:
+except (ImportError, OSError):
     KEYBOARD_AVAILABLE = False
-    print("Warning: 'keyboard' library not installed. Global hotkeys (Win+F, Win+C) disabled. Install with: pip install keyboard")
+    print("Warning: 'keyboard' library not available. Global hotkeys (Win+F, Win+C) disabled.")
 
 # --- Core Modules ---
 from icharlotte_core.config import SCRIPTS_DIR, GEMINI_DATA_DIR, BASE_PATH_WIN
@@ -60,8 +75,8 @@ from icharlotte_core.ui.widgets import (
     StatusWidget, AgentRunner, FileTreeWidget
 )
 from icharlotte_core.ui.case_view_enhanced import (
-    EnhancedAgentButton, AgentSettingsDB, AgentSettingsDialog, ContradictionSettingsDialog,
-    TimelineSettingsDialog, AdvancedFilterWidget, FilePreviewWidget, OutputBrowserWidget,
+    EnhancedAgentButton, AgentSettingsDB, AgentSettingsDialog,
+    AdvancedFilterWidget, FilePreviewWidget, OutputBrowserWidget,
     ProcessingLogWidget, ProcessingLogDB, FileTagsDB, EnhancedFileTreeWidget
 )
 from icharlotte_core.ui.dialogs import FileNumberDialog, VariablesDialog, PromptsDialog, LLMSettingsDialog
@@ -669,9 +684,6 @@ class MainWindow(QMainWindow):
         new_label = QLabel("Document Agents")
         new_label.setStyleSheet("font-weight: bold; font-size: 12px; color: #666;")
         left_layout.addWidget(new_label)
-
-        self.create_enhanced_agent_button("Timeline Agent", "extract_timeline.py", left_layout, arg_type="file_picker")
-        self.create_enhanced_agent_button("Contradiction Detector", "detect_contradictions.py", left_layout, arg_type="file_number")
 
         left_layout.addStretch()
         self.main_splitter.addWidget(left_panel)
@@ -1806,14 +1818,7 @@ class MainWindow(QMainWindow):
 
     def open_agent_settings(self, script):
         """Open the settings dialog for an agent."""
-        if script == "detect_contradictions.py":
-            # Use custom dialog for Contradiction Detector
-            dialog = ContradictionSettingsDialog(self.file_number, self.agent_settings_db, self)
-        elif script == "extract_timeline.py":
-            # Use custom dialog for Timeline Extraction
-            dialog = TimelineSettingsDialog(self.file_number, self.agent_settings_db, self)
-        else:
-            dialog = AgentSettingsDialog(script, self.agent_settings_db, self)
+        dialog = AgentSettingsDialog(script, self.agent_settings_db, self)
         dialog.exec()
 
     def open_output_browser(self):
@@ -2310,6 +2315,9 @@ class MainWindow(QMainWindow):
         # Save email update tab state before closing
         if hasattr(self, 'email_update_tab') and self.email_update_tab:
             self.email_update_tab.save_state()
+        # Save discovery tab state before closing
+        if hasattr(self, 'discovery_tab') and self.discovery_tab:
+            self.discovery_tab.save_state()
         # Clean up global hotkeys
         if KEYBOARD_AVAILABLE:
             try:
@@ -2333,29 +2341,6 @@ class MainWindow(QMainWindow):
         if arg_type == "file_number":
             args.append(self.file_number)
             details = f"File: {self.file_number}"
-
-            # Special handling for Contradiction Detector - pass selected summaries
-            if script == "detect_contradictions.py":
-                settings = self.agent_settings_db.get_settings(script)
-                selected_summaries = settings.get("selected_summaries")
-
-                if selected_summaries:
-                    args.extend(["--summaries", ",".join(selected_summaries)])
-                    details = f"{len(selected_summaries)} summaries"
-
-            # Special handling for Timeline Extraction - pass mode and selected summaries
-            if script == "extract_timeline.py":
-                settings = self.agent_settings_db.get_settings(script)
-                from_summaries = settings.get("from_summaries", True)
-                selected_summaries = settings.get("selected_summaries")
-
-                if from_summaries:
-                    args.append("--from-summaries")
-                    if selected_summaries:
-                        args.extend(["--summaries", ",".join(selected_summaries)])
-                        details = f"{len(selected_summaries)} summaries"
-                    else:
-                        details = "All summaries"
 
         elif arg_type == "file_picker":
             # Show file picker dialog, starting in the case directory
