@@ -503,6 +503,8 @@ class ChatTab(QWidget):
             self.med_brief_worker.request_stop()
             self.med_brief_worker.wait(1000)
         self.med_brief_worker = None
+        if hasattr(self, 'add_quotes_btn') and self.add_quotes_btn:
+            self.add_quotes_btn.setVisible(False)
 
         # Clear attached files from previous case (without persisting)
         self._clear_files_no_persist()
@@ -2006,6 +2008,7 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
             )
             if save_path:
                 shutil.copy2(temp_output, save_path)
+                gen.saved_path = save_path
                 self.chat_history.append(f"<b>Mediation brief saved to:</b> {save_path}")
             else:
                 self.chat_history.append(
@@ -2015,9 +2018,20 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
         self.chat_history.append("")
         self.chat_history.append(
             "<i>You can now refine the brief by typing instructions "
-            "(e.g., 'make the Damages section more aggressive'). "
-            "Or send a normal message to exit brief mode.</i>"
+            "(e.g., 'make the Damages section more aggressive'), "
+            "or use the Add Quotes button to insert deposition testimony. "
+            "Send a normal message to exit brief mode.</i>"
         )
+
+        # Show "Add Quotes" button
+        if not hasattr(self, 'add_quotes_btn') or self.add_quotes_btn is None:
+            self.add_quotes_btn = QPushButton("Add Quotes")
+            self.add_quotes_btn.clicked.connect(self._on_add_quotes_clicked)
+            send_layout = self.send_btn.parent().layout()
+            if send_layout:
+                send_layout.insertWidget(send_layout.indexOf(self.send_btn), self.add_quotes_btn)
+        self.add_quotes_btn.setVisible(True)
+        self.add_quotes_btn.setEnabled(True)
 
     def _on_brief_error(self, error_msg: str):
         """Handle generation error."""
@@ -2067,6 +2081,109 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
         worker.error.connect(self._on_brief_error)
         self.med_brief_worker = worker
         worker.start()
+
+    def _on_add_quotes_clicked(self):
+        """Open the Quote Insertion dialog."""
+        from .quote_dialog import QuoteInsertionDialog
+
+        if not self.med_brief_generator or not self.med_brief_generator.is_active:
+            return
+
+        dlg = QuoteInsertionDialog(self.med_brief_generator, parent=self)
+        dlg.quotes_to_insert.connect(self._on_quotes_confirmed)
+        dlg.exec()
+
+    def _on_quotes_confirmed(self, quotes: list, section_name: str,
+                              subsection: str, mode: str):
+        """Handle confirmed quote insertion from the dialog."""
+        gen = self.med_brief_generator
+        count = len(quotes)
+
+        self.chat_history.append(
+            f"<b>Inserting {count} quote(s) into "
+            f"{SECTION_HEADINGS.get(section_name, ('', section_name))[1]}...</b>"
+        )
+
+        if mode == "quick":
+            sub_title = subsection if subsection else None
+            gen.insert_quotes_quick(quotes, section_name, sub_title)
+            self.chat_history.append(f"<i>{count} quote(s) inserted.</i>")
+            self._reassemble_and_save()
+        else:
+            # Weave In — regenerate section with LLM
+            self.send_btn.setEnabled(False)
+            if hasattr(self, 'add_quotes_btn') and self.add_quotes_btn:
+                self.add_quotes_btn.setEnabled(False)
+
+            quote_text_parts = []
+            for q in quotes:
+                quote_text_parts.append(
+                    f"DEPO_QUOTE_START\n{q['qa_text']}\nDEPO_QUOTE_END\n"
+                    f"({q['deponent']} Depo Trns., at p. {q['page_line']}.)"
+                )
+            all_quotes = "\n\n".join(quote_text_parts)
+
+            instruction = (
+                f"Incorporate the following deposition testimony into this section "
+                f"at the most appropriate location. Weave it into the argument "
+                f"naturally with proper context and transitions. Include the "
+                f"testimony verbatim — do not change any wording.\n\n{all_quotes}"
+            )
+
+            worker = RefinementWorker(
+                gen, [section_name], instruction, parent=self
+            )
+            worker.section_complete.connect(self._on_brief_section_complete)
+            worker.all_complete.connect(
+                lambda regenerated: self._on_quote_weave_complete()
+            )
+            worker.error.connect(self._on_brief_error)
+            self.med_brief_worker = worker
+            worker.start()
+
+    def _reassemble_and_save(self):
+        """Reassemble the Word document and save (overwrite or Save As)."""
+        import tempfile
+        gen = self.med_brief_generator
+
+        self.chat_history.append("<i>Assembling document...</i>")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            temp_output = os.path.join(tmpdir, "mediation_brief.docx")
+            try:
+                gen.assemble_document(gen.caption_template_path, temp_output)
+            except Exception as e:
+                self.chat_history.append(f"<b style='color:red'>Assembly error: {e}</b>")
+                return
+
+            if gen.saved_path and os.path.exists(os.path.dirname(gen.saved_path)):
+                shutil.copy2(temp_output, gen.saved_path)
+                self.chat_history.append(f"<b>Document updated:</b> {gen.saved_path}")
+            else:
+                main_win = self.window()
+                case_path = getattr(main_win, 'case_path', None)
+                default_dir = os.path.dirname(case_path) if case_path else ""
+                default_name = os.path.join(
+                    default_dir, "Defendant's Confidential Mediation Brief.docx"
+                )
+                save_path, _ = QFileDialog.getSaveFileName(
+                    self, "Save Mediation Brief", default_name,
+                    "Word Documents (*.docx)"
+                )
+                if save_path:
+                    shutil.copy2(temp_output, save_path)
+                    gen.saved_path = save_path
+                    self.chat_history.append(f"<b>Document saved:</b> {save_path}")
+                else:
+                    self.chat_history.append("<i>Save cancelled.</i>")
+
+    def _on_quote_weave_complete(self):
+        """Handle completion of Weave In mode — reassemble and save."""
+        self.send_btn.setEnabled(True)
+        if hasattr(self, 'add_quotes_btn') and self.add_quotes_btn:
+            self.add_quotes_btn.setEnabled(True)
+        self.chat_history.append("<i>Quotes woven into section.</i>")
+        self._reassemble_and_save()
 
 class IndexTab(QWidget):
     def __init__(self, parent=None):
