@@ -660,21 +660,143 @@ class RespondTab(QWidget):
                     parsed, objections_map, responses_map, file_label
                 )
         else:
-            # SI, RFA, RPD: rule-based pre-select + LLM for objections and responses
+            # SI, RFA, RPD: Phase 2 (objection selection) then Phase 3 (responses)
+            # Rule-based pre-select provides minimum objections
+            rule_ids_per_req: Dict[str, set] = {}
             for req in parsed.requests:
-                rule_ids = rule_based_preselect(
+                rule_ids_per_req[req.number] = rule_based_preselect(
                     req, self.rules, self._objection_menu
                 )
-                # Use first defined term for placeholder substitution
-                term = req.defined_terms_used[0] if req.defined_terms_used else None
-                obj_text = format_objections(rule_ids, self._objection_menu, term=term)
-                objections_map[req.number] = obj_text
 
-            # Build a single comprehensive LLM prompt for all requests
-            self._draft_responses_combined(
-                parsed, objections_map, responses_map,
+            # Launch LLM for objection selection (Phase 2)
+            self._run_phase2_objections(
+                parsed, rule_ids_per_req, responses_map,
                 file_label, context_text
             )
+
+    def _run_phase2_objections(
+        self,
+        parsed: ParsedDiscovery,
+        rule_ids_per_req: Dict[str, set],
+        responses_map: Dict[str, str],
+        file_label: str,
+        context_text: str,
+    ):
+        """Phase 2: LLM selects objections for each request.
+
+        Builds a single prompt listing all requests and the objection menu,
+        asks the LLM to pick applicable objections per request. Results are
+        merged with rule-based pre-selections, then Phase 3 is launched.
+        """
+        menu_text = self._objection_menu.all_text()
+        aggressiveness = self.rules.objection_aggressiveness
+
+        if aggressiveness == "aggressive":
+            aggressiveness_instruction = (
+                "Err on the side of OVER-INCLUSION. A failure to include an "
+                "objection waives it permanently. If an objection might in "
+                "any way apply, include it."
+            )
+        elif aggressiveness == "conservative":
+            aggressiveness_instruction = (
+                "Only include objections that clearly and directly apply "
+                "to the specific request."
+            )
+        else:
+            aggressiveness_instruction = (
+                "Include objections that are reasonably applicable to each request."
+            )
+
+        requests_listing = "\n\n".join(
+            f"REQUEST NO. {req.number}:\n{req.text}"
+            for req in parsed.requests
+        )
+
+        prompt = (
+            "You are a California civil litigation defense attorney selecting "
+            "objections for discovery responses.\n\n"
+            f"OBJECTION SELECTION STRATEGY: {aggressiveness_instruction}\n\n"
+            "AVAILABLE OBJECTIONS (select by number):\n"
+            f"{menu_text}\n\n"
+            "For each request below, list the objection numbers that apply.\n"
+            "Format your output as:\n"
+            "REQUEST 1: 1, 2, 4, 6\n"
+            "REQUEST 2: 1, 3, 4\n"
+            "... and so on.\n\n"
+            f"REQUESTS:\n{requests_listing}\n"
+        )
+
+        provider = self.provider_combo.currentText()
+        model = self.model_combo.currentText()
+
+        worker = LLMWorker(
+            provider=provider,
+            model=model,
+            system="You are a California litigation defense attorney.",
+            user=_truncate_prompt(prompt),
+            files=[],
+            settings={"stream": False},
+        )
+
+        worker.finished.connect(
+            lambda text: self._on_phase2_finished(
+                text, parsed, rule_ids_per_req, responses_map,
+                file_label, context_text
+            )
+        )
+        worker.error.connect(self._on_llm_error)
+
+        self._llm_workers.append(worker)
+        worker.start()
+        self.status_label.setText(f"Selecting objections for {file_label}...")
+
+    def _on_phase2_finished(
+        self,
+        response_text: str,
+        parsed: ParsedDiscovery,
+        rule_ids_per_req: Dict[str, set],
+        responses_map: Dict[str, str],
+        file_label: str,
+        context_text: str,
+    ):
+        """Parse LLM objection selections, merge with rule-based, launch Phase 3."""
+        import re
+
+        objections_map: Dict[str, str] = {}
+
+        # Parse "REQUEST {n}: 1, 2, 4" lines from LLM response
+        pattern = re.compile(
+            r"REQUEST\s+([\d.]+)\s*:\s*([\d,\s]+)", re.IGNORECASE
+        )
+        llm_selections: Dict[str, set] = {}
+        for match in pattern.finditer(response_text):
+            req_num = match.group(1).strip()
+            ids_str = match.group(2)
+            ids = {int(x.strip()) for x in ids_str.split(",") if x.strip().isdigit()}
+            llm_selections[req_num] = ids
+
+        # Merge rule-based + LLM selections, format objection text
+        for req in parsed.requests:
+            rule_ids = rule_ids_per_req.get(req.number, set())
+            llm_ids = llm_selections.get(req.number, set())
+            merged = merge_objections(rule_ids, llm_ids)
+
+            # If still empty (LLM returned nothing for this request),
+            # default to at least objection 1 (vague/ambiguous)
+            if not merged:
+                merged = {1}
+
+            term = req.defined_terms_used[0] if req.defined_terms_used else None
+            obj_text = format_objections(merged, self._objection_menu, term=term)
+            objections_map[req.number] = obj_text
+
+        self.status_label.setText(f"Drafting responses for {file_label}...")
+
+        # Phase 3: Draft substantive responses
+        self._draft_responses_combined(
+            parsed, objections_map, responses_map,
+            file_label, context_text
+        )
 
     def _draft_remaining_fi(
         self,
