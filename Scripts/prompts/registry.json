@@ -287,6 +287,22 @@
           "usage_count": 0
         }
       ]
+    },
+    "mediation_brief:quote_search": {
+      "agent": "mediation_brief",
+      "pass_name": "quote_search",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-10T18:00:00.000000",
+          "description": "Initial quote search prompt",
+          "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
     }
   }
 }
