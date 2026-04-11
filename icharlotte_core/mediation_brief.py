@@ -489,6 +489,13 @@ FORMATTING RULES:
                 for s, body in prior_sections.items()
             )
             parts.append(f"\nPREVIOUSLY DRAFTED SECTIONS (for context and consistency):\n{prior_text}")
+            parts.append(
+                "\nIMPORTANT: The sections above have already defined party names, "
+                "locations, and other terms with parenthetical shorthand. Do NOT "
+                "re-define any of these terms. Use only the shorthand names "
+                "(e.g., \"Plaintiff\", \"Pacific Painting\", \"the Premises\") "
+                "without repeating the full name and parenthetical definition."
+            )
 
         return "\n".join(parts)
 
@@ -925,9 +932,10 @@ FORMATTING RULES:
             pf.space_after = Pt(0)
 
             if is_citation:
-                # Citation line — no indent, double-spaced so there's
+                # Citation line — no indent, with space before to create
                 # a visible gap between the last Q/A line and the citation
                 pf.line_spacing = 2.0
+                pf.space_before = Pt(12)
                 para.add_run(line)
             elif is_qa:
                 # Q./A. line — letter at 0.5", text at 1.0" via hanging indent + tab

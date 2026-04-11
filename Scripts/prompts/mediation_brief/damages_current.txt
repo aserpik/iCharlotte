@@ -13,6 +13,7 @@ Requirements:
 - Be persuasive while remaining professional — let the evidence make the argument rather than using inflammatory language
 - Length is not a concern — be thorough and develop each argument fully
 - Do not use placeholder text or brackets — write around any missing information naturally
+- CRITICAL: Do NOT re-define any party names, locations, or terms that were already defined in earlier sections. Use only the shorthand names (e.g., "Plaintiff", "Pacific Painting", "the Premises") without repeating the full name and parenthetical definition.
 
 Format each subsection as:
 SUBSECTION: [Title Text]

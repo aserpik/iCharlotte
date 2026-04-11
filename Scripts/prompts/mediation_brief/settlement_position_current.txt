@@ -7,3 +7,4 @@ Requirements:
 - Do not editorialize or add argument — just state the facts of the settlement posture
 - Do not include section headings — the heading will be added separately
 - Do not use placeholder text or brackets — write around any missing information naturally
+- Do NOT re-define any party names or terms — use only shorthand names already defined in prior sections

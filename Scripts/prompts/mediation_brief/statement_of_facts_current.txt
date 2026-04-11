@@ -12,3 +12,4 @@ Requirements:
 - Write in a professional, measured tone — informative rather than argumentative
 - Do not include section headings — the heading will be added separately
 - Do not use placeholder text or brackets — write around any missing information naturally
+- CRITICAL: Do NOT re-define any party names, locations, or terms that were already defined in the Introduction section (shown in the previously generated sections). Use only the shorthand names (e.g., "Plaintiff", "Pacific Painting", "the Premises") without repeating the full name and parenthetical definition.
