@@ -67,6 +67,17 @@ _CONTEXT_EXTENSIONS = (".pdf", ".docx", ".txt")
 
 _SUPPORTED_DROP_EXTENSIONS = _DISCOVERY_EXTENSIONS + (".docx", ".txt")
 
+# Gemini 1M token limit ≈ 3-4M chars for English text.  Leave headroom
+# for the response and internal overhead by capping user prompts at ~2.5M chars.
+_MAX_PROMPT_CHARS = 2_500_000
+
+
+def _truncate_prompt(text: str, limit: int = _MAX_PROMPT_CHARS) -> str:
+    """Truncate a prompt string to stay within token limits."""
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "\n\n[... content truncated to fit model context window ...]"
+
 
 # ---------------------------------------------------------------------------
 # RespondTab
@@ -529,8 +540,10 @@ class RespondTab(QWidget):
         self._parsed_discoveries.clear()
         self._rfa_responses_cache = None
 
-        # 4. Read context once
+        # 3. Read context once
         context_text = self.read_context_content()
+        logger.info("Context text length: %d chars (~%dk tokens)",
+                    len(context_text), len(context_text) // 4000)
 
         # 5. For each checked discovery PDF, launch Phase 1
         for path, label in checked_paths:
@@ -563,7 +576,7 @@ class RespondTab(QWidget):
             provider=provider,
             model=model,
             system="You are a legal document parser. Return only valid JSON.",
-            user=prompt,
+            user=_truncate_prompt(prompt),
             files=[],
             settings={"stream": False},
         )
@@ -689,7 +702,7 @@ class RespondTab(QWidget):
             f"INTERROGATORIES:\n{requests_text}\n\n"
         )
         if context_text:
-            max_ctx = 800_000
+            max_ctx = 500_000
             ctx = context_text[:max_ctx]
             if len(context_text) > max_ctx:
                 ctx += "\n\n[Context truncated due to length]"
@@ -704,7 +717,7 @@ class RespondTab(QWidget):
             provider=provider,
             model=model,
             system="You are a California litigation defense attorney.",
-            user=prompt,
+            user=_truncate_prompt(prompt),
             files=[],
             settings={"stream": False},
         )
@@ -760,7 +773,7 @@ class RespondTab(QWidget):
 
         # Truncate context to avoid exceeding token limits.
         # ~4 chars per token; leave room for instructions + requests.
-        max_context_chars = 800_000
+        max_context_chars = 500_000
         truncated_context = context_text[:max_context_chars]
         if len(context_text) > max_context_chars:
             truncated_context += "\n\n[Context truncated due to length]"
@@ -837,11 +850,14 @@ class RespondTab(QWidget):
         provider = self.provider_combo.currentText()
         model = self.model_combo.currentText()
 
+        logger.info("Combined prompt length: %d chars (~%dk tokens)",
+                    len(combined), len(combined) // 4000)
+
         worker = LLMWorker(
             provider=provider,
             model=model,
             system="You are a California litigation defense attorney.",
-            user=combined,
+            user=_truncate_prompt(combined),
             files=[],
             settings={"stream": False},
         )
@@ -966,7 +982,7 @@ class RespondTab(QWidget):
             provider=provider,
             model=model,
             system="You are a California litigation defense attorney.",
-            user=prompt,
+            user=_truncate_prompt(prompt),
             files=[],
             settings={"stream": False},
         )
