@@ -70,13 +70,19 @@ def format_single_response(
 
     parts = [req_header, request_text, "", resp_header]
 
-    if objections:
+    # Objections + waiver on the same line
+    if objections and waiver:
+        parts.append(f"{objections} {waiver}")
+    elif objections:
         parts.append(objections)
-    if waiver:
-        parts.append(waiver)
-    if substantive:
+
+    # Substantive on a new line
+    # Reservation follows substantive on the same line
+    if substantive and reservation:
+        parts.append(f"{substantive} {reservation}")
+    elif substantive:
         parts.append(substantive)
-    if reservation:
+    elif reservation:
         parts.append(reservation)
 
     return "\n".join(parts)

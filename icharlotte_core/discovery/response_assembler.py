@@ -251,7 +251,7 @@ class ResponseAssembler:
 
         # (7) Request/response pairs
         pairs = parse_response_text(response_text, disc_type)
-        self._insert_response_pairs(doc, pairs, disc_type, set_word)
+        self._insert_response_pairs(doc, pairs, disc_type, set_word, rules)
 
         # (8) Verification page
         self._insert_verification(doc, parsed, rules, title, verifier_name, date_str)
@@ -382,8 +382,8 @@ class ResponseAssembler:
         }
         stmt_text = stmt_map.get(disc_type, rules.preliminary_statement_si)
 
-        # Heading
-        p = _add_para(doc, "PRELIMINARY STATEMENT", STYLE_BODY_DOUBLE,
+        # Heading — centered
+        p = _add_para(doc, "PRELIMINARY STATEMENT", STYLE_CENTER_DOUBLE_BOLD_UND,
                       bold=True, underline=True)
         p.paragraph_format.first_line_indent = Inches(0)
 
@@ -420,6 +420,7 @@ class ResponseAssembler:
         pairs: List[Dict],
         disc_type: str,
         set_word: str,
+        rules: ResponseRules = None,
     ):
         """Insert formatted request/response pairs."""
         header_label_map = {
@@ -435,6 +436,9 @@ class ResponseAssembler:
         req_tmpl, resp_tmpl = header_label_map.get(
             disc_type, header_label_map["SI"]
         )
+
+        waiver = rules.waiver_language.strip()
+        reservation = rules.reservation_clause.strip()
 
         for pair in pairs:
             num = pair["number"]
@@ -453,11 +457,31 @@ class ResponseAssembler:
             _add_para(doc, resp_tmpl.format(number=num),
                       STYLE_DISCOVERY_NO, bold=True, underline=True)
 
-            # Response body — may contain multiple paragraphs
-            for paragraph in resp_text.split("\n\n"):
-                stripped = paragraph.strip()
-                if stripped:
-                    _add_para(doc, stripped, STYLE_BODY_DOUBLE)
+            # Parse the response body into: objections, waiver, substantive, reservation
+            # The plain text may contain these as separate lines or merged
+            obj_part, subst_part = self._split_response_parts(
+                resp_text, waiver, reservation
+            )
+
+            # Objections + waiver on the same paragraph (waiver follows objections inline)
+            if obj_part and waiver:
+                _add_para(doc, f"{obj_part} {waiver}", STYLE_BODY_DOUBLE)
+            elif obj_part:
+                _add_para(doc, obj_part, STYLE_BODY_DOUBLE)
+
+            # Substantive response — new paragraph, first line indented 0.5"
+            if subst_part:
+                # Split substantive into sub-paragraphs if needed
+                sub_paras = [s.strip() for s in subst_part.split("\n\n") if s.strip()]
+                for i, sp in enumerate(sub_paras):
+                    if i == len(sub_paras) - 1 and reservation:
+                        # Last paragraph: append reservation inline
+                        p = _add_para(doc, f"{sp} {reservation}", STYLE_BODY_DOUBLE)
+                    else:
+                        p = _add_para(doc, sp, STYLE_BODY_DOUBLE)
+            elif reservation:
+                # No substantive, just reservation
+                _add_para(doc, reservation, STYLE_BODY_DOUBLE)
 
     def _insert_verification(
         self,
@@ -499,14 +523,57 @@ class ResponseAssembler:
                 else:
                     _add_para(doc, stripped, STYLE_BODY_DOUBLE)
 
+    @staticmethod
+    def _split_response_parts(
+        resp_text: str,
+        waiver: str,
+        reservation: str,
+    ):
+        """Split response body into (objections_part, substantive_part).
+
+        The plain-text response may contain the waiver and reservation
+        language inline.  Strip those out so they can be re-inserted
+        with the correct formatting (waiver inline after objections,
+        reservation inline after substantive).
+        """
+        text = resp_text.strip()
+
+        # Remove waiver language if present in the text
+        if waiver and waiver in text:
+            text = text.replace(waiver, "").strip()
+
+        # Remove reservation language if present in the text
+        if reservation and reservation in text:
+            text = text.replace(reservation, "").strip()
+
+        # Try to split on "Subject to and without waiving" boundary
+        # — everything before is objections, everything after is substantive
+        waiver_marker = "Subject to and without waiving"
+        idx = text.find(waiver_marker)
+        if idx > 0:
+            obj_part = text[:idx].strip()
+            subst_part = text[idx:].strip()
+            # The substantive part may start with the waiver text we need to strip
+            if subst_part.startswith(waiver_marker):
+                # Find the end of the waiver sentence (ends with ":")
+                colon_idx = subst_part.find(":")
+                if colon_idx >= 0:
+                    subst_part = subst_part[colon_idx + 1:].strip()
+                else:
+                    subst_part = subst_part[len(waiver_marker):].strip()
+            return obj_part, subst_part
+
+        # No clear split — treat entire text as substantive
+        return "", text
+
     def _set_footer(self, doc, title: str):
         """Set the document title in the footer of all sections."""
         for section in doc.sections:
             footer = section.footer
             footer.is_linked_to_previous = False
-            for para in footer.paragraphs:
-                for run in para.runs:
-                    run.text = ""
+            # Clear ALL existing footer content (including [PLEADING TITLE])
+            for para in list(footer.paragraphs):
+                para.clear()
             if footer.paragraphs:
                 para = footer.paragraphs[0]
             else:
