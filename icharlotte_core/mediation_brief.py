@@ -199,6 +199,7 @@ FORMATTING RULES:
         self.document_content: str = ""
         self.caption_template_path: Optional[str] = None
         self.is_active: bool = False
+        self.saved_path: Optional[str] = None  # Last saved file path for overwrite
 
     # ------------------------------------------------------------------
     # Section parsing
@@ -1177,6 +1178,125 @@ FORMATTING RULES:
 
         return regenerated
 
+    # ------------------------------------------------------------------
+    # Quote search and insertion
+    # ------------------------------------------------------------------
+
+    _QUOTE_RESULT_RE = re.compile(
+        r'QUOTE_RESULT_START\s*\n'
+        r'DEPONENT:\s*(.+)\n'
+        r'SOURCE:\s*(.+)\n'
+        r'PAGE_LINE:\s*(.+)\n'
+        r'RELEVANCE:\s*(.+)\n'
+        r'((?:(?:Q\.|A\.).*\n?)+)'
+        r'QUOTE_RESULT_END',
+        re.MULTILINE
+    )
+
+    def _parse_quote_results(self, llm_output: str) -> List[Dict]:
+        """Parse LLM quote search output into structured results."""
+        if not llm_output or "NO_MATCHES_FOUND" in llm_output:
+            return []
+        results = []
+        for match in self._QUOTE_RESULT_RE.finditer(llm_output):
+            results.append({
+                "deponent": match.group(1).strip(),
+                "source": match.group(2).strip(),
+                "page_line": match.group(3).strip(),
+                "relevance": match.group(4).strip(),
+                "qa_text": match.group(5).strip(),
+            })
+        return results
+
+    def search_quotes(self, transcript_paths: List[str], description: str) -> List[Dict]:
+        """Search deposition transcripts for Q&A passages matching description."""
+        transcript_text = ""
+        for path in transcript_paths:
+            fname = os.path.basename(path)
+            ext = os.path.splitext(path)[1].lower()
+            transcript_text += f"\n--- TRANSCRIPT: {fname} ---\n"
+            if ext == ".pdf":
+                try:
+                    doc = fitz.open(path)
+                    for page in doc:
+                        transcript_text += page.get_text() + "\n"
+                    doc.close()
+                except Exception as e:
+                    logger.warning("Failed to read transcript %s: %s", fname, e)
+                    transcript_text += f"[Error reading file: {e}]\n"
+            elif ext == ".docx":
+                try:
+                    doc = DocxDocument(path)
+                    for para in doc.paragraphs:
+                        transcript_text += para.text + "\n"
+                except Exception as e:
+                    logger.warning("Failed to read transcript %s: %s", fname, e)
+                    transcript_text += f"[Error reading file: {e}]\n"
+            transcript_text += "\n"
+
+        if not transcript_text.strip():
+            return []
+
+        search_prompt = self._get_section_prompt("quote_search")
+        full_prompt = f"{search_prompt}\n\nUSER'S SEARCH DESCRIPTION:\n{description}"
+        system = (
+            "You are a legal transcript analyst. Find Q&A passages in deposition "
+            "transcripts that match the user's description. Return testimony EXACTLY "
+            "as it appears — do NOT paraphrase, reword, or change any text."
+        )
+        caller = LLMCaller()
+        result = caller.call(
+            prompt=full_prompt,
+            text=transcript_text,
+            agent_id="agent_mediation_brief",
+        )
+        if not result:
+            return []
+        return self._parse_quote_results(result)
+
+    def insert_quotes_quick(self, quotes: List[Dict], section_name: str,
+                            subsection_title: Optional[str] = None) -> None:
+        """Insert quote blocks into a section's text (Quick Insert mode)."""
+        if section_name not in self.sections:
+            return
+
+        quote_blocks = []
+        for q in quotes:
+            block = (
+                f"\n\nDEPO_QUOTE_START\n"
+                f"{q['qa_text']}\n"
+                f"DEPO_QUOTE_END\n"
+                f"({q['deponent']} Depo Trns., at p. {q['page_line']}.)"
+            )
+            quote_blocks.append(block)
+        insert_text = "".join(quote_blocks)
+
+        section_text = self.sections[section_name]
+
+        if subsection_title:
+            pattern = re.compile(
+                rf'^SUBSECTION:\s*{re.escape(subsection_title)}\s*$',
+                re.MULTILINE
+            )
+            match = pattern.search(section_text)
+            if match:
+                next_sub = self._SUBSECTION_RE.search(section_text, match.end())
+                if next_sub:
+                    insert_pos = next_sub.start()
+                    section_text = (
+                        section_text[:insert_pos].rstrip()
+                        + insert_text + "\n\n"
+                        + section_text[insert_pos:]
+                    )
+                else:
+                    section_text = section_text.rstrip() + insert_text
+            else:
+                section_text = section_text.rstrip() + insert_text
+        else:
+            section_text = section_text.rstrip() + insert_text
+
+        self.sections[section_name] = section_text
+
     def reset(self) -> None:
         """Clear all generated state, resetting the generator to its initial condition."""
         self.sections = {}
@@ -1184,6 +1304,7 @@ FORMATTING RULES:
         self.document_content = ""
         self.caption_template_path = None
         self.is_active = False
+        self.saved_path = None
 
 
 # ---------------------------------------------------------------------------
