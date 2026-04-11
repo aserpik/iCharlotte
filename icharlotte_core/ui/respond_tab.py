@@ -25,7 +25,7 @@ from icharlotte_core.llm import LLMWorker, ModelFetcher
 from icharlotte_core.config import API_KEYS
 from icharlotte_core.discovery.response_rules import ResponseRules
 from icharlotte_core.discovery.response_parser import (
-    ParsedDiscovery, build_parse_prompt, parse_llm_response,
+    ParsedDiscovery, ParsedRequest, build_parse_prompt, parse_llm_response,
     detect_discovery_type,
 )
 from icharlotte_core.discovery.objection_selector import (
@@ -1311,7 +1311,7 @@ class RespondTab(QWidget):
 
     @Slot()
     def _save_output(self):
-        """Persist the editor output tabs to CaseDataManager."""
+        """Persist the editor output tabs and parsed discovery data."""
         if not self.file_number:
             return
         manager = self._get_manager()
@@ -1324,7 +1324,17 @@ class RespondTab(QWidget):
             text = ""
             if isinstance(editor, QPlainTextEdit):
                 text = editor.toPlainText()
-            tabs_data.append({"label": label, "text": text})
+            # Include parsed discovery metadata so Save works after restart
+            parsed = self._parsed_discoveries.get(label)
+            parsed_dict = None
+            if parsed:
+                from dataclasses import asdict
+                parsed_dict = asdict(parsed)
+            tabs_data.append({
+                "label": label,
+                "text": text,
+                "parsed": parsed_dict,
+            })
         try:
             manager.save_variable(
                 self.file_number, "respond_output", tabs_data,
@@ -1334,7 +1344,7 @@ class RespondTab(QWidget):
             logger.warning("Failed to save response output: %s", e)
 
     def _load_output(self):
-        """Restore the editor output tabs from CaseDataManager."""
+        """Restore the editor output tabs and parsed discovery data."""
         if not self.file_number:
             return
         manager = self._get_manager()
@@ -1361,6 +1371,16 @@ class RespondTab(QWidget):
                 editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
                 editor.textChanged.connect(self._output_save_timer.start)
                 self.output_tabs.addTab(editor, label)
+
+                # Restore parsed discovery metadata for Save functionality
+                parsed_dict = entry.get("parsed")
+                if parsed_dict and isinstance(parsed_dict, dict):
+                    requests = [
+                        ParsedRequest(**r) for r in parsed_dict.pop("requests", [])
+                    ]
+                    parsed = ParsedDiscovery(**parsed_dict, requests=requests)
+                    self._parsed_discoveries[label] = parsed
+
             self._update_refresh_17_1_state()
         except Exception as e:
             logger.warning("Failed to load response output: %s", e)
