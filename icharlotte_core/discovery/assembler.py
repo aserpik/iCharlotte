@@ -7,8 +7,9 @@ styles (Body Double, Flush Left, Discovery No., etc.) matching the
 format of sample documents in discovery/Standard Negligence Discovery/.
 """
 import os
+import re
 from datetime import date
-from typing import Optional
+from typing import List, Optional
 
 from docx import Document as DocxDocument
 from docx.shared import Pt, Inches, Emu
@@ -33,6 +34,72 @@ STYLE_DISCOVERY_NO = "Discovery No."                 # Request headers (no inden
 # Signature block indentation (from sample: ~3 inches)
 SIG_LEFT_INDENT = Emu(2743200)       # "Dated:" and "By:" lines
 SIG_NAME_LEFT_INDENT = Emu(3086100)  # Attorney names, firm info
+
+
+# ---------------------------------------------------------------------------
+# Definition filtering helpers
+# ---------------------------------------------------------------------------
+
+# Matches the start of a new definition entry
+_DEF_START_RE = re.compile(
+    r'^\(?The\s+term|^RPDs?\s+Only|^[\u201c"]',
+    re.IGNORECASE,
+)
+
+# Extracts quoted terms (smart quotes \u201c\u201d or ASCII quotes)
+_QUOTED_TERM_RE = re.compile(r'[\u201c"]([^"\u201d]+?)[\u201d",]')
+
+
+def _parse_definition_entries(definitions_text: str) -> List[str]:
+    """Parse a definitions block into individual multi-line definition entries.
+
+    Each entry starts with a line matching ``_DEF_START_RE`` and continues
+    until the next definition start (e.g. "With respect to ..." continuation
+    lines stay with the preceding definition).
+    """
+    entries: List[str] = []
+    current: List[str] = []
+
+    for line in definitions_text.strip().split("\n"):
+        stripped = line.strip()
+        if not stripped or stripped.upper() in ("DEFINITIONS", "DEFINED TERMS"):
+            continue
+        if _DEF_START_RE.match(stripped):
+            if current:
+                entries.append("\n".join(current))
+            current = [line]
+        else:
+            current.append(line)
+
+    if current:
+        entries.append("\n".join(current))
+    return entries
+
+
+def _extract_terms_from_entry(entry_text: str) -> List[str]:
+    """Return uppercase defined terms from the first line of a definition entry."""
+    first_line = entry_text.split("\n")[0].strip()
+    first_line = re.sub(r'^RPDs?\s+Only:\s*', '', first_line, flags=re.IGNORECASE)
+
+    terms: List[str] = []
+    for m in _QUOTED_TERM_RE.finditer(first_line):
+        term = m.group(1).strip().rstrip('.,;: ')
+        if term and len(term) < 60:
+            terms.append(term.upper())
+    return terms
+
+
+def _term_in_requests(term: str, all_text_upper: str) -> bool:
+    """Return True if *term* (possibly with parenthesised suffix) appears in text."""
+    base = re.sub(r'\([A-Za-z]+\)', '', term).strip()
+    variants = {base}
+    paren = re.search(r'\(([A-Za-z]+)\)', term)
+    if paren:
+        variants.add(base + paren.group(1).upper())
+    for v in variants:
+        if v and re.search(r'\b' + re.escape(v) + r'\b', all_text_upper):
+            return True
+    return False
 
 
 def _safe_style(doc, preferred, fallback=STYLE_BODY_DOUBLE):
@@ -108,9 +175,11 @@ class DiscoveryAssembler:
         if ds.instructions_block:
             self._insert_instructions(doc, ds.instructions_block)
 
-        # (5) Definitions — NO extra blank line before heading
+        # (5) Definitions — filter to only terms used in the requests
         if ds.definitions_block:
-            self._insert_definitions(doc, ds.definitions_block)
+            filtered_defs = self._filter_definitions_block(ds.definitions_block, ds)
+            if filtered_defs:
+                self._insert_definitions(doc, filtered_defs)
 
         # (6) Section heading
         heading = f"{ds.discovery_type.section_heading}, SET {ds.set_word.upper()}"
@@ -275,7 +344,7 @@ class DiscoveryAssembler:
             if not stripped:
                 continue
             if "INSTRUCTIONS TO ANSWERING PARTY" in stripped.upper():
-                p = _add_para(doc, stripped, STYLE_BODY_DOUBLE, bold=True, underline=True)
+                p = _add_para(doc, stripped, STYLE_CENTER_DOUBLE_BOLD_UND, bold=True, underline=True)
                 p.paragraph_format.first_line_indent = Inches(0)
             else:
                 _add_para(doc, stripped, STYLE_BODY_DOUBLE)
@@ -292,6 +361,45 @@ class DiscoveryAssembler:
                 p.paragraph_format.first_line_indent = Inches(0)
             else:
                 _add_para(doc, stripped, STYLE_BODY_DOUBLE)
+
+    def _filter_definitions_block(self, definitions_block: str, ds: DiscoverySet) -> str:
+        """Return *definitions_block* with only definitions whose terms
+        appear in the request texts.  RPD-only definitions are dropped
+        for non-RPD discovery types.
+        """
+        if not definitions_block or not ds.requests:
+            return ""
+
+        all_text = " ".join(req.text for req in ds.requests).upper()
+        entries = _parse_definition_entries(definitions_block)
+
+        kept: list[str] = []
+        for entry in entries:
+            first_line = entry.split("\n")[0].strip()
+
+            # RPD-only definitions: skip for non-RPD types
+            if re.match(r'^RPDs?\s+Only', first_line, re.IGNORECASE):
+                if ds.discovery_type != DiscoveryType.RPD:
+                    continue
+
+            terms = _extract_terms_from_entry(entry)
+            if not terms:
+                continue
+
+            if any(_term_in_requests(t, all_text) for t in terms):
+                kept.append(entry)
+
+        if not kept:
+            return ""
+
+        # Preserve the original heading
+        heading = "DEFINITIONS"
+        for line in definitions_block.strip().split("\n"):
+            if line.strip().upper() in ("DEFINITIONS", "DEFINED TERMS"):
+                heading = line.strip()
+                break
+
+        return heading + "\n" + "\n".join(kept)
 
     def _insert_requests(self, doc, ds: DiscoverySet):
         """Insert numbered requests — no extra blank lines between them."""

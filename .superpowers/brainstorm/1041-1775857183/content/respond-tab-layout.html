@@ -1,0 +1,123 @@
+<h2>Respond Tab — Layout</h2>
+<p class="subtitle">Left pane controls + right pane editor, mirroring the Propound tab structure</p>
+
+<div class="mockup">
+  <div class="mockup-header">Respond Tab Layout</div>
+  <div class="mockup-body" style="display:flex; gap:0; min-height:520px; font-size:13px; background:#1e1e2e;">
+
+    <!-- LEFT PANE -->
+    <div style="width:320px; min-width:320px; background:#2a2a3e; padding:14px; display:flex; flex-direction:column; gap:10px; border-right:1px solid #444;">
+
+      <div style="font-weight:bold; color:#cdd6f4; font-size:14px; margin-bottom:2px;">Controls</div>
+
+      <!-- Discovery to Respond To -->
+      <div style="background:#313244; border-radius:6px; padding:10px;">
+        <div style="color:#89b4fa; font-size:11px; font-weight:bold; text-transform:uppercase; margin-bottom:6px;">📄 Discovery to Respond To</div>
+        <div style="border:1px dashed #585b70; border-radius:4px; padding:16px; text-align:center; color:#6c7086; font-size:11px;">
+          Drop PDF files here<br><span style="font-size:10px; color:#585b70;">Form Interrogatories, Special Interrogatories,<br>Requests for Admission, Requests for Production</span>
+        </div>
+        <div style="margin-top:6px;">
+          <div style="display:flex; align-items:center; gap:4px; color:#cdd6f4; font-size:11px; padding:2px 0;">
+            <span style="color:#a6e3a1;">☑</span> Pltf's Form Interrogatories(1).pdf
+          </div>
+          <div style="display:flex; align-items:center; gap:4px; color:#cdd6f4; font-size:11px; padding:2px 0;">
+            <span style="color:#a6e3a1;">☑</span> Pltf's RFA(1).pdf
+          </div>
+          <div style="display:flex; align-items:center; gap:4px; color:#cdd6f4; font-size:11px; padding:2px 0;">
+            <span style="color:#a6e3a1;">☑</span> Pltf's RPD(1).pdf
+          </div>
+        </div>
+      </div>
+
+      <!-- Context Documents -->
+      <div style="background:#313244; border-radius:6px; padding:10px;">
+        <div style="color:#f9e2af; font-size:11px; font-weight:bold; text-transform:uppercase; margin-bottom:6px;">📁 Context Documents</div>
+        <div style="border:1px dashed #585b70; border-radius:4px; padding:12px; text-align:center; color:#6c7086; font-size:11px;">
+          Drop context files here<br><span style="font-size:10px; color:#585b70;">Medical records, depositions, reports, etc.</span>
+        </div>
+        <div style="margin-top:6px;">
+          <div style="display:flex; align-items:center; gap:4px; color:#cdd6f4; font-size:11px; padding:2px 0;">
+            <span style="color:#a6e3a1;">☑</span> Medical Records - Dr. Smith.pdf
+          </div>
+          <div style="display:flex; align-items:center; gap:4px; color:#cdd6f4; font-size:11px; padding:2px 0;">
+            <span style="color:#a6e3a1;">☑</span> Incident Report.pdf
+          </div>
+        </div>
+      </div>
+
+      <!-- Responding Party / LLM -->
+      <div style="background:#313244; border-radius:6px; padding:10px;">
+        <div style="color:#cba6f7; font-size:11px; font-weight:bold; text-transform:uppercase; margin-bottom:6px;">⚙️ Settings</div>
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <div>
+            <div style="color:#a6adc8; font-size:10px;">Our Client</div>
+            <div style="background:#45475a; border-radius:3px; padding:4px 8px; color:#cdd6f4; font-size:11px; display:flex; justify-content:space-between;">
+              <span>Defendant USA Waste ▾</span>
+              <span style="color:#89b4fa; cursor:pointer;">+</span>
+            </div>
+          </div>
+          <div>
+            <div style="color:#a6adc8; font-size:10px;">LLM Provider</div>
+            <div style="background:#45475a; border-radius:3px; padding:4px 8px; color:#cdd6f4; font-size:11px;">Gemini ▾</div>
+          </div>
+          <div>
+            <div style="color:#a6adc8; font-size:10px;">Model</div>
+            <div style="background:#45475a; border-radius:3px; padding:4px 8px; color:#cdd6f4; font-size:11px;">gemini-2.5-pro ▾</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div style="display:flex; flex-direction:column; gap:6px; margin-top:auto;">
+        <button style="background:#45475a; color:#cdd6f4; border:1px solid #585b70; border-radius:4px; padding:8px; font-size:12px; cursor:pointer;">📋 Response Rules...</button>
+        <button style="background:#89b4fa; color:#1e1e2e; border:none; border-radius:4px; padding:10px; font-size:13px; font-weight:bold; cursor:pointer;">Generate Responses</button>
+      </div>
+    </div>
+
+    <!-- RIGHT PANE -->
+    <div style="flex:1; display:flex; flex-direction:column; background:#1e1e2e;">
+
+      <!-- Toolbar -->
+      <div style="display:flex; align-items:center; gap:8px; padding:8px 12px; background:#2a2a3e; border-bottom:1px solid #444;">
+        <button style="background:#45475a; color:#cdd6f4; border:1px solid #585b70; border-radius:3px; padding:4px 10px; font-size:11px; cursor:pointer;">💾 Save as .docx</button>
+        <button style="background:#45475a; color:#cdd6f4; border:1px solid #585b70; border-radius:3px; padding:4px 10px; font-size:11px; cursor:pointer;">Save All</button>
+        <button style="background:#45475a; color:#cdd6f4; border:1px solid #585b70; border-radius:3px; padding:4px 10px; font-size:11px; cursor:pointer;">Clear</button>
+        <button style="background:#f38ba8; color:#1e1e2e; border:none; border-radius:3px; padding:4px 10px; font-size:11px; cursor:pointer;">🔄 Refresh 17.1</button>
+        <div style="flex:1;"></div>
+        <span style="color:#a6e3a1; font-size:11px;">✓ 3 response sets generated</span>
+      </div>
+
+      <!-- Tabs -->
+      <div style="display:flex; background:#2a2a3e; padding:0 8px; gap:2px;">
+        <div style="background:#1e1e2e; color:#89b4fa; padding:6px 14px; font-size:11px; border-radius:4px 4px 0 0; border:1px solid #444; border-bottom:none;">Resp to FI(1)</div>
+        <div style="background:#313244; color:#a6adc8; padding:6px 14px; font-size:11px; border-radius:4px 4px 0 0; cursor:pointer;">Resp to RFA(1)</div>
+        <div style="background:#313244; color:#a6adc8; padding:6px 14px; font-size:11px; border-radius:4px 4px 0 0; cursor:pointer;">Resp to RPD(1)</div>
+      </div>
+
+      <!-- Editor Content -->
+      <div style="flex:1; padding:12px; overflow-y:auto; font-family:'Consolas','Courier New',monospace; font-size:11px; color:#cdd6f4; line-height:1.6; background:#1e1e2e;">
+        <div style="color:#f9e2af; font-weight:bold;">PROPOUNDING PARTY:&nbsp;&nbsp;&nbsp;Plaintiff SALAMUDIN JAN</div>
+        <div style="color:#f9e2af; font-weight:bold;">RESPONDING PARTY:&nbsp;&nbsp;&nbsp;Defendant USA WASTE OF CALIFORNIA, INC.</div>
+        <div style="color:#f9e2af; font-weight:bold;">SET NO.:&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ONE (1)</div>
+        <br>
+        <div style="color:#a6adc8; font-style:italic;">Defendant USA WASTE OF CALIFORNIA, INC. ("Defendant" or "Responding Party") hereby responds and objects to the Form Interrogatories, Set One, served by Plaintiff SALAMUDIN JAN ("Plaintiff" or "Propounding Party"), as follows:</div>
+        <br>
+        <div style="color:#cba6f7; font-weight:bold;">PRELIMINARY STATEMENT</div>
+        <div style="color:#a6adc8;">These responses are made solely for the purpose of this action...</div>
+        <br>
+        <div style="color:#cba6f7; font-weight:bold;">FORM INTERROGATORY NO. 1.1:</div>
+        <div>State the name, ADDRESS, telephone number...</div>
+        <br>
+        <div style="color:#89b4fa; font-weight:bold;">RESPONSE TO FORM INTERROGATORY NO. 1.1:</div>
+        <div style="color:#f38ba8;">Responding Party objects to this request on the grounds that it is vague, ambiguous...</div>
+        <div><br>Subject to and without waiving the foregoing objections, Responding Party responds as follows:</div>
+        <div style="color:#a6e3a1;">Responding Party is represented by: Joshua Bordin-Wosk, Esq....</div>
+        <br>
+        <div style="color:#6c7086; font-style:italic;">Discovery and investigation are ongoing and Responding Party reserves the right to amend...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<p style="margin-top:16px; color:#a6adc8; font-size:13px;"><strong>Key elements:</strong> Two document drop zones (blue = discovery to respond to, gold = context docs), party/LLM settings, Response Rules button, Generate button. Right pane has tabbed plain-text editors with Save/Clear/Refresh 17.1 toolbar.</p>

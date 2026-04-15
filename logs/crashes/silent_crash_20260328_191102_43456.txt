@@ -1,0 +1,297 @@
+======================================================================
+SILENT CRASH DETECTED (previous session)
+======================================================================
+Detection Time:   2026-03-28T19:11:02.550566
+Last Heartbeat:   2026-03-28T19:10:58.424083
+Previous PID:     43456
+Memory at death:  N/A MB RSS
+
+Last Checkpoints:
+  [2026-03-28T19:07:47.671232] Application starting
+  [2026-03-28T19:07:47.671296] Parsing command-line arguments
+  [2026-03-28T19:07:47.673039] Configuring Qt WebEngine
+  [2026-03-28T19:07:47.673105] Creating QApplication
+  [2026-03-28T19:07:47.740860] Creating MainWindow
+  [2026-03-28T19:07:47.741088] MainWindow.__init__ starting
+  [2026-03-28T19:07:47.860969] setup_ui starting - creating tabs
+  [2026-03-28T19:07:47.862305] Creating MasterCaseTab
+
+Context:
+  startup_file_number: 5800.057
+  startup_case_path: Z:\Shared\Current Clients\5800 - AMTRUST\057 - DeLeon
+  startup_tab: 0
+  current_file_number: 5800.057
+  current_case_path: Z:\Shared\Current Clients\5800 - AMTRUST\057 - DeLeon
+
+----------------------------------------------------------------------
+STDERR (last 50 lines before crash):
+----------------------------------------------------------------------
+
+--- stderr.log ---
+============================================================
+[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-28T15:15:13.453144
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-28T16:20:13.211672
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-28T18:22:05.043330
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-28T18:37:50.321411
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-28T18:49:20.512001
+============================================================
+[DEBUG] refresh_data_inner START
+============================================================
+Stderr capture started: 2026-03-28T19:07:47.636867
+============================================================
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte.py", line 2909, in <module>
+    window = MainWindow(
+        file_number=args.file_number,
+        case_path=args.case_path,
+        initial_tab=args.tab
+    )
+  File "C:\geminiterminal2\icharlotte.py", line 425, in __init__
+    self.setup_ui()
+    ~~~~~~~~~~~~~^^
+  File "C:\geminiterminal2\icharlotte.py", line 581, in setup_ui
+    self.master_tab = MasterCaseTab(self)
+                      ~~~~~~~~~~~~~^^^^^^
+  File "C:\geminiterminal2\icharlotte_core\ui\master_case_tab.py", line 406, in __init__
+    self.setup_ui()
+    ~~~~~~~~~~~~~^^
+  File "C:\geminiterminal2\icharlotte_core\ui\master_case_tab.py", line 441, in setup_ui
+    self.docket_refresh_action.toggled.connect(self.toggle_docket_refresh)
+                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MasterCaseTab' object has no attribute 'toggle_docket_refresh'
+
+============================================================
+Stderr capture started: 2026-03-28T19:09:06.567577
+============================================================
+[DEBUG] refresh_data_inner START
+--- stderr.log.fd2 ---
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+[DEBUG] refresh_data_inner START
+
+QThread: Destroyed while thread '' is still running
+Traceback (most recent call last):
+
+  File "C:\geminiterminal2\icharlotte.py", line 2909, in <module>
+
+    window = MainWindow(
+
+        file_number=args.file_number,
+
+        case_path=args.case_path,
+
+        initial_tab=args.tab
+
+    )
+
+  File "C:\geminiterminal2\icharlotte.py", line 425, in __init__
+
+    self.setup_ui()
+
+    ~~~~~~~~~~~~~^^
+
+  File "C:\geminiterminal2\icharlotte.py", line 581, in setup_ui
+
+    self.master_tab = MasterCaseTab(self)
+
+                      ~~~~~~~~~~~~~^^^^^^
+
+  File "C:\geminiterminal2\icharlotte_core\ui\master_case_tab.py", line 406, in __init__
+
+    self.setup_ui()
+
+    ~~~~~~~~~~~~~^^
+
+  File "C:\geminiterminal2\icharlotte_core\ui\master_case_tab.py", line 441, in setup_ui
+
+    self.docket_refresh_action.toggled.connect(self.toggle_docket_refresh)
+
+                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+AttributeError: 'MasterCaseTab' object has no attribute 'toggle_docket_refresh'
+
+Press Enter to exit...[DEBUG] refresh_data_inner START
+
+
+
+----------------------------------------------------------------------
+FAULTHANDLER LOG (tail):
+----------------------------------------------------------------------
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_winkeyboard.py", line 563 in listen
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\__init__.py", line 294 in listen
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x00009860 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 363 in wait
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 660 in wait
+  File "C:\geminiterminal2\icharlotte_core\app_crash_handler.py", line 515 in _beat
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x00003d74 (most recent call first):
+  File "C:\geminiterminal2\icharlotte_core\ui\tabs.py", line 836 in select_files
+  File "C:\geminiterminal2\icharlotte.py", line 2943 in <module>
+Windows fatal exception: code 0x8001010e
+
+Thread 0x0000a54c (most recent call first):
+  File "C:\geminiterminal2\icharlotte_core\sent_items_monitor.py", line 327 in run
+
+Thread 0x0000ba80 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 359 in wait
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\queue.py", line 199 in get
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_generic.py", line 57 in process
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x00008728 (most recent call first):
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\_winkeyboard.py", line 563 in listen
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\__init__.py", line 294 in listen
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x00009860 (most recent call first):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 363 in wait
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 660 in wait
+  File "C:\geminiterminal2\icharlotte_core\app_crash_handler.py", line 515 in _beat
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 995 in run
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1044 in _bootstrap_inner
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\threading.py", line 1015 in _bootstrap
+
+Thread 0x00003d74 (most recent call first):
+  File "C:\geminiterminal2\icharlotte_core\ui\tabs.py", line 836 in select_files
+  File "C:\geminiterminal2\icharlotte.py", line 2943 in <module>
+
+============================================================
+Session start: 2026-03-28T15:15:13.452657
+============================================================
+
+============================================================
+Session start: 2026-03-28T16:20:13.211257
+============================================================
+
+============================================================
+Session start: 2026-03-28T18:22:03.512459
+============================================================
+
+============================================================
+Session start: 2026-03-28T18:37:50.021742
+============================================================
+
+============================================================
+Session start: 2026-03-28T18:49:20.199742
+============================================================
+
+============================================================
+Session start: 2026-03-28T19:07:47.636648
+============================================================
+
+============================================================
+Session start: 2026-03-28T19:09:06.220844
+============================================================
+
+============================================================
+Session start: 2026-03-28T19:11:02.550375
+============================================================
+
+
+----------------------------------------------------------------------
+WINDOWS ERROR REPORTING:
+----------------------------------------------------------------------
+TimeCreated : 3/28/2026 7:07:45 PM
+Message     : Faulting application name: 
+              python3.13.exe, version: 
+              3.13.12150.1013, time stamp: 
+              0x69823dc6
+              Faulting module name: 
+              Qt6Core.dll, version: 6.10.2.0, 
+              time stamp: 0x696e7645
+              Exception code: 0xc0000409
+              Fault offset: 0x000000000001bbd8
+              Faulting process id: 0x94B0
+              Faulting application start time: 
+              0x1DCBF096AFFCFB9
+              Faulting application path: 
+              C:\Program Files\WindowsApps\Pytho
+              nSoftwareFoundation.Python.3.13_3.
+              13.3312.0_x64__qbz5n2kfra8p0\pytho
+              n3.13.exe
+              Faulting module path: C:\Users\ASe
+              rpik.DESKTOP-MRIMK0D\AppData\Local
+              \Packages\PythonSoftwareFoundation
+              .Python.3.13_qbz5n2kfra8p0\LocalCa
+              che\local-packages\Python313\site-
+              packages\PySide6\Qt6Core.dll
+              Report Id: 68928759-4330-4238-8d8d
+              -e1277a9d4dad
+              Faulting package full name: Python
+              SoftwareFoundation.Python.3.13_3.1
+              3.3312.0_x64__qbz5n2kfra8p0
+              Faulting package-relative 
+              application ID: Python
+
+TimeCreated : 3/28/2026 4:48:52 PM
+Message     : Faulting application name: 
+              ONENOTE.EXE, version: 
+              16.0.19725.20190, time stamp: 
+              0x69b4d6ee
+              Faulting module name: 
+              ucrtbase.dll, version: 
+              10.0.26100.7623, time stamp: 
+              0x53a0792e
+              Exception code: 0xc0000409
+              Fault offset: 0x00000000000a4ace
+              Faulting process id: 0x4A0C
+              Faulting application start time: 
+              0x1DCBB7466057912
+              Faulting application path: 
+              C:\Program Files\Microsoft 
+              Office\root\Office16\ONENOTE.EXE
+              Faulting module path: 
+              C:\WINDOWS\System32\ucrtbase.dll
+              Report Id: b6b53ad1-b925-4975-b1cc
+              -d9651f6112f7
+              Faulting package full name: 
+              Faulting package-relative 
+              application ID: 
+
+TimeCreated : 3/28/2026 4:20:09 PM
+Message     : Faulting application name: 
+              python3.13.exe, version: 
+              3.13.12150.1013, time stamp: 
+              0x69823dc6
+              Faulting module name: 
+              Qt6Core.dll, version: 6.10.2.0, 
+              time stamp: 0x696e7645
+              Exception code: 0xc0000409
+              Fault offset: 0x000000000001bbd8
+              Faulting process id: 0xBF00
+              Faulting application start time: 
+              0x1DCBF00551FDE35
+              Faulting application path: 
+              C:\Program Files\WindowsApps\Pytho
+              nSoftwareFoundation.Python.3.13_3.
+              13.3312.0_x64__qbz5n2kfra8p0\pytho
+              n3.13.exe
+          

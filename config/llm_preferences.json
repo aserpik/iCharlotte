@@ -552,7 +552,7 @@
       "model_sequence": [
         {
           "provider": "Gemini",
-          "model": "gemini-3-pro-preview",
+          "model": "gemini-3.1-pro-preview",
           "max_tokens": -1,
           "supports_thinking": false,
           "supports_streaming": true,

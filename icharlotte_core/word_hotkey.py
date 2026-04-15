@@ -39,10 +39,21 @@ try:
 except ImportError:
     HAS_MASTER_DB = False
 
+# Ensure platform WMI workaround is applied (see iCharlotte.py for primary fix)
+import platform as _platform_mod
+if not hasattr(_platform_mod, '_uname_cache') or _platform_mod._uname_cache is None:
+    _platform_mod._uname_cache = _platform_mod.uname_result(
+        system='Windows', node=os.environ.get('COMPUTERNAME', ''),
+        release='11', version='10.0.26200',
+        machine=os.environ.get('PROCESSOR_ARCHITECTURE', 'AMD64'),
+    )
+    _platform_mod.win32_ver = lambda *a, **kw: ('11', '10.0.26200', '', 'Multiprocessor Free')
+    _platform_mod._wmi_query = lambda *a, **kw: (_ for _ in ()).throw(OSError('WMI disabled'))
+
 try:
     import keyboard
     HAS_KEYBOARD = True
-except ImportError:
+except (ImportError, OSError):
     HAS_KEYBOARD = False
 
 # Windows RegisterHotKey API - more reliable than keyboard library hooks
@@ -66,6 +77,51 @@ except ImportError:
     HAS_WIN32 = False
 
 logger = logging.getLogger("icharlotte.word_hotkey")
+
+# ---------------------------------------------------------------------------
+# COM retry helper — reusable across all Word COM calls
+# ---------------------------------------------------------------------------
+_RPC_E_CALL_REJECTED = -2147418111  # 0x80010001
+
+def _com_retry(func, retries=5, delay=0.5, label="COM op"):
+    """Retry a COM operation that may fail with RPC_E_CALL_REJECTED.
+
+    Word rejects COM calls when it's busy (e.g. processing UI, executing a
+    macro, or handling another COM call).  This retries with increasing delay.
+    """
+    import time
+    try:
+        import pywintypes as _pywintypes
+    except ImportError:
+        return func()
+    for attempt in range(retries):
+        try:
+            return func()
+        except _pywintypes.com_error as e:
+            if e.hresult == _RPC_E_CALL_REJECTED and attempt < retries - 1:
+                wait = delay * (attempt + 1)
+                print(f"[COM retry] {label} rejected, retrying in {wait:.1f}s "
+                      f"(attempt {attempt + 1}/{retries})...")
+                time.sleep(wait)
+            else:
+                raise
+
+
+def _force_restore_screen_updating():
+    """Last-resort: brute-force restore Word ScreenUpdating from a fresh COM connection."""
+    if not HAS_WIN32:
+        return
+    import time
+    for attempt in range(5):
+        try:
+            app = win32com.client.GetActiveObject("Word.Application")
+            if not app.ScreenUpdating:
+                app.ScreenUpdating = True
+                print(f"[COM safety] Restored Word ScreenUpdating (attempt {attempt + 1})")
+            return
+        except Exception:
+            time.sleep(1.0 * (attempt + 1))
+    print("WARNING: Could not restore Word ScreenUpdating after all retries")
 
 # Set up file logging for word_hotkey so COM errors are captured
 def _setup_word_hotkey_logger():
@@ -1471,8 +1527,9 @@ class TaskManager(QObject):
         if not word:
             raise Exception("Could not connect to Word")
 
-        # Activate document
-        doc.Activate()
+        # Activate document (retry — Word may be busy processing UI)
+        _com_retry(lambda: doc.Activate(), retries=5, delay=0.5,
+                   label="doc.Activate before insert")
 
         # Resolve bookmark to current range
         if td.bookmark_name:
@@ -1492,12 +1549,17 @@ class TaskManager(QObject):
             range_start = selection.Range.Start
             range_end = selection.Range.Start  # Insertion point
 
-        # Lock Word UI during insertion
-        ui_locked = False
+        # Suppress screen repainting during insertion for performance.
+        # NOTE: We intentionally do NOT set word.Interactive = False.
+        # Interactive=False blocks ALL user interaction with Word, and if
+        # the unlock fails (COM error, multi-instance mismatch, hanging
+        # call), Word stays locked until iCharlotte is killed.  The
+        # bookmark system already tracks insertion positions, so cursor
+        # movement during insertion is handled correctly.
+        screen_off = False
         try:
             word.ScreenUpdating = False
-            word.Interactive = False
-            ui_locked = True
+            screen_off = True
         except Exception:
             pass
 
@@ -1539,24 +1601,38 @@ class TaskManager(QObject):
 
             print(f"[TaskManager] Successfully inserted result for task {td.task_id}")
         finally:
-            if ui_locked:
+            if screen_off:
+                restored = False
+                # Try the original word reference first with retries
                 try:
-                    word.Interactive = True
-                    word.ScreenUpdating = True
+                    _com_retry(lambda: setattr(word, 'ScreenUpdating', True),
+                               retries=5, delay=0.3, label="restore ScreenUpdating")
+                    restored = True
                 except Exception:
+                    pass
+                # Try a fresh COM connection with retries
+                if not restored:
                     try:
-                        fresh = win32com.client.GetActiveObject("Word.Application")
-                        fresh.Interactive = True
-                        fresh.ScreenUpdating = True
+                        _com_retry(
+                            lambda: setattr(
+                                win32com.client.GetActiveObject("Word.Application"),
+                                'ScreenUpdating', True),
+                            retries=3, delay=1.0, label="restore ScreenUpdating (fresh)")
+                        restored = True
                     except Exception:
-                        print("WARNING: Could not unlock Word UI")
+                        pass
+                # Last resort: schedule a background retry so we don't
+                # leave Word frozen if it's temporarily unresponsive.
+                if not restored:
+                    print("WARNING: Could not restore Word ScreenUpdating — "
+                          "scheduling background recovery")
+                    QTimer.singleShot(2000, _force_restore_screen_updating)
 
             # Bring Word to the foreground showing the correct document.
-            # After doc.Activate(), the document is active within Word but
-            # the window may be behind other apps if the user switched away.
             try:
                 if doc:
-                    doc.Activate()
+                    _com_retry(lambda: doc.Activate(),
+                               retries=3, delay=0.5, label="doc.Activate")
                 if word and HAS_WIN32:
                     import win32con
                     hwnd = getattr(word, 'hwnd', 0) or 0
@@ -2293,7 +2369,7 @@ class WordLLMPopup(QDialog):
         self._original_range_end = None  # Range end position
         self._original_has_selection = False  # Whether original capture had a selection
         self._redline_mode_active = False  # Whether current operation uses redline
-        self._word_ui_locked = False  # Whether Word UI is locked (Interactive=False)
+        self._word_ui_locked = False  # Whether Word ScreenUpdating is suppressed
 
         self.setWindowTitle("AI Assistant")
         self.setWindowFlags(
@@ -3816,9 +3892,9 @@ class WordLLMPopup(QDialog):
             else:
                 # Restore original document context before applying
                 # (handles case where user switched documents while LLM ran)
-                # NOTE: _restore_original_context() also locks Word UI
-                # (Interactive=False) to prevent cursor movement during
-                # insertion. We MUST unlock in the finally block below.
+                # NOTE: _restore_original_context() suppresses Word screen
+                # updating during insertion. We MUST restore it in the
+                # finally block below.
                 word = None
                 try:
                     word, selection = self._restore_original_context()
@@ -4142,9 +4218,9 @@ class WordLLMPopup(QDialog):
         correct document and location, even if the user switched documents
         or moved the cursor while the LLM was running.
 
-        IMPORTANT: This method locks Word's UI (Interactive=False) to prevent
-        the user from moving the cursor during insertion. The caller MUST
-        call _unlock_word_ui(word) in a finally block after insertion is done.
+        IMPORTANT: This method suppresses Word's screen updating. The caller
+        MUST call _unlock_word_ui(word) in a finally block after insertion
+        is done to restore screen updates.
 
         Returns:
             (word_app, selection) tuple
@@ -4190,18 +4266,15 @@ class WordLLMPopup(QDialog):
                 f"is no longer open"
             )
 
-        # Step 4: Lock Word UI BEFORE selecting the range.
-        # This prevents the user from moving the cursor between Select()
-        # and the subsequent TypeText() calls. COM cross-process calls pump
-        # Windows messages, so without this lock, user clicks/keystrokes
-        # processed during COM calls could move the cursor mid-insertion.
+        # Step 4: Suppress repainting during insertion for performance.
+        # NOTE: We intentionally do NOT set word.Interactive = False.
+        # See TaskManager._insert_result for rationale.
         try:
             word.ScreenUpdating = False
-            word.Interactive = False
             self._word_ui_locked = True
-            print("Locked Word UI for insertion")
+            print("Suppressed Word screen updating for insertion")
         except Exception as e:
-            print(f"Could not lock Word UI: {e}")
+            print(f"Could not suppress Word screen updating: {e}")
             self._word_ui_locked = False
 
         # Step 5: Restore the selection to the original range
@@ -4231,28 +4304,37 @@ class WordLLMPopup(QDialog):
         return word, selection
 
     def _unlock_word_ui(self, word):
-        """Re-enable Word UI after insertion is complete.
+        """Re-enable Word screen updating after insertion is complete.
 
         Must be called in a finally block after _restore_original_context().
         """
         if not getattr(self, '_word_ui_locked', False):
             return
+        restored = False
         try:
-            word.Interactive = True
-            word.ScreenUpdating = True
+            _com_retry(lambda: setattr(word, 'ScreenUpdating', True),
+                       retries=5, delay=0.3, label="unlock ScreenUpdating")
             self._word_ui_locked = False
-            print("Unlocked Word UI")
+            restored = True
+            print("Restored Word screen updating")
         except Exception as e:
-            print(f"Could not unlock Word UI: {e}")
-            # Last resort: try to get a fresh Word connection and unlock
+            print(f"Could not restore Word screen updating: {e}")
+        if not restored:
             try:
-                fresh_word = win32com.client.GetActiveObject("Word.Application")
-                fresh_word.Interactive = True
-                fresh_word.ScreenUpdating = True
+                _com_retry(
+                    lambda: setattr(
+                        win32com.client.GetActiveObject("Word.Application"),
+                        'ScreenUpdating', True),
+                    retries=3, delay=1.0, label="unlock ScreenUpdating (fresh)")
                 self._word_ui_locked = False
-                print("Unlocked Word UI via fresh connection")
+                restored = True
+                print("Restored Word screen updating via fresh connection")
             except Exception:
-                print("WARNING: Could not unlock Word UI - user may need to restart Word")
+                pass
+        if not restored:
+            print("WARNING: Could not restore Word ScreenUpdating — "
+                  "scheduling background recovery")
+            QTimer.singleShot(2000, _force_restore_screen_updating)
 
     def _capture_initial_document(self, fg_hwnd=None):
         """Capture the active document and selection at Win+V time.

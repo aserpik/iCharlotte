@@ -1,0 +1,990 @@
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QThread: Destroyed while thread '' is still running
+QWindowsWindow::setGeometry: Unable to set geometry 502x751+2987+311 (frame: 502x751+2987+311) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2422H". Resulting geometry: 502x759+2987+311 (frame: 502x759+2987+311) margins: 0, 0, 0, 0 minimum size: 450x751 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=751)))
+QWindowsWindow::setGeometry: Unable to set geometry 502x769+2987+311 (frame: 502x769+2987+311) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2422H". Resulting geometry: 502x777+2987+311 (frame: 502x777+2987+311) margins: 0, 0, 0, 0 minimum size: 450x769 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=769)))
+QWindowsWindow::setGeometry: Unable to set geometry 502x751+2844+311 (frame: 502x751+2844+311) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2422H". Resulting geometry: 502x759+2844+311 (frame: 502x759+2844+311) margins: 0, 0, 0, 0 minimum size: 450x751 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=751)))
+QWindowsWindow::setGeometry: Unable to set geometry 502x769+2844+311 (frame: 502x769+2844+311) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2422H". Resulting geometry: 502x777+2844+311 (frame: 502x777+2844+311) margins: 0, 0, 0, 0 minimum size: 450x769 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=769)))
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+[43832:44800:0302/095816.696:ERROR:device_event_log_impl.cc(202)] [09:58:10.409] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[43832:44800:0302/095816.926:ERROR:device_event_log_impl.cc(202)] [09:58:16.928] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[43832:44800:0302/095822.146:ERROR:device_event_log_impl.cc(202)] [09:58:22.148] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[43832:44800:0302/100841.753:ERROR:device_event_log_impl.cc(202)] [10:08:41.756] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[43832:44800:0302/101409.460:ERROR:device_event_log_impl.cc(202)] [10:14:09.461] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+[43832:44800:0302/101410.123:ERROR:device_event_log_impl.cc(202)] [10:14:10.122] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[43832:44800:0302/102644.215:ERROR:device_event_log_impl.cc(202)] [10:26:44.215] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[43832:44800:0302/102644.285:ERROR:device_event_log_impl.cc(202)] [10:26:44.285] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+[22564:6604:0302/122455.130:ERROR:device_event_log_impl.cc(202)] [12:24:55.090] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[22564:6604:0302/122455.564:ERROR:device_event_log_impl.cc(202)] [12:24:55.571] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[22564:6604:0302/122455.580:ERROR:device_event_log_impl.cc(202)] [12:24:55.588] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[22564:6604:0302/122457.849:ERROR:device_event_log_impl.cc(202)] [12:24:57.855] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[22564:6604:0302/122458.263:ERROR:device_event_log_impl.cc(202)] [12:24:58.264] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[22564:6604:0302/122458.796:ERROR:device_event_log_impl.cc(202)] [12:24:58.808] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[22564:6604:0302/122547.351:ERROR:device_event_log_impl.cc(202)] [12:25:47.352] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[22564:6604:0302/122547.465:ERROR:device_event_log_impl.cc(202)] [12:25:47.465] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QWindowsWindow::setGeometry: Unable to set geometry 500x751+1357+311 (frame: 500x751+1357+311) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (2)". Resulting geometry: 500x759+1357+311 (frame: 500x759+1357+311) margins: 0, 0, 0, 0 minimum size: 450x751 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=751)))
+QWindowsWindow::setGeometry: Unable to set geometry 500x769+1357+311 (frame: 500x769+1357+311) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (2)". Resulting geometry: 500x777+1357+311 (frame: 500x777+1357+311) margins: 0, 0, 0, 0 minimum size: 450x769 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=769)))
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QWindowsWindow::setGeometry: Unable to set geometry 500x751-1206+272 (frame: 500x751-1206+272) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425H". Resulting geometry: 500x759-1206+272 (frame: 500x759-1206+272) margins: 0, 0, 0, 0 minimum size: 450x751 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=751)))
+QWindowsWindow::setGeometry: Unable to set geometry 500x769-1206+272 (frame: 500x769-1206+272) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425H". Resulting geometry: 500x777-1206+272 (frame: 500x777-1206+272) margins: 0, 0, 0, 0 minimum size: 450x769 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=769)))
+QWindowsWindow::setGeometry: Unable to set geometry 500x751-1084+272 (frame: 500x751-1084+272) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425H". Resulting geometry: 500x759-1084+272 (frame: 500x759-1084+272) margins: 0, 0, 0, 0 minimum size: 450x751 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=751)))
+QWindowsWindow::setGeometry: Unable to set geometry 500x769-1084+272 (frame: 500x769-1084+272) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425H". Resulting geometry: 500x777-1084+272 (frame: 500x777-1084+272) margins: 0, 0, 0, 0 minimum size: 450x769 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=769)))
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte.py", line 2387, in process_checked_items
+    self.add_status_task(display_name, details, sys.executable, args, script_name=script_name, file_path=path)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte.py", line 2040, in add_status_task
+    running = sum(1 for r in self.agent_runners if r.success is None)
+  File "C:\geminiterminal2\icharlotte.py", line 2040, in <genexpr>
+    running = sum(1 for r in self.agent_runners if r.success is None)
+                                                   ^^^^^^^^^
+AttributeError: 'ReportPipelineWorker' object has no attribute 'success'
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte.py", line 2387, in process_checked_items
+    self.add_status_task(display_name, details, sys.executable, args, script_name=script_name, file_path=path)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte.py", line 2040, in add_status_task
+    running = sum(1 for r in self.agent_runners if r.success is None)
+  File "C:\geminiterminal2\icharlotte.py", line 2040, in <genexpr>
+    running = sum(1 for r in self.agent_runners if r.success is None)
+                                                   ^^^^^^^^^
+AttributeError: 'ReportPipelineWorker' object has no attribute 'success'
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte.py", line 2387, in process_checked_items
+    self.add_status_task(display_name, details, sys.executable, args, script_name=script_name, file_path=path)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\geminiterminal2\icharlotte.py", line 2040, in add_status_task
+    running = sum(1 for r in self.agent_runners if r.success is None)
+  File "C:\geminiterminal2\icharlotte.py", line 2040, in <genexpr>
+    running = sum(1 for r in self.agent_runners if r.success is None)
+                                                   ^^^^^^^^^
+AttributeError: 'ReportPipelineWorker' object has no attribute 'success'
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+[50204:38816:0305/145423.301:ERROR:device_event_log_impl.cc(202)] [14:54:23.246] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+[50204:38816:0305/145518.980:ERROR:device_event_log_impl.cc(202)] [14:55:18.980] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+[50204:38816:0305/145520.431:ERROR:device_event_log_impl.cc(202)] [14:55:20.432] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+[50204:38816:0305/145520.461:ERROR:device_event_log_impl.cc(202)] [14:55:20.461] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+[50204:38816:0305/145522.988:ERROR:device_event_log_impl.cc(202)] [14:55:22.981] Display: display_layout.cc:556 PlacementList must be sorted by first 8 bits of display_id
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte_core\word_hotkey.py", line 1115, in _process_insertion_queue
+    self._insert_result(td)
+    ~~~~~~~~~~~~~~~~~~~^^^^
+  File "C:\geminiterminal2\icharlotte_core\word_hotkey.py", line 1186, in _insert_result
+    raise Exception("No bookmark for range tracking")
+Exception: No bookmark for range tracking
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+844+280 (frame: 450x783+844+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (2)". Resulting geometry: 450x791+844+280 (frame: 450x791+844+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+844+280 (frame: 450x801+844+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (2)". Resulting geometry: 450x809+844+280 (frame: 450x809+844+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+1245+280 (frame: 450x783+1245+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (2)". Resulting geometry: 450x791+1245+280 (frame: 450x791+1245+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+1245+280 (frame: 450x801+1245+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (2)". Resulting geometry: 450x809+1245+280 (frame: 450x809+1245+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QWindowsWindow::setGeometry: Unable to set geometry 501x783+2747+405 (frame: 501x783+2747+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (1)". Resulting geometry: 501x791+2747+405 (frame: 501x791+2747+405) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 501x801+2747+405 (frame: 501x801+2747+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (1)". Resulting geometry: 501x809+2747+405 (frame: 501x809+2747+405) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QWindowsWindow::setGeometry: Unable to set geometry 501x783+2734+405 (frame: 501x783+2734+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (1)". Resulting geometry: 501x791+2734+405 (frame: 501x791+2734+405) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 501x801+2734+405 (frame: 501x801+2734+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (1)". Resulting geometry: 501x809+2734+405 (frame: 501x809+2734+405) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QWindowsWindow::setGeometry: Unable to set geometry 501x783+3070+405 (frame: 501x783+3070+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (1)". Resulting geometry: 501x791+3070+405 (frame: 501x791+3070+405) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 501x801+3070+405 (frame: 501x801+3070+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (1)". Resulting geometry: 501x809+3070+405 (frame: 501x809+3070+405) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QWindowsWindow::setGeometry: Unable to set geometry 501x783+683+280 (frame: 501x783+683+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (2)". Resulting geometry: 501x791+683+280 (frame: 501x791+683+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 501x801+683+280 (frame: 501x801+683+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (2)". Resulting geometry: 501x809+683+280 (frame: 501x809+683+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte_core\word_hotkey.py", line 1253, in _process_insertion_queue
+    self._insert_result(td)
+    ~~~~~~~~~~~~~~~~~~~^^^^
+  File "C:\geminiterminal2\icharlotte_core\word_hotkey.py", line 1363, in _insert_result
+    target_range = doc.Range(range_start, range_start)
+  File "C:\Users\ASERPI~1.DES\AppData\Local\Temp\gen_py\3.13\00020905-0000-0000-C000-000000000046x0x8x7\_Document.py", line 383, in Range
+    ret = self._oleobj_.InvokeTypes(2000, LCID, 1, (9, 0), ((16396, 17), (16396, 17)),Start
+    	, End)
+pywintypes.com_error: (-2147352567, 'Exception occurred.', (0, 'Microsoft Word', 'Value out of range', 'wdmain11.chm', 37376, -2146823680), None)
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QThread: Destroyed while thread '' is still running
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+981+280 (frame: 450x783+981+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+981+280 (frame: 450x791+981+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+981+280 (frame: 450x801+981+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+981+280 (frame: 450x809+981+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+773+280 (frame: 450x783+773+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+773+280 (frame: 450x791+773+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+773+280 (frame: 450x801+773+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+773+280 (frame: 450x809+773+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+952+280 (frame: 450x783+952+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+952+280 (frame: 450x791+952+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+952+280 (frame: 450x801+952+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+952+280 (frame: 450x809+952+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte.py", line 17, in <module>
+    from icharlotte_core.bridge import register_custom_schemes
+  File "C:\geminiterminal2\icharlotte_core\bridge.py", line 3, in <module>
+    from PySide6.QtCore import QIODevice
+ModuleNotFoundError: No module named 'PySide6.QtCore'
+QThread: Destroyed while thread '' is still running
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+960+280 (frame: 450x783+960+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+960+280 (frame: 450x791+960+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+960+280 (frame: 450x801+960+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+960+280 (frame: 450x809+960+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+952+280 (frame: 450x783+952+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+952+280 (frame: 450x791+952+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+952+280 (frame: 450x801+952+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+952+280 (frame: 450x809+952+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+977+280 (frame: 450x783+977+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+977+280 (frame: 450x791+977+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+977+280 (frame: 450x801+977+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+977+280 (frame: 450x809+977+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+937+280 (frame: 450x783+937+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+937+280 (frame: 450x791+937+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+937+280 (frame: 450x801+937+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+937+280 (frame: 450x809+937+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+554+280 (frame: 450x783+554+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+554+280 (frame: 450x791+554+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+554+280 (frame: 450x801+554+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+554+280 (frame: 450x809+554+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+980+280 (frame: 450x783+980+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+980+280 (frame: 450x791+980+280) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+980+280 (frame: 450x801+980+280) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+980+280 (frame: 450x809+980+280) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QWindowsWindow::setGeometry: Unable to set geometry 491x783+2815+405 (frame: 491x783+2815+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (1)". Resulting geometry: 491x791+2815+405 (frame: 491x791+2815+405) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 491x801+2815+405 (frame: 491x801+2815+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (1)". Resulting geometry: 491x809+2815+405 (frame: 491x809+2815+405) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+[DEBUG] refresh_data_inner START
+QWindowsWindow::setGeometry: Unable to set geometry 500x783+3127+405 (frame: 500x783+3127+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (1)". Resulting geometry: 500x791+3127+405 (frame: 500x791+3127+405) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QWindowsWindow::setGeometry: Unable to set geometry 500x783+2648+405 (frame: 500x783+2648+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (1)". Resulting geometry: 500x791+2648+405 (frame: 500x791+2648+405) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 500x801+2648+405 (frame: 500x801+2648+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (1)". Resulting geometry: 500x809+2648+405 (frame: 500x809+2648+405) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QWindowsWindow::setGeometry: Unable to set geometry 500x783+2746+405 (frame: 500x783+2746+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (1)". Resulting geometry: 500x791+2746+405 (frame: 500x791+2746+405) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+The cached device pixel ratio value was stale on window expose.  Please file a QTBUG which explains how to reproduce.
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+2632+405 (frame: 450x783+2632+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (1)". Resulting geometry: 450x791+2632+405 (frame: 450x791+2632+405) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+2632+405 (frame: 450x801+2632+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL S2721D (1)". Resulting geometry: 450x809+2632+405 (frame: 450x809+2632+405) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+QThread: Destroyed while thread '' is still running
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte.py", line 2909, in <module>
+    window = MainWindow(
+        file_number=args.file_number,
+        case_path=args.case_path,
+        initial_tab=args.tab
+    )
+  File "C:\geminiterminal2\icharlotte.py", line 425, in __init__
+    self.setup_ui()
+    ~~~~~~~~~~~~~^^
+  File "C:\geminiterminal2\icharlotte.py", line 581, in setup_ui
+    self.master_tab = MasterCaseTab(self)
+                      ~~~~~~~~~~~~~^^^^^^
+  File "C:\geminiterminal2\icharlotte_core\ui\master_case_tab.py", line 406, in __init__
+    self.setup_ui()
+    ~~~~~~~~~~~~~^^
+  File "C:\geminiterminal2\icharlotte_core\ui\master_case_tab.py", line 441, in setup_ui
+    self.docket_refresh_action.toggled.connect(self.toggle_docket_refresh)
+                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'MasterCaseTab' object has no attribute 'toggle_docket_refresh'
+Press Enter to exit...[DEBUG] refresh_data_inner START
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+QThread: Destroyed while thread '' is still running
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+[DEBUG] refresh_data_inner START
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+Traceback (most recent call last):
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\platform.py", line 330, in _wmi_query
+    data = _wmi.exec_query("SELECT {} FROM {}".format(
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ",".join(keys),
+        ^^^^^^^^^^^^^^^
+        table,
+        ^^^^^^
+    )).split("\0")
+    ^^
+OSError: [WinError -2147217358] Windows Error 0x80041032
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte.py", line 48, in <module>
+    # hang if another process already holds the hook chain.
+  File "C:\Users\ASerpik.DESKTOP-MRIMK0D\AppData\Local\Packages\PythonSoftwareFoundation.Python.3.13_qbz5n2kfra8p0\LocalCache\local-packages\Python313\site-packages\keyboard\__init__.py", line 121, in <module>
+    if _platform.system() == 'Windows':
+       ~~~~~~~~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\platform.py", line 1073, in system
+    return uname().system
+           ~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\platform.py", line 999, in uname
+    release, version, csd, ptype = win32_ver()
+                                   ~~~~~~~~~^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\platform.py", line 450, in win32_ver
+    version, csd, ptype, is_client = _win32_ver(version, csd, ptype)
+                                     ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\platform.py", line 391, in _win32_ver
+    (version, product_type, ptype, spmajor, spminor)  = _wmi_query(
+                                                        ~~~~~~~~~~^
+        'OS',
+        ^^^^^
+    ...<4 lines>...
+        'ServicePackMinorVersion',
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3312.0_x64__qbz5n2kfra8p0\Lib\platform.py", line 336, in _wmi_query
+    raise OSError("not supported")
+          ~~~~~~~^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+[DEBUG] refresh_data_inner START
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+Error calling Python override of QObject::eventFilter(): QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QWindowsWindow::setGeometry: Unable to set geometry 450x783-1157+241 (frame: 450x783-1157+241) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425H". Resulting geometry: 450x791-1157+241 (frame: 450x791-1157+241) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801-1157+241 (frame: 450x801-1157+241) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425H". Resulting geometry: 450x809-1157+241 (frame: 450x809-1157+241) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x783-1171+241 (frame: 450x783-1171+241) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425H". Resulting geometry: 450x791-1171+241 (frame: 450x791-1171+241) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801-1171+241 (frame: 450x801-1171+241) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425H". Resulting geometry: 450x809-1171+241 (frame: 450x809-1171+241) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY3:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+2654+405 (frame: 450x783+2654+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+2654+405 (frame: 450x791+2654+405) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+2654+405 (frame: 450x801+2654+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+2654+405 (frame: 450x809+2654+405) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+3103+405 (frame: 450x783+3103+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+3103+405 (frame: 450x791+3103+405) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+3103+405 (frame: 450x801+3103+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+3103+405 (frame: 450x809+3103+405) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+2692+405 (frame: 450x783+2692+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+2692+405 (frame: 450x791+2692+405) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+2692+405 (frame: 450x801+2692+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+2692+405 (frame: 450x809+2692+405) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+2780+405 (frame: 450x783+2780+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+2780+405 (frame: 450x791+2780+405) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+2780+405 (frame: 450x801+2780+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+2780+405 (frame: 450x809+2780+405) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+2738+405 (frame: 450x783+2738+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+2738+405 (frame: 450x791+2738+405) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+2738+405 (frame: 450x801+2738+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+2738+405 (frame: 450x809+2738+405) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+2801+405 (frame: 450x783+2801+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+2801+405 (frame: 450x791+2801+405) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+2801+405 (frame: 450x801+2801+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+2801+405 (frame: 450x809+2801+405) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+2749+405 (frame: 450x783+2749+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+2749+405 (frame: 450x791+2749+405) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+2749+405 (frame: 450x801+2749+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+2749+405 (frame: 450x809+2749+405) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+3179+405 (frame: 450x783+3179+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+3179+405 (frame: 450x791+3179+405) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+3179+405 (frame: 450x801+3179+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+3179+405 (frame: 450x809+3179+405) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x783+2698+405 (frame: 450x783+2698+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x791+2698+405 (frame: 450x791+2698+405) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 450x801+2698+405 (frame: 450x801+2698+405) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425HE". Resulting geometry: 450x809+2698+405 (frame: 450x809+2698+405) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QThread: Destroyed while thread '' is still running
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QThread: Destroyed while thread '' is still running
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QWindowsWindow::setGeometry: Unable to set geometry 503x783-797+102 (frame: 503x783-797+102) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425H". Resulting geometry: 503x791-797+102 (frame: 503x791-797+102) margins: 0, 0, 0, 0 minimum size: 450x783 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=783)))
+QWindowsWindow::setGeometry: Unable to set geometry 503x801-797+102 (frame: 503x801-797+102) on QWidgetWindow/"WordLLMPopupClassWindow" on "DELL P2425H". Resulting geometry: 503x809-797+102 (frame: 503x809-797+102) margins: 0, 0, 0, 0 minimum size: 450x801 MINMAXINFO(maxSize=POINT(x=0, y=0), maxpos=POINT(x=0, y=0), maxtrack=POINT(x=0, y=0), mintrack=POINT(x=450, y=801)))
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY1:" "Unknown error 0xe0000225."
+qt.qpa.screen: "Unable to open monitor interface to \\\\.\\DISPLAY2:" "Unknown error 0xe0000225."
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0
+QFont::setPointSize: Point size <= 0 (-1), must be greater than 0

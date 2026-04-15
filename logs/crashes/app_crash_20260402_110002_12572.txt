@@ -1,0 +1,60 @@
+======================================================================
+iCharlotte Application Crash Report
+======================================================================
+
+Crash Time: 2026-04-02T11:00:02.524715
+Uptime: 93993.3 seconds
+Source: main_thread
+
+----------------------------------------------------------------------
+EXCEPTION
+----------------------------------------------------------------------
+Type: KeyboardInterrupt
+Message: 
+
+Traceback:
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte_core\ui\zoom_handler.py", line 74, in eventFilter
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:  # noqa: N802
+    
+KeyboardInterrupt
+
+----------------------------------------------------------------------
+RECENT CHECKPOINTS
+----------------------------------------------------------------------
+  [2026-04-01T08:53:32.573669] Application starting
+  [2026-04-01T08:53:32.573718] Parsing command-line arguments
+  [2026-04-01T08:53:32.574400] Configuring Qt WebEngine
+  [2026-04-01T08:53:32.574464] Creating QApplication
+  [2026-04-01T08:53:32.684952] Creating MainWindow
+  [2026-04-01T08:53:32.693279] MainWindow.__init__ starting
+  [2026-04-01T08:53:32.785545] setup_ui starting - creating tabs
+  [2026-04-01T08:53:32.807181] Creating MasterCaseTab
+  [2026-04-01T08:53:34.324728] Creating ChatTab
+  [2026-04-01T08:53:34.591776] setup_ui complete - all tabs created
+  [2026-04-01T08:53:34.778402] Showing MainWindow
+  [2026-04-01T08:53:34.827605] Entering Qt event loop
+
+----------------------------------------------------------------------
+ADDITIONAL CONTEXT
+----------------------------------------------------------------------
+  startup_file_number: None
+  startup_case_path: None
+  startup_tab: None
+  current_file_number: None
+  current_case_path: None
+
+----------------------------------------------------------------------
+SYSTEM INFORMATION
+----------------------------------------------------------------------
+Python: 3.13.12
+Platform: Windows-11-10.0.26200
+PID: 12572
+
+----------------------------------------------------------------------
+QT STATE
+----------------------------------------------------------------------
+  app_name: python3
+  window_visible: True
+  window_size: 1335x706
+  file_number: 5800.063

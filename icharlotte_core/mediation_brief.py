@@ -181,6 +181,7 @@ FORMATTING RULES:
   DEPO_QUOTE_END
   (Smith Depo Trns., at p. 45:12.)
 - Clean deposition quotes of transcript artifacts (line numbers, extra characters) but keep the testimony verbatim. Do NOT remove dashes (--) from testimony — keep them as-is
+- CRITICAL — deposition quote source restriction: Deposition quotes may ONLY be drawn from actual deposition transcript documents — i.e., files containing verbatim court-reported Q&A with page and line numbers produced by a court reporter. You MUST NOT create, reconstruct, paraphrase, or extract deposition quotes from deposition summaries, deposition digests, deposition outlines, case summaries, medical records, expert reports, letters, emails, pleadings, or any other secondary or synthesized document — even if such a document describes what a witness said or contains page:line references. If no verbatim deposition transcript for a given witness is present in the source documents, do NOT include any deposition quote for that witness; discuss the witness's testimony in narrative form only, without the DEPO_QUOTE_START/END block. A document is a transcript only if it contains the raw, uninterrupted Q&A flow of a court-reported deposition; if in doubt, treat it as NOT a transcript and omit the quote.
 - Write in plain text. Do not use markdown formatting (no **, ##, etc.)
 """
 
@@ -580,14 +581,24 @@ FORMATTING RULES:
     def find_caption_template(self, folder: str) -> Optional[str]:
         """Search *folder* for a .docx file with "caption" in its name.
 
-        Returns the full path to the first match (case-insensitive), or None
-        if no matching file is found.
+        Prefers matches in the root of *folder*; falls back to a recursive
+        search of subfolders. Returns the full path to the first match
+        (case-insensitive), or None if no matching file is found.
         """
         if not os.path.isdir(folder):
             return None
-        for entry in os.listdir(folder):
-            if entry.lower().endswith(".docx") and "caption" in entry.lower():
-                return os.path.join(folder, entry)
+        try:
+            for entry in os.listdir(folder):
+                if entry.lower().endswith(".docx") and "caption" in entry.lower():
+                    return os.path.join(folder, entry)
+        except OSError:
+            pass
+        for dirpath, _, filenames in os.walk(folder):
+            if os.path.abspath(dirpath) == os.path.abspath(folder):
+                continue
+            for fname in filenames:
+                if fname.lower().endswith(".docx") and "caption" in fname.lower():
+                    return os.path.join(dirpath, fname)
         return None
 
     def prepare_caption_template(self, caption_path: str, output_path: str) -> list:

@@ -16,7 +16,8 @@ from PySide6.QtGui import QColor, QAction, QFont, QShortcut, QKeySequence
 from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.utils import log_event, get_case_path, BASE_PATH_WIN, parse_hearing_data
 from icharlotte_core.sent_items_monitor import SentItemsMonitorWorker
-from icharlotte_core.calendar import CalendarMonitorWorker
+from icharlotte_core.docket_refresh_worker import DocketRefreshWorker
+
 
 class CalendarDialog(QDialog):
     def __init__(self, parent=None, current_date=None):
@@ -399,17 +400,16 @@ class MasterCaseTab(QWidget):
         # Email monitor worker (initialized when started)
         self.email_monitor_worker = None
 
-        # Calendar monitor worker (initialized when started)
-        self.calendar_monitor_worker = None
+        # Docket refresh worker (auto-downloads new dockets when hearings pass)
+        self.docket_refresh_worker = None
 
         self.setup_ui()
         self.refresh_data()
 
         # Auto-start email monitor
         QTimer.singleShot(1000, self._auto_start_email_monitor)
-
-        # Auto-start calendar monitor (after email monitor)
-        QTimer.singleShot(2000, self._auto_start_calendar_monitor)
+        # Auto-start docket refresh worker (delayed to let app settle)
+        QTimer.singleShot(3000, self._auto_start_docket_refresh)
 
     def setup_ui(self):
         main_layout = QVBoxLayout(self)
@@ -429,48 +429,12 @@ class MasterCaseTab(QWidget):
         self.scan_btn.clicked.connect(self.start_scan)
         top_bar.addWidget(self.scan_btn)
 
-        self.clear_btn = QPushButton("Clear List")
-        self.clear_btn.setStyleSheet("color: red;")
-        self.clear_btn.clicked.connect(self.clear_list)
-        top_bar.addWidget(self.clear_btn)
-
-        # Email Monitor Toggle Button
-        self.email_monitor_btn = QPushButton("Start Email Monitor")
-        self.email_monitor_btn.setCheckable(True)
-        self.email_monitor_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #e8f5e9;
-                border: 1px solid #4caf50;
-                border-radius: 4px;
-                padding: 5px 10px;
-            }
-            QPushButton:checked {
-                background-color: #c8e6c9;
-                border: 2px solid #2e7d32;
-            }
-        """)
-        self.email_monitor_btn.clicked.connect(self.toggle_email_monitor)
-        top_bar.addWidget(self.email_monitor_btn)
-
-        # Calendar Monitor Toggle Button
-        self.calendar_monitor_btn = QPushButton("Start Calendar")
-        self.calendar_monitor_btn.setCheckable(True)
-        self.calendar_monitor_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #e3f2fd;
-                border: 1px solid #2196f3;
-                border-radius: 4px;
-                padding: 5px 10px;
-            }
-            QPushButton:checked {
-                background-color: #bbdefb;
-                border: 2px solid #1565c0;
-            }
-        """)
-        self.calendar_monitor_btn.clicked.connect(self.toggle_calendar_monitor)
-        top_bar.addWidget(self.calendar_monitor_btn)
-
         main_layout.addLayout(top_bar)
+
+        # email_monitor_action and docket_refresh_action are set by the main
+        # window after construction (they live in the global Settings menu).
+        self.email_monitor_action = None
+        self.docket_refresh_action = None
         
         # Progress Bar for scan
         self.scan_progress = QProgressBar()
@@ -869,20 +833,6 @@ class MasterCaseTab(QWidget):
         QMessageBox.information(self, "Scan Complete", "\n".join(msg))
         self.refresh_data()
 
-    def clear_list(self):
-        confirm = QMessageBox.question(
-            self, 
-            "Confirm Clear", 
-            "Are you sure you want to clear the entire case list? This will remove all cases from this view (but not your files).",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        
-        if confirm == QMessageBox.StandardButton.Yes:
-            self.db.clear_all_cases()
-            self.refresh_data()
-            self.details_widget.setEnabled(False)
-            self.case_title.setText("Select a Case")
-
     def refresh_data(self):
         try:
             self._refresh_data_inner()
@@ -892,8 +842,6 @@ class MasterCaseTab(QWidget):
             log_event(f"CRASH in refresh_data: {e}\n{traceback.format_exc()}", "error")
 
     def _refresh_data_inner(self):
-        import sys
-        print("[DEBUG] refresh_data_inner START", file=sys.stderr, flush=True)
         # Visual Feedback
         if hasattr(self, 'refresh_btn'):
             self.refresh_btn.setText("Refreshed!")
@@ -1405,8 +1353,7 @@ class MasterCaseTab(QWidget):
     def update_todo_color(self, tid, color):
         self.db.update_todo_color(tid, color)
         # Defer refresh — the emitting TodoItemWidget is still on the call stack;
-        # refresh_details() calls todo_list.clear() which destroys it, causing
-        # an access-violation segfault when execution returns to the widget.
+        # refresh_details() calls todo_list.clear() which destroys it mid-signal.
         QTimer.singleShot(0, self._deferred_color_refresh)
 
     def _deferred_color_refresh(self):
@@ -1419,11 +1366,15 @@ class MasterCaseTab(QWidget):
 
     def restore_selection(self):
         if hasattr(self, 'current_file_number'):
-             for i in range(self.table.rowCount()):
-                item = self.table.item(i, 0)
-                if item and item.data(Qt.ItemDataRole.UserRole) == self.current_file_number:
-                    self.table.selectRow(i)
-                    break
+            self.table.blockSignals(True)
+            try:
+                for i in range(self.table.rowCount()):
+                    item = self.table.item(i, 0)
+                    if item and item.data(Qt.ItemDataRole.UserRole) == self.current_file_number:
+                        self.table.selectRow(i)
+                        break
+            finally:
+                self.table.blockSignals(False)
 
     def save_case_summary_debounced(self):
         # We can reuse the existing save_timer or create a new one. 
@@ -1806,7 +1757,8 @@ class MasterCaseTab(QWidget):
 
     def _auto_start_email_monitor(self):
         """Auto-start the email monitor on app launch."""
-        self.email_monitor_btn.setChecked(True)
+        if self.email_monitor_action:
+            self.email_monitor_action.setChecked(True)
         self.start_email_monitor()
 
     def toggle_email_monitor(self, checked):
@@ -1829,7 +1781,8 @@ class MasterCaseTab(QWidget):
         self.email_monitor_worker.finished.connect(self.on_email_monitor_finished)
         self.email_monitor_worker.start()
 
-        self.email_monitor_btn.setText("Stop Email Monitor")
+        if self.email_monitor_action:
+            self.email_monitor_action.setText("Stop Email Monitor")
 
     def stop_email_monitor(self):
         """Stop the sent items monitor worker."""
@@ -1868,59 +1821,65 @@ class MasterCaseTab(QWidget):
 
     def on_email_monitor_finished(self):
         """Handle worker finished signal."""
-        self.email_monitor_btn.setChecked(False)
-        self.email_monitor_btn.setText("Start Email Monitor")
+        if self.email_monitor_action:
+            self.email_monitor_action.setChecked(False)
+            self.email_monitor_action.setText("Start Email Monitor")
         self.email_monitor_worker = None
 
-    # --- Calendar Monitor Methods ---
+    # --- Docket Refresh Methods ---
 
-    def _auto_start_calendar_monitor(self):
-        """Auto-start the calendar monitor on app launch."""
-        self.calendar_monitor_btn.setChecked(True)
-        self.start_calendar_monitor()
+    def _auto_start_docket_refresh(self):
+        """Auto-start docket refresh worker on app launch."""
+        if self.docket_refresh_action:
+            self.docket_refresh_action.setChecked(True)
+        self.start_docket_refresh()
 
-    def toggle_calendar_monitor(self, checked):
-        """Toggle the calendar monitor on/off."""
+    def toggle_docket_refresh(self, checked):
+        """Toggle the docket refresh worker on/off."""
         if checked:
-            self.start_calendar_monitor()
+            self.start_docket_refresh()
         else:
-            self.stop_calendar_monitor()
+            self.stop_docket_refresh()
 
-    def start_calendar_monitor(self):
-        """Start the calendar monitor worker."""
-        if self.calendar_monitor_worker is not None and self.calendar_monitor_worker.isRunning():
-            return  # Already running
-
-        self.calendar_monitor_worker = CalendarMonitorWorker()
-        self.calendar_monitor_worker.calendar_event_created.connect(self.on_calendar_event_created)
-        self.calendar_monitor_worker.error.connect(self.on_calendar_monitor_error)
-        self.calendar_monitor_worker.status.connect(self.on_calendar_monitor_status)
-        self.calendar_monitor_worker.finished.connect(self.on_calendar_monitor_finished)
-        self.calendar_monitor_worker.start()
-
-        self.calendar_monitor_btn.setText("Stop Calendar")
-
-    def stop_calendar_monitor(self):
-        """Stop the calendar monitor worker."""
-        if self.calendar_monitor_worker is None:
+    def start_docket_refresh(self):
+        """Start the docket refresh worker."""
+        if self.docket_refresh_worker is not None and self.docket_refresh_worker.isRunning():
             return
 
-        self.calendar_monitor_worker.request_stop()
+        self.docket_refresh_worker = DocketRefreshWorker(self.db)
+        self.docket_refresh_worker.docket_refreshed.connect(self.on_docket_refreshed)
+        self.docket_refresh_worker.error.connect(self.on_docket_refresh_error)
+        self.docket_refresh_worker.status.connect(self.on_docket_refresh_status)
+        self.docket_refresh_worker.finished.connect(self.on_docket_refresh_finished)
+        self.docket_refresh_worker.start()
 
-    def on_calendar_event_created(self, file_number, event_title):
-        """Handle calendar event created signal."""
-        pass  # Event logged in logs tab
+        if self.docket_refresh_action:
+            self.docket_refresh_action.setText("Stop Auto Docket Refresh")
 
-    def on_calendar_monitor_error(self, message):
-        """Handle error signal from calendar monitor."""
-        log_event(f"Calendar monitor error: {message}", "error")
+    def stop_docket_refresh(self):
+        """Stop the docket refresh worker."""
+        if self.docket_refresh_worker is None:
+            return
+        self.docket_refresh_worker.request_stop()
 
-    def on_calendar_monitor_status(self, message):
-        """Handle status signal from calendar monitor."""
-        pass  # Status logged in logs tab
+    def on_docket_refreshed(self, file_number):
+        """Handle docket refresh completed for a case — reload UI data."""
+        log_event(f"[DocketRefresh] UI notified: docket updated for {file_number}")
+        self.refresh_data()
+        if hasattr(self, 'current_file_number') and self.current_file_number == file_number:
+            self.refresh_details()
+            self.restore_selection()
 
-    def on_calendar_monitor_finished(self):
+    def on_docket_refresh_error(self, message):
+        log_event(f"Docket refresh error: {message}", "error")
+
+    def on_docket_refresh_status(self, message):
+        log_event(f"[DocketRefresh] {message}")
+
+    def on_docket_refresh_finished(self):
         """Handle worker finished signal."""
-        self.calendar_monitor_btn.setChecked(False)
-        self.calendar_monitor_btn.setText("Start Calendar")
-        self.calendar_monitor_worker = None
+        if self.docket_refresh_action:
+            self.docket_refresh_action.setChecked(False)
+            self.docket_refresh_action.setText("Auto Docket Refresh")
+        self.docket_refresh_worker = None
+

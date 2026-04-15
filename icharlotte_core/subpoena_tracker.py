@@ -23,7 +23,7 @@ import docx.opc.constants as opc_constants
 log = logging.getLogger(__name__)
 
 # --- Regex patterns ---
-ID_PATTERN = re.compile(r'(\d{3,7})[.\-](\d{1,4})')
+ID_PATTERN = re.compile(r'(\d{3,7})[.\-_ /](\d{1,4})')
 DATE_PATTERN = re.compile(r'(\d{4})[.\-](\d{2})[.\-](\d{2})')
 SEPARATOR_STRIP = re.compile(r'^[\s,_\-]+')
 CNR_PATTERN = re.compile(r'\bCNR\b', re.IGNORECASE)
@@ -67,8 +67,72 @@ _BOILERPLATE_PHRASES = re.compile(
 )
 
 
-def _extract_facility_from_pdf(pdf_path):
-    """Try to extract the facility/custodian name from the first page of a subpoena PDF.
+# Common abbreviation expansions for facility name normalization
+_FACILITY_ABBREVIATIONS = [
+    (re.compile(r'\bst\.?\b', re.IGNORECASE), 'saint'),
+    (re.compile(r'\bmt\.?\b', re.IGNORECASE), 'mount'),
+    (re.compile(r'\bdr\.?\b', re.IGNORECASE), 'doctor'),
+    (re.compile(r'\bhosp\.?\b', re.IGNORECASE), 'hospital'),
+    (re.compile(r'\bmed\.?\b', re.IGNORECASE), 'medical'),
+    (re.compile(r'\bctr\.?\b', re.IGNORECASE), 'center'),
+    (re.compile(r'\bcomm\.?\b', re.IGNORECASE), 'community'),
+    (re.compile(r'\bortho\.?\b', re.IGNORECASE), 'orthopedic'),
+    (re.compile(r'\bradiol\.?\b', re.IGNORECASE), 'radiology'),
+    (re.compile(r'\brehab\.?\b', re.IGNORECASE), 'rehabilitation'),
+    (re.compile(r'\bsurg\.?\b', re.IGNORECASE), 'surgical'),
+    (re.compile(r'\bassoc\.?\b', re.IGNORECASE), 'associates'),
+    (re.compile(r'\bgrp\.?\b', re.IGNORECASE), 'group'),
+    (re.compile(r'\bsvcs?\.?\b', re.IGNORECASE), 'services'),
+    (re.compile(r'\bdept\.?\b', re.IGNORECASE), 'department'),
+    (re.compile(r'\buniv\.?\b', re.IGNORECASE), 'university'),
+    (re.compile(r'\buc\b', re.IGNORECASE), 'university of california'),
+    (re.compile(r'\busc\b', re.IGNORECASE), 'university of southern california'),
+    (re.compile(r'\bucla\b', re.IGNORECASE), 'university of california los angeles'),
+    (re.compile(r'\binc\.?\b', re.IGNORECASE), ''),
+    (re.compile(r'\bllc\.?\b', re.IGNORECASE), ''),
+    (re.compile(r'\bcorp\.?\b', re.IGNORECASE), ''),
+    (re.compile(r'\bco\.?\b', re.IGNORECASE), ''),
+    (re.compile(r'\bp\.?c\.?\b', re.IGNORECASE), ''),
+    (re.compile(r'\bd/?b/?a\.?\b', re.IGNORECASE), ''),
+]
+
+
+def _normalize_facility(name):
+    """Normalize a facility name for fuzzy comparison.
+
+    Expands common medical/legal abbreviations (St.→Saint, Med.→Medical, etc.),
+    strips corporate suffixes (Inc., LLC), and removes punctuation.
+    """
+    name = name.lower().strip()
+    for pattern, replacement in _FACILITY_ABBREVIATIONS:
+        name = pattern.sub(replacement, name)
+    # Remove punctuation and collapse whitespace
+    name = re.sub(r'[,.\-\'\"()/]', ' ', name)
+    name = re.sub(r'\s+', ' ', name).strip()
+    return name
+
+
+def _facility_similarity(name_a, name_b):
+    """Compare two facility names after normalization. Returns 0.0–1.0.
+
+    Uses SequenceMatcher ratio with a boost for substring containment —
+    if one normalized name fully contains the other, the score is at least 0.80.
+    This handles cases like "Kaiser Permanente" vs "Kaiser Permanente Medical Center".
+    """
+    norm_a = _normalize_facility(name_a)
+    norm_b = _normalize_facility(name_b)
+    if not norm_a or not norm_b:
+        return 0.0
+    ratio = SequenceMatcher(None, norm_a, norm_b).ratio()
+    # Boost if one name contains the other (strong signal for partial names)
+    if len(norm_a) >= 4 and len(norm_b) >= 4:
+        if norm_a in norm_b or norm_b in norm_a:
+            ratio = max(ratio, 0.80)
+    return ratio
+
+
+def _extract_facility_from_text(text):
+    """Extract facility/custodian name from subpoena page text.
 
     Looks for patterns like:
       - "TO THE CUSTODIAN OF RECORDS OF <facility>"
@@ -77,16 +141,6 @@ def _extract_facility_from_pdf(pdf_path):
     Returns:
         Facility name string, or None if extraction fails.
     """
-    try:
-        doc = fitz.open(pdf_path)
-        if len(doc) == 0:
-            doc.close()
-            return None
-        text = doc[0].get_text()
-        doc.close()
-    except Exception:
-        return None
-
     if not text or len(text.strip()) < 20:
         return None
 
@@ -132,6 +186,53 @@ def _extract_facility_from_pdf(pdf_path):
     return facility
 
 
+def _extract_facility_from_pdf(pdf_path):
+    """Try to extract the facility/custodian name from a subpoena PDF.
+
+    Strategy:
+    1. Try native text extraction from page 1, then page 2
+    2. If no usable text, fall back to OCR (pytesseract) on page 1
+
+    Returns:
+        Facility name string, or None if extraction fails.
+    """
+    try:
+        doc = fitz.open(pdf_path)
+        if len(doc) == 0:
+            doc.close()
+            return None
+    except Exception:
+        return None
+
+    # --- Try native text extraction on first 2 pages ---
+    for page_idx in range(min(2, len(doc))):
+        text = doc[page_idx].get_text()
+        facility = _extract_facility_from_text(text)
+        if facility:
+            doc.close()
+            return facility
+
+    # --- OCR fallback: try pytesseract on page 1 ---
+    try:
+        import pytesseract
+        from PIL import Image
+        import io
+
+        page = doc[0]
+        pix = page.get_pixmap(dpi=300)
+        img = Image.open(io.BytesIO(pix.tobytes("png")))
+        ocr_text = pytesseract.image_to_string(img)
+        facility = _extract_facility_from_text(ocr_text)
+        if facility:
+            doc.close()
+            return facility
+    except Exception:
+        pass
+
+    doc.close()
+    return None
+
+
 def parse_subpoena_id(filename):
     """Parse a vendor-subpoena ID and remaining text from a filename.
 
@@ -170,7 +271,12 @@ def parse_subpoena_id(filename):
 
 
 def _find_folder_ci(base_path, *folder_names):
-    """Walk directory tree one level at a time, matching each folder name case-insensitively.
+    """Walk directory tree one level at a time, matching each folder name with fallbacks.
+
+    Matching priority per level:
+    1. Exact case-insensitive match
+    2. Substring containment (target in folder name, or folder name in target)
+    3. Fuzzy match via SequenceMatcher (>= 0.65 threshold)
 
     Args:
         base_path: Starting directory.
@@ -183,13 +289,36 @@ def _find_folder_ci(base_path, *folder_names):
     for target_name in folder_names:
         target_lower = target_name.lower()
         found = None
+        best_substring = None
+        best_fuzzy = (0.0, None)
+
         try:
             for entry in os.scandir(current):
-                if entry.is_dir() and entry.name.lower() == target_lower:
+                if not entry.is_dir():
+                    continue
+                name_lower = entry.name.lower()
+
+                # Priority 1: exact case-insensitive
+                if name_lower == target_lower:
                     found = entry.path
                     break
+
+                # Priority 2: substring containment (prefer shortest containing match)
+                if target_lower in name_lower or name_lower in target_lower:
+                    if best_substring is None or len(entry.name) < len(best_substring[1]):
+                        best_substring = (entry.path, entry.name)
+
+                # Priority 3: fuzzy
+                ratio = SequenceMatcher(None, target_lower, name_lower).ratio()
+                if ratio > best_fuzzy[0]:
+                    best_fuzzy = (ratio, entry.path)
         except OSError:
             return None
+
+        if found is None and best_substring is not None:
+            found = best_substring[0]
+        if found is None and best_fuzzy[0] >= 0.65:
+            found = best_fuzzy[1]
         if found is None:
             return None
         current = found
@@ -270,9 +399,18 @@ class SubpoenaTrackerWorker(QThread):
         # --- Phase 2b: Fill missing facility names from received records ---
         self._enrich_facilities_from_received(subpoenas, received)
 
+        # --- Phase 2c: Match unmatched received records by facility name ---
+        self.progress.emit("Matching received records by facility name...")
+        self._match_received_by_facility(subpoenas, received)
+
         # --- Phase 3: Scan medical chronologies ---
         self.progress.emit("Reading medical chronologies...")
         chronologies, pages_map, non_subpoena_records = self._scan_medical_chronologies()
+
+        # --- Phase 3b: Match non-subpoena chron entries by facility name ---
+        self.progress.emit("Matching chronology entries by facility name...")
+        self._match_chron_by_facility(subpoenas, chronologies, pages_map,
+                                      non_subpoena_records)
 
         # --- Phase 4: Generate report ---
         self.progress.emit("Generating report...")
@@ -519,6 +657,26 @@ class SubpoenaTrackerWorker(QThread):
     # ---------------------------------------------------------------
     # Phase 3
     # ---------------------------------------------------------------
+    def _find_med_summary_folder(self):
+        """Find the medical summary folder under RECORDS/, tolerating naming variations.
+
+        Handles: "Medical Summary – DO NOT PRODUCE", "Med. Summary - DO NOT PRODUCE",
+        and other abbreviation/dash variants.
+        """
+        records_folder = _find_folder_ci(self.case_path, "RECORDS")
+        if records_folder is None:
+            return None
+        try:
+            for entry in os.scandir(records_folder):
+                if not entry.is_dir():
+                    continue
+                name_lower = entry.name.lower()
+                if "summar" in name_lower and "do not" in name_lower:
+                    return entry.path
+        except OSError:
+            pass
+        return None
+
     def _scan_medical_chronologies(self):
         """Scan RECORDS/Medical Summary – DO NOT PRODUCE/ for chronology .docx files.
 
@@ -528,10 +686,7 @@ class SubpoenaTrackerWorker(QThread):
             - pages_map: {sid_or_filename: str} — page counts from RECORDS SUMMARIZED
             - non_subpoena_records: {filename: [{"date": str, "path": str}, ...]}
         """
-        # Try both dash types (regular hyphen and en-dash)
-        folder = _find_folder_ci(self.case_path, "RECORDS", "Medical Summary – DO NOT PRODUCE")
-        if folder is None:
-            folder = _find_folder_ci(self.case_path, "RECORDS", "Medical Summary - DO NOT PRODUCE")
+        folder = self._find_med_summary_folder()
         if folder is None:
             return {}, {}, {}
 
@@ -637,6 +792,94 @@ class SubpoenaTrackerWorker(QThread):
 
         self.warning.emit(f"No 2-column RECORDS SUMMARIZED table found in: {fname}")
         return []
+
+    # ---------------------------------------------------------------
+    # Phase 2c / 3b — Fuzzy facility matching
+    # ---------------------------------------------------------------
+    def _match_received_by_facility(self, subpoenas, received):
+        """Match received records to subpoenas by facility name when IDs don't match.
+
+        Copy services (JJ Photocopy, Gemini, COMPEX) assign their own numbering,
+        so the received record's ID won't match the subpoena's ID. This method
+        bridges them by comparing extracted facility names.
+
+        Modifies `received` in-place: matched entries are re-keyed under the
+        subpoena SID and the copy-service SID entry is removed.
+        """
+        unmatched_sids = [sid for sid in received if sid not in subpoenas]
+        if not unmatched_sids:
+            return
+
+        already_received = {sid for sid in received if sid in subpoenas}
+
+        for u_sid in unmatched_sids:
+            rec = received[u_sid]
+            rec_facility = self._extract_facility_from_received(
+                os.path.basename(rec["path"]))
+            if not rec_facility or rec_facility.lower().strip() in UNINFORMATIVE_FACILITY:
+                continue
+
+            best_sid, best_ratio = None, 0.0
+            for s_sid, s_data in subpoenas.items():
+                if s_sid in already_received:
+                    continue
+                ratio = _facility_similarity(rec_facility, s_data["facility"])
+                if ratio > best_ratio:
+                    best_ratio = ratio
+                    best_sid = s_sid
+
+            if best_ratio >= 0.70 and best_sid:
+                received[best_sid] = rec
+                already_received.add(best_sid)
+                del received[u_sid]
+                self.progress.emit(
+                    f"Matched received '{rec_facility}' → subpoena {best_sid} "
+                    f"(facility similarity {best_ratio:.0%})")
+
+    def _match_chron_by_facility(self, subpoenas, chronologies, pages_map,
+                                 non_subpoena_records):
+        """Match non-subpoena med chron entries to subpoenas by facility name.
+
+        RECORDS SUMMARIZED entries often lack subpoena IDs (e.g. "Kaiser
+        Permanente Medical Records.pdf"). This method compares facility names
+        to link them to the correct subpoena row.
+
+        Modifies `chronologies`, `pages_map`, and `non_subpoena_records` in-place.
+        """
+        matched_filenames = []
+
+        for filename, chron_list in list(non_subpoena_records.items()):
+            clean = _RECORD_SUFFIX.sub(
+                '', os.path.splitext(filename)[0]).strip()
+            if not clean or clean.lower() in UNINFORMATIVE_FACILITY:
+                continue
+
+            best_sid, best_ratio = None, 0.0
+            for sid, data in subpoenas.items():
+                ratio = _facility_similarity(clean, data["facility"])
+                if ratio > best_ratio:
+                    best_ratio = ratio
+                    best_sid = sid
+
+            if best_ratio >= 0.65 and best_sid:
+                # Merge chron entries under the subpoena SID
+                if best_sid not in chronologies:
+                    chronologies[best_sid] = []
+                for entry in chron_list:
+                    if not any(c["date"] == entry["date"]
+                              and c["path"] == entry["path"]
+                              for c in chronologies[best_sid]):
+                        chronologies[best_sid].append(entry)
+                # Merge page count
+                if filename in pages_map and best_sid not in pages_map:
+                    pages_map[best_sid] = pages_map[filename]
+                matched_filenames.append(filename)
+                self.progress.emit(
+                    f"Matched chron '{clean}' → subpoena {best_sid} "
+                    f"(facility similarity {best_ratio:.0%})")
+
+        for fn in matched_filenames:
+            del non_subpoena_records[fn]
 
     # ---------------------------------------------------------------
     # Phase 4
@@ -841,19 +1084,34 @@ class SubpoenaTrackerWorker(QThread):
           6900848-01_Deshawn Stampley_Healthpointe Medical Group, Inc Meds.pdf
           6900848-13 Bear Valley Community Hospital Meds CNR.pdf
           62195-0002_ ALL STATE INSURANCE COMPANY-2nd prod.pdf
+          6900848-01-John Doe-Kaiser Permanente Meds.pdf
         """
         basename = os.path.splitext(filename)[0]
-        # Pattern 1: ID_Client Name_Facility  or  ID_ Facility
+
+        # Pattern 1: Underscore-delimited — ID_Client_Facility or ID_Facility
         parts = basename.split('_')
         if len(parts) >= 3:
             facility = '_'.join(parts[2:]).strip()
         elif len(parts) == 2:
-            # ID_ Facility (no client name segment)
             facility = parts[1].strip()
         else:
-            # Pattern 2: ID Facility (after the first space-separated ID)
+            # Pattern 2: Get remainder after subpoena ID, then try delimiters
             _, remainder = parse_subpoena_id(basename)
-            facility = remainder.strip() if remainder else basename
+            if remainder:
+                # Try " - " (space-dash-space) to separate client from facility
+                dash_parts = remainder.split(' - ')
+                if len(dash_parts) >= 2:
+                    facility = ' - '.join(dash_parts[1:]).strip()
+                else:
+                    # Try standalone dash between name segments (at least 3 chars each side)
+                    dash_match = re.match(
+                        r'([A-Za-z].{2,}?)\s*-\s*([A-Z].{2,})', remainder)
+                    if dash_match:
+                        facility = dash_match.group(2).strip()
+                    else:
+                        facility = remainder.strip()
+            else:
+                facility = basename
 
         # Strip common record-type suffixes (medical, billing, CNR, etc.)
         facility = _RECORD_SUFFIX.sub('', facility).strip()

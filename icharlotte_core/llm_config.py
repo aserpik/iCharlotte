@@ -62,9 +62,6 @@ AGENT_DEFINITIONS = [
     ("agent_med_rec", "Medical Records", "Medical record processing", "extraction"),
     ("agent_med_chron", "Medical Chronology", "Medical chronology generation", "extraction"),
     ("agent_organize", "Organize", "Document organization and categorization", "quick"),
-    ("agent_timeline", "Timeline", "Date and event extraction for timelines", "extraction"),
-    ("agent_contradict", "Contradictions", "Detect factual contradictions across documents", "cross_check"),
-
     # Case Agents
     ("agent_docket", "Docket", "Docket download and processing", "extraction"),
     ("agent_complaint", "Complaint", "Complaint document analysis", "extraction"),

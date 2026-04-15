@@ -1,0 +1,71 @@
+======================================================================
+iCharlotte Application Crash Report
+======================================================================
+
+Crash Time: 2026-03-30T16:59:29.287443
+Uptime: 1894.6 seconds
+Source: main_thread
+
+----------------------------------------------------------------------
+EXCEPTION
+----------------------------------------------------------------------
+Type: TypeError
+Message: 'PySide6.QtWidgets.QAbstractButton.setChecked' called with wrong argument types:
+  PySide6.QtWidgets.QAbstractButton.setChecked(str)
+Supported signatures:
+  PySide6.QtWidgets.QAbstractButton.setChecked(arg__1: bool, /)
+
+Traceback:
+Traceback (most recent call last):
+  File "C:\geminiterminal2\icharlotte_core\ui\discovery_tab.py", line 488, in _on_party_context_menu
+    self._edit_party(idx)
+    ~~~~~~~~~~~~~~~~^^^^^
+  File "C:\geminiterminal2\icharlotte_core\ui\discovery_tab.py", line 494, in _edit_party
+    dlg = PartyEditDialog(self, party)
+  File "C:\geminiterminal2\icharlotte_core\ui\discovery_tab.py", line 103, in __init__
+    self.our_client_cb.setChecked(party.is_our_client)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+TypeError: 'PySide6.QtWidgets.QAbstractButton.setChecked' called with wrong argument types:
+  PySide6.QtWidgets.QAbstractButton.setChecked(str)
+Supported signatures:
+  PySide6.QtWidgets.QAbstractButton.setChecked(arg__1: bool, /)
+
+----------------------------------------------------------------------
+RECENT CHECKPOINTS
+----------------------------------------------------------------------
+  [2026-03-30T16:28:06.951038] Application starting
+  [2026-03-30T16:28:06.951209] Parsing command-line arguments
+  [2026-03-30T16:28:06.953478] Configuring Qt WebEngine
+  [2026-03-30T16:28:06.953666] Creating QApplication
+  [2026-03-30T16:28:07.358607] Creating MainWindow
+  [2026-03-30T16:28:07.455277] MainWindow.__init__ starting
+  [2026-03-30T16:28:07.959572] setup_ui starting - creating tabs
+  [2026-03-30T16:28:08.053797] Creating MasterCaseTab
+  [2026-03-30T16:28:14.767652] Creating ChatTab
+  [2026-03-30T16:28:15.342630] setup_ui complete - all tabs created
+  [2026-03-30T16:28:15.749484] Showing MainWindow
+  [2026-03-30T16:28:15.929716] Entering Qt event loop
+
+----------------------------------------------------------------------
+ADDITIONAL CONTEXT
+----------------------------------------------------------------------
+  startup_file_number: None
+  startup_case_path: None
+  startup_tab: None
+  current_file_number: None
+  current_case_path: None
+
+----------------------------------------------------------------------
+SYSTEM INFORMATION
+----------------------------------------------------------------------
+Python: 3.13.12
+Platform: Windows-11-10.0.26200
+PID: 23024
+
+----------------------------------------------------------------------
+QT STATE
+----------------------------------------------------------------------
+  app_name: python3
+  window_visible: True
+  window_size: 1920x1009
+  file_number: 5800.052

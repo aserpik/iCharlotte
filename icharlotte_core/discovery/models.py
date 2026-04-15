@@ -236,7 +236,7 @@ class Party:
         return cls(
             name=data["name"],
             role=PartyRole(data["role"]),
-            is_our_client=data.get('is_our_client', False),
+            is_our_client=bool(data.get('is_our_client', False)),
             abbreviation=data.get('abbreviation', ''),
         )
 

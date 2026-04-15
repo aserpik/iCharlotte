@@ -1,0 +1,185 @@
+<h2>Discovery Tab — Propound Layout</h2>
+<p class="subtitle">Left pane: configuration & generation controls. Right pane: document editor with sub-tabs.</p>
+
+<div class="mockup" style="margin-top: 24px;">
+  <div class="mockup-header">Discovery Tab → Propound Sub-Tab</div>
+  <div class="mockup-body" style="padding: 0; display: flex; min-height: 600px; font-size: 13px;">
+
+    <!-- LEFT PANE -->
+    <div style="width: 320px; min-width: 320px; border-right: 2px solid #444; padding: 16px; display: flex; flex-direction: column; gap: 12px; background: #1a1a2e;">
+
+      <!-- Discovery Mode -->
+      <div>
+        <div style="font-size: 11px; text-transform: uppercase; color: #888; margin-bottom: 6px; letter-spacing: 0.5px;">Discovery Mode</div>
+        <div style="background: #252540; border-radius: 6px; padding: 8px 12px; border: 1px solid #333;">
+          <label style="display: block; padding: 3px 0; color: #ccc; cursor: pointer;">
+            <input type="radio" name="mode" checked style="margin-right: 8px;">Initial — Standard
+          </label>
+          <label style="display: block; padding: 3px 0; color: #ccc; cursor: pointer;">
+            <input type="radio" name="mode" style="margin-right: 8px;">Initial — Custom
+          </label>
+          <label style="display: block; padding: 3px 0; color: #ccc; cursor: pointer;">
+            <input type="radio" name="mode" style="margin-right: 8px;">Additional Discovery
+          </label>
+        </div>
+      </div>
+
+      <!-- Standard Type (conditional) -->
+      <div>
+        <div style="font-size: 11px; text-transform: uppercase; color: #888; margin-bottom: 6px; letter-spacing: 0.5px;">Standard Type</div>
+        <select style="width: 100%; padding: 8px; background: #252540; border: 1px solid #333; color: #ccc; border-radius: 6px;">
+          <option>Standard Negligence</option>
+          <option disabled style="color: #555;">Standard Wrongful Death (coming soon)</option>
+        </select>
+      </div>
+
+      <!-- Discovery Types -->
+      <div>
+        <div style="font-size: 11px; text-transform: uppercase; color: #888; margin-bottom: 6px; letter-spacing: 0.5px;">Discovery Types</div>
+        <div style="background: #252540; border-radius: 6px; padding: 8px 12px; border: 1px solid #333; display: flex; gap: 16px; flex-wrap: wrap;">
+          <label style="color: #ccc; cursor: pointer;">
+            <input type="checkbox" checked style="margin-right: 4px;">SI
+          </label>
+          <label style="color: #ccc; cursor: pointer;">
+            <input type="checkbox" checked style="margin-right: 4px;">RPD
+          </label>
+          <label style="color: #ccc; cursor: pointer;">
+            <input type="checkbox" style="margin-right: 4px;">RFA
+          </label>
+        </div>
+      </div>
+
+      <!-- Directed To -->
+      <div>
+        <div style="font-size: 11px; text-transform: uppercase; color: #888; margin-bottom: 6px; letter-spacing: 0.5px;">Directed To</div>
+        <select style="width: 100%; padding: 8px; background: #252540; border: 1px solid #333; color: #ccc; border-radius: 6px;">
+          <option>Plaintiff — Ruxandra Raschkovsky</option>
+          <option>Defendant — City of Los Angeles</option>
+        </select>
+      </div>
+
+      <!-- Party Roster -->
+      <div>
+        <div style="font-size: 11px; text-transform: uppercase; color: #888; margin-bottom: 6px; letter-spacing: 0.5px;">Party Roster
+          <span style="float: right; color: #6c8cff; cursor: pointer; font-size: 11px; text-transform: none;">+ Add Party</span>
+        </div>
+        <div style="background: #252540; border-radius: 6px; border: 1px solid #333; max-height: 100px; overflow-y: auto;">
+          <div style="padding: 6px 12px; border-bottom: 1px solid #333; color: #ccc; display: flex; justify-content: space-between; align-items: center;">
+            <span><span style="color: #888; font-size: 11px;">PLF</span> Ruxandra Raschkovsky</span>
+            <span style="color: #555; cursor: pointer; font-size: 11px;">edit</span>
+          </div>
+          <div style="padding: 6px 12px; border-bottom: 1px solid #333; color: #ccc; display: flex; justify-content: space-between; align-items: center;">
+            <span><span style="color: #888; font-size: 11px;">DEF</span> City of Los Angeles</span>
+            <span style="color: #555; cursor: pointer; font-size: 11px;">edit</span>
+          </div>
+          <div style="padding: 6px 12px; color: #ccc; display: flex; justify-content: space-between; align-items: center;">
+            <span><span style="color: #888; font-size: 11px;">DEF</span> Servitek Electric, Inc.</span>
+            <span style="color: #6c8cff; font-size: 11px;">our client</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Document Box -->
+      <div style="flex: 0 0 auto;">
+        <div style="font-size: 11px; text-transform: uppercase; color: #888; margin-bottom: 6px; letter-spacing: 0.5px;">Context Documents</div>
+        <div style="background: #252540; border: 2px dashed #444; border-radius: 6px; padding: 16px; text-align: center; color: #666; min-height: 60px;">
+          <div style="font-size: 12px;">Drop files here or click to browse</div>
+          <div style="font-size: 11px; margin-top: 4px; color: #555;">PDF, DOCX, TXT, MSG</div>
+        </div>
+      </div>
+
+      <!-- LLM Provider / Model -->
+      <div style="display: flex; gap: 8px;">
+        <div style="flex: 1;">
+          <div style="font-size: 11px; text-transform: uppercase; color: #888; margin-bottom: 6px; letter-spacing: 0.5px;">Provider</div>
+          <select style="width: 100%; padding: 6px; background: #252540; border: 1px solid #333; color: #ccc; border-radius: 6px; font-size: 12px;">
+            <option>Gemini</option>
+            <option>Claude</option>
+            <option>OpenAI</option>
+          </select>
+        </div>
+        <div style="flex: 1.5;">
+          <div style="font-size: 11px; text-transform: uppercase; color: #888; margin-bottom: 6px; letter-spacing: 0.5px;">Model</div>
+          <select style="width: 100%; padding: 6px; background: #252540; border: 1px solid #333; color: #ccc; border-radius: 6px; font-size: 12px;">
+            <option>gemini-2.5-pro</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Spacer -->
+      <div style="flex: 1;"></div>
+
+      <!-- Prompt Input -->
+      <div>
+        <div style="font-size: 11px; text-transform: uppercase; color: #888; margin-bottom: 6px; letter-spacing: 0.5px;">Instructions / Prompt</div>
+        <textarea style="width: 100%; min-height: 80px; background: #252540; border: 1px solid #333; color: #ccc; border-radius: 6px; padding: 8px; resize: vertical; font-family: inherit; font-size: 12px; box-sizing: border-box;" placeholder="Describe what discovery requests to generate..."></textarea>
+      </div>
+
+      <!-- Generate Button -->
+      <button style="width: 100%; padding: 10px; background: #4a6cf7; color: white; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: 600;">
+        Generate Discovery
+      </button>
+    </div>
+
+    <!-- RIGHT PANE -->
+    <div style="flex: 1; display: flex; flex-direction: column; background: #16162a;">
+
+      <!-- Sub-tab bar -->
+      <div style="display: flex; border-bottom: 2px solid #333; background: #1a1a2e;">
+        <div style="padding: 10px 20px; background: #16162a; color: #ccc; border-bottom: 2px solid #4a6cf7; font-size: 13px; cursor: pointer;">
+          SI(1) tPltf
+        </div>
+        <div style="padding: 10px 20px; color: #666; font-size: 13px; cursor: pointer;">
+          RPD(1) tPltf
+        </div>
+        <div style="padding: 10px 20px; color: #666; font-size: 13px; cursor: pointer;">
+          RFA(1) tPltf
+        </div>
+      </div>
+
+      <!-- Toolbar -->
+      <div style="display: flex; gap: 8px; padding: 8px 16px; border-bottom: 1px solid #333; background: #1a1a2e; align-items: center;">
+        <button style="padding: 5px 12px; background: #252540; border: 1px solid #333; color: #ccc; border-radius: 4px; font-size: 12px; cursor: pointer;">Save as .docx</button>
+        <button style="padding: 5px 12px; background: #252540; border: 1px solid #333; color: #ccc; border-radius: 4px; font-size: 12px; cursor: pointer;">Save All</button>
+        <div style="flex: 1;"></div>
+        <span style="color: #555; font-size: 11px;">63 interrogatories | Set One | to Plaintiff</span>
+      </div>
+
+      <!-- Editor area -->
+      <div style="flex: 1; padding: 16px; overflow-y: auto; font-family: 'Consolas', 'Courier New', monospace; font-size: 12px; color: #ccc; line-height: 1.6;">
+        <div style="color: #888; margin-bottom: 8px;">SPECIAL INTERROGATORIES, SET ONE</div>
+        <div style="margin-bottom: 16px;">
+          <div style="color: #6c8cff; font-weight: bold;">SPECIAL INTERROGATORY NO. 1:</div>
+          <div style="margin-top: 4px;">If YOU contend that DEFENDANT'S negligence caused the INCIDENT, please state all facts which support YOUR contention.</div>
+        </div>
+        <div style="margin-bottom: 16px;">
+          <div style="color: #6c8cff; font-weight: bold;">SPECIAL INTERROGATORY NO. 2:</div>
+          <div style="margin-top: 4px;">Please IDENTIFY all PERSONS that can support YOUR contention that the INCIDENT was caused by DEFENDANT'S negligence.</div>
+        </div>
+        <div style="margin-bottom: 16px;">
+          <div style="color: #6c8cff; font-weight: bold;">SPECIAL INTERROGATORY NO. 3:</div>
+          <div style="margin-top: 4px;">Please IDENTIFY all DOCUMENTS that can support YOUR claim that the INCIDENT was caused by DEFENDANT'S negligence.</div>
+        </div>
+        <div style="margin-bottom: 16px;">
+          <div style="color: #6c8cff; font-weight: bold;">SPECIAL INTERROGATORY NO. 4:</div>
+          <div style="margin-top: 4px; color: #888;">If YOU contend that any party other than DEFENDANT's negligence caused the INCIDENT, please state all facts which support YOUR contention.</div>
+        </div>
+        <div style="color: #555; text-align: center; margin-top: 24px;">· · ·  (59 more interrogatories)  · · ·</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div style="margin-top: 24px; padding: 16px; background: rgba(74, 108, 247, 0.1); border-radius: 8px; border: 1px solid rgba(74, 108, 247, 0.3);">
+  <h3 style="margin: 0 0 8px 0; color: #6c8cff;">Key Layout Decisions</h3>
+  <ul style="margin: 0; padding-left: 20px; color: #aaa; line-height: 1.8;">
+    <li><strong>QSplitter</strong> divides left/right panes (resizable)</li>
+    <li><strong>Left pane</strong> scrolls independently if content overflows</li>
+    <li><strong>"Standard Type"</strong> dropdown hides when mode is Custom or Additional</li>
+    <li><strong>"Instructions" box</strong> is optional for Standard mode, required for Custom/Additional</li>
+    <li><strong>Party roster</strong> edits sync back to case variables (plaintiffs/defendants)</li>
+    <li><strong>Document box</strong> reuses ChatTab's drag-and-drop pattern</li>
+    <li><strong>Status bar</strong> in right pane shows request count, set number, and target party</li>
+  </ul>
+</div>

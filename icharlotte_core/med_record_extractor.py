@@ -147,11 +147,30 @@ def _lookup_file(file_index: dict, filename: str) -> Optional[str]:
 
 def _find_most_recent_med_chron(case_path: str) -> Optional[str]:
     """Find the most recent medical chronology .docx in the Medical Summary folder."""
-    folder = _find_folder_ci(case_path, "RECORDS", "Medical Summary – DO NOT PRODUCE")
-    if folder is None:
-        folder = _find_folder_ci(case_path, "RECORDS", "Medical Summary - DO NOT PRODUCE")
-    if folder is None:
-        folder = _find_folder_ci(case_path, "RECORDS", "MEDICAL SUMMARY - DO NOT PRODUCE")
+    # Try exact names first, then fall back to pattern match
+    for name in (
+        "Medical Summary – DO NOT PRODUCE",
+        "Medical Summary - DO NOT PRODUCE",
+        "Med. Summary - DO NOT PRODUCE",
+        "MEDICAL SUMMARY - DO NOT PRODUCE",
+    ):
+        folder = _find_folder_ci(case_path, "RECORDS", name)
+        if folder is not None:
+            break
+    else:
+        # Fallback: scan RECORDS for any subfolder containing "med" and "summary"
+        records = _find_folder_ci(case_path, "RECORDS")
+        if records:
+            for entry in os.scandir(records):
+                if entry.is_dir():
+                    low = entry.name.lower()
+                    if "med" in low and "summ" in low:
+                        folder = entry.path
+                        break
+            else:
+                folder = None
+        else:
+            folder = None
     if folder is None:
         return None
 
