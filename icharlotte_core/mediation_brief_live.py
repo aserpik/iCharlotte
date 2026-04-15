@@ -13,7 +13,6 @@ a separate task.
 from __future__ import annotations
 
 import logging
-import re
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -42,7 +41,12 @@ class LiveSection:
         start_para_index: 1-based index of the first body paragraph in
             ``doc.Paragraphs``.
         end_para_index: 1-based index of the last body paragraph in
-            ``doc.Paragraphs``.
+            ``doc.Paragraphs``.  For sections with no body paragraphs
+            (a heading immediately followed by the next heading),
+            ``end_para_index`` will be LESS than ``start_para_index`` —
+            callers can use ``end_para_index < start_para_index`` as the
+            empty-body signal.  The range helper in Task 3 relies on this
+            contract.
     """
 
     name: str

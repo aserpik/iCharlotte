@@ -202,6 +202,29 @@ class TestParseBriefFromWordDoc(unittest.TestCase):
         self.assertEqual(intro.start_para_index, 2)
         self.assertEqual(intro.end_para_index, 3)
 
+    def test_empty_section_body_yields_end_less_than_start(self):
+        """A heading immediately followed by the next heading is a valid
+        empty-body section. The contract is: end_para_index < start_para_index.
+        Task 3's get_word_range_for_section uses this as the empty-body signal.
+        """
+        doc = make_doc(
+            "I.   INTRODUCTION",
+            "II.  STATEMENT OF FACTS",
+            "Facts body.",
+            "IV.  LIABILITY",
+            "Liability body.",
+        )
+        live = parse_brief_from_word_doc(doc)
+        intro = live.sections["introduction"]
+        self.assertEqual(intro.text, "")
+        # Introduction heading is at para 1; no body follows.
+        # start_para_index should be 2 (the would-be first body paragraph)
+        # and end_para_index should stay at 1 (the heading itself).
+        self.assertEqual(intro.start_para_index, 2)
+        self.assertEqual(intro.end_para_index, 1)
+        # And the empty-body signal:
+        self.assertLess(intro.end_para_index, intro.start_para_index)
+
 
 if __name__ == "__main__":
     unittest.main()
