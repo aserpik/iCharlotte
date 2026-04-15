@@ -19,7 +19,7 @@ import threading
 import logging
 import uuid
 from dataclasses import dataclass, field
-from typing import Optional, Callable, Dict, Any
+from typing import Optional, Callable, Dict, List, Any
 
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QComboBox,
@@ -3761,6 +3761,71 @@ class WordLLMPopup(QDialog):
             pass
         self._prep_id = None
 
+    def _handle_mb_add_quotes(self) -> bool:
+        """Dispatch for "Mediation Brief: Add Quotes".
+
+        Opens the WordQuoteInsertionDialog modally. On acceptance, inserts
+        the selected quotes into the live Word document at the cursor
+        position via insert_formatted_quotes_at_range. Returns True to
+        indicate the caller should stop processing regardless of outcome.
+        """
+        from icharlotte_core.mediation_brief_live import (
+            insert_formatted_quotes_at_range,
+        )
+        from icharlotte_core.ui.quote_dialog_word import WordQuoteInsertionDialog
+
+        doc = self._original_document
+        if doc is None:
+            QMessageBox.warning(
+                self, "Word Not Found",
+                "No active Word document — please open the brief first."
+            )
+            self._clear_preparing_row()
+            return True
+
+        # Capture the current cursor/selection range for later insertion.
+        try:
+            sel = doc.Application.Selection
+            range_start = int(sel.Range.Start)
+            range_end = int(sel.Range.End)
+        except Exception as e:
+            QMessageBox.warning(
+                self, "Cursor not found",
+                f"Could not read current Word cursor position: {e}"
+            )
+            self._clear_preparing_row()
+            return True
+
+        # Clear the preparing row; we're not submitting an LLM task.
+        self._clear_preparing_row()
+
+        dialog = WordQuoteInsertionDialog(parent=self)
+        inserted_quotes: List[Dict] = []
+
+        def _on_quotes_to_insert(quotes):
+            inserted_quotes.extend(quotes)
+
+        dialog.quotes_to_insert.connect(_on_quotes_to_insert)
+        result = dialog.exec()
+
+        if result != QDialog.DialogCode.Accepted or not inserted_quotes:
+            self.close()
+            return True
+
+        # Splice the quotes into the Word doc at the captured range.
+        try:
+            target_range = doc.Range(range_start, range_end)
+            insert_formatted_quotes_at_range(doc, target_range, inserted_quotes)
+            print(f"[WordLLMPopup] Inserted {len(inserted_quotes)} depo quote(s)")
+        except Exception as e:
+            QMessageBox.warning(
+                self, "Insertion failed",
+                f"Failed to insert quotes into Word: {e}"
+            )
+
+        self.close()
+        return True
+
     def _do_execute(self, prompt: str):
         """Actually execute the LLM call - dispatch to Word or Outlook handler."""
         try:
@@ -3778,6 +3843,10 @@ class WordLLMPopup(QDialog):
                 print("[DEBUG] _do_execute: MB Refine branch")
                 if not self._handle_mb_refine(prompt):
                     return
+                return
+            if combo_data == MB_ADD_QUOTES_SENTINEL:
+                print("[DEBUG] _do_execute: MB Add Quotes branch")
+                self._handle_mb_add_quotes()
                 return
 
             # Default: Word context
