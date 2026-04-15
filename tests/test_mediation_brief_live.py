@@ -292,5 +292,131 @@ class TestGetWordRangeForSection(unittest.TestCase):
         self.assertEqual(end_char, heading_end)
 
 
+class TestInsertFormattedQuotesAtRange(unittest.TestCase):
+    def _quote(self, deponent, qa, page_line):
+        return {
+            "deponent": deponent,
+            "source": f"{deponent}.pdf",
+            "page_line": page_line,
+            "relevance": "test",
+            "qa_text": qa,
+        }
+
+    def test_builds_temp_docx_and_calls_insertfile(self):
+        from icharlotte_core.mediation_brief_live import (
+            insert_formatted_quotes_at_range,
+        )
+
+        insert_calls = []
+
+        class FakeRange:
+            def InsertFile(self, FileName, **kwargs):
+                insert_calls.append(FileName)
+                # Confirm file actually exists at call time — after the call
+                # returns the helper deletes it.
+                import os
+                assert os.path.isfile(FileName), f"temp file missing: {FileName}"
+
+        quotes = [
+            self._quote("Smith", "Q. Did you see the light?\nA. Yes.", "45:12"),
+            self._quote("Jones", "Q. Were you paying attention?\nA. No.", "12:3"),
+        ]
+        insert_formatted_quotes_at_range(doc_com=object(), range_com=FakeRange(), quotes=quotes)
+
+        self.assertEqual(len(insert_calls), 1)
+
+    def test_temp_docx_contains_all_quotes_with_citations(self):
+        import os
+        import tempfile
+        from docx import Document as DocxDocument
+        from icharlotte_core.mediation_brief_live import (
+            insert_formatted_quotes_at_range,
+        )
+
+        captured_path = {"path": None}
+
+        class CopyingRange:
+            def InsertFile(self, FileName, **kwargs):
+                # Copy the temp file to a location we control so we can
+                # inspect it after the helper deletes the original.
+                import shutil
+                dst = tempfile.NamedTemporaryFile(suffix=".docx", delete=False).name
+                shutil.copy2(FileName, dst)
+                captured_path["path"] = dst
+
+        quotes = [
+            self._quote("Smith", "Q. Did you see the light?\nA. Yes.", "45:12"),
+            self._quote("Jones", "Q. Were you paying attention?\nA. No.", "12:3"),
+        ]
+        insert_formatted_quotes_at_range(doc_com=object(), range_com=CopyingRange(), quotes=quotes)
+
+        try:
+            self.assertIsNotNone(captured_path["path"])
+            tdoc = DocxDocument(captured_path["path"])
+            all_text = "\n".join(p.text for p in tdoc.paragraphs)
+            self.assertIn("Did you see the light", all_text)
+            self.assertIn("Yes.", all_text)
+            self.assertIn("Were you paying attention", all_text)
+            self.assertIn("(Smith Depo Trns., at p. 45:12.)", all_text)
+            self.assertIn("(Jones Depo Trns., at p. 12:3.)", all_text)
+        finally:
+            if captured_path["path"] and os.path.isfile(captured_path["path"]):
+                os.unlink(captured_path["path"])
+
+    def test_temp_file_is_deleted_after_insert(self):
+        from icharlotte_core.mediation_brief_live import (
+            insert_formatted_quotes_at_range,
+        )
+        import os
+
+        captured_path = {"path": None}
+
+        class CapturingRange:
+            def InsertFile(self, FileName, **kwargs):
+                captured_path["path"] = FileName
+
+        quotes = [self._quote("Smith", "Q. Did you see?\nA. Yes.", "45:12")]
+        insert_formatted_quotes_at_range(doc_com=object(), range_com=CapturingRange(), quotes=quotes)
+
+        self.assertIsNotNone(captured_path["path"])
+        self.assertFalse(os.path.isfile(captured_path["path"]))
+
+    def test_temp_file_is_deleted_even_on_insert_error(self):
+        from icharlotte_core.mediation_brief_live import (
+            insert_formatted_quotes_at_range,
+        )
+        import os
+
+        captured_path = {"path": None}
+
+        class FailingRange:
+            def InsertFile(self, FileName, **kwargs):
+                captured_path["path"] = FileName
+                raise RuntimeError("COM failure")
+
+        quotes = [self._quote("Smith", "Q. Did you see?\nA. Yes.", "45:12")]
+        with self.assertRaises(RuntimeError):
+            insert_formatted_quotes_at_range(doc_com=object(), range_com=FailingRange(), quotes=quotes)
+
+        self.assertIsNotNone(captured_path["path"])
+        self.assertFalse(os.path.isfile(captured_path["path"]))
+
+    def test_empty_quote_list_is_noop(self):
+        from icharlotte_core.mediation_brief_live import (
+            insert_formatted_quotes_at_range,
+        )
+
+        class FakeRange:
+            def __init__(self):
+                self.called = False
+
+            def InsertFile(self, FileName, **kwargs):
+                self.called = True
+
+        fake = FakeRange()
+        insert_formatted_quotes_at_range(doc_com=object(), range_com=fake, quotes=[])
+        self.assertFalse(fake.called)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -13,12 +13,17 @@ a separate task.
 from __future__ import annotations
 
 import logging
+import os
+import tempfile
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
+
+from docx import Document as DocxDocument
 
 from icharlotte_core.mediation_brief import (
     _HEADING_PATTERN,
     _HEADING_TO_SECTION,
+    MediationBriefGenerator,
 )
 
 logger = logging.getLogger(__name__)
@@ -191,3 +196,62 @@ def get_word_range_for_section(doc_com, section: LiveSection):
     first = doc_com.Paragraphs(section.start_para_index)
     last = doc_com.Paragraphs(section.end_para_index)
     return doc_com.Range(first.Range.Start, last.Range.End)
+
+
+def _format_quote_block_text(quote: Dict) -> str:
+    """Assemble a single quote block in the same format as the chat-tab flow.
+
+    Matches the format produced by
+    :meth:`MediationBriefGenerator.insert_quotes_quick` — a Q&A block
+    followed by the citation on the next line, without the
+    ``DEPO_QUOTE_START``/``DEPO_QUOTE_END`` markers (which are consumed by
+    the section-text parser, not rendered).
+    """
+    qa = (quote.get("qa_text") or "").strip()
+    deponent = (quote.get("deponent") or "").strip()
+    page_line = (quote.get("page_line") or "").strip()
+    citation = f"({deponent} Depo Trns., at p. {page_line}.)"
+    return f"{qa}\n{citation}"
+
+
+def insert_formatted_quotes_at_range(doc_com, range_com, quotes: List[Dict]) -> None:
+    """Insert *quotes* as formatted Q&A blocks at *range_com*.
+
+    Builds a temporary .docx containing the formatted quote paragraphs using
+    :meth:`MediationBriefGenerator._add_depo_quote` — the same formatter the
+    chat-tab flow uses — then calls Word COM ``Range.InsertFile`` to splice
+    that content into the live document at the given range.
+
+    The temporary file is always deleted, even if ``InsertFile`` raises.
+
+    Args:
+        doc_com: The Word COM ``Document`` (currently unused — kept for
+            future hook points and to make the call site explicit).
+        range_com: A Word COM ``Range`` — the insertion point / replacement
+            target.
+        quotes: List of quote dicts as produced by
+            :meth:`MediationBriefGenerator.search_quotes`.
+    """
+    if not quotes:
+        return
+
+    # Build the temp docx.
+    tmp = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
+    tmp_path = tmp.name
+    tmp.close()
+    try:
+        docx_doc = DocxDocument()
+        generator = MediationBriefGenerator()
+        for quote in quotes:
+            block_text = _format_quote_block_text(quote)
+            generator._add_depo_quote(docx_doc, block_text)
+        docx_doc.save(tmp_path)
+
+        # Insert into the live Word document.
+        range_com.InsertFile(FileName=str(tmp_path), ConfirmConversions=False)
+    finally:
+        try:
+            if os.path.isfile(tmp_path):
+                os.unlink(tmp_path)
+        except OSError as e:
+            logger.warning("Failed to delete temp quote docx %s: %s", tmp_path, e)
