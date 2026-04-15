@@ -1189,6 +1189,42 @@ FORMATTING RULES:
 
         return regenerated
 
+    def build_refinement_prompts(
+        self,
+        section_name: str,
+        sections_dict: Dict[str, str],
+        instruction: str,
+    ) -> tuple:
+        """Return ``(system_prompt, full_prompt)`` for refining *section_name*.
+
+        Stateless sibling of ``refine_sections`` — used by the Word AI
+        assistant popup so refinement can run against a live Word document
+        without touching this generator's in-memory state.
+
+        Temporarily swaps ``self.sections`` with *sections_dict* while the
+        existing prompt builders run, then restores the original value.
+
+        Args:
+            section_name: Canonical section name (e.g. ``"liability"``).
+            sections_dict: Mapping of canonical section name → current body
+                text, parsed from the live Word document.
+            instruction: The user's refinement instruction.
+
+        Returns:
+            ``(system_prompt, full_prompt)`` — the two prompt strings ready to
+            be submitted through ``TaskLLMWorkerThread``.
+        """
+        saved_sections = self.sections
+        self.sections = dict(sections_dict)
+        try:
+            system_prompt = self._build_system_prompt(section_name)
+            full_prompt = self._build_section_prompt(
+                section_name, refinement_instruction=instruction
+            )
+            return system_prompt, full_prompt
+        finally:
+            self.sections = saved_sections
+
     # ------------------------------------------------------------------
     # Quote search and insertion
     # ------------------------------------------------------------------
