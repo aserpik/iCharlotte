@@ -2001,16 +2001,15 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
         """Start the mediation brief generation pipeline."""
         main_win = self.window()
         case_path = getattr(main_win, 'case_path', None)
-        parent_folder = os.path.dirname(case_path) if case_path else None
 
         generator = MediationBriefGenerator()
 
         caption_path = None
-        if parent_folder:
-            caption_path = generator.find_caption_template(parent_folder)
+        if case_path:
+            caption_path = generator.find_caption_template(case_path)
 
         if not caption_path:
-            search_loc = parent_folder or ""
+            search_loc = case_path or ""
             caption_path, _ = QFileDialog.getOpenFileName(
                 self,
                 f"No caption template found in {search_loc}. Select one:",
