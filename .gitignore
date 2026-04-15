@@ -1,5 +1,15 @@
 # Logs
 *.log
+*.log.*
+logs/*.fd*
+logs/crashes/
+
+# SQLite WAL/SHM sidecar files
+*.db-shm
+*.db-wal
+
+# Superpowers brainstorm session runtime state
+.superpowers/brainstorm/*/state/
 
 # Python
 __pycache__/
