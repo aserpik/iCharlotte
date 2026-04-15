@@ -167,3 +167,27 @@ def is_mediation_brief(doc_com) -> bool:
         logger.debug("is_mediation_brief: parse failed: %s", e)
         return False
     return len(live.sections) >= 3
+
+
+def get_word_range_for_section(doc_com, section: LiveSection):
+    """Return a Word ``Range`` object covering *section*'s body paragraphs.
+
+    The range runs from the start of the first body paragraph to the end of
+    the last body paragraph (inclusive of its trailing paragraph mark).
+
+    If the section has no body paragraphs (heading followed directly by the
+    next heading), returns a zero-length range at the end of the heading
+    paragraph — suitable as an insertion point.
+    """
+    if section.end_para_index < section.start_para_index:
+        # Empty body — caret at the end of the heading paragraph.
+        heading_idx = section.start_para_index - 1
+        if heading_idx < 1:
+            heading_idx = 1
+        heading_para = doc_com.Paragraphs(heading_idx)
+        pos = heading_para.Range.End
+        return doc_com.Range(pos, pos)
+
+    first = doc_com.Paragraphs(section.start_para_index)
+    last = doc_com.Paragraphs(section.end_para_index)
+    return doc_com.Range(first.Range.Start, last.Range.End)

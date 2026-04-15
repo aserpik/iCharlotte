@@ -226,5 +226,71 @@ class TestParseBriefFromWordDoc(unittest.TestCase):
         self.assertLess(intro.end_para_index, intro.start_para_index)
 
 
+class TestGetWordRangeForSection(unittest.TestCase):
+    def _make_doc(self):
+        return make_doc(
+            "I.   INTRODUCTION",
+            "Intro para one.",
+            "Intro para two.",
+            "II.  STATEMENT OF FACTS",
+            "Facts.",
+            "III. LIABILITY",
+            "Liability.",
+        )
+
+    def _capture_range_calls(self, fake_doc):
+        calls = []
+
+        def _Range(start, end):
+            calls.append((start, end))
+            return ("range", start, end)
+
+        fake_doc.Range = _Range
+        return calls
+
+    def test_range_spans_all_body_paragraphs(self):
+        from icharlotte_core.mediation_brief_live import (
+            get_word_range_for_section,
+            parse_brief_from_word_doc,
+        )
+        doc = self._make_doc()
+        calls = self._capture_range_calls(doc)
+        live = parse_brief_from_word_doc(doc)
+
+        intro = live.sections["introduction"]
+        get_word_range_for_section(doc, intro)
+
+        self.assertEqual(len(calls), 1)
+        start_char, end_char = calls[0]
+        expected_start = doc.Paragraphs(intro.start_para_index).Range.Start
+        expected_end = doc.Paragraphs(intro.end_para_index).Range.End
+        self.assertEqual(start_char, expected_start)
+        self.assertEqual(end_char, expected_end)
+
+    def test_empty_body_collapses_to_caret_after_heading(self):
+        from icharlotte_core.mediation_brief_live import (
+            LiveSection,
+            get_word_range_for_section,
+        )
+        doc = make_doc("I.   INTRODUCTION", "II.  STATEMENT OF FACTS", "Facts.")
+        calls = self._capture_range_calls(doc)
+        # Simulate an "introduction" section with no body paragraphs:
+        # start_para_index=2 (would be the next body para) but end_para_index=1
+        # (still pointing at the heading paragraph, because no body landed).
+        empty_intro = LiveSection(
+            name="introduction",
+            heading_title="I. INTRODUCTION",
+            text="",
+            start_para_index=2,
+            end_para_index=1,
+        )
+        get_word_range_for_section(doc, empty_intro)
+        self.assertEqual(len(calls), 1)
+        start_char, end_char = calls[0]
+        heading_end = doc.Paragraphs(1).Range.End
+        self.assertEqual(start_char, heading_end)
+        self.assertEqual(end_char, heading_end)
+
+
 if __name__ == "__main__":
     unittest.main()
