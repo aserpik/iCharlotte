@@ -554,6 +554,12 @@ FORMAT_MARKDOWN = "Parse Markdown"
 FORMAT_DEFAULT = "Document Default"
 FORMAT_CUSTOM = "Custom..."
 
+# Sentinel userData values for the Word popup's prompt dropdown. These flag
+# the two Mediation-Brief-specific dropdown entries so _do_execute can branch
+# to the live-brief paths instead of running a normal LLM task.
+MB_REFINE_SENTINEL = "__MB_REFINE__"
+MB_ADD_QUOTES_SENTINEL = "__MB_ADD_QUOTES__"
+
 # Available LLM models for selection
 # Format: (display_name, provider, model_id)
 AVAILABLE_MODELS = [
@@ -3099,6 +3105,28 @@ class WordLLMPopup(QDialog):
         for p in prompts:
             self.prompt_combo.addItem(p["name"], p["prompt"])
 
+        # Add Mediation Brief entries if the active Word document is a brief.
+        if self.app_context != APP_CONTEXT_OUTLOOK and self._is_active_doc_a_brief():
+            self.prompt_combo.insertSeparator(self.prompt_combo.count())
+            self.prompt_combo.addItem(
+                "Mediation Brief: Refine Section", MB_REFINE_SENTINEL
+            )
+            self.prompt_combo.addItem(
+                "Mediation Brief: Add Quotes", MB_ADD_QUOTES_SENTINEL
+            )
+
+    def _is_active_doc_a_brief(self) -> bool:
+        """Return True if the popup's captured Word document is a mediation brief."""
+        doc = getattr(self, "_original_document", None)
+        if doc is None:
+            return False
+        try:
+            from icharlotte_core.mediation_brief_live import is_mediation_brief
+            return is_mediation_brief(doc)
+        except Exception as e:
+            print(f"[WordLLMPopup] _is_active_doc_a_brief failed: {e}")
+            return False
+
     def save_prompts_to_file(self):
         """Save Word prompts to file."""
         try:
@@ -4389,6 +4417,12 @@ class WordLLMPopup(QDialog):
                     self._original_text = text
                     self._original_text_raw = selection.Text if selection.Text else ""
                     print(f"[Win+V] Pre-captured selection: range={self._original_range_start}-{self._original_range_end}, has_selection={self._original_has_selection}")
+                # Refresh the prompt dropdown now that _original_document is set,
+                # so Mediation Brief entries can appear if the active doc is a brief.
+                try:
+                    self.refresh_combo()
+                except Exception as refresh_err:
+                    print(f"[Win+V] refresh_combo after capture failed: {refresh_err}")
         except Exception as e:
             print(f"[Win+V] Could not pre-capture document: {e}")
 
