@@ -973,23 +973,30 @@ class ChatTab(QWidget):
 
         imported = 0
         already_attached = 0
+        failed = []
+        attached_normcase = {os.path.normcase(p) for p in self.attached_files}
         for name in entries:
             if not CARRIER_REPORT_RE.match(name):
                 continue
             full_path = os.path.join(status_dir, name)
-            if full_path in self.attached_files:
+            if os.path.normcase(full_path) in attached_normcase:
                 already_attached += 1
                 continue
-            self.add_file(full_path)
+            try:
+                self.add_file(full_path)
+            except OSError as e:
+                failed.append(f"{name}: {e}")
+                continue
+            attached_normcase.add(os.path.normcase(full_path))
             imported += 1
 
-        if imported == 0 and already_attached == 0:
+        if imported == 0 and already_attached == 0 and not failed:
             QMessageBox.information(
                 self,
                 "Import Reports",
                 "No carrier reports (carrier001\u2013carrier015) found in STATUS.",
             )
-        elif imported == 0 and already_attached > 0:
+        elif imported == 0 and already_attached > 0 and not failed:
             QMessageBox.information(
                 self,
                 "Import Reports",
@@ -999,7 +1006,11 @@ class ChatTab(QWidget):
             msg = f"Imported {imported} carrier report(s) from STATUS."
             if already_attached > 0:
                 msg += f"\n({already_attached} already attached, skipped.)"
-            QMessageBox.information(self, "Import Reports", msg)
+            if failed:
+                msg += f"\n\nFailed to import {len(failed)} file(s):\n" + "\n".join(failed)
+                QMessageBox.warning(self, "Import Reports", msg)
+            else:
+                QMessageBox.information(self, "Import Reports", msg)
 
     def _clear_files_no_persist(self):
         """Clear attached files from UI without persisting (used when switching cases)."""
