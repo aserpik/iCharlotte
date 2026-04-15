@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import json
 import subprocess
@@ -46,6 +47,14 @@ except ImportError:
         import PyPDF2 as pypdf
     except ImportError:
         pypdf = None
+
+# Matches carrier report filenames: carrier001..carrier015 with optional
+# trailing text (e.g. " (FSR)", "(lit plan)", " - Final"), .doc or .docx.
+# Anchored at start to reject prefixed variants like "[draft]carrier001.docx".
+CARRIER_REPORT_RE = re.compile(
+    r'^carrier0(0[1-9]|1[0-5])(?![0-9]).*\.docx?$',
+    re.IGNORECASE,
+)
 
 class DateTableWidgetItem(QTableWidgetItem):
     def __lt__(self, other):
