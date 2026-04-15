@@ -348,7 +348,7 @@ class ChatTab(QWidget):
         self.file_list.itemDoubleClicked.connect(self.open_file_from_list)
         settings_layout.addWidget(self.file_list)
 
-        # Select All / Deselect All / Clear Files buttons
+        # Select All / Deselect All / Clear Files / Import Reports buttons
         file_btn_layout = QHBoxLayout()
         select_all_btn = QPushButton("All")
         select_all_btn.setToolTip("Select all files")
@@ -359,9 +359,13 @@ class ChatTab(QWidget):
         clear_files_btn = QPushButton("Clear")
         clear_files_btn.setToolTip("Remove all files")
         clear_files_btn.clicked.connect(self.clear_files)
+        import_reports_btn = QPushButton("Import Reports")
+        import_reports_btn.setToolTip("Import carrier reports from the case's STATUS folder")
+        import_reports_btn.clicked.connect(self.import_carrier_reports)
         file_btn_layout.addWidget(select_all_btn)
         file_btn_layout.addWidget(deselect_all_btn)
         file_btn_layout.addWidget(clear_files_btn)
+        file_btn_layout.addWidget(import_reports_btn)
         settings_layout.addLayout(file_btn_layout)
 
         clear_chat_btn = QPushButton("Clear Chat")
@@ -929,6 +933,73 @@ class ChatTab(QWidget):
         # Persist the cleared state
         if self.persistence:
             self.persistence.clear_attached_files()
+
+    def import_carrier_reports(self):
+        """Scan {case_path}/STATUS/ for carrier00X.doc(x) files and attach them.
+
+        Matches carrier001..carrier015 with optional trailing text after the
+        number. Rejects filenames with any prefix before "carrier". Adds matches
+        to the existing attached-files list (deduped), leaving current files
+        intact. Shows a popup summarizing the result.
+        """
+        main_win = self.window()
+        case_path = getattr(main_win, 'case_path', None)
+        if not case_path:
+            QMessageBox.warning(
+                self,
+                "Import Reports",
+                "No case is currently selected.",
+            )
+            return
+
+        status_dir = os.path.join(case_path, "STATUS")
+        if not os.path.isdir(status_dir):
+            QMessageBox.warning(
+                self,
+                "Import Reports",
+                f"No STATUS folder found at:\n{status_dir}",
+            )
+            return
+
+        try:
+            entries = os.listdir(status_dir)
+        except (PermissionError, OSError) as e:
+            QMessageBox.warning(
+                self,
+                "Import Reports",
+                f"Could not read STATUS folder:\n{e}",
+            )
+            return
+
+        imported = 0
+        already_attached = 0
+        for name in entries:
+            if not CARRIER_REPORT_RE.match(name):
+                continue
+            full_path = os.path.join(status_dir, name)
+            if full_path in self.attached_files:
+                already_attached += 1
+                continue
+            self.add_file(full_path)
+            imported += 1
+
+        if imported == 0 and already_attached == 0:
+            QMessageBox.information(
+                self,
+                "Import Reports",
+                "No carrier reports (carrier001\u2013carrier015) found in STATUS.",
+            )
+        elif imported == 0 and already_attached > 0:
+            QMessageBox.information(
+                self,
+                "Import Reports",
+                f"All {already_attached} matching report(s) were already attached.",
+            )
+        else:
+            msg = f"Imported {imported} carrier report(s) from STATUS."
+            if already_attached > 0:
+                msg += f"\n({already_attached} already attached, skipped.)"
+            QMessageBox.information(self, "Import Reports", msg)
 
     def _clear_files_no_persist(self):
         """Clear attached files from UI without persisting (used when switching cases)."""
