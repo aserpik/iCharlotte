@@ -3637,6 +3637,130 @@ class WordLLMPopup(QDialog):
         # Small delay to allow UI to update before _do_execute
         QTimer.singleShot(50, lambda: self._do_execute(prompt))
 
+    def _handle_mb_refine(self, instruction: str) -> bool:
+        """Dispatch for "Mediation Brief: Refine Section".
+
+        Parses the live Word document, resolves the target section's range,
+        bookmarks it, builds the refinement prompts, and submits a TaskData
+        to TaskManager. Returns True if a task was submitted (caller should
+        stop processing); False if prerequisites failed (the preparing row
+        is cleared here before returning False).
+        """
+        from icharlotte_core.mediation_brief import MediationBriefGenerator
+        from icharlotte_core.mediation_brief_live import (
+            get_word_range_for_section,
+            parse_brief_from_word_doc,
+        )
+
+        section_name = self.mb_section_combo.currentData()
+        if not section_name:
+            QMessageBox.warning(self, "No section", "Please pick a section to refine.")
+            self._clear_preparing_row()
+            return False
+
+        doc = self._original_document
+        if doc is None:
+            QMessageBox.warning(
+                self, "Word Not Found",
+                "No active Word document — please open the brief first."
+            )
+            self._clear_preparing_row()
+            return False
+
+        try:
+            live = parse_brief_from_word_doc(doc)
+        except Exception as e:
+            QMessageBox.warning(self, "Parse failed", f"Could not read brief: {e}")
+            self._clear_preparing_row()
+            return False
+
+        target = live.sections.get(section_name)
+        if target is None:
+            display = self.mb_section_combo.currentText()
+            QMessageBox.warning(
+                self, "Section not found",
+                f"The '{display}' section was not found in this document."
+            )
+            self._clear_preparing_row()
+            return False
+
+        sections_dict = {name: sec.text for name, sec in live.sections.items()}
+
+        generator = MediationBriefGenerator()
+        try:
+            system_prompt, full_prompt = generator.build_refinement_prompts(
+                section_name=section_name,
+                sections_dict=sections_dict,
+                instruction=instruction,
+            )
+        except Exception as e:
+            QMessageBox.warning(self, "Prompt build failed", str(e))
+            self._clear_preparing_row()
+            return False
+
+        # Resolve the Word range for the target section and read its bounds
+        # for bookmark creation.
+        try:
+            target_range = get_word_range_for_section(doc, target)
+            range_start = int(target_range.Start)
+            range_end = int(target_range.End)
+        except Exception as e:
+            QMessageBox.warning(
+                self, "Range lookup failed",
+                f"Could not locate section range in document: {e}"
+            )
+            self._clear_preparing_row()
+            return False
+
+        # Build TaskData. Reuse the existing selected-model + redline handling.
+        provider, model_id = self._get_selected_model()
+        task_data = TaskData(
+            document_name=self._original_document_name or "",
+            document_com=doc,
+            has_selection=True,
+            original_text=target.text,
+            original_text_raw=target.text,
+            captured_format=self._captured_format,
+            format_type=getattr(self, "_exec_format_type", FORMAT_PLAIN),
+            redline_mode_active=self._redline_mode_active,
+            redline_settings=self.redline_settings.copy() if self.redline_settings else {},
+            research_result=None,
+            do_legal_research=False,
+            legal_research_engine=None,
+            legal_research_model=None,
+            prompt_preview=f"MB Refine {section_name}: {instruction[:40]}",
+            provider=provider,
+            model_id=model_id,
+            system_prompt=system_prompt,
+            full_prompt=full_prompt,
+        )
+
+        bm_name = _create_task_bookmark(doc, range_start, range_end, task_data.task_id)
+        task_data.bookmark_name = bm_name
+
+        # Upgrade the preparing row before submit.
+        prep_id = getattr(self, "_prep_id", None)
+        if prep_id:
+            TaskStatusBar.instance().upgrade_preparing(prep_id, task_data.task_id)
+            self._prep_id = None
+
+        TaskManager.instance().submit_task(task_data)
+        self.close()
+        return True
+
+    def _clear_preparing_row(self):
+        """Remove the status-bar 'preparing' row if one is pending."""
+        prep_id = getattr(self, "_prep_id", None)
+        if not prep_id:
+            return
+        try:
+            tsb = TaskStatusBar.instance()
+            tsb._remove_task_row(prep_id)
+            tsb._on_all_done()
+        except Exception:
+            pass
+        self._prep_id = None
+
     def _do_execute(self, prompt: str):
         """Actually execute the LLM call - dispatch to Word or Outlook handler."""
         try:
@@ -3645,6 +3769,15 @@ class WordLLMPopup(QDialog):
             if self.app_context == APP_CONTEXT_OUTLOOK:
                 self.show()  # Re-show for Outlook (uses old worker thread path)
                 self._do_execute_outlook(prompt)
+                return
+
+            # Mediation Brief dispatch — must run before the generic Word path
+            # so that we bypass the normal "get selection → build prompt" flow.
+            combo_data = self.prompt_combo.currentData()
+            if combo_data == MB_REFINE_SENTINEL:
+                print("[DEBUG] _do_execute: MB Refine branch")
+                if not self._handle_mb_refine(prompt):
+                    return
                 return
 
             # Default: Word context
