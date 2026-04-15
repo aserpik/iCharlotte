@@ -2623,6 +2623,22 @@ class WordLLMPopup(QDialog):
         self.custom_input.setMaximumHeight(80)
         ai_layout.addWidget(self.custom_input)
 
+        # Mediation Brief section picker (hidden by default — shown only when
+        # the user selects "Mediation Brief: Refine Section" from the
+        # prompt dropdown).
+        from icharlotte_core.mediation_brief import SECTION_ORDER, SECTION_HEADINGS
+        self.mb_section_row = QWidget()
+        mb_section_layout = QHBoxLayout(self.mb_section_row)
+        mb_section_layout.setContentsMargins(0, 0, 0, 0)
+        mb_section_layout.addWidget(QLabel("Section:"))
+        self.mb_section_combo = QComboBox()
+        for name in SECTION_ORDER:
+            _, display = SECTION_HEADINGS[name]
+            self.mb_section_combo.addItem(display, name)
+        mb_section_layout.addWidget(self.mb_section_combo, 1)
+        self.mb_section_row.setVisible(False)
+        ai_layout.addWidget(self.mb_section_row)
+
         # Save prompt checkbox row
         save_row = QHBoxLayout()
         self.save_name_input = QLineEdit()
@@ -3146,10 +3162,29 @@ class WordLLMPopup(QDialog):
             print(f"Error saving Outlook prompts: {e}")
 
     def on_prompt_selected(self, index):
-        """When a saved prompt is selected, populate the custom input."""
-        prompt_text = self.prompt_combo.currentData()
-        if prompt_text:
-            self.custom_input.setPlainText(prompt_text)
+        """When a saved prompt is selected, populate the custom input.
+
+        When one of the Mediation Brief sentinel entries is selected, show
+        or hide the section-picker row instead of overwriting the prompt
+        input.
+        """
+        data = self.prompt_combo.currentData()
+
+        # Mediation Brief entries carry sentinel strings, not real prompts.
+        if data == MB_REFINE_SENTINEL:
+            if hasattr(self, "mb_section_row"):
+                self.mb_section_row.setVisible(True)
+            return
+        if data == MB_ADD_QUOTES_SENTINEL:
+            if hasattr(self, "mb_section_row"):
+                self.mb_section_row.setVisible(False)
+            return
+
+        # Regular prompt — populate the custom input and hide the MB section row.
+        if hasattr(self, "mb_section_row"):
+            self.mb_section_row.setVisible(False)
+        if data:
+            self.custom_input.setPlainText(data)
 
     def save_prompt(self):
         """Save the current custom prompt to the appropriate list based on context."""
