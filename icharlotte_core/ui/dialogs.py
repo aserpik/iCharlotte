@@ -397,6 +397,8 @@ WORKBENCH_TO_AGENT_ID = {
     "email_update": "func_email_compose",
     "chat": "func_chat",
     "mediation_brief": "agent_mediation_brief",
+    "word_assistant": "func_word_assistant",
+    "legal_research": "func_legal_research",
 }
 
 DEFAULT_IMPROVEMENT_PROMPTS = {
@@ -1443,7 +1445,8 @@ class PromptsDialog(QDialog):
         # Add predefined agents
         for agent in ['summarize', 'discovery', 'deposition',
                       'liability', 'exposure', 'med_record', 'med_chron', 'extraction',
-                      'email_update', 'chat']:
+                      'email_update', 'chat',
+                      'word_assistant', 'legal_research', 'mediation_brief']:
             agents.add(agent)
 
         for agent in sorted(agents):
@@ -1471,6 +1474,14 @@ class PromptsDialog(QDialog):
                     log_event(f"Migrated {migrated} legacy prompts to versioned storage")
             except Exception as e:
                 log_event(f"Error migrating prompts: {e}", "error")
+
+        # Seed pipeline prompts (word assistant, legal research, mediation brief)
+        try:
+            seeded = self.prompt_manager.seed_pipeline_prompts()
+            if seeded and seeded > 0:
+                log_event(f"Seeded {seeded} pipeline prompts in Workbench")
+        except Exception as e:
+            log_event(f"Error seeding pipeline prompts: {e}", "error")
 
     def _auto_select_agent_for_tab(self):
         """Auto-select the most relevant agent based on the tab that was open."""
@@ -2503,9 +2514,9 @@ class LLMSettingsDialog(QDialog):
             row_layout.addWidget(model_combo)
 
             max_tokens_spin = QSpinBox()
-            max_tokens_spin.setRange(1024, 128000)
+            max_tokens_spin.setRange(1024, 1000000)
             max_tokens_spin.setSingleStep(1024)
-            max_tokens_spin.setValue(8192)
+            max_tokens_spin.setValue(65536)
             max_tokens_spin.setPrefix("Tokens: ")
             max_tokens_spin.setFixedWidth(130)
             row_layout.addWidget(max_tokens_spin)
