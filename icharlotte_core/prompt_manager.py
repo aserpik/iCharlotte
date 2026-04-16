@@ -469,10 +469,13 @@ class PromptManager:
         seeded = 0
         for agent, pass_name, content, description in seeds:
             key = self._get_prompt_key(agent, pass_name)
+            current_path = self._get_current_path(agent, pass_name)
+            # Skip if registry entry exists AND the file is actually on disk
+            if key in self._registry.get("prompts", {}) and os.path.exists(current_path):
+                continue
+            # Clean orphaned registry entry (key exists but file missing)
             if key in self._registry.get("prompts", {}):
-                continue
-            if os.path.exists(self._get_current_path(agent, pass_name)):
-                continue
+                del self._registry["prompts"][key]
             self.create_version(
                 agent, pass_name, content.strip(),
                 version="v1",
