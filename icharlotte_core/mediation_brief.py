@@ -12,7 +12,7 @@ import logging
 import os
 import re
 import shutil
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from docx.shared import Inches, Pt
 from docx.enum.text import WD_BREAK
@@ -421,10 +421,10 @@ FORMATTING RULES:
         return ""
 
     def _build_system_prompt(self, section_name: str) -> str:
-        """Return the hard-coded system prompt for the given section.
+        """Return the system prompt for the given section.
 
-        Combines the style guide, formatting rules, and a defense attorney
-        persona statement.
+        Loads style guide and formatting rules from the Workbench
+        (PromptManager) if edited, otherwise uses class constants.
         """
         persona = (
             "You are a senior defense litigation attorney with decades of trial experience. "
@@ -432,7 +432,14 @@ FORMATTING RULES:
             "Your goal is to present the strongest possible defense position to the mediator, "
             "supported by the evidence and the facts of the case."
         )
-        return f"{persona}\n{self.STYLE_GUIDE}\n{self.FORMATTING_RULES}"
+        try:
+            from icharlotte_core.prompt_manager import get_prompt
+            style = get_prompt("mediation_brief", "style_guide") or self.STYLE_GUIDE
+            formatting = get_prompt("mediation_brief", "formatting_rules") or self.FORMATTING_RULES
+        except Exception:
+            style = self.STYLE_GUIDE
+            formatting = self.FORMATTING_RULES
+        return f"{persona}\n{style}\n{formatting}"
 
     def _build_section_prompt(self, section_name: str, refinement_instruction: str = "") -> str:
         """Build the full prompt for *section_name*.
@@ -1229,77 +1236,385 @@ FORMATTING RULES:
     # Quote search and insertion
     # ------------------------------------------------------------------
 
-    _QUOTE_RESULT_RE = re.compile(
-        r'QUOTE_RESULT_START\s*\n'
-        r'DEPONENT:\s*(.+)\n'
-        r'SOURCE:\s*(.+)\n'
-        r'PAGE_LINE:\s*(.+)\n'
-        r'RELEVANCE:\s*(.+)\n'
-        r'((?:(?:Q\.|A\.).*\n?)+)'
-        r'QUOTE_RESULT_END',
-        re.MULTILINE
+    # ID-based match format returned by the LLM after reviewing a numbered
+    # list of candidate exchanges. The LLM only returns IDs + a relevance
+    # sentence; the actual Q/A text and citation are looked up from the
+    # parsed TranscriptIndex, so fabrication is impossible.
+    _QUOTE_MATCH_RE = re.compile(
+        r'MATCH_START\s*\n'
+        r'ID:\s*EX_(\d+)\s*\n'
+        r'RELEVANCE:\s*(.+?)\n'
+        r'MATCH_END',
+        re.DOTALL
     )
 
-    def _parse_quote_results(self, llm_output: str) -> List[Dict]:
-        """Parse LLM quote search output into structured results."""
+    # Tokenizer used by the keyword pre-filter. Keeps alphabetic words of
+    # length >= 3; stop words are removed to avoid matching on filler.
+    _WORD_RE = re.compile(r"[a-zA-Z]+")
+
+    _STOPWORDS = frozenset([
+        # Generic English stopwords
+        "a", "about", "after", "all", "also", "an", "and", "another", "any",
+        "are", "as", "at", "be", "because", "been", "before", "but", "by",
+        "can", "could", "did", "do", "does", "down", "during", "each",
+        "every", "for", "from", "had", "has", "have", "he", "her", "him",
+        "his", "how", "i", "if", "in", "into", "is", "it", "its", "just",
+        "may", "me", "might", "my", "no", "not", "now", "of", "on", "one",
+        "only", "or", "other", "our", "out", "over", "own", "said", "same",
+        "she", "should", "so", "some", "than", "that", "the", "their",
+        "them", "then", "there", "these", "they", "this", "those", "to",
+        "too", "two", "under", "up", "us", "very", "was", "we", "well",
+        "were", "what", "when", "where", "which", "while", "who", "why",
+        "will", "with", "would", "you", "your", "yes",
+        # Legal / deposition meta-words. These show up constantly in search
+        # descriptions ("find testimony that supports the liability
+        # argument") but carry no signal about what content to match — in
+        # fact they match procedural boilerplate inside the transcript.
+        "testimony", "testify", "testified", "depo", "deposition", "depose",
+        "brief", "argument", "arguments", "argue", "argued", "support",
+        "supports", "supporting", "supported", "case", "matter", "issue",
+        "section", "paragraph", "passage", "witness", "witnessed",
+        "statement", "statements", "claim", "claims", "claimed",
+        "plaintiff", "defendant", "counsel", "attorney", "mediator",
+        "find", "finds", "found", "show", "shows", "showed", "prove",
+        "proves", "proved", "demonstrate", "demonstrates", "mention",
+        "mentions", "mentioned", "discuss", "discusses", "discussed",
+        "regarding", "relating", "related", "relates", "concerning",
+        "concerns", "concerned",
+    ])
+
+    def _tokenize_for_ranking(self, text: str) -> List[str]:
+        """Lowercase alphabetic tokens of length >= 3, minus stopwords."""
+        tokens = []
+        for w in self._WORD_RE.findall(text or ""):
+            lw = w.lower()
+            if len(lw) >= 3 and lw not in self._STOPWORDS:
+                tokens.append(lw)
+        return tokens
+
+    def _rank_exchanges_by_keywords(
+        self,
+        candidates: List[tuple],
+        description: str,
+        top_n: int = 200,
+    ) -> List[tuple]:
+        """Score candidate exchanges against the search description.
+
+        Each candidate is a tuple of ``(QAExchange, deponent_last, source)``.
+        Score = 10 * (distinct query terms hit) + (total query-term occurrences).
+        Coverage breadth dominates; TF is a tie-breaker.
+
+        When the query has content-word signal, return up to *top_n* ranked
+        matches. When the query has NO content signal (either empty after
+        stopword filtering, or no candidate shares any query term), return
+        ALL candidates unchanged — the LLM is then the sole filter. This
+        avoids the degenerate case where abstract legal-theory queries
+        ("testimony supporting the liability arguments") rank procedural
+        boilerplate to the top simply because it appears first in the
+        transcript.
+        """
+        query_terms = set(self._tokenize_for_ranking(description))
+        if not query_terms:
+            return list(candidates)
+
+        scored = []
+        for tup in candidates:
+            ex = tup[0]
+            doc_tokens = self._tokenize_for_ranking(f"{ex.question} {ex.answer}")
+            if not doc_tokens:
+                continue
+            tf = 0
+            distinct_hits = set()
+            for t in doc_tokens:
+                if t in query_terms:
+                    tf += 1
+                    distinct_hits.add(t)
+            if tf == 0:
+                continue
+            score = len(distinct_hits) * 10 + tf
+            scored.append((score, tup))
+
+        if not scored:
+            return list(candidates)
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [tup for _, tup in scored[:top_n]]
+
+    def _format_candidates_for_llm(self, candidates: List[tuple]) -> str:
+        """Render candidates as a numbered list for the LLM to review.
+
+        Layout is deliberately compact — one exchange per block, with a
+        stable ``[EX_NNNN]`` identifier the LLM can echo back.
+        """
+        lines = []
+        for idx, (ex, deponent, source) in enumerate(candidates):
+            citation = ex.citation_range()
+            lines.append(f"[EX_{idx:04d}] {deponent} Depo Trns., p. {citation}")
+            lines.append(f"Q. {ex.question}")
+            lines.append(f"A. {ex.answer}")
+            lines.append("")
+        return "\n".join(lines)
+
+    def _parse_quote_match_results(
+        self,
+        llm_output: str,
+        candidates: List[tuple],
+        full_exchanges_by_source: Optional[Dict[Tuple[str, str], Dict[int, object]]] = None,
+    ) -> List[Dict]:
+        """Parse LLM MATCH_START/END blocks, resolving IDs to real exchanges.
+
+        Any ID not present in ``candidates`` is dropped (grounding check —
+        the LLM cannot smuggle in text we didn't supply). Duplicates are
+        collapsed.
+
+        When ``full_exchanges_by_source`` is supplied (a mapping of
+        ``(deponent, source) -> {exchange_id: QAExchange}`` containing every
+        usable exchange from each transcript), the immediately preceding
+        exchange is prepended to the result's ``qa_text`` so the quote is
+        easier to read in isolation. Context is skipped when no preceding
+        usable exchange exists or when the mapping isn't provided (keeps
+        unit tests and legacy callers working unchanged).
+        """
         if not llm_output or "NO_MATCHES_FOUND" in llm_output:
             return []
-        results = []
-        for match in self._QUOTE_RESULT_RE.finditer(llm_output):
+
+        results: List[Dict] = []
+        seen: set = set()
+        for match in self._QUOTE_MATCH_RE.finditer(llm_output):
+            try:
+                idx = int(match.group(1))
+            except ValueError:
+                continue
+            if idx < 0 or idx >= len(candidates) or idx in seen:
+                continue
+            seen.add(idx)
+
+            ex, deponent, source = candidates[idx]
+            relevance = match.group(2).strip()
+            qa_text = self._build_qa_text_with_context(
+                ex, deponent, source, full_exchanges_by_source
+            )
             results.append({
-                "deponent": match.group(1).strip(),
-                "source": match.group(2).strip(),
-                "page_line": match.group(3).strip(),
-                "relevance": match.group(4).strip(),
-                "qa_text": match.group(5).strip(),
+                "deponent": deponent,
+                "source": source,
+                "page_line": ex.citation_range(),
+                "relevance": relevance,
+                "qa_text": qa_text,
             })
         return results
 
-    def search_quotes(self, transcript_paths: List[str], description: str) -> List[Dict]:
-        """Search deposition transcripts for Q&A passages matching description."""
-        transcript_text = ""
+    def _build_qa_text_with_context(
+        self,
+        ex,
+        deponent: str,
+        source: str,
+        full_exchanges_by_source: Optional[Dict[Tuple[str, str], Dict[int, object]]],
+    ) -> str:
+        """Assemble ``qa_text`` for a single quote, optionally prefixed with
+        the preceding usable Q/A exchange so the quote reads in context.
+
+        Returns just ``"Q. ...\\nA. ..."`` when no context is available.
+        """
+        parts: List[str] = []
+        if full_exchanges_by_source:
+            by_id = full_exchanges_by_source.get((deponent, source), {})
+            prev = by_id.get(ex.id - 1)
+            if prev is not None:
+                parts.append(f"Q. {prev.question}")
+                parts.append(f"A. {prev.answer}")
+                parts.append("")  # blank line separator between context and main
+        parts.append(f"Q. {ex.question}")
+        parts.append(f"A. {ex.answer}")
+        return "\n".join(parts)
+
+    # Markers that indicate a parse failure bled reporter/colloquy text
+    # into the Q or A body. TranscriptParser normally drops these but
+    # occasionally leaks them on edge cases, and a leaked colloquy exchange
+    # is worthless as a quote candidate.
+    _LEAK_MARKERS = (
+        "THE REPORTER",
+        "THE STENOGRAPHIC REPORTER",
+        "THE VIDEOGRAPHER",
+        "THE WITNESS",
+        "Anyone else?",
+        "off the record",
+    )
+
+    def _is_usable_exchange(self, ex) -> bool:
+        """Quick quality filter to drop exchanges that are unlikely to be
+        quoteable — too short, too long, or clearly parse-broken.
+        """
+        q = (ex.question or "").strip()
+        a = (ex.answer or "").strip()
+        # Must have real content on both sides
+        if len(q) < 10 or len(a) < 3:
+            return False
+        # Reject runaway exchanges that span too many transcript pages —
+        # usually a parser state-machine failure where several Q/A pairs
+        # merged into one.
+        if (ex.page_end - ex.page_start) > 2:
+            return False
+        # Reject if the answer is absurdly long (likely multiple merged
+        # answers or a transcript section that bled in)
+        if len(a) > 1500:
+            return False
+        # Reject obvious colloquy/reporter leaks inside the text
+        haystack = f"{q}\n{a}"
+        if any(marker in haystack for marker in self._LEAK_MARKERS):
+            return False
+        return True
+
+    def _load_transcript_candidates(
+        self, transcript_paths: List[str]
+    ) -> Tuple[List[tuple], Dict[Tuple[str, str], Dict[int, object]]]:
+        """Parse transcripts into a flat list of candidate exchanges.
+
+        Uses :class:`TranscriptParser` which handles both full-size and
+        condensed (4-up mini-transcript) formats correctly and caches the
+        structured index as JSON next to the PDF. Applies a cheap quality
+        filter to drop obvious parser failures before ranking.
+
+        Returns a tuple of:
+          * the flat candidate list ``[(ex, deponent, source), ...]`` used
+            for ranking + LLM selection, and
+          * a per-transcript map ``{(deponent, source): {id: exchange}}``
+            covering every *usable* exchange. The map lets
+            :meth:`_parse_quote_match_results` look up preceding exchanges
+            so a matched quote can be shown with a bit of surrounding
+            context.
+        """
+        from icharlotte_core.deposition.transcript_parser import TranscriptParser
+
+        parser = TranscriptParser()
+        out: List[tuple] = []
+        by_source: Dict[Tuple[str, str], Dict[int, object]] = {}
         for path in transcript_paths:
             fname = os.path.basename(path)
             ext = os.path.splitext(path)[1].lower()
-            transcript_text += f"\n--- TRANSCRIPT: {fname} ---\n"
-            if ext == ".pdf":
-                try:
-                    doc = fitz.open(path)
-                    for page in doc:
-                        transcript_text += page.get_text() + "\n"
-                    doc.close()
-                except Exception as e:
-                    logger.warning("Failed to read transcript %s: %s", fname, e)
-                    transcript_text += f"[Error reading file: {e}]\n"
-            elif ext == ".docx":
-                try:
-                    doc = DocxDocument(path)
-                    for para in doc.paragraphs:
-                        transcript_text += para.text + "\n"
-                except Exception as e:
-                    logger.warning("Failed to read transcript %s: %s", fname, e)
-                    transcript_text += f"[Error reading file: {e}]\n"
-            transcript_text += "\n"
+            if ext != ".pdf":
+                logger.warning(
+                    "Quote search skipping non-PDF transcript %s — structured "
+                    "parser only supports PDFs", fname
+                )
+                continue
+            try:
+                index = parser.parse(path)
+            except Exception as e:
+                logger.warning("Failed to parse transcript %s: %s", fname, e)
+                continue
+            deponent = index.deponent.last_name or os.path.splitext(fname)[0]
+            id_map = by_source.setdefault((deponent, fname), {})
+            for ex in index.exchanges:
+                if not self._is_usable_exchange(ex):
+                    continue
+                out.append((ex, deponent, fname))
+                id_map[ex.id] = ex
+        return out, by_source
 
-        if not transcript_text.strip():
+    def _format_brief_context(
+        self, brief_sections: Optional[Dict[str, str]]
+    ) -> str:
+        """Render the current brief as a BRIEF CONTEXT block for the LLM.
+
+        Skips empty sections. Section names are rendered using
+        :data:`SECTION_HEADINGS` so the LLM sees them as the user would
+        ("IV. LIABILITY" etc.). Returns an empty string when no usable
+        context was provided — callers should omit the block entirely in
+        that case.
+        """
+        if not brief_sections:
+            return ""
+
+        parts: List[str] = []
+        for name in SECTION_ORDER:
+            body = (brief_sections.get(name) or "").strip()
+            if not body:
+                continue
+            roman, title = SECTION_HEADINGS.get(name, ("", name.upper()))
+            header = f"{roman}. {title}" if roman else title
+            parts.append(f"--- {header} ---\n{body}")
+
+        # Include any extra sections that aren't in SECTION_ORDER (rare,
+        # but harmless — e.g. a variant heading the parser kept under a
+        # non-canonical key).
+        for name, body in brief_sections.items():
+            if name in SECTION_ORDER:
+                continue
+            body = (body or "").strip()
+            if not body:
+                continue
+            parts.append(f"--- {name.upper()} ---\n{body}")
+
+        if not parts:
+            return ""
+        return "BRIEF CONTEXT (current text of the mediation brief):\n\n" + "\n\n".join(parts)
+
+    def search_quotes(
+        self,
+        transcript_paths: List[str],
+        description: str,
+        brief_sections: Optional[Dict[str, str]] = None,
+    ) -> List[Dict]:
+        """Search deposition transcripts for Q&A passages matching *description*.
+
+        Pipeline:
+          1. Parse each transcript into a :class:`TranscriptIndex` via
+             :class:`TranscriptParser` (handles condensed / full-size).
+          2. Keyword-rank the exchanges against *description*, keeping the
+             top candidates. Prevents large depos from overflowing the LLM
+             context and improves signal-to-noise.
+          3. Render candidates as a numbered list, optionally prepended
+             with a BRIEF CONTEXT block containing the brief's current
+             section text (so the LLM can orient on the actual defense
+             theory of the case and pick quotes that support the
+             arguments already present).
+          4. Ask the LLM to return only the IDs of genuine matches.
+          5. Resolve the returned IDs back to the parsed exchanges.
+             Hallucinations cannot escape the candidate set — text and
+             citations always come from the index.
+
+        Args:
+            transcript_paths: Deposition PDFs to search.
+            description: User's search description.
+            brief_sections: Optional mapping of canonical section name →
+                current body text. Populated by the chat-tab from
+                ``generator.sections`` or by the Word popup from
+                ``parse_brief_from_word_doc(doc).sections``. When provided,
+                the LLM receives the brief content as orientation context.
+                Pass ``None`` to skip this block (e.g. when there is no
+                associated brief).
+        """
+        candidates, full_by_source = self._load_transcript_candidates(transcript_paths)
+        if not candidates:
             return []
+
+        ranked = self._rank_exchanges_by_keywords(candidates, description)
+        if not ranked:
+            return []
+
+        candidate_text = self._format_candidates_for_llm(ranked)
+        brief_context = self._format_brief_context(brief_sections)
+
+        # Text sent to the LLM: BRIEF CONTEXT (if any) followed by the
+        # numbered candidate list. The search_quotes prompt in
+        # Scripts/prompts/mediation_brief/quote_search_current.txt
+        # references both blocks by name.
+        if brief_context:
+            llm_text = f"{brief_context}\n\n---\n\nCANDIDATE EXCHANGES:\n\n{candidate_text}"
+        else:
+            llm_text = candidate_text
 
         search_prompt = self._get_section_prompt("quote_search")
         full_prompt = f"{search_prompt}\n\nUSER'S SEARCH DESCRIPTION:\n{description}"
-        system = (
-            "You are a legal transcript analyst. Find Q&A passages in deposition "
-            "transcripts that match the user's description. Return testimony EXACTLY "
-            "as it appears — do NOT paraphrase, reword, or change any text."
-        )
         caller = LLMCaller()
         result = caller.call(
             prompt=full_prompt,
-            text=transcript_text,
+            text=llm_text,
             agent_id="agent_mediation_brief",
         )
         if not result:
             return []
-        return self._parse_quote_results(result)
+        return self._parse_quote_match_results(result, ranked, full_by_source)
 
     def insert_quotes_quick(self, quotes: List[Dict], section_name: str,
                             subsection_title: Optional[str] = None) -> None:
