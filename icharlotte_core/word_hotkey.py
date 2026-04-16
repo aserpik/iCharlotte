@@ -32,6 +32,8 @@ from PySide6.QtCore import Qt, Signal, QObject, QTimer, QThread
 from PySide6.QtGui import QFont, QKeySequence, QShortcut
 import re
 
+from icharlotte_core.prompt_manager import get_prompt as _get_workbench_prompt
+
 # Import MasterCaseDatabase for case variable insertion
 try:
     from .master_db import MasterCaseDatabase
@@ -122,6 +124,17 @@ def _force_restore_screen_updating():
         except Exception:
             time.sleep(1.0 * (attempt + 1))
     print("WARNING: Could not restore Word ScreenUpdating after all retries")
+
+
+def _load_pipeline_prompt(agent: str, pass_name: str, default: str) -> str:
+    """Load a prompt from the Workbench (PromptManager), falling back to default."""
+    try:
+        custom = _get_workbench_prompt(agent, pass_name)
+        if custom:
+            return custom
+    except Exception:
+        pass
+    return default
 
 
 # Set up file logging for word_hotkey so COM errors are captured
@@ -2916,7 +2929,14 @@ class WordLLMPopup(QDialog):
         return self._custom_system_prompt or ""
 
     def _load_custom_system_prompt(self) -> str:
-        """Load custom system prompt from disk. Returns empty string if none saved."""
+        """Load custom system prompt from PromptManager. Returns empty string if using default."""
+        try:
+            workbench = _get_workbench_prompt("word_assistant", "system_prompt")
+            if workbench and workbench.strip() != DEFAULT_WORD_SYSTEM_PROMPT.strip():
+                return workbench
+        except Exception:
+            pass
+        # Legacy fallback: check old JSON file
         if os.path.exists(self.system_prompt_path):
             try:
                 with open(self.system_prompt_path, 'r', encoding='utf-8') as f:
@@ -2943,6 +2963,17 @@ class WordLLMPopup(QDialog):
             return
 
         self._custom_system_prompt = text
+        # Also save to PromptManager for Workbench sync
+        try:
+            from icharlotte_core.prompt_manager import get_prompt_manager
+            pm = get_prompt_manager()
+            pm.create_version(
+                "word_assistant", "system_prompt", text,
+                description="Saved from Word popup",
+                set_as_current=True,
+            )
+        except Exception as e:
+            print(f"Error saving system prompt to PromptManager: {e}")
         try:
             os.makedirs(os.path.dirname(self.system_prompt_path), exist_ok=True)
             with open(self.system_prompt_path, 'w', encoding='utf-8') as f:
@@ -4039,7 +4070,8 @@ class WordLLMPopup(QDialog):
             # When redline mode is active, prepend instruction to preserve unchanged text
             redline_prefix = ""
             if self._redline_mode_active:
-                redline_prefix = DEFAULT_REDLINE_PREFIX
+                redline_prefix = _load_pipeline_prompt(
+                    "word_assistant", "redline_prefix", DEFAULT_REDLINE_PREFIX)
                 prompt = redline_prefix + prompt
 
             if use_all_text and has_selection and selected_text:
@@ -4065,6 +4097,8 @@ class WordLLMPopup(QDialog):
                             context_after = all_text[after_start:].strip()
 
                         # Placeholder/blank: instruct AI to write replacement prose
+                        _ph_instr = _load_pipeline_prompt(
+                            "word_assistant", "placeholder_instructions", DEFAULT_PLACEHOLDER_INSTRUCTIONS)
                         full_prompt = (
                             f"=== USER DIRECTIVE (describes what to write — NOT the text itself) ===\n"
                             f"{prompt}\n\n"
@@ -4073,15 +4107,17 @@ class WordLLMPopup(QDialog):
                             f"Text BEFORE the blank: \"{context_before}\"\n"
                             f"[___BLANK TO FILL___]\n"
                             f"Text AFTER the blank: \"{context_after}\"\n\n"
-                            f"{DEFAULT_PLACEHOLDER_INSTRUCTIONS}"
+                            f"{_ph_instr}"
                         )
                     else:
                         # Normal selection: process/transform the selected text
+                        _sel_instr = _load_pipeline_prompt(
+                            "word_assistant", "selection_instructions", DEFAULT_SELECTION_INSTRUCTIONS)
                         full_prompt = (
                             f"{prompt}\n\n"
                             f"=== FULL DOCUMENT (for context) ===\n{all_text}\n\n"
                             f"=== SELECTED TEXT TO PROCESS ===\n{selected_text}\n\n"
-                            f"{DEFAULT_SELECTION_INSTRUCTIONS}"
+                            f"{_sel_instr}"
                         )
                     self.status_label.setText("Processing with full document context...")
                 else:
@@ -4101,6 +4137,8 @@ class WordLLMPopup(QDialog):
                     if cursor_pos is not None and cursor_pos <= len(all_text):
                         context_before = all_text[:cursor_pos].strip()
                         context_after = all_text[cursor_pos:].strip()
+                        _cur_instr = _load_pipeline_prompt(
+                            "word_assistant", "cursor_instructions", DEFAULT_CURSOR_INSTRUCTIONS)
                         full_prompt = (
                             f"=== USER DIRECTIVE (describes what to write — NOT the text itself) ===\n"
                             f"{prompt}\n\n"
@@ -4109,7 +4147,7 @@ class WordLLMPopup(QDialog):
                             f"Text BEFORE cursor: \"{context_before}\"\n"
                             f"[___CURSOR IS HERE___]\n"
                             f"Text AFTER cursor: \"{context_after}\"\n\n"
-                            f"{DEFAULT_CURSOR_INSTRUCTIONS}"
+                            f"{_cur_instr}"
                         )
                     else:
                         full_prompt = f"{prompt}\n\nDocument text:\n{all_text}"
@@ -4155,9 +4193,11 @@ class WordLLMPopup(QDialog):
             # Build system prompt — use custom override if set, else defaults
             custom_sp = self._get_custom_system_prompt()
             if self._redline_mode_active:
-                system_prompt = custom_sp if custom_sp else DEFAULT_WORD_REDLINE_SYSTEM_PROMPT
+                system_prompt = custom_sp if custom_sp else _load_pipeline_prompt(
+                    "word_assistant", "redline_system_prompt", DEFAULT_WORD_REDLINE_SYSTEM_PROMPT)
             else:
-                system_prompt = custom_sp if custom_sp else DEFAULT_WORD_SYSTEM_PROMPT
+                system_prompt = custom_sp if custom_sp else _load_pipeline_prompt(
+                    "word_assistant", "system_prompt", DEFAULT_WORD_SYSTEM_PROMPT)
 
             task_data = TaskData(
                 document_name=self._original_document_name or "",
@@ -5652,9 +5692,11 @@ class WordLLMPopup(QDialog):
             # Use custom system prompt if set, else defaults
             custom_sp = self._get_custom_system_prompt()
             if self._redline_mode_active:
-                system_prompt = custom_sp if custom_sp else DEFAULT_WORD_REDLINE_SYSTEM_PROMPT
+                system_prompt = custom_sp if custom_sp else _load_pipeline_prompt(
+                    "word_assistant", "redline_system_prompt", DEFAULT_WORD_REDLINE_SYSTEM_PROMPT)
             else:
-                system_prompt = custom_sp if custom_sp else DEFAULT_WORD_SYSTEM_PROMPT
+                system_prompt = custom_sp if custom_sp else _load_pipeline_prompt(
+                    "word_assistant", "system_prompt", DEFAULT_WORD_SYSTEM_PROMPT)
 
             print(f"Calling LLMHandler.generate...")
             result = LLMHandler.generate(
@@ -5925,7 +5967,8 @@ class WordLLMPopup(QDialog):
             result = LLMHandler.generate(
                 provider=provider,
                 model=model_id,
-                system_prompt=EMAIL_SYSTEM_PROMPT,
+                system_prompt=_load_pipeline_prompt(
+                    "word_assistant", "email_system_prompt", EMAIL_SYSTEM_PROMPT),
                 user_prompt=prompt,
                 file_contents="",
                 settings=settings
