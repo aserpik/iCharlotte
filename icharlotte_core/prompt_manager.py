@@ -90,6 +90,7 @@ class PromptManager:
             prompts_dir: Directory for prompt storage. Defaults to Scripts/prompts.
         """
         self.prompts_dir = prompts_dir or PROMPTS_DIR
+        self._registry_path = os.path.join(self.prompts_dir, "registry.json")
         self._ensure_directory_structure()
         self._registry = self._load_registry()
 
@@ -99,16 +100,17 @@ class PromptManager:
             os.makedirs(self.prompts_dir)
 
         # Create agent subdirectories
-        for agent in ['summarize', 'discovery', 'deposition', 'timeline', 'contradiction']:
+        for agent in ['summarize', 'discovery', 'deposition', 'timeline', 'contradiction',
+                      'word_assistant', 'legal_research', 'mediation_brief']:
             agent_dir = os.path.join(self.prompts_dir, agent)
             if not os.path.exists(agent_dir):
                 os.makedirs(agent_dir)
 
     def _load_registry(self) -> Dict:
         """Load the prompt registry."""
-        if os.path.exists(PROMPT_REGISTRY):
+        if os.path.exists(self._registry_path):
             try:
-                with open(PROMPT_REGISTRY, "r", encoding="utf-8") as f:
+                with open(self._registry_path, "r", encoding="utf-8") as f:
                     return json.load(f)
             except Exception:
                 pass
@@ -117,7 +119,7 @@ class PromptManager:
     def _save_registry(self):
         """Save the prompt registry."""
         try:
-            with open(PROMPT_REGISTRY, "w", encoding="utf-8") as f:
+            with open(self._registry_path, "w", encoding="utf-8") as f:
                 json.dump(self._registry, f, indent=2)
         except Exception as e:
             print(f"Warning: Could not save prompt registry: {e}")
@@ -418,6 +420,71 @@ class PromptManager:
                 migrated += 1
 
         return migrated
+
+    def seed_pipeline_prompts(self):
+        """Seed all pipeline prompts (word assistant, legal research, mediation brief).
+
+        Writes each hardcoded default as v1 if no version exists yet.
+        Idempotent — safe to call multiple times; never overwrites user edits.
+        """
+        from icharlotte_core.word_hotkey import (
+            DEFAULT_WORD_SYSTEM_PROMPT,
+            DEFAULT_WORD_REDLINE_SYSTEM_PROMPT,
+            EMAIL_SYSTEM_PROMPT,
+            DEFAULT_REDLINE_PREFIX,
+            DEFAULT_PLACEHOLDER_INSTRUCTIONS,
+            DEFAULT_CURSOR_INSTRUCTIONS,
+            DEFAULT_SELECTION_INSTRUCTIONS,
+        )
+        from icharlotte_core.legal_research.prompts import (
+            QUERY_PLANNING_PROMPT,
+            QUERY_EXTRACTION_PROMPT,
+            SYNTHESIS_PROMPT,
+            VERIFICATION_PROMPT,
+            RELEVANCE_RANKING_PROMPT,
+            RESEARCH_FRAMING_INSTRUCTION,
+            CITATION_INSTRUCTION,
+        )
+        from icharlotte_core.mediation_brief import MediationBriefGenerator
+
+        seeds = [
+            ("word_assistant", "system_prompt", DEFAULT_WORD_SYSTEM_PROMPT, "Default Word system prompt"),
+            ("word_assistant", "redline_system_prompt", DEFAULT_WORD_REDLINE_SYSTEM_PROMPT, "Default redline system prompt"),
+            ("word_assistant", "email_system_prompt", EMAIL_SYSTEM_PROMPT, "Default Outlook email system prompt"),
+            ("word_assistant", "redline_prefix", DEFAULT_REDLINE_PREFIX, "Prefix prepended in redline mode"),
+            ("word_assistant", "placeholder_instructions", DEFAULT_PLACEHOLDER_INSTRUCTIONS, "Instructions for filling blank/placeholder"),
+            ("word_assistant", "cursor_instructions", DEFAULT_CURSOR_INSTRUCTIONS, "Instructions for cursor-position insertion"),
+            ("word_assistant", "selection_instructions", DEFAULT_SELECTION_INSTRUCTIONS, "Instructions for selected text with full doc"),
+            ("legal_research", "query_planning", QUERY_PLANNING_PROMPT, "Structured JSON query generation"),
+            ("legal_research", "query_extraction", QUERY_EXTRACTION_PROMPT, "Extract queries from litigation prompt"),
+            ("legal_research", "synthesis", SYNTHESIS_PROMPT, "Synthesize authorities into memo"),
+            ("legal_research", "verification", VERIFICATION_PROMPT, "Citation verification"),
+            ("legal_research", "relevance_ranking", RELEVANCE_RANKING_PROMPT, "Case relevance ranking"),
+            ("legal_research", "research_framing", RESEARCH_FRAMING_INSTRUCTION, "Citation requirements for user prompt"),
+            ("legal_research", "citation_instruction", CITATION_INSTRUCTION, "Strict citation rules"),
+            ("mediation_brief", "style_guide", MediationBriefGenerator.STYLE_GUIDE, "Defense writing style/tone guide"),
+            ("mediation_brief", "formatting_rules", MediationBriefGenerator.FORMATTING_RULES, "Structural formatting rules"),
+        ]
+
+        seeded = 0
+        for agent, pass_name, content, description in seeds:
+            key = self._get_prompt_key(agent, pass_name)
+            if key in self._registry.get("prompts", {}):
+                continue
+            if os.path.exists(self._get_current_path(agent, pass_name)):
+                continue
+            self.create_version(
+                agent, pass_name, content.strip(),
+                version="v1",
+                description=description,
+                author="system",
+                set_as_current=True,
+            )
+            seeded += 1
+
+        if seeded:
+            print(f"[PromptManager] Seeded {seeded} pipeline prompts")
+        return seeded
 
 
 # =============================================================================
