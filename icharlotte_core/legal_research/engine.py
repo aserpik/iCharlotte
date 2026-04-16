@@ -8,10 +8,10 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from .models import CaseResult, ResearchResult, StatuteResult, VerificationStatus
 from .prompts import (
-    QUERY_PLANNING_PROMPT,
-    RELEVANCE_RANKING_PROMPT,
-    SYNTHESIS_PROMPT,
-    VERIFICATION_PROMPT,
+    get_query_planning_prompt,
+    get_relevance_ranking_prompt,
+    get_synthesis_prompt,
+    get_verification_prompt,
 )
 from .sources.courtlistener import CourtListenerClient
 from .sources.ca_leginfo import CALegInfoClient
@@ -127,7 +127,7 @@ class LegalResearchEngine:
         )
         authority_block = result.format_authority_block()
         memo = llm_callback(
-            SYNTHESIS_PROMPT,
+            get_synthesis_prompt(),
             f"User's legal question: {query}\n\n{authority_block}",
         )
         result.memo = memo
@@ -165,7 +165,7 @@ class LegalResearchEngine:
 
     def _plan_queries(self, query: str, llm_callback: LLMCallback) -> Dict:
         """Use LLM to extract structured search terms from natural language."""
-        raw = llm_callback(QUERY_PLANNING_PROMPT, query)
+        raw = llm_callback(get_query_planning_prompt(), query)
         try:
             # Strip markdown code fences if present
             cleaned = raw.strip()
@@ -372,7 +372,7 @@ class LegalResearchEngine:
             f"CASES ({len(cases)} total):\n" + "\n".join(case_list)
         )
 
-        raw = llm_callback(RELEVANCE_RANKING_PROMPT, user_prompt)
+        raw = llm_callback(get_relevance_ranking_prompt(), user_prompt)
         try:
             cleaned = raw.strip()
             if cleaned.startswith("```"):
@@ -476,7 +476,7 @@ class LegalResearchEngine:
             f"Verify every citation in the draft. A citation is ONLY valid if "
             f"the case name appears in KNOWN CASE NAMES above."
         )
-        raw = llm_callback(VERIFICATION_PROMPT, prompt)
+        raw = llm_callback(get_verification_prompt(), prompt)
         try:
             cleaned = raw.strip()
             if cleaned.startswith("```"):

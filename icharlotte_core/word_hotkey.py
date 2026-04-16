@@ -1287,9 +1287,9 @@ class TaskLLMWorkerThread(QThread):
             provider, model_id = self.task_data.legal_research_model or (self.task_data.provider, self.task_data.model_id)
 
             from icharlotte_core.legal_research.prompts import (
-                QUERY_EXTRACTION_PROMPT,
-                CITATION_INSTRUCTION,
-                RESEARCH_FRAMING_INSTRUCTION,
+                get_query_extraction_prompt,
+                get_citation_instruction,
+                get_research_framing_instruction,
             )
             from icharlotte_core.llm import LLMHandler
 
@@ -1311,7 +1311,7 @@ class TaskLLMWorkerThread(QThread):
             # Step 1/4: Extract legal questions
             self._emit_status("Research 1/4 · Extracting legal questions...")
             research_query = _llm_for_research(
-                QUERY_EXTRACTION_PROMPT, self.task_data.full_prompt[:8000]
+                get_query_extraction_prompt(), self.task_data.full_prompt[:8000]
             )
             if not research_query or len(research_query.strip()) < 20:
                 research_query = self.task_data.full_prompt[:8000]
@@ -1346,17 +1346,17 @@ class TaskLLMWorkerThread(QThread):
                 # Also inject into user prompt for models that weight user content more
                 if memo:
                     self.task_data.full_prompt = (
-                        f"{RESEARCH_FRAMING_INSTRUCTION}\n\n"
+                        f"{get_research_framing_instruction()}\n\n"
                         f"{self.task_data.full_prompt}\n\n"
                         f"[LEGAL RESEARCH MEMO]\n{memo}\n[/LEGAL RESEARCH MEMO]\n\n"
                         f"{authority_block}\n\n"
-                        f"{CITATION_INSTRUCTION}"
+                        f"{get_citation_instruction()}"
                     )
                 else:
                     self.task_data.full_prompt = (
                         f"{self.task_data.full_prompt}\n\n"
                         f"{authority_block}\n\n"
-                        f"{CITATION_INSTRUCTION}"
+                        f"{get_citation_instruction()}"
                     )
 
             # Step 4/4 will be "Generating response..." emitted in run()

@@ -261,10 +261,10 @@ def build_augmented_system_prompt(
 
     if research_memo:
         parts.append("")
-        parts.append(RESEARCH_FRAMING_INSTRUCTION)
+        parts.append(get_research_framing_instruction())
 
     parts.append("")
-    parts.append(CITATION_INSTRUCTION)
+    parts.append(get_citation_instruction())
 
     if research_memo:
         parts.append("")
@@ -276,3 +276,46 @@ def build_augmented_system_prompt(
     parts.append(f"[LEGAL AUTHORITY]\n{authority_block}")
 
     return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Workbench-aware getters — check PromptManager first, fall back to constant
+# ---------------------------------------------------------------------------
+
+def _load(pass_name: str, default: str) -> str:
+    try:
+        from icharlotte_core.prompt_manager import get_prompt
+        custom = get_prompt("legal_research", pass_name)
+        if custom:
+            return custom
+    except Exception:
+        pass
+    return default
+
+
+def get_query_planning_prompt() -> str:
+    return _load("query_planning", QUERY_PLANNING_PROMPT)
+
+
+def get_query_extraction_prompt() -> str:
+    return _load("query_extraction", QUERY_EXTRACTION_PROMPT)
+
+
+def get_synthesis_prompt() -> str:
+    return _load("synthesis", SYNTHESIS_PROMPT)
+
+
+def get_verification_prompt() -> str:
+    return _load("verification", VERIFICATION_PROMPT)
+
+
+def get_relevance_ranking_prompt() -> str:
+    return _load("relevance_ranking", RELEVANCE_RANKING_PROMPT)
+
+
+def get_research_framing_instruction() -> str:
+    return _load("research_framing", RESEARCH_FRAMING_INSTRUCTION)
+
+
+def get_citation_instruction() -> str:
+    return _load("citation_instruction", CITATION_INSTRUCTION)
