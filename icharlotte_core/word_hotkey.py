@@ -123,6 +123,7 @@ def _force_restore_screen_updating():
             time.sleep(1.0 * (attempt + 1))
     print("WARNING: Could not restore Word ScreenUpdating after all retries")
 
+
 # Set up file logging for word_hotkey so COM errors are captured
 def _setup_word_hotkey_logger():
     import datetime
@@ -196,7 +197,10 @@ DEFAULT_WORD_SYSTEM_PROMPT = (
     "fill in a blank, or continue from a specific point, output ONLY "
     "the new text that comes after the existing content. Do NOT repeat "
     "any part of the preceding sentence, paragraph, or context that was "
-    "provided to you. Start exactly where the existing text leaves off.\n\n"
+    "provided to you. Start your output as fresh, complete text — never "
+    "begin mid-word or mid-sentence as if continuing a truncated fragment. "
+    "The cursor context shown to you may be abbreviated with '…' — always "
+    "refer to the FULL DOCUMENT section for the complete, untruncated text.\n\n"
     "ELABORATION RULE: The user's prompt is a DIRECTIVE describing what "
     "to write — it is NOT the text itself. You must compose original, "
     "substantive, detailed prose that develops the ideas the user described. "
@@ -223,6 +227,67 @@ EMAIL_SYSTEM_PROMPT = (
     "Output ONLY the processed body text - never include Subject lines, To/From/CC headers, "
     "greetings, signatures, or any email metadata. Just output the revised text content directly. "
     "Do not add any preamble or explanation."
+)
+
+# Redline mode prefix — prepended to prompt when Track Changes mode is active
+DEFAULT_REDLINE_PREFIX = (
+    "IMPORTANT — REDLINE MODE IS ACTIVE: Your output will be compared "
+    "word-by-word against the original text to generate Track Changes. "
+    "You MUST follow these rules:\n"
+    "1. Preserve any text that does not need to change EXACTLY as-is — "
+    "same wording, same sentence structure, same word order.\n"
+    "2. PRESERVE THE EXACT PARAGRAPH STRUCTURE — keep the same number of "
+    "paragraphs and blank lines between them. Each paragraph must start "
+    "and end at the same boundaries as the original. Do NOT merge paragraphs, "
+    "split paragraphs, or remove blank lines.\n"
+    "3. Do NOT rephrase, reorganize, or rewrite portions that are already correct.\n"
+    "4. Only modify the specific words or sentences that need to change.\n"
+    "5. If a sentence is fine as-is, copy it verbatim.\n\n"
+)
+
+# Instructions for filling a placeholder/blank in the document
+DEFAULT_PLACEHOLDER_INSTRUCTIONS = (
+    "CRITICAL INSTRUCTIONS:\n"
+    "- The USER DIRECTIVE above tells you WHAT to write about — it is "
+    "NOT the text to insert. You must compose original, substantive "
+    "prose that develops the ideas described. NEVER copy or rephrase "
+    "the user's instruction as your output.\n"
+    "- Your output will be INSERTED DIRECTLY into the document at "
+    "the position of the blank shown above.\n"
+    "- Write ACTUAL PROSE that flows naturally from the text before "
+    "the blank and connects to the text after it.\n"
+    "- You are ghostwriting as the document's author. Match their "
+    "voice, tone, and person (e.g., if they write \"we\", you write \"we\").\n"
+    "- Do NOT write instructions, action items, task descriptions, "
+    "or summaries. Write the actual words that belong in the document.\n"
+    "- Output ONLY the replacement text — no preamble, no explanation."
+)
+
+# Instructions for inserting text at the cursor position (no selection)
+DEFAULT_CURSOR_INSTRUCTIONS = (
+    "CRITICAL INSTRUCTIONS:\n"
+    "- The USER DIRECTIVE above tells you WHAT to write about — it is "
+    "NOT the text to insert. You must compose original, substantive "
+    "prose that develops the ideas described. NEVER copy or rephrase "
+    "the user's instruction as your output.\n"
+    "- Your output will be INSERTED DIRECTLY into the document at "
+    "the cursor position shown above.\n"
+    "- Write ACTUAL PROSE that flows naturally from the text before "
+    "the cursor and connects to the text after it.\n"
+    "- You are ghostwriting as the document's author. Match their "
+    "voice, tone, and person (e.g., if they write \"we\", you write \"we\").\n"
+    "- Do NOT write instructions, action items, task descriptions, "
+    "or meta-commentary. Write the actual words that belong in the document.\n"
+    "- Your output must start as a complete, well-formed sentence or "
+    "paragraph. NEVER begin with a partial word or sentence fragment.\n"
+    "- Output ONLY the text to insert — no preamble, no explanation."
+)
+
+# Instructions for processing a normal text selection
+DEFAULT_SELECTION_INSTRUCTIONS = (
+    "Apply the user's instructions to the SELECTED TEXT above. "
+    "Use the full document for context and to match the writing style. "
+    "Output only the processed version of the selected text."
 )
 
 
@@ -371,112 +436,112 @@ def _get_word_app_from_hwnd(hwnd):
     return None, None
 
 
-def detect_case_from_document() -> tuple:
+def detect_case_from_document(doc_path: Optional[str] = None) -> tuple:
     """
     Detect case info from the currently open Word document's file path.
     Returns: (case_dict_or_None, file_number_or_None, error_message_or_None)
 
-    Parses the document path for file number pattern (####.###) and looks up
-    the case in MasterCaseDatabase.
+    If *doc_path* is provided, skip the COM call and use it directly.
+    Otherwise, connect to Word to get the active document path.
     """
-    if not HAS_WIN32:
-        return None, None, "Win32 not available"
-
     if not HAS_MASTER_DB:
         return None, None, "Database not available"
 
-    doc = None
-    word = None
-    try:
-        pythoncom.CoInitialize()
+    if doc_path is None:
+        # Need to fetch path via COM
+        if not HAS_WIN32:
+            return None, None, "Win32 not available"
 
-        # Try to connect to Word
+        doc = None
+        word = None
         try:
-            word = win32com.client.GetActiveObject("Word.Application")
-        except:
+            pythoncom.CoInitialize()
+
+            # Try to connect to Word
             try:
-                word = win32com.client.GetObject(None, "Word.Application")
+                word = win32com.client.GetActiveObject("Word.Application")
             except:
-                pass
+                try:
+                    word = win32com.client.GetObject(None, "Word.Application")
+                except:
+                    pass
 
-        if not word:
-            return None, None, "Word not running"
+            if not word:
+                return None, None, "Word not running"
 
-        doc = word.ActiveDocument
-        if not doc:
-            del word; word = None
-            return None, None, "No active document"
+            doc = word.ActiveDocument
+            if not doc:
+                del word; word = None
+                return None, None, "No active document"
 
-        # Get the document's full path
-        try:
-            doc_path = doc.FullName
-        except:
+            # Get the document's full path
+            try:
+                doc_path = doc.FullName
+            except:
+                del doc; doc = None
+                del word; word = None
+                return None, None, "Document not saved"
+
+            # Release COM objects immediately — we only need the string path
             del doc; doc = None
             del word; word = None
-            return None, None, "Document not saved"
-
-        # Release COM objects immediately — we only need the string path
-        del doc; doc = None
-        del word; word = None
-
-        if not doc_path or doc_path.startswith("Document"):
-            return None, None, "Document not saved"
-
-        # Try multiple patterns to extract file number from path
-        file_number = None
-
-        # Pattern 1: Direct match for ####.### format (e.g., "1280.001 - Name")
-        direct_pattern = r'(\d{4}\.\d{3})'
-        direct_matches = re.findall(direct_pattern, doc_path)
-        if direct_matches:
-            file_number = direct_matches[0]
-
-        # Pattern 2: Split folder structure (e.g., "3800- NATIONWIDE\167 - Nikitina")
-        # Carrier folder: 4 digits followed by optional space and hyphen
-        # Case folder: 1-3 digits followed by space and hyphen
-        if not file_number:
-            # Look for carrier folder pattern: ####- or #### -
-            carrier_pattern = r'[\\/](\d{4})\s*-\s*[^\\/]+'
-            # Look for case subfolder pattern: ### - (1-3 digits)
-            case_pattern = r'[\\/](\d{1,3})\s*-\s*[^\\/]+'
-
-            carrier_matches = re.findall(carrier_pattern, doc_path)
-            case_matches = re.findall(case_pattern, doc_path)
-
-            if carrier_matches and case_matches:
-                # Use the last carrier and case match (most specific to the document)
-                carrier = carrier_matches[-1]
-                case_num = case_matches[-1].zfill(3)  # Pad to 3 digits
-                file_number = f"{carrier}.{case_num}"
-
-        if not file_number:
-            # Show truncated path for debugging
-            short_path = doc_path if len(doc_path) <= 60 else "..." + doc_path[-57:]
-            return None, None, f"No case number in: {short_path}"
-
-        # Look up in database
-        try:
-            db = MasterCaseDatabase()
-            case = db.get_case(file_number)
-            if case:
-                return case, file_number, None
-            else:
-                return None, file_number, f"Case {file_number} not in database"
         except Exception as e:
-            return None, file_number, f"Database error: {str(e)}"
+            logger.error(f"COM error in detect_case_from_document: {type(e).__name__}: {e}", exc_info=True)
+            return None, None, f"Error: {str(e)}"
+        finally:
+            try:
+                if doc is not None:
+                    del doc
+                if word is not None:
+                    del word
+            except Exception:
+                pass
 
+    if not doc_path or doc_path.startswith("Document"):
+        return None, None, "Document not saved"
+
+    # Try multiple patterns to extract file number from path
+    file_number = None
+
+    # Pattern 1: Direct match for ####.### format (e.g., "1280.001 - Name")
+    direct_pattern = r'(\d{4}\.\d{3})'
+    direct_matches = re.findall(direct_pattern, doc_path)
+    if direct_matches:
+        file_number = direct_matches[0]
+
+    # Pattern 2: Split folder structure (e.g., "3800- NATIONWIDE\167 - Nikitina")
+    # Carrier folder: 4 digits followed by optional space and hyphen
+    # Case folder: 1-3 digits followed by space and hyphen
+    if not file_number:
+        # Look for carrier folder pattern: ####- or #### -
+        carrier_pattern = r'[\\/](\d{4})\s*-\s*[^\\/]+'
+        # Look for case subfolder pattern: ### - (1-3 digits)
+        case_pattern = r'[\\/](\d{1,3})\s*-\s*[^\\/]+'
+
+        carrier_matches = re.findall(carrier_pattern, doc_path)
+        case_matches = re.findall(case_pattern, doc_path)
+
+        if carrier_matches and case_matches:
+            # Use the last carrier and case match (most specific to the document)
+            carrier = carrier_matches[-1]
+            case_num = case_matches[-1].zfill(3)  # Pad to 3 digits
+            file_number = f"{carrier}.{case_num}"
+
+    if not file_number:
+        # Show truncated path for debugging
+        short_path = doc_path if len(doc_path) <= 60 else "..." + doc_path[-57:]
+        return None, None, f"No case number in: {short_path}"
+
+    # Look up in database
+    try:
+        db = MasterCaseDatabase()
+        case = db.get_case(file_number)
+        if case:
+            return case, file_number, None
+        else:
+            return None, file_number, f"Case {file_number} not in database"
     except Exception as e:
-        logger.error(f"COM error in detect_case_from_document: {type(e).__name__}: {e}", exc_info=True)
-        return None, None, f"Error: {str(e)}"
-    finally:
-        # Ensure COM objects are released to prevent GC crashes
-        try:
-            if doc is not None:
-                del doc
-            if word is not None:
-                del word
-        except Exception:
-            pass
+        return None, file_number, f"Database error: {str(e)}"
 
 
 _last_zombie_check = 0.0  # timestamp of last kill_zombie run
@@ -1249,7 +1314,7 @@ class TaskLLMWorkerThread(QThread):
                 QUERY_EXTRACTION_PROMPT, self.task_data.full_prompt[:8000]
             )
             if not research_query or len(research_query.strip()) < 20:
-                research_query = self.task_data.full_prompt[:2000]
+                research_query = self.task_data.full_prompt[:8000]
 
             if self._cancelled:
                 return
@@ -3045,7 +3110,15 @@ class WordLLMPopup(QDialog):
             return
 
         try:
-            self._detected_case, self._detected_file_number, self._case_detection_error = detect_case_from_document()
+            # If _capture_initial_document already ran, reuse the path to
+            # skip a redundant COM GetActiveObject call.
+            doc_path = None
+            if self._original_document is not None:
+                try:
+                    doc_path = self._original_document.FullName
+                except Exception:
+                    pass
+            self._detected_case, self._detected_file_number, self._case_detection_error = detect_case_from_document(doc_path=doc_path)
         except Exception as e:
             logger.error(f"COM error in _detect_and_update_case: {type(e).__name__}: {e}", exc_info=True)
             self._detected_case = None
@@ -3290,6 +3363,60 @@ class WordLLMPopup(QDialog):
                 return None
             self._legal_research_engine = LegalResearchEngine(courtlistener_token=token)
         return self._legal_research_engine
+
+    def _reset_for_new_session(self, cursor_pos=None):
+        """Reset transient state so the popup can be reused without rebuilding UI.
+
+        Called by _show_popup when reusing an existing (hidden) popup instance.
+        This avoids the multi-second cost of constructing a new WordLLMPopup.
+        """
+        self.cursor_pos = cursor_pos
+
+        # Clear stale COM references from the previous session
+        self._original_document = None
+        self._original_document_name = None
+        self._original_range_start = None
+        self._original_range_end = None
+        self._original_has_selection = False
+        self._original_text = None
+        self._word_app = None
+        self._captured_format = None
+        self._redline_mode_active = False
+        self._word_ui_locked = False
+        self._pending_format_type = None
+        self._is_outlook_task = False
+        self._detected_case = None
+        self._detected_file_number = None
+        self._case_detection_error = None
+        self.active_inspector = None
+
+        # Clean up worker threads from previous session
+        if self._worker_thread and self._worker_thread.isRunning():
+            self._worker_thread.cancel()
+            self._worker_thread.terminate()
+            self._worker_thread.wait(200)
+        self._worker_thread = None
+        if self._review_thread and self._review_thread.isRunning():
+            self._review_thread.cancel()
+            self._review_thread.terminate()
+            self._review_thread.wait(200)
+        self._review_thread = None
+
+        # Reset UI to clean state
+        self.custom_input.clear()
+        self.status_label.setText("")
+        self.cancel_btn.setEnabled(True)
+        self.execute_btn.setEnabled(True)
+        self.case_info_label.setText("")
+        if hasattr(self, "mb_section_row"):
+            self.mb_section_row.setVisible(False)
+        self.tab_widget.setCurrentIndex(0)  # Switch back to AI Prompt tab
+
+        # Re-read checkbox settings in case they changed on disk
+        self.redline_settings = load_redline_settings(GEMINI_DATA_DIR)
+        self.redline_checkbox.setChecked(self.redline_settings.get("redline_mode_default", False))
+        self.use_all_text_check.setChecked(self.redline_settings.get("use_all_text_default", False))
+        self.legal_research_checkbox.setChecked(self.redline_settings.get("legal_research_default", False))
 
     def set_app_context(self, context: str, inspector=None):
         """Set the application context and update UI accordingly."""
@@ -3771,6 +3898,7 @@ class WordLLMPopup(QDialog):
         """
         from icharlotte_core.mediation_brief_live import (
             insert_formatted_quotes_at_range,
+            parse_brief_from_word_doc,
         )
         from icharlotte_core.ui.quote_dialog_word import WordQuoteInsertionDialog
 
@@ -3796,10 +3924,26 @@ class WordLLMPopup(QDialog):
             self._clear_preparing_row()
             return True
 
+        # Parse the live brief so the search LLM can orient on the actual
+        # defense arguments when picking quotes. Failure is non-fatal —
+        # if the doc isn't a recognised brief we just fall back to
+        # description-only search.
+        brief_sections: Optional[Dict[str, str]] = None
+        try:
+            live = parse_brief_from_word_doc(doc)
+            if live.sections:
+                brief_sections = {
+                    name: sec.text for name, sec in live.sections.items()
+                }
+        except Exception as e:
+            print(f"[WordLLMPopup] Could not parse brief sections: {e}")
+
         # Clear the preparing row; we're not submitting an LLM task.
         self._clear_preparing_row()
 
-        dialog = WordQuoteInsertionDialog(parent=self)
+        dialog = WordQuoteInsertionDialog(
+            parent=self, brief_sections=brief_sections,
+        )
         inserted_quotes: List[Dict] = []
 
         def _on_quotes_to_insert(quotes):
@@ -3895,20 +4039,7 @@ class WordLLMPopup(QDialog):
             # When redline mode is active, prepend instruction to preserve unchanged text
             redline_prefix = ""
             if self._redline_mode_active:
-                redline_prefix = (
-                    "IMPORTANT — REDLINE MODE IS ACTIVE: Your output will be compared "
-                    "word-by-word against the original text to generate Track Changes. "
-                    "You MUST follow these rules:\n"
-                    "1. Preserve any text that does not need to change EXACTLY as-is — "
-                    "same wording, same sentence structure, same word order.\n"
-                    "2. PRESERVE THE EXACT PARAGRAPH STRUCTURE — keep the same number of "
-                    "paragraphs and blank lines between them. Each paragraph must start "
-                    "and end at the same boundaries as the original. Do NOT merge paragraphs, "
-                    "split paragraphs, or remove blank lines.\n"
-                    "3. Do NOT rephrase, reorganize, or rewrite portions that are already correct.\n"
-                    "4. Only modify the specific words or sentences that need to change.\n"
-                    "5. If a sentence is fine as-is, copy it verbatim.\n\n"
-                )
+                redline_prefix = DEFAULT_REDLINE_PREFIX
                 prompt = redline_prefix + prompt
 
             if use_all_text and has_selection and selected_text:
@@ -3929,12 +4060,9 @@ class WordLLMPopup(QDialog):
                         context_before = ""
                         context_after = ""
                         if placeholder_pos >= 0:
-                            # Grab ~300 chars before and after for context
-                            start = max(0, placeholder_pos - 300)
-                            end = min(len(all_text), placeholder_pos + len(selected_text.strip()) + 300)
-                            context_before = all_text[start:placeholder_pos].strip()
+                            context_before = all_text[:placeholder_pos].strip()
                             after_start = placeholder_pos + len(selected_text.strip())
-                            context_after = all_text[after_start:end].strip()
+                            context_after = all_text[after_start:].strip()
 
                         # Placeholder/blank: instruct AI to write replacement prose
                         full_prompt = (
@@ -3942,23 +4070,10 @@ class WordLLMPopup(QDialog):
                             f"{prompt}\n\n"
                             f"=== FULL DOCUMENT ===\n{all_text}\n\n"
                             f"=== IMMEDIATE CONTEXT ===\n"
-                            f"Text BEFORE the blank: \"{context_before[-200:]}\"\n"
+                            f"Text BEFORE the blank: \"{context_before}\"\n"
                             f"[___BLANK TO FILL___]\n"
-                            f"Text AFTER the blank: \"{context_after[:200]}\"\n\n"
-                            f"CRITICAL INSTRUCTIONS:\n"
-                            f"- The USER DIRECTIVE above tells you WHAT to write about — it is "
-                            f"NOT the text to insert. You must compose original, substantive "
-                            f"prose that develops the ideas described. NEVER copy or rephrase "
-                            f"the user's instruction as your output.\n"
-                            f"- Your output will be INSERTED DIRECTLY into the document at "
-                            f"the position of the blank shown above.\n"
-                            f"- Write ACTUAL PROSE that flows naturally from the text before "
-                            f"the blank and connects to the text after it.\n"
-                            f"- You are ghostwriting as the document's author. Match their "
-                            f"voice, tone, and person (e.g., if they write \"we\", you write \"we\").\n"
-                            f"- Do NOT write instructions, action items, task descriptions, "
-                            f"or summaries. Write the actual words that belong in the document.\n"
-                            f"- Output ONLY the replacement text — no preamble, no explanation."
+                            f"Text AFTER the blank: \"{context_after}\"\n\n"
+                            f"{DEFAULT_PLACEHOLDER_INSTRUCTIONS}"
                         )
                     else:
                         # Normal selection: process/transform the selected text
@@ -3966,9 +4081,7 @@ class WordLLMPopup(QDialog):
                             f"{prompt}\n\n"
                             f"=== FULL DOCUMENT (for context) ===\n{all_text}\n\n"
                             f"=== SELECTED TEXT TO PROCESS ===\n{selected_text}\n\n"
-                            f"Apply the user's instructions to the SELECTED TEXT above. "
-                            f"Use the full document for context and to match the writing style. "
-                            f"Output only the processed version of the selected text."
+                            f"{DEFAULT_SELECTION_INSTRUCTIONS}"
                         )
                     self.status_label.setText("Processing with full document context...")
                 else:
@@ -3993,23 +4106,10 @@ class WordLLMPopup(QDialog):
                             f"{prompt}\n\n"
                             f"=== FULL DOCUMENT ===\n{all_text}\n\n"
                             f"=== CURSOR POSITION ===\n"
-                            f"Text BEFORE cursor: \"{context_before[-300:]}\"\n"
+                            f"Text BEFORE cursor: \"{context_before}\"\n"
                             f"[___CURSOR IS HERE___]\n"
-                            f"Text AFTER cursor: \"{context_after[:300]}\"\n\n"
-                            f"CRITICAL INSTRUCTIONS:\n"
-                            f"- The USER DIRECTIVE above tells you WHAT to write about — it is "
-                            f"NOT the text to insert. You must compose original, substantive "
-                            f"prose that develops the ideas described. NEVER copy or rephrase "
-                            f"the user's instruction as your output.\n"
-                            f"- Your output will be INSERTED DIRECTLY into the document at "
-                            f"the cursor position shown above.\n"
-                            f"- Write ACTUAL PROSE that flows naturally from the text before "
-                            f"the cursor and connects to the text after it.\n"
-                            f"- You are ghostwriting as the document's author. Match their "
-                            f"voice, tone, and person (e.g., if they write \"we\", you write \"we\").\n"
-                            f"- Do NOT write instructions, action items, task descriptions, "
-                            f"or summaries. Write the actual words that belong in the document.\n"
-                            f"- Output ONLY the text to insert — no preamble, no explanation."
+                            f"Text AFTER cursor: \"{context_after}\"\n\n"
+                            f"{DEFAULT_CURSOR_INSTRUCTIONS}"
                         )
                     else:
                         full_prompt = f"{prompt}\n\nDocument text:\n{all_text}"
@@ -4654,12 +4754,8 @@ class WordLLMPopup(QDialog):
                     self._original_text = text
                     self._original_text_raw = selection.Text if selection.Text else ""
                     print(f"[Win+V] Pre-captured selection: range={self._original_range_start}-{self._original_range_end}, has_selection={self._original_has_selection}")
-                # Refresh the prompt dropdown now that _original_document is set,
-                # so Mediation Brief entries can appear if the active doc is a brief.
-                try:
-                    self.refresh_combo()
-                except Exception as refresh_err:
-                    print(f"[Win+V] refresh_combo after capture failed: {refresh_err}")
+                # Note: refresh_combo is NOT called here — set_app_context
+                # (which runs after _capture_initial_document) already calls it.
         except Exception as e:
             print(f"[Win+V] Could not pre-capture document: {e}")
 
@@ -6100,63 +6196,75 @@ class WordHotkeyManager:
         self._hotkey_registered = False
 
     def _show_popup(self):
-        """Show the popup dialog (on main thread)."""
+        """Show the popup dialog (on main thread).
+
+        Reuses the existing popup widget when possible to avoid the
+        multi-second cost of constructing a new WordLLMPopup (3 tabs,
+        stylesheet parsing, imports, COM calls).  On the first invocation
+        the popup is created; subsequent invocations reset transient state
+        and re-show it.
+        """
         try:
             logger.debug(f"_show_popup called. popup={self.popup}, visible={self.popup.isVisible() if self.popup else 'N/A'}")
 
-            if self.popup is None or not self.popup.isVisible():
-                # Capture foreground hwnd IMMEDIATELY — before any popup
-                # creation or COM calls that might shift focus.
-                fg_hwnd = None
+            if self.popup is not None and self.popup.isVisible():
+                logger.debug("_show_popup: popup already visible, skipping")
+                return
+
+            # Capture foreground hwnd IMMEDIATELY — before any popup
+            # creation or COM calls that might shift focus.
+            fg_hwnd = None
+            try:
+                fg_hwnd = win32gui.GetForegroundWindow() if HAS_WIN32 else None
+            except Exception:
+                pass
+
+            # Detect active application context BEFORE creating popup
+            app_context, inspector = detect_active_app_context()
+            logger.debug(f"_show_popup: app_context={app_context}")
+
+            # Only show if Word or Outlook compose is active
+            if app_context == APP_CONTEXT_UNKNOWN:
                 try:
-                    fg_hwnd = win32gui.GetForegroundWindow() if HAS_WIN32 else None
+                    hwnd = fg_hwnd or win32gui.GetForegroundWindow()
+                    cls = win32gui.GetClassName(hwnd) if hwnd else "None"
+                    title = win32gui.GetWindowText(hwnd)[:60] if hwnd else "None"
+                    logger.debug(f"Win+V pressed but neither Word nor Outlook compose is active (fg={cls}, title={title})")
                 except Exception:
-                    pass
+                    logger.debug("Win+V pressed but neither Word nor Outlook compose is active")
+                return
 
-                # Detect active application context BEFORE creating popup
-                app_context, inspector = detect_active_app_context()
-                logger.debug(f"_show_popup: app_context={app_context}")
+            # Capture cursor position on main thread
+            from PySide6.QtGui import QCursor
+            cursor_pos = QCursor.pos()
 
-                # Only show if Word or Outlook compose is active
-                if app_context == APP_CONTEXT_UNKNOWN:
-                    # Log what the foreground window actually is for debugging
-                    try:
-                        hwnd = fg_hwnd or win32gui.GetForegroundWindow()
-                        cls = win32gui.GetClassName(hwnd) if hwnd else "None"
-                        title = win32gui.GetWindowText(hwnd)[:60] if hwnd else "None"
-                        logger.debug(f"Win+V pressed but neither Word nor Outlook compose is active (fg={cls}, title={title})")
-                    except Exception:
-                        logger.debug("Win+V pressed but neither Word nor Outlook compose is active")
-                    return
-
-                # Capture cursor position on main thread
-                from PySide6.QtGui import QCursor
-                cursor_pos = QCursor.pos()
-
+            if self.popup is None:
+                # First invocation — build the popup (slow, but only once)
                 logger.debug("_show_popup: creating new WordLLMPopup...")
                 self.popup = WordLLMPopup(
-                    parent=None,  # No parent so it's a top-level window
+                    parent=None,
                     llm_callback=self._get_llm_callback(),
                     cursor_pos=cursor_pos
                 )
-                logger.debug("_show_popup: popup created, setting context and showing")
-
-                # Set the detected context before showing
-                self.popup.set_app_context(app_context, inspector)
-
-                # Capture the active document NOW (at Win+V time) before the
-                # popup steals focus.  This prevents the bug where switching
-                # to another Word document while typing a prompt causes the
-                # result to be inserted into the wrong document.
-                if app_context == APP_CONTEXT_WORD:
-                    self.popup._capture_initial_document(fg_hwnd=fg_hwnd)
-
-                self.popup.show()
-
-                # Force focus to the popup window (Windows focus stealing prevention workaround)
-                self._force_focus(self.popup)
             else:
-                logger.debug("_show_popup: popup already visible, skipping")
+                # Reuse existing popup — reset transient state (fast)
+                logger.debug("_show_popup: reusing existing popup")
+                self.popup._reset_for_new_session(cursor_pos=cursor_pos)
+
+            # Capture the active document NOW (at Win+V time) before the
+            # popup steals focus.  Done BEFORE set_app_context so that
+            # _detect_and_update_case can reuse the captured doc path
+            # instead of making a redundant COM call.
+            if app_context == APP_CONTEXT_WORD:
+                self.popup._capture_initial_document(fg_hwnd=fg_hwnd)
+
+            # Set the detected context and update UI
+            self.popup.set_app_context(app_context, inspector)
+
+            self.popup.show()
+
+            # Force focus to the popup window
+            self._force_focus(self.popup)
         except Exception as e:
             logger.error(f"Error in _show_popup: {type(e).__name__}: {e}", exc_info=True)
 
