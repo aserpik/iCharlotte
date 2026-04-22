@@ -2282,11 +2282,12 @@ class AttachmentArea(QFrame):
         chip_layout.addWidget(status_label)
 
         remove_btn = QPushButton("\u00d7")  # ×
-        remove_btn.setFixedSize(16, 16)
+        remove_btn.setFixedSize(18, 18)
+        remove_btn.setToolTip("Remove file")
         remove_btn.setStyleSheet(
-            "QPushButton { background: transparent; color: #a6adc8; border: none; "
-            "font-size: 12px; font-weight: bold; }"
-            "QPushButton:hover { color: #f38ba8; }"
+            "QPushButton { background: #45475a; color: #cdd6f4; border: none; "
+            "border-radius: 9px; font-size: 12px; font-weight: bold; }"
+            "QPushButton:hover { background: #f38ba8; color: #1e1e2e; }"
         )
         remove_btn.clicked.connect(lambda checked, p=file_path: self._remove_file(p))
         chip_layout.addWidget(remove_btn)
@@ -3236,16 +3237,37 @@ class WordLLMPopup(QDialog):
             )
 
     def _is_active_doc_a_brief(self) -> bool:
-        """Return True if the popup's captured Word document is a mediation brief."""
+        """Return True if the popup's captured Word document is a mediation brief.
+
+        Caches the result keyed by the document's FullName so that re-opening
+        the popup on the same document doesn't re-scan the text.  The cache
+        lives on the popup instance and is carried across reuse.
+        """
         doc = getattr(self, "_original_document", None)
         if doc is None:
             return False
         try:
+            doc_key = doc.FullName
+        except Exception:
+            doc_key = None
+
+        cache = getattr(self, "_brief_check_cache", None)
+        if cache is None:
+            cache = {}
+            self._brief_check_cache = cache
+        if doc_key is not None and doc_key in cache:
+            return cache[doc_key]
+
+        try:
             from icharlotte_core.mediation_brief_live import is_mediation_brief
-            return is_mediation_brief(doc)
+            result = is_mediation_brief(doc)
         except Exception as e:
             print(f"[WordLLMPopup] _is_active_doc_a_brief failed: {e}")
             return False
+
+        if doc_key is not None:
+            cache[doc_key] = result
+        return result
 
     def save_prompts_to_file(self):
         """Save Word prompts to file."""
@@ -3435,6 +3457,7 @@ class WordLLMPopup(QDialog):
 
         # Reset UI to clean state
         self.custom_input.clear()
+        self.attachment_area.clear()
         self.status_label.setText("")
         self.cancel_btn.setEnabled(True)
         self.execute_btn.setEnabled(True)
