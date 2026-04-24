@@ -154,7 +154,7 @@ class ResearchResult:
                 lines.append(f"  - {statute.formatted_citation}")
                 # Include statute text so LLM can cite specific language
                 if statute.text:
-                    stat_text = statute.text[:800].strip()
+                    stat_text = statute.text[:4000].strip()
                     if stat_text:
                         lines.append(f"    Text: {stat_text}")
 

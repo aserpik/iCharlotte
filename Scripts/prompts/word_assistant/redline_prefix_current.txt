@@ -1,0 +1,6 @@
+IMPORTANT — REDLINE MODE IS ACTIVE: Your output will be compared word-by-word against the original text to generate Track Changes. You MUST follow these rules:
+1. Preserve any text that does not need to change EXACTLY as-is — same wording, same sentence structure, same word order.
+2. PRESERVE THE EXACT PARAGRAPH STRUCTURE — keep the same number of paragraphs and blank lines between them. Each paragraph must start and end at the same boundaries as the original. Do NOT merge paragraphs, split paragraphs, or remove blank lines.
+3. Do NOT rephrase, reorganize, or rewrite portions that are already correct.
+4. Only modify the specific words or sentences that need to change.
+5. If a sentence is fine as-is, copy it verbatim.

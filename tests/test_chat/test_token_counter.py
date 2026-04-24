@@ -64,10 +64,10 @@ class TestTokenCounter(unittest.TestCase):
         """Test getting context limit for known models."""
         # Gemini models
         limit = TokenCounter.get_context_limit('gemini-3-flash-preview')
-        self.assertEqual(limit, 1000000)
+        self.assertEqual(limit, 1048576)
 
         limit = TokenCounter.get_context_limit('gemini-1.5-pro')
-        self.assertEqual(limit, 2000000)
+        self.assertEqual(limit, 2097152)
 
         # OpenAI models
         limit = TokenCounter.get_context_limit('gpt-4o')
@@ -86,7 +86,7 @@ class TestTokenCounter(unittest.TestCase):
     def test_get_context_limit_unknown_with_provider(self):
         """Test context limit fallback for unknown model with provider."""
         limit = TokenCounter.get_context_limit('unknown-model', provider='Gemini')
-        self.assertEqual(limit, 1000000)
+        self.assertEqual(limit, 1048576)
 
         limit = TokenCounter.get_context_limit('unknown-model', provider='OpenAI')
         self.assertEqual(limit, 128000)
@@ -159,8 +159,8 @@ class TestTokenCounter(unittest.TestCase):
     def test_estimate_remaining_tokens(self):
         """Test estimating remaining tokens."""
         remaining = TokenCounter.estimate_remaining_tokens(50000, 'gpt-4o')
-        # 128000 - 50000 - 4096 (reserve) = 73904
-        self.assertEqual(remaining, 73904)
+        # 128000 - 50000 - 16384 (reserve) = 61616
+        self.assertEqual(remaining, 61616)
 
         # Custom reserve
         remaining = TokenCounter.estimate_remaining_tokens(50000, 'gpt-4o', reserve_for_response=8000)

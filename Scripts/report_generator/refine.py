@@ -249,7 +249,7 @@ def _build_refinement_prompt(
     # Prior report context
     prior_block = ""
     if prior_section:
-        prior_truncated = prior_section[:4000] if len(prior_section) > 4000 else prior_section
+        prior_truncated = prior_section[:15000] if len(prior_section) > 15000 else prior_section
         prior_block = (
             "\nPRIOR REPORT VERSION (match this voice and structure):\n"
             f"{prior_truncated}\n"

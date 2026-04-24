@@ -13,9 +13,11 @@ a single place.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+import os
+from typing import Dict, List, Mapping, Optional
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QDialog,
     QFileDialog,
@@ -47,14 +49,35 @@ class WordQuoteInsertionDialog(QDialog):
 
     quotes_to_insert = Signal(list)
 
-    def __init__(self, parent=None):
+    def __init__(
+        self,
+        parent=None,
+        brief_sections: Optional[Mapping[str, str]] = None,
+    ):
+        """Construct the dialog.
+
+        Args:
+            parent: Qt parent widget.
+            brief_sections: Optional mapping of canonical section name →
+                current body text, parsed from the live Word document by
+                the caller via
+                :func:`mediation_brief_live.parse_brief_from_word_doc`.
+                When provided, the search LLM receives the brief's current
+                text as orientation context so it can pick quotes that
+                support the actual defense arguments. Pass ``None`` when
+                the active document is not a recognised mediation brief.
+        """
         super().__init__(parent)
         self._worker: Optional[QuoteSearchWorker] = None
         self._result_widgets: List[QuoteResultWidget] = []
+        self._brief_sections: Optional[Dict[str, str]] = (
+            dict(brief_sections) if brief_sections else None
+        )
 
         self.setWindowTitle("Insert Deposition Quotes")
         self.setMinimumWidth(640)
         self.setMinimumHeight(640)
+        self.setAcceptDrops(True)
 
         root = QVBoxLayout(self)
         root.setSpacing(8)
@@ -156,15 +179,59 @@ class WordQuoteInsertionDialog(QDialog):
             "",
             "Transcripts (*.pdf *.docx);;All Files (*)",
         )
+        self._append_transcript_paths(paths)
+
+    def _append_transcript_paths(self, paths) -> int:
+        """Add transcript file paths to the list, skipping duplicates and
+        unsupported extensions. Returns the number of new items added.
+        """
+        added = 0
+        existing = {
+            self.transcript_list.item(i).data(Qt.ItemDataRole.UserRole)
+            for i in range(self.transcript_list.count())
+        }
         for path in paths:
-            if not any(
-                self.transcript_list.item(i).data(Qt.ItemDataRole.UserRole) == path
-                for i in range(self.transcript_list.count())
-            ):
-                item = QListWidgetItem(path)
-                item.setData(Qt.ItemDataRole.UserRole, path)
-                self.transcript_list.addItem(item)
-        self._update_search_button()
+            if not path or path in existing:
+                continue
+            ext = os.path.splitext(path)[1].lower()
+            if ext not in (".pdf", ".docx"):
+                continue
+            item = QListWidgetItem(os.path.basename(path))
+            item.setData(Qt.ItemDataRole.UserRole, path)
+            self.transcript_list.addItem(item)
+            existing.add(path)
+            added += 1
+        if added:
+            self._update_search_button()
+        return added
+
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        mime = event.mimeData()
+        if mime.hasUrls() and any(
+            u.isLocalFile()
+            and os.path.splitext(u.toLocalFile())[1].lower() in (".pdf", ".docx")
+            for u in mime.urls()
+        ):
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            super().dragMoveEvent(event)
+
+    def dropEvent(self, event: QDropEvent):
+        mime = event.mimeData()
+        if not mime.hasUrls():
+            super().dropEvent(event)
+            return
+        paths = [u.toLocalFile() for u in mime.urls() if u.isLocalFile()]
+        if self._append_transcript_paths(paths):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
 
     def _remove_selected_transcripts(self):
         for item in self.transcript_list.selectedItems():
@@ -198,7 +265,10 @@ class WordQuoteInsertionDialog(QDialog):
         self.status_label.setText("Searching transcripts…")
 
         generator = MediationBriefGenerator()
-        self._worker = QuoteSearchWorker(generator, paths, description, parent=self)
+        self._worker = QuoteSearchWorker(
+            generator, paths, description,
+            brief_sections=self._brief_sections, parent=self,
+        )
         self._worker.results_ready.connect(self._on_search_done)
         self._worker.error.connect(self._on_search_error)
         self._worker.start()

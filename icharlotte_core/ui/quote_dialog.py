@@ -37,23 +37,34 @@ _QUOTE_SECTIONS = [
 
 
 class QuoteSearchWorker(QThread):
-    """Background thread that calls generator.search_quotes()."""
+    """Background thread that calls generator.search_quotes().
+
+    ``brief_sections`` is optional context describing the current text of
+    the mediation brief — passed through to ``search_quotes`` so the LLM
+    can orient on which arguments actually appear in each section.
+    Callers without brief context (or outside a brief workflow) should
+    pass ``None``.
+    """
 
     results_ready = Signal(list)
     error = Signal(str)
 
     def __init__(self, generator: MediationBriefGenerator,
                  transcript_paths: List[str], description: str,
+                 brief_sections: Optional[Dict[str, str]] = None,
                  parent=None):
         super().__init__(parent)
         self._generator = generator
         self._transcript_paths = transcript_paths
         self._description = description
+        self._brief_sections = brief_sections
 
     def run(self):
         try:
             results = self._generator.search_quotes(
-                self._transcript_paths, self._description
+                self._transcript_paths,
+                self._description,
+                brief_sections=self._brief_sections,
             )
             self.results_ready.emit(results)
         except Exception as exc:
@@ -96,7 +107,7 @@ class QuoteResultWidget(QFrame):
             header_text += f"  (p. {page_line})"
 
         header_label = QLabel(header_text)
-        header_label.setStyleSheet("font-weight: bold;")
+        header_label.setStyleSheet("font-weight: bold; color: #000;")
         header_row.addWidget(header_label, 1)
 
         self.edit_btn = QPushButton("Edit")
@@ -111,7 +122,7 @@ class QuoteResultWidget(QFrame):
         relevance = quote_data.get("relevance", "")
         if relevance:
             rel_label = QLabel(relevance)
-            rel_label.setStyleSheet("font-style: italic; color: #555;")
+            rel_label.setStyleSheet("font-style: italic; color: #222;")
             rel_label.setWordWrap(True)
             root.addWidget(rel_label)
 
@@ -124,8 +135,8 @@ class QuoteResultWidget(QFrame):
             Qt.TextInteractionFlag.TextSelectableByMouse
         )
         self.qa_display.setStyleSheet(
-            "background: #f0f0f0; padding: 6px; border-radius: 3px;"
-            " font-family: monospace; font-size: 11px;"
+            "background: #f0f0f0; color: #000; padding: 6px;"
+            " border-radius: 3px; font-family: monospace; font-size: 12px;"
         )
         root.addWidget(self.qa_display)
 
@@ -135,7 +146,8 @@ class QuoteResultWidget(QFrame):
         self.qa_editor.setMinimumHeight(80)
         self.qa_editor.setVisible(False)
         self.qa_editor.setStyleSheet(
-            "background: #fff9e6; font-family: monospace; font-size: 11px;"
+            "background: #fff9e6; color: #000; font-family: monospace;"
+            " font-size: 12px;"
         )
         root.addWidget(self.qa_editor)
 
@@ -409,7 +421,13 @@ class QuoteInsertionDialog(QDialog):
         self.search_btn.setEnabled(False)
         self.insert_btn.setEnabled(False)
 
-        self._worker = QuoteSearchWorker(self._generator, paths, description, self)
+        # Pass the generator's current in-memory sections so the LLM sees
+        # the actual brief text as orientation context.
+        brief_sections = dict(getattr(self._generator, "sections", {}) or {})
+        self._worker = QuoteSearchWorker(
+            self._generator, paths, description,
+            brief_sections=brief_sections, parent=self,
+        )
         self._worker.results_ready.connect(self._on_results_ready)
         self._worker.error.connect(self._on_search_error)
         self._worker.finished.connect(self._on_worker_finished)

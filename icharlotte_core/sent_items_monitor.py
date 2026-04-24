@@ -153,10 +153,10 @@ class SentItemsMonitorWorker(QThread):
                     continue
                 if past_headers and line_stripped:
                     content_lines.append(line_stripped)
-                    if len(' '.join(content_lines)) > 200:
+                    if len(' '.join(content_lines)) > 500:
                         break
 
-            snippet = ' '.join(content_lines)[:200]
+            snippet = ' '.join(content_lines)[:500]
 
             if subject or snippet:
                 emails.append({
@@ -169,7 +169,7 @@ class SentItemsMonitorWorker(QThread):
     # File extensions to skip (images, signatures, etc.)
     SKIP_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.ico', '.tiff', '.webp'}
     # Max chars to extract from first page of attachment
-    MAX_ATTACHMENT_TEXT = 500
+    MAX_ATTACHMENT_TEXT = 2000
 
     def _extract_attachment_text(self, item) -> list:
         """
@@ -690,7 +690,7 @@ class SentItemsMonitorWorker(QThread):
                 if filename:
                     if first_page:
                         # Truncate first page text for prompt
-                        first_page_truncated = first_page[:300] + "..." if len(first_page) > 300 else first_page
+                        first_page_truncated = first_page[:1500] + "..." if len(first_page) > 1500 else first_page
                         att_info.append(f"  - {filename}\n    First page: {first_page_truncated}")
                     else:
                         att_info.append(f"  - {filename}")

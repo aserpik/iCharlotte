@@ -5,66 +5,10 @@ import unittest
 from unittest.mock import patch, MagicMock
 
 
-class TestQuoteResultParsing(unittest.TestCase):
-
-    def test_parse_single_quote_result(self):
-        from icharlotte_core.mediation_brief import MediationBriefGenerator
-        gen = MediationBriefGenerator()
-        llm_output = (
-            "QUOTE_RESULT_START\n"
-            "DEPONENT: Haydel\n"
-            "SOURCE: 25.05.29 Depo of Benjamin Haydel.pdf\n"
-            "PAGE_LINE: 35:4-8\n"
-            "RELEVANCE: Plaintiff admits seeing the plastic sheeting\n"
-            "Q. Did you see the plastic on the ground before you fell?\n"
-            "A. Yeah, I saw it -- I saw it coming up the stairs.\n"
-            "QUOTE_RESULT_END"
-        )
-        results = gen._parse_quote_results(llm_output)
-        self.assertEqual(len(results), 1)
-        self.assertEqual(results[0]["deponent"], "Haydel")
-        self.assertEqual(results[0]["source"], "25.05.29 Depo of Benjamin Haydel.pdf")
-        self.assertEqual(results[0]["page_line"], "35:4-8")
-        self.assertIn("Q. Did you see", results[0]["qa_text"])
-        self.assertIn("A. Yeah, I saw it", results[0]["qa_text"])
-
-    def test_parse_multiple_quote_results(self):
-        from icharlotte_core.mediation_brief import MediationBriefGenerator
-        gen = MediationBriefGenerator()
-        llm_output = (
-            "QUOTE_RESULT_START\n"
-            "DEPONENT: Haydel\n"
-            "SOURCE: depo1.pdf\n"
-            "PAGE_LINE: 35:4-8\n"
-            "RELEVANCE: First relevant passage\n"
-            "Q. First question?\n"
-            "A. First answer.\n"
-            "QUOTE_RESULT_END\n\n"
-            "QUOTE_RESULT_START\n"
-            "DEPONENT: Smith\n"
-            "SOURCE: depo2.pdf\n"
-            "PAGE_LINE: 12:1-5\n"
-            "RELEVANCE: Second relevant passage\n"
-            "Q. Second question?\n"
-            "A. Second answer.\n"
-            "QUOTE_RESULT_END"
-        )
-        results = gen._parse_quote_results(llm_output)
-        self.assertEqual(len(results), 2)
-        self.assertEqual(results[0]["deponent"], "Haydel")
-        self.assertEqual(results[1]["deponent"], "Smith")
-
-    def test_parse_no_matches(self):
-        from icharlotte_core.mediation_brief import MediationBriefGenerator
-        gen = MediationBriefGenerator()
-        results = gen._parse_quote_results("NO_MATCHES_FOUND")
-        self.assertEqual(results, [])
-
-    def test_parse_empty_response(self):
-        from icharlotte_core.mediation_brief import MediationBriefGenerator
-        gen = MediationBriefGenerator()
-        results = gen._parse_quote_results("")
-        self.assertEqual(results, [])
+# NOTE: the old LLM quote-output parser (_parse_quote_results) was replaced
+# by the grounded ID-based pipeline in tests/test_mediation_brief_quote_search.py.
+# The old parser tested free-form LLM output; the new parser resolves IDs
+# against a pre-computed candidate list and therefore needs different fixtures.
 
 
 class TestQuoteInsertion(unittest.TestCase):

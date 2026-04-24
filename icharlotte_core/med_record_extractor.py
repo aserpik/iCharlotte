@@ -21,7 +21,7 @@ from icharlotte_core.subpoena_tracker import _find_folder_ci
 logger = logging.getLogger(__name__)
 
 DATE_PATTERN = re.compile(r'(\d{4})[.\-](\d{2})[.\-](\d{2})')
-PAGE_SPEC_RE = re.compile(r'Pg\.?\s*(?:No)?:?\s*(\d+)(?:\s*-\s*(\d+))?/(\d+)')
+PAGE_SPEC_RE = re.compile(r'Pg\.?\s*(?:No)?:?\s*(\d+)(?:\s*-\s*(\d+))?/(\d+)', re.IGNORECASE)
 # Fallback: bare "number/total" with no Pg prefix
 BARE_PAGE_RE = re.compile(r'^(\d+)(?:\s*-\s*(\d+))?/(\d+)$')
 

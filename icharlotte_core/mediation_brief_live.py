@@ -165,13 +165,27 @@ def is_mediation_brief(doc_com) -> bool:
 
     Used by the Word popup to gate the "Mediation Brief" template entries so
     they only appear when the active document looks like a brief.
+
+    Fast path: reads the full document text in a single ``doc.Content.Text``
+    COM call and counts matching headings, short-circuiting once 3 are found.
+    Avoids the per-paragraph COM round-trips of ``parse_brief_from_word_doc``,
+    which were making the Win+V popup take 10+ seconds to open on long briefs.
     """
     try:
-        live = parse_brief_from_word_doc(doc_com)
+        text = doc_com.Content.Text or ""
     except Exception as e:
-        logger.debug("is_mediation_brief: parse failed: %s", e)
+        logger.debug("is_mediation_brief: Content.Text failed: %s", e)
         return False
-    return len(live.sections) >= 3
+
+    seen = set()
+    for line in text.splitlines():
+        canonical = _match_heading(line)
+        if canonical is None or canonical in seen:
+            continue
+        seen.add(canonical)
+        if len(seen) >= 3:
+            return True
+    return False
 
 
 def get_word_range_for_section(doc_com, section: LiveSection):

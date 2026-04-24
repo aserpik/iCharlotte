@@ -1220,15 +1220,23 @@ class PromptsDialog(QDialog):
         input_layout = QVBoxLayout(input_group)
 
         input_controls = QHBoxLayout()
-        self.load_test_file_btn = QPushButton("Load from File")
+        self.load_test_file_btn = QPushButton("Load Documents...")
+        self.load_test_file_btn.setToolTip(
+            "Load one or more PDF / DOCX / TXT / MSG files as test context. "
+            "Extracted text is concatenated with file headers."
+        )
         self.load_test_file_btn.clicked.connect(self._load_test_input)
         input_controls.addWidget(self.load_test_file_btn)
         input_controls.addStretch()
         input_layout.addLayout(input_controls)
 
         self.test_input = QTextEdit()
-        self.test_input.setPlaceholderText("Paste test input here or load from file...")
-        self.test_input.setMaximumHeight(120)
+        self.test_input.setPlaceholderText(
+            "Paste test input here, or click 'Load Documents...' to add one or more "
+            "PDFs / DOCX / TXT / MSG files as context for the prompt."
+        )
+        self.test_input.setMinimumHeight(150)
+        self.test_input.setMaximumHeight(300)
         input_layout.addWidget(self.test_input)
 
         layout.addWidget(input_group)
@@ -1911,16 +1919,69 @@ Provide the improved prompt:"""
     # =========================================================================
 
     def _load_test_input(self):
-        """Load test input from a file."""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self, "Load Test Input", "", "Text Files (*.txt);;All Files (*)"
+        """Load test input from one or more documents (PDF/DOCX/TXT/MSG).
+
+        Uses DocumentProcessor so binary formats (PDFs in particular) don't
+        blow up with UTF-8 decode errors. Multiple files are concatenated
+        with file-name headers so the LLM can distinguish sources.
+        """
+        file_paths, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Load Test Documents",
+            "",
+            "Documents (*.pdf *.docx *.txt *.msg);;"
+            "PDF Files (*.pdf);;"
+            "Word Documents (*.docx);;"
+            "Outlook Messages (*.msg);;"
+            "Text Files (*.txt);;"
+            "All Files (*)"
         )
-        if file_path:
+        if not file_paths:
+            return
+
+        # Lazy import — DocumentProcessor pulls in pypdf/docx/OCR deps
+        from ..document_processor import DocumentProcessor
+        processor = DocumentProcessor()
+
+        text, errors = self._extract_test_input_from_files(file_paths, processor)
+
+        if text:
+            self.test_input.setPlainText(text)
+
+        if errors:
+            QMessageBox.warning(
+                self,
+                "Some files could not be loaded",
+                "Failed to extract text from:\n\n" + "\n".join(errors),
+            )
+        elif not text:
+            QMessageBox.warning(
+                self, "No content", "No text could be extracted from the selected files."
+            )
+
+    @staticmethod
+    def _extract_test_input_from_files(file_paths, processor):
+        """Extract and concatenate text from files using DocumentProcessor.
+
+        Pure helper — no Qt dependencies — so it can be unit-tested with a
+        mock processor. Returns (combined_text, error_messages).
+        """
+        parts = []
+        errors = []
+        for path in file_paths:
+            filename = os.path.basename(path)
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    self.test_input.setPlainText(f.read())
+                result = processor.extract_text(path)
+                if result.success:
+                    header = f"=== FILE: {filename} ==="
+                    parts.append(f"{header}\n{result.text.strip()}")
+                else:
+                    errors.append(f"{filename}: {result.error or 'extraction produced no text'}")
             except Exception as e:
-                QMessageBox.critical(self, "Error", f"Failed to load file: {e}")
+                errors.append(f"{filename}: {e}")
+
+        combined = "\n\n".join(parts)
+        return combined, errors
 
     def _run_ab_test(self):
         """Run A/B test with selected versions and/or models."""

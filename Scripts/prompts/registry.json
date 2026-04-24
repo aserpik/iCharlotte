@@ -67,13 +67,22 @@
     "deposition:summary": {
       "agent": "deposition",
       "pass_name": "summary",
-      "current_version": "v1",
+      "current_version": "v2",
       "versions": [
         {
           "version": "v1",
           "created": "2026-01-29T08:28:04.111915",
           "description": "Migrated from legacy location",
           "author": "",
+          "is_current": false,
+          "performance_score": 0.0,
+          "usage_count": 0
+        },
+        {
+          "version": "v2",
+          "created": "2026-04-21T14:49:09.233671",
+          "description": "v2",
+          "author": "user",
           "is_current": true,
           "performance_score": 0.0,
           "usage_count": 0
@@ -298,6 +307,262 @@
           "created": "2026-04-10T18:00:00.000000",
           "description": "Initial quote search prompt",
           "author": "",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "word_assistant:system_prompt": {
+      "agent": "word_assistant",
+      "pass_name": "system_prompt",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-16T15:50:46.055286",
+          "description": "Default Word system prompt",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "word_assistant:redline_system_prompt": {
+      "agent": "word_assistant",
+      "pass_name": "redline_system_prompt",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-16T15:50:46.057801",
+          "description": "Default redline system prompt",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "word_assistant:email_system_prompt": {
+      "agent": "word_assistant",
+      "pass_name": "email_system_prompt",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-16T15:50:46.061050",
+          "description": "Default Outlook email system prompt",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "word_assistant:redline_prefix": {
+      "agent": "word_assistant",
+      "pass_name": "redline_prefix",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-16T15:50:46.063176",
+          "description": "Prefix prepended in redline mode",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "word_assistant:placeholder_instructions": {
+      "agent": "word_assistant",
+      "pass_name": "placeholder_instructions",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-16T15:50:46.064861",
+          "description": "Instructions for filling blank/placeholder",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "word_assistant:cursor_instructions": {
+      "agent": "word_assistant",
+      "pass_name": "cursor_instructions",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-16T15:50:46.066583",
+          "description": "Instructions for cursor-position insertion",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "word_assistant:selection_instructions": {
+      "agent": "word_assistant",
+      "pass_name": "selection_instructions",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-16T15:50:46.068105",
+          "description": "Instructions for selected text with full doc",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "legal_research:query_planning": {
+      "agent": "legal_research",
+      "pass_name": "query_planning",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-16T15:50:46.069748",
+          "description": "Structured JSON query generation",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "legal_research:query_extraction": {
+      "agent": "legal_research",
+      "pass_name": "query_extraction",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-16T15:50:46.071403",
+          "description": "Extract queries from litigation prompt",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "legal_research:synthesis": {
+      "agent": "legal_research",
+      "pass_name": "synthesis",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-16T15:50:46.073539",
+          "description": "Synthesize authorities into memo",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "legal_research:verification": {
+      "agent": "legal_research",
+      "pass_name": "verification",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-16T15:50:46.075171",
+          "description": "Citation verification",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "legal_research:relevance_ranking": {
+      "agent": "legal_research",
+      "pass_name": "relevance_ranking",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-16T15:50:46.077236",
+          "description": "Case relevance ranking",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "legal_research:research_framing": {
+      "agent": "legal_research",
+      "pass_name": "research_framing",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-16T15:50:46.079965",
+          "description": "Citation requirements for user prompt",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "legal_research:citation_instruction": {
+      "agent": "legal_research",
+      "pass_name": "citation_instruction",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-16T15:50:46.081674",
+          "description": "Strict citation rules",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "mediation_brief:style_guide": {
+      "agent": "mediation_brief",
+      "pass_name": "style_guide",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-16T15:50:46.083234",
+          "description": "Defense writing style/tone guide",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "mediation_brief:formatting_rules": {
+      "agent": "mediation_brief",
+      "pass_name": "formatting_rules",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-04-16T15:50:46.085261",
+          "description": "Structural formatting rules",
+          "author": "system",
           "is_current": true,
           "performance_score": 0.0,
           "usage_count": 0

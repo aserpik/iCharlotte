@@ -34,9 +34,16 @@ class FakeParagraphCollection:
         return iter(self._items)
 
 
+class FakeContent:
+    """Mimics doc.Content — a Range-like object exposing full doc text."""
+    def __init__(self, paragraphs: List[FakeParagraph]):
+        self.Text = "".join(p.Range.Text for p in paragraphs)
+
+
 class FakeDoc:
     def __init__(self, paragraphs: List[FakeParagraph], full_name: str = "test.docx"):
         self.Paragraphs = FakeParagraphCollection(paragraphs)
+        self.Content = FakeContent(paragraphs)
         self.FullName = full_name
 
 

@@ -525,6 +525,9 @@ class ChatTab(QWidget):
         self.file_number = file_number
         self.persistence = ChatPersistence(file_number)
 
+        # Refresh template menu now that persistence is available
+        self.update_template_menu()
+
         # Restore persisted attached files for this case
         self._restore_attached_files()
 
@@ -755,6 +758,8 @@ class ChatTab(QWidget):
         if role == 'user':
             prefix = "<b>You:</b>"
             bg_color = colors['user_bubble']
+            if "\n\n[ATTACHED FILES]:\n" in content:
+                content = content.split("\n\n[ATTACHED FILES]:\n", 1)[0]
         else:
             prefix = "<b>AI:</b>"
             bg_color = colors['assistant_bubble']
@@ -865,8 +870,8 @@ class ChatTab(QWidget):
     def select_files(self):
         files, _ = QFileDialog.getOpenFileNames(
             self, "Select Files", "",
-            "All Supported (*.pdf *.docx *.txt *.msg *.png *.jpg *.jpeg *.gif *.webp *.mp3 *.mp4 *.m4a *.wav *.ogg *.flac *.aac *.wma *.avi *.mkv *.mov *.webm);;"
-            "Documents (*.pdf *.docx *.txt *.msg);;"
+            "All Supported (*.pdf *.docx *.doc *.txt *.msg *.png *.jpg *.jpeg *.gif *.webp *.mp3 *.mp4 *.m4a *.wav *.ogg *.flac *.aac *.wma *.avi *.mkv *.mov *.webm);;"
+            "Documents (*.pdf *.docx *.doc *.txt *.msg);;"
             "Images (*.png *.jpg *.jpeg *.gif *.webp);;"
             "Audio/Video (*.mp3 *.mp4 *.m4a *.wav *.ogg *.flac *.aac *.wma *.avi *.mkv *.mov *.webm)"
         )
@@ -1202,7 +1207,7 @@ class ChatTab(QWidget):
         Files are collected immediately but processed asynchronously to avoid
         blocking Windows Explorer during OCR or other heavy operations.
         """
-        supported_extensions = (".pdf", ".docx", ".txt", ".msg", ".png", ".jpg", ".jpeg", ".gif", ".webp",
+        supported_extensions = (".pdf", ".docx", ".doc", ".txt", ".msg", ".png", ".jpg", ".jpeg", ".gif", ".webp",
                                 ".mp3", ".mp4", ".m4a", ".wav", ".ogg", ".flac", ".aac", ".wma", ".avi", ".mkv", ".mov", ".webm")
         files_to_add = []
         for url in event.mimeData().urls():
@@ -1256,10 +1261,10 @@ class ChatTab(QWidget):
                         with open(path, 'r', encoding='utf-8', errors='ignore') as f:
                             content += f.read()
                     elif ext == ".docx":
-                        from docx import Document
-                        doc = Document(path)
-                        for p in doc.paragraphs:
-                            content += p.text + "\n"
+                        from ..document_processor import extract_docx_text
+                        content += extract_docx_text(path) + "\n"
+                    elif ext == ".doc":
+                        content += self._extract_doc_text(path)
                     elif ext == ".pdf":
                         if fitz:
                             doc = fitz.open(path)
@@ -1296,6 +1301,56 @@ class ChatTab(QWidget):
 
     AUDIO_VIDEO_EXTENSIONS = {'.mp3', '.mp4', '.m4a', '.wav', '.ogg', '.flac', '.aac', '.wma',
                               '.avi', '.mkv', '.mov', '.webm'}
+
+    @staticmethod
+    def _extract_doc_text(path: str) -> str:
+        """Extract text from a legacy .doc file via Word COM automation.
+
+        Deliberately never calls ``word.Quit()`` and never touches
+        ``word.Visible`` — the user may have Word open with other documents,
+        and the global safety rule is that we must not close or hide it. We
+        open the .doc read-only, pull its text, and close only the document
+        we opened.
+        """
+        try:
+            import pythoncom
+            import win32com.client
+        except ImportError as e:
+            return f"[Error reading .doc file: win32com not available: {e}]\n"
+
+        pythoncom.CoInitialize()
+        try:
+            try:
+                word = win32com.client.Dispatch("Word.Application")
+            except Exception as e:
+                return f"[Error reading .doc file: could not launch Word: {e}]\n"
+
+            doc = None
+            try:
+                abs_path = os.path.abspath(path)
+                doc = word.Documents.Open(
+                    FileName=abs_path,
+                    ConfirmConversions=False,
+                    ReadOnly=True,
+                    AddToRecentFiles=False,
+                )
+                text = doc.Content.Text or ""
+                return text if text.endswith("\n") else text + "\n"
+            except Exception as e:
+                return f"[Error reading .doc file: {e}]\n"
+            finally:
+                if doc is not None:
+                    try:
+                        doc.Close(SaveChanges=0)
+                    except Exception:
+                        pass
+                # Intentionally NOT calling word.Quit() — never close the
+                # user's Word session (global safety rule).
+        finally:
+            try:
+                pythoncom.CoUninitialize()
+            except Exception:
+                pass
 
     def stop_generation(self):
         """Stop the current generation."""
@@ -1400,12 +1455,12 @@ class ChatTab(QWidget):
                 QApplication.processEvents()
                 research_query = _llm_for_research(
                     QUERY_EXTRACTION_PROMPT,
-                    (user_text + ("\n\nContext:\n" + file_content[:8000] if file_content else ""))[:8000]
+                    (user_text + ("\n\nContext:\n" + file_content[:100000] if file_content else ""))[:100000]
                 )
                 if not research_query or len(research_query.strip()) < 20:
                     research_query = user_text
                     if file_content:
-                        research_query += "\n\nContext:\n" + file_content[:8000]
+                        research_query += "\n\nContext:\n" + file_content[:100000]
 
                 def _llm_for_research(system_prompt, user_prompt):
                     from icharlotte_core.llm import LLMHandler
@@ -1422,7 +1477,7 @@ class ChatTab(QWidget):
                     # Pass the original user text so the engine can extract
                     # specific case names that QUERY_EXTRACTION_PROMPT may
                     # have stripped out.
-                    _orig = (user_text + ("\n\n" + file_content[:8000] if file_content else ""))[:8000]
+                    _orig = (user_text + ("\n\n" + file_content[:100000] if file_content else ""))[:100000]
                     research_result = engine.research(
                         query=research_query,
                         llm_callback=_llm_for_research,

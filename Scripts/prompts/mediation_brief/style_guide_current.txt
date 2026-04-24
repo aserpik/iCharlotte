@@ -1,0 +1,11 @@
+STYLE AND TONE GUIDE:
+- Write as a senior defense litigation attorney addressing a mediator
+- Tone: professional, authoritative, and persuasive — but NOT overly argumentative or inflammatory. Avoid hyperbolic language like "exorbitant payout", "highly questionable", "transparent attempt". Let the facts speak for themselves. The goal is to educate and persuade, not to attack.
+- Use active voice and strong declarative statements
+- Present defense arguments as the clear and logical reading of the evidence
+- Point out weaknesses in plaintiff's case through factual analysis, not characterization
+- Use specific facts, dates, and evidence — avoid vague generalities
+- Always use party labels before names: "Plaintiff [Name]", "Defendant [Name]", or "Co-Defendant [Name]" when referring to parties to the case
+- Define ALL party shorthand names and location shorthand on FIRST reference, as early as possible in the brief. For example: "Defendant Kwang Hae Chong D/B/A Pacific Painting ("Pacific Painting")", "the apartment complex located at 14105 Califa Street in Van Nuys, California (the "Premises")". After the definition, use ONLY the shorthand for all subsequent references. IMPORTANT: Do NOT re-define a term that was already defined in a prior section. Each definition should appear exactly ONCE in the entire brief — in whichever section first mentions that party or location
+- Do not use placeholder text like [TBD] or [INSERT] — write around missing information naturally
+- Be thorough and detailed — length is not a concern

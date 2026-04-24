@@ -740,7 +740,7 @@ class LLMCaller:
             },
             json={
                 "model": model,
-                "max_tokens": 65536,
+                "max_tokens": 128000,
                 "messages": [{"role": "user", "content": full_content}]
             },
             timeout=120

@@ -132,12 +132,15 @@ class DocumentProcessor:
             except OSError:
                 pass  # stdout pipe broken
 
-    def extract_text(self, file_path: str) -> ExtractResult:
+    def extract_text(self, file_path: str, ocr_enabled: bool = True) -> ExtractResult:
         """
         Extract text from a document (PDF, DOCX, or plain text).
 
         Args:
             file_path: Path to the document file.
+            ocr_enabled: If False, skip OCR entirely for PDFs and return only
+                the native text layer. Use this for fast attachment ingestion
+                where image-based pages (e.g. exhibit scans) are not needed.
 
         Returns:
             ExtractResult with extracted text and metadata.
@@ -157,7 +160,7 @@ class DocumentProcessor:
 
         try:
             if ext == ".pdf":
-                return self._extract_from_pdf(file_path)
+                return self._extract_from_pdf(file_path, ocr_enabled=ocr_enabled)
             elif ext == ".docx":
                 return self._extract_from_docx(file_path)
             elif ext == ".msg":
@@ -272,11 +275,11 @@ class DocumentProcessor:
         return max(self.ocr_config.min_threshold,
                    min(int(base), self.ocr_config.max_threshold))
 
-    def _extract_from_pdf(self, file_path: str) -> ExtractResult:
-        """Extract text from a PDF file with OCR fallback."""
+    def _extract_from_pdf(self, file_path: str, ocr_enabled: bool = True) -> ExtractResult:
+        """Extract text from a PDF file with optional OCR fallback."""
         reader = PdfReader(file_path)
         total_pages = len(reader.pages)
-        self._log(f"PDF has {total_pages} pages.")
+        self._log(f"PDF has {total_pages} pages.{' (OCR disabled)' if not ocr_enabled else ''}")
 
         text_parts = []
         ocr_pages = []
@@ -291,6 +294,12 @@ class DocumentProcessor:
 
             # Check if OCR is needed
             if len(page_text.strip()) < threshold:
+                if not ocr_enabled:
+                    # OCR suppressed — accept the native (possibly empty) text and move on.
+                    # Callers that need exhibit content must opt in via ocr_enabled=True.
+                    text_parts.append(page_text)
+                    continue
+
                 self._log(f"Page {i+1} has insufficient text ({len(page_text.strip())} chars). Attempting OCR...", "warning")
 
                 ocr_text = self._ocr_page(file_path, i)
@@ -363,14 +372,8 @@ class DocumentProcessor:
                     pass  # Ignore cleanup errors
 
     def _extract_from_docx(self, file_path: str) -> ExtractResult:
-        """Extract text from a DOCX file."""
-        doc = DocxDocument(file_path)
-
-        text_parts = []
-        for paragraph in doc.paragraphs:
-            text_parts.append(paragraph.text)
-
-        full_text = "\n".join(text_parts)
+        """Extract text from a DOCX file (including tables + headers)."""
+        full_text = extract_docx_text(file_path)
 
         # Estimate page count (rough approximation)
         estimated_pages = max(1, len(full_text) // 3000)
@@ -865,3 +868,100 @@ class PartyExtractor:
                 return match.group(1)
 
         return None
+
+
+# =============================================================================
+# Shared .docx text extractor
+# =============================================================================
+# python-docx's ``doc.paragraphs`` returns ONLY top-level paragraphs in the body.
+# It silently skips:
+#   - text inside tables (critical — chronological summaries, medical timelines,
+#     intake forms, and pleading captions all use tables)
+#   - text in section headers / footers
+#   - paragraphs nested inside table cells (including nested tables)
+#
+# This helper walks the body XML in document order so paragraphs and tables are
+# emitted in the same sequence the reader sees them. Used by both
+# DocumentProcessor._extract_from_docx and ChatTab's attachment reader.
+
+
+def _iter_block_items(parent):
+    """Yield docx.text.paragraph.Paragraph and docx.table.Table objects from
+    ``parent`` (a Document or _Cell) in document order."""
+    from docx.document import Document as _Document
+    from docx.oxml.table import CT_Tbl
+    from docx.oxml.text.paragraph import CT_P
+    from docx.table import Table, _Cell
+    from docx.text.paragraph import Paragraph
+
+    if isinstance(parent, _Document):
+        parent_elm = parent.element.body
+    elif isinstance(parent, _Cell):
+        parent_elm = parent._tc
+    else:
+        parent_elm = parent
+
+    for child in parent_elm.iterchildren():
+        if isinstance(child, CT_P):
+            yield Paragraph(child, parent)
+        elif isinstance(child, CT_Tbl):
+            yield Table(child, parent)
+
+
+def _render_cell_text(cell) -> str:
+    """Render a table cell's contents (paragraphs + nested tables) as a
+    single string. Nested tables are flattened with the same row separator."""
+    from docx.table import Table
+    from docx.text.paragraph import Paragraph
+
+    parts = []
+    for block in _iter_block_items(cell):
+        if isinstance(block, Paragraph):
+            if block.text.strip():
+                parts.append(block.text)
+        elif isinstance(block, Table):
+            parts.append(_render_table_text(block))
+    return "\n".join(parts)
+
+
+def _render_table_text(table) -> str:
+    """Render a table as pipe-separated rows, one row per line."""
+    rows = []
+    for row in table.rows:
+        cell_texts = [_render_cell_text(cell).replace("\n", " ") for cell in row.cells]
+        rows.append(" | ".join(cell_texts))
+    return "\n".join(rows)
+
+
+def extract_docx_text(file_path: str, include_headers: bool = True) -> str:
+    """Extract all readable text from a .docx, including tables and headers.
+
+    Returns body content in document order. Headers are emitted once at the
+    top, prefixed with a marker so the LLM can distinguish them from body
+    content. Empty lines are preserved where the document has blank paragraphs.
+    """
+    from docx.table import Table
+    from docx.text.paragraph import Paragraph
+
+    doc = DocxDocument(file_path)
+    parts = []
+
+    if include_headers:
+        header_lines = []
+        seen_headers = set()  # dedupe identical headers across sections
+        for section in doc.sections:
+            for p in section.header.paragraphs:
+                line = p.text.strip()
+                if line and line not in seen_headers:
+                    header_lines.append(line)
+                    seen_headers.add(line)
+        if header_lines:
+            parts.append("[HEADER] " + " / ".join(header_lines))
+
+    for block in _iter_block_items(doc):
+        if isinstance(block, Paragraph):
+            parts.append(block.text)
+        elif isinstance(block, Table):
+            parts.append(_render_table_text(block))
+
+    return "\n".join(parts)

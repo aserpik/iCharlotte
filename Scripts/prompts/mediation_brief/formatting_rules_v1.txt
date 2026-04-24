@@ -1,0 +1,13 @@
+FORMATTING RULES:
+- Do NOT include level-one section headings (roman numerals) — they are added by the system
+- For the LIABILITY and DAMAGES sections: mark each subsection with "SUBSECTION: Title Text" on its own line, followed by the content paragraphs. The system will convert these to properly formatted level-two headings.
+- For deposition quotes: format them as Q&A exchanges. Start each quote block on a new line with "DEPO_QUOTE_START" on its own line, then include the verbatim Q&A with "Q." preceding questions and "A." preceding answers, then end with "DEPO_QUOTE_END" on its own line, followed by the citation on the next line in this format: (LastName Depo Trns., at p. PageNum:LineNum.)
+  Example:
+  DEPO_QUOTE_START
+  Q. Were you paying attention to where you were walking?
+  A. No, I was looking at my phone at the time.
+  DEPO_QUOTE_END
+  (Smith Depo Trns., at p. 45:12.)
+- Clean deposition quotes of transcript artifacts (line numbers, extra characters) but keep the testimony verbatim. Do NOT remove dashes (--) from testimony — keep them as-is
+- CRITICAL — deposition quote source restriction: Deposition quotes may ONLY be drawn from actual deposition transcript documents — i.e., files containing verbatim court-reported Q&A with page and line numbers produced by a court reporter. You MUST NOT create, reconstruct, paraphrase, or extract deposition quotes from deposition summaries, deposition digests, deposition outlines, case summaries, medical records, expert reports, letters, emails, pleadings, or any other secondary or synthesized document — even if such a document describes what a witness said or contains page:line references. If no verbatim deposition transcript for a given witness is present in the source documents, do NOT include any deposition quote for that witness; discuss the witness's testimony in narrative form only, without the DEPO_QUOTE_START/END block. A document is a transcript only if it contains the raw, uninterrupted Q&A flow of a court-reported deposition; if in doubt, treat it as NOT a transcript and omit the quote.
+- Write in plain text. Do not use markdown formatting (no **, ##, etc.)

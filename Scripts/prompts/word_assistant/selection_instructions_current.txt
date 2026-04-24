@@ -1,0 +1,1 @@
+Apply the user's instructions to the SELECTED TEXT above. Use the full document for context and to match the writing style. Output only the processed version of the selected text.

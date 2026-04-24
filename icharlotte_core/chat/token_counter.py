@@ -8,15 +8,17 @@ import re
 # Context window limits for various models
 MODEL_CONTEXT_LIMITS = {
     # Gemini models
-    'gemini-3-flash': 1000000,
-    'gemini-3-flash-preview': 1000000,
-    'gemini-3-pro': 1000000,
-    'gemini-3-pro-preview': 1000000,
-    'gemini-2.5-flash': 1000000,
-    'gemini-2.5-pro': 1000000,
-    'gemini-2.0-flash': 1000000,
-    'gemini-1.5-flash': 1000000,
-    'gemini-1.5-pro': 2000000,
+    'gemini-3.1-flash-lite-preview': 1048576,
+    'gemini-3.1-pro-preview': 1048576,
+    'gemini-3-flash': 1048576,
+    'gemini-3-flash-preview': 1048576,
+    'gemini-3-pro': 1048576,
+    'gemini-3-pro-preview': 1048576,
+    'gemini-2.5-flash': 1048576,
+    'gemini-2.5-pro': 1048576,
+    'gemini-2.0-flash': 1048576,
+    'gemini-1.5-flash': 1048576,
+    'gemini-1.5-pro': 2097152,
     'gemini-1.0-pro': 32000,
 
     # OpenAI models
@@ -29,7 +31,7 @@ MODEL_CONTEXT_LIMITS = {
     'gpt-3.5-turbo': 16385,
     'gpt-3.5-turbo-16k': 16385,
     'o1': 200000,
-    'o1-preview': 128000,
+    'o1-preview': 200000,
     'o1-mini': 128000,
     'o3': 200000,
     'o3-mini': 200000,
@@ -47,11 +49,13 @@ MODEL_CONTEXT_LIMITS = {
     'claude-3-5-sonnet-20241022': 200000,
     'claude-sonnet-4-20250514': 200000,
     'claude-opus-4-20250514': 200000,
+    'claude-haiku-4-20250514': 200000,
+    'claude-haiku-4-5-20251001': 200000,
 }
 
 # Default limits by provider
 PROVIDER_DEFAULT_LIMITS = {
-    'Gemini': 1000000,
+    'Gemini': 1048576,
     'OpenAI': 128000,
     'Claude': 200000,
 }
@@ -261,7 +265,7 @@ class TokenCounter:
         total_tokens: int,
         model: str,
         provider: str = None,
-        reserve_for_response: int = 4096
+        reserve_for_response: int = 16384
     ) -> int:
         """
         Estimate remaining tokens available for new content.

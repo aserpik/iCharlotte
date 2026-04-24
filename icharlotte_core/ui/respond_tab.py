@@ -824,7 +824,7 @@ class RespondTab(QWidget):
             f"INTERROGATORIES:\n{requests_text}\n\n"
         )
         if context_text:
-            max_ctx = 500_000
+            max_ctx = 2_000_000
             ctx = context_text[:max_ctx]
             if len(context_text) > max_ctx:
                 ctx += "\n\n[Context truncated due to length]"
@@ -895,7 +895,7 @@ class RespondTab(QWidget):
 
         # Truncate context to avoid exceeding token limits.
         # ~4 chars per token; leave room for instructions + requests.
-        max_context_chars = 500_000
+        max_context_chars = 2_000_000
         truncated_context = context_text[:max_context_chars]
         if len(context_text) > max_context_chars:
             truncated_context += "\n\n[Context truncated due to length]"

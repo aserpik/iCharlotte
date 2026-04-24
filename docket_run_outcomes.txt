@@ -1,0 +1,109 @@
+Docket agent run — 101 cases, single attempt each (no retries)
+Run date: 2026-04-15
+Summary docx: dockets_processed_2026-04-15_17-06-38.docx
+
+File #     Venue                  Status   Reason
+--------------------------------------------------------------------------------------------------------------
+1011.011   Orange                 SUCCESS  
+1280.001   LOS ANGELES            FAILED   Scraper returned 'No Match' for case number
+1293.002   (unknown)              FAILED   Missing case#/venue after Complaint Agent (terminated)
+3000.075   San Bernardino         SUCCESS  
+3000.117   Riverside              FAILED   Scraper attempt failed (see Docket_activity.log for details)
+3000.119   Riverside              SUCCESS  
+3100.094   RIVERSIDE              SUCCESS  
+3100.104   SAN BERNARDINO         SUCCESS  
+3100.109   LAKE                   FAILED   Scraper attempt failed (see Docket_activity.log for details)
+3100.123   (unknown)              FAILED   Complaint Agent failed to extract case#/venue
+3100.124   (unknown)              FAILED   Missing case#/venue after Complaint Agent (terminated)
+3100.128   (unknown)              FAILED   Missing case#/venue after Complaint Agent (terminated)
+3100.139   Riverside              SUCCESS  
+3200.284   Santa Clara            SUCCESS  
+3200.288   Los Angeles            SUCCESS  
+3200.292   Los Angeles            SUCCESS  
+3200.321   Yolo                   FAILED   Scraper attempt failed (see Docket_activity.log for details)
+3200.323   Ventura                FAILED   Unsupported venue: Ventura
+3200.324   Riverside              SUCCESS  
+3200.325   Sacramento             SUCCESS  
+3200.337   Los Angeles            SUCCESS  
+3200.350   Los Angeles            SUCCESS  
+3800.082   Los Angeles            SUCCESS  
+3800.133   Los Angeles            SUCCESS  
+3800.149   Alameda                SUCCESS  
+3800.156   Los Angeles            SUCCESS  
+3800.160   San Diego              FAILED   Scraper attempt failed (see Docket_activity.log for details)
+3800.167   San Bernardino         SUCCESS  
+3800.168   San Bernardino         SUCCESS  
+3800.170   Orange                 SUCCESS  
+3800.173   Kern                   FAILED   Scraper attempt failed (see Docket_activity.log for details)
+3800.183   Los Angeles            SUCCESS  
+3800.194   Los Angeles            SUCCESS  
+3800.219   LOS ANGELES            SUCCESS  
+3800.221   (unknown)              FAILED   Complaint Agent failed to extract case#/venue
+3800.223   Los Angeles            SUCCESS  
+3800.227   Los Angeles            SUCCESS  
+3800.230   Alameda                SUCCESS  
+3800.232   (unknown)              FAILED   Missing case#/venue after Complaint Agent (terminated)
+3800.233   Los Angeles            SUCCESS  
+3850.083   Riverside              SUCCESS  
+3850.084   Los Angeles            SUCCESS  
+3850.089   San Bernardino         SUCCESS  
+3850.122   Riverside              SUCCESS  
+3850.123   Orange                 SUCCESS  
+3850.134   San Luis Obispo        FAILED   Unsupported venue: San Luis Obispo
+4000.170   (unknown)              FAILED   Missing case#/venue after Complaint Agent (terminated)
+4519.003   San Diego              FAILED   Complaint Agent failed to extract case#/venue
+4537.001   San Bernardino         SUCCESS  
+4553.001   Los Angeles            SUCCESS  
+4558.001   Los Angeles            SUCCESS  
+4579.001   (unknown)              FAILED   Missing case directory: case folder not found on Z:
+5800.002   SAN DIEGO              FAILED   Scraper attempt failed (see Docket_activity.log for details)
+5800.004   Los Angeles            SUCCESS  
+5800.007   San Diego              FAILED   Scraper attempt failed (see Docket_activity.log for details)
+5800.010   San Diego              FAILED   Scraper attempt failed (see Docket_activity.log for details)
+5800.014   San Bernardino         SUCCESS  
+5800.015   Riverside              SUCCESS  
+5800.016   San Bernardino         SUCCESS  
+5800.017   Riverside              SUCCESS  
+5800.020   Los Angeles            SUCCESS  
+5800.023   Los Angeles            SUCCESS  
+5800.024   Los Angeles            SUCCESS  
+5800.025   Los Angeles            SUCCESS  
+5800.026   Los Angeles            SUCCESS  
+5800.027   SAN BERNARDINO         SUCCESS  
+5800.029   Los Angeles            SUCCESS  
+5800.030   Riverside              SUCCESS  
+5800.032   San Bernardino         SUCCESS  
+5800.034   Los Angeles            SUCCESS  
+5800.035   Los Angeles            FAILED   Scraper returned 'No Match' for case number
+5800.038   LOS ANGELES            SUCCESS  
+5800.039   Los Angeles            SUCCESS  
+5800.040   LOS ANGELES            SUCCESS  
+5800.041   Riverside              SUCCESS  
+5800.042   Los Angeles            SUCCESS  
+5800.044   (unknown)              FAILED   Complaint Agent failed to extract case#/venue
+5800.045   Los Angeles County     FAILED   Unsupported venue: Los Angeles County
+5800.046   San Bernardino         SUCCESS  
+5800.047   LOS ANGELES            SUCCESS  
+5800.048   Mariposa               FAILED   Scraper attempt failed (see Docket_activity.log for details)
+5800.050   Santa Clara            SUCCESS  
+5800.051   Los Angeles            SUCCESS  
+5800.052   Los Angeles            SUCCESS  
+5800.053   Los Angeles            SUCCESS  
+5800.054   Los Angeles            SUCCESS  
+5800.055   Los Angeles            SUCCESS  
+5800.056   Kern                   FAILED   Scraper attempt failed (see Docket_activity.log for details)
+5800.057   Los Angeles            SUCCESS  
+5800.058   San Bernardino         SUCCESS  
+5800.060   Orange                 SUCCESS  
+5800.061   Los Angeles            SUCCESS  
+5800.062   Placer                 FAILED   Unsupported venue: Placer
+5800.063   Los Angeles            SUCCESS  
+5800.064   Los Angeles            SUCCESS  
+5800.068   SACRAMENTO             SUCCESS  
+5800.070   Los Angeles            SUCCESS  
+5800.071   Los Angeles            FAILED   Missing case#/venue after Complaint Agent (terminated)
+5800.072   San Bernardino         SUCCESS  
+5800.073   San Diego              FAILED   Scraper attempt failed (see Docket_activity.log for details)
+5900.005   Los Angeles            SUCCESS  
+
+Totals: {'SUCCESS': 73, 'FAILED': 28}

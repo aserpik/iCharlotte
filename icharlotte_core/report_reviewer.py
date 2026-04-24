@@ -810,42 +810,36 @@ class ReportReviewer:
                     f"=== END EXAMPLE {i} ===\n"
                 )
 
-        # Full document context
-        # Analytical sections get the FULL document (no truncation) since they
-        # need to cross-reference facts from all other sections
+        # Full document context — all sections get the full document so the
+        # reviewer can cross-reference facts across the entire report
         doc_context = ""
         if full_doc_text:
             if is_analytical:
-                truncated_doc = full_doc_text
                 context_label = "for substantive cross-reference — READ CAREFULLY"
             else:
-                truncated_doc = full_doc_text[:15000] if len(full_doc_text) > 15000 else full_doc_text
-                context_label = "for cross-reference context only"
+                context_label = "for cross-reference context"
             doc_context = (
                 f"\n=== FULL DOCUMENT ({context_label}) ===\n"
-                f"{truncated_doc}\n"
+                f"{full_doc_text}\n"
                 "=== END FULL DOCUMENT ===\n"
             )
 
-        # Case data context
+        # Case data context — include full case data so reviewer has all facts
         case_context = ""
         if case_data:
             sections_data = case_data.get("sections", {})
             relevant = sections_data.get(section_name, "")
             if relevant:
-                truncated_case = relevant[:8000] if len(relevant) > 8000 else relevant
                 case_context = (
                     "\n=== CASE FILE DATA (facts that may be missing from the draft) ===\n"
-                    f"{truncated_case}\n"
+                    f"{relevant}\n"
                     "=== END CASE FILE DATA ===\n"
                 )
 
-        # Extra documents context
+        # Extra documents context — include full reference documents
         extra_context = ""
         if extra_texts:
-            combined = "\n---\n".join(t[:5000] for t in extra_texts)
-            if len(combined) > 12000:
-                combined = combined[:12000] + "\n[truncated]"
+            combined = "\n---\n".join(extra_texts)
             extra_context = (
                 "\n=== ADDITIONAL REFERENCE DOCUMENTS ===\n"
                 f"{combined}\n"
@@ -1101,7 +1095,7 @@ Output ONLY the revised section body text, nothing else. Do NOT include the sect
                 sub_examples = self._subsection_examples_fn(section_name, subsection_name)
                 if sub_examples:
                     for i, ex in enumerate(sub_examples[:2], 1):
-                        truncated = ex[:1000] if len(ex) > 1000 else ex
+                        truncated = ex[:10000] if len(ex) > 10000 else ex
                         subsection_example_block += (
                             f"\n=== TARGET VOICE EXAMPLE {i} (for {subsection_name}) ===\n"
                             f"{truncated}\n"
@@ -1110,10 +1104,10 @@ Output ONLY the revised section body text, nothing else. Do NOT include the sect
             except Exception as e:
                 logger.debug(f"Could not load subsection examples: {e}")
 
-        # Section context (read-only)
+        # Section context (read-only) — include full section text
         section_context = (
             f"\n=== FULL SECTION CONTEXT (read-only — do NOT include other subsections in output) ===\n"
-            f"{full_section_text[:15000]}\n"
+            f"{full_section_text}\n"
             f"=== END FULL SECTION CONTEXT ===\n"
         )
 
@@ -1126,10 +1120,9 @@ Output ONLY the revised section body text, nothing else. Do NOT include the sect
                 f"=== END FULL DOCUMENT ===\n"
             )
         elif full_doc_text:
-            truncated = full_doc_text[:10000]
             doc_context = (
-                f"\n=== DOCUMENT CONTEXT (for reference only) ===\n"
-                f"{truncated}\n"
+                f"\n=== DOCUMENT CONTEXT (for reference) ===\n"
+                f"{full_doc_text}\n"
                 f"=== END DOCUMENT CONTEXT ===\n"
             )
 
