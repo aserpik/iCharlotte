@@ -41,9 +41,9 @@ def test_dialog_loads_session_and_populates_topics(qtbot, tmp_path):
     dlg = DepoSummaryConfigDialog(session_path)
     qtbot.addWidget(dlg)
 
-    titles = [row.title_edit.text() for row in dlg.topic_rows]
+    titles = [row.title_edit.text() for row in dlg.topic_rows_in_order()]
     assert titles == ["Pre-Accident History", "Mechanism Of Injury", "Damages"]
-    assert all(row.checkbox.isChecked() for row in dlg.topic_rows)
+    assert all(row.checkbox.isChecked() for row in dlg.topic_rows_in_order())
     assert dlg.deponent_label_edit.text() == "Plaintiff"
     assert dlg.bullets_spinbox.value() == 5
     assert dlg.cross_check_checkbox.isChecked()
@@ -55,8 +55,9 @@ def test_dialog_accept_writes_user_config_back_to_session(qtbot, tmp_path):
     qtbot.addWidget(dlg)
 
     # Uncheck topic 2, rename topic 1, add a custom topic, change settings.
-    dlg.topic_rows[1].checkbox.setChecked(False)
-    dlg.topic_rows[0].title_edit.setText("Pre-Accident Lower Back Treatment")
+    rows = list(dlg.topic_rows_in_order())
+    rows[1].checkbox.setChecked(False)
+    rows[0].title_edit.setText("Pre-Accident Lower Back Treatment")
     dlg.added_topics_edit.setPlainText("Communications With Treating Providers\n")
     dlg.bullets_spinbox.setValue(7)
     dlg.deponent_label_edit.setText("Mr. Smith")
@@ -82,7 +83,7 @@ def test_dialog_cancel_does_not_modify_session(qtbot, tmp_path):
 
     dlg = DepoSummaryConfigDialog(session_path)
     qtbot.addWidget(dlg)
-    dlg.topic_rows[0].checkbox.setChecked(False)
+    list(dlg.topic_rows_in_order())[0].checkbox.setChecked(False)
     dlg.bullets_spinbox.setValue(99)
     dlg.reject()
 
@@ -120,7 +121,7 @@ def test_dialog_accept_blocks_when_no_topics_selected(qtbot, tmp_path, monkeypat
     dlg = DepoSummaryConfigDialog(session_path)
     qtbot.addWidget(dlg)
 
-    for row in dlg.topic_rows:
+    for row in dlg.topic_rows_in_order():
         row.checkbox.setChecked(False)
     dlg.added_topics_edit.setPlainText("")
 
@@ -135,3 +136,28 @@ def test_dialog_accept_blocks_when_no_topics_selected(qtbot, tmp_path, monkeypat
     # Session JSON must be unchanged: phase still 'awaiting_input', user_config still None.
     after = session_path.read_text(encoding="utf-8")
     assert before == after
+
+
+def test_dialog_topic_drag_reorder_changes_selected_topics_order(qtbot, tmp_path):
+    """Programmatically reorder topics via QListWidget and verify selected_topics order."""
+    session_path = _make_session(tmp_path)
+    dlg = DepoSummaryConfigDialog(session_path)
+    qtbot.addWidget(dlg)
+
+    # Initial fixture order: Pre-Accident History, Mechanism Of Injury, Damages.
+    # Move "Damages" (row 2) to row 0. takeItem destroys the row widget, so we
+    # rebuild it as a fresh _TopicRow to mirror what happens during a real drag.
+    from icharlotte_core.ui.depo_summary_config_dialog import _TopicRow
+    from PySide6.QtWidgets import QListWidgetItem
+    dlg.topics_list.takeItem(2)
+    new_row = _TopicRow("Damages")
+    new_item = QListWidgetItem()
+    new_item.setSizeHint(new_row.sizeHint())
+    dlg.topics_list.insertItem(0, new_item)
+    dlg.topics_list.setItemWidget(new_item, new_row)
+
+    dlg.accept()
+
+    loaded = session_manager.read_session(session_path)
+    cfg = loaded["user_config"]
+    assert cfg["selected_topics"] == ["Damages", "Pre-Accident History", "Mechanism Of Injury"]

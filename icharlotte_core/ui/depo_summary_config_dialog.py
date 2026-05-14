@@ -5,7 +5,8 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox, QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit,
-    QMessageBox, QPlainTextEdit, QScrollArea, QSpinBox, QVBoxLayout, QWidget,
+    QListWidget, QListWidgetItem, QMessageBox, QPlainTextEdit, QSpinBox,
+    QVBoxLayout, QWidget,
 )
 
 from icharlotte_core.deposition import session_manager
@@ -43,22 +44,19 @@ class DepoSummaryConfigDialog(QDialog):
         )
         root.addWidget(QLabel(header_text))
 
-        # Topic rows in a scroll area
-        root.addWidget(QLabel("Topics (uncheck to omit, edit text to rename):"))
-        topics_container = QWidget()
-        topics_layout = QVBoxLayout(topics_container)
-        topics_layout.setContentsMargins(4, 4, 4, 4)
-        self.topic_rows = []
+        # Topics list with drag-reorder
+        root.addWidget(QLabel("Topics (drag to reorder, uncheck to omit, edit text to rename):"))
+        self.topics_list = QListWidget()
+        self.topics_list.setDragDropMode(QListWidget.InternalMove)
+        self.topics_list.setSelectionMode(QListWidget.SingleSelection)
+        self.topics_list.setDefaultDropAction(Qt.MoveAction)
         for t in self._session.get("topics", []):
             row = _TopicRow(t.get("title", ""))
-            self.topic_rows.append(row)
-            topics_layout.addWidget(row)
-        topics_layout.addStretch(1)
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setWidget(topics_container)
-        root.addWidget(scroll, 1)
+            item = QListWidgetItem()
+            item.setSizeHint(row.sizeHint())
+            self.topics_list.addItem(item)
+            self.topics_list.setItemWidget(item, row)
+        root.addWidget(self.topics_list, 1)
 
         # Additional topics
         root.addWidget(QLabel("Additional topics (one per line):"))
@@ -106,10 +104,16 @@ class DepoSummaryConfigDialog(QDialog):
         buttons.rejected.connect(self.reject)
         root.addWidget(buttons)
 
+    def topic_rows_in_order(self):
+        """Yield each topic _TopicRow widget in current visual order."""
+        for i in range(self.topics_list.count()):
+            item = self.topics_list.item(i)
+            yield self.topics_list.itemWidget(item)
+
     def accept(self):
         selected_topics = [
             row.title_edit.text().strip()
-            for row in self.topic_rows
+            for row in self.topic_rows_in_order()
             if row.checkbox.isChecked() and row.title_edit.text().strip()
         ]
         added_topics = [
