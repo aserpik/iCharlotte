@@ -214,6 +214,7 @@ class StatusWidget(QFrame):
     cancel_requested = Signal()
     retry_requested = Signal()  # whole-task retry
     retry_pass_requested = Signal(str)  # pass_name
+    ready_clicked = Signal(str)  # session_path
 
     def __init__(self, agent_name, details, parent=None):
         super().__init__(parent)
@@ -263,6 +264,18 @@ class StatusWidget(QFrame):
         self.cancel_btn.clicked.connect(self.cancel_requested.emit)
         header_layout.addWidget(self.cancel_btn)
 
+        self.ready_btn = QPushButton("READY")
+        self.ready_btn.setFixedSize(80, 25)
+        self.ready_btn.setStyleSheet(
+            "background-color: #2e7d32; color: white; font-weight: bold;"
+        )
+        self.ready_btn.setToolTip("Click to choose topics and configure summary.")
+        self.ready_btn.setVisible(False)
+        self.ready_btn.clicked.connect(self._on_ready_button_clicked)
+        header_layout.addWidget(self.ready_btn)
+
+        self._pending_session_path = None
+
         layout.addLayout(header_layout)
 
         # Pass Progress Widget (NEW)
@@ -291,6 +304,19 @@ class StatusWidget(QFrame):
     def update_progress(self, percent, message):
         self.progress_bar.setValue(percent)
         self.status_text_label.setText(message)
+
+    def on_awaiting_input(self, session_path: str):
+        self._pending_session_path = session_path
+        self.ready_btn.setVisible(True)
+
+    def _on_ready_button_clicked(self):
+        if self._pending_session_path:
+            self.ready_clicked.emit(self._pending_session_path)
+
+    def clear_ready_state(self):
+        """Called when phase 2 starts (or the run is cancelled) — hide the button."""
+        self._pending_session_path = None
+        self.ready_btn.setVisible(False)
 
     def update_pass_start(self, name: str, number: int, total: int):
         """Handle pass start event."""
@@ -503,6 +529,7 @@ class AgentRunner(QObject):
         safe_disconnect(self.pass_failed, self.status_widget.update_pass_failed)
         safe_disconnect(self.status_widget.cancel_requested, self.cancel)
         safe_disconnect(self.status_widget.retry_pass_requested, self.retry_pass)
+        safe_disconnect(self.awaiting_input, self.status_widget.on_awaiting_input)
         self.status_widget = None
 
     def connect_widget(self, widget):
@@ -525,6 +552,9 @@ class AgentRunner(QObject):
 
         # Handle pass retry
         self.status_widget.retry_pass_requested.connect(self.retry_pass)
+
+        # Phase-1 paused → show READY button on widget
+        self.awaiting_input.connect(self.status_widget.on_awaiting_input)
 
     def reconnect_widget(self, widget):
         """Reconnect a restored widget to this running agent."""
@@ -554,6 +584,10 @@ class AgentRunner(QObject):
         # If already finished, sync that state
         if self.success is not None:
              widget.set_finished(self.success)
+
+        # Replay awaiting-input state if phase 1 paused and we haven't resumed yet
+        if self.session_path is not None:
+            widget.on_awaiting_input(self.session_path)
 
     def start(self):
         import time
