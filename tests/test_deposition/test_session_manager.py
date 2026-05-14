@@ -9,15 +9,25 @@ import pytest
 from icharlotte_core.deposition import session_manager
 
 
-def test_compute_session_paths_are_deterministic_per_input(tmp_path, monkeypatch):
+def test_compute_session_paths_hash_keyed_on_input(tmp_path, monkeypatch):
     monkeypatch.setattr(session_manager, "SESSION_DIR", tmp_path)
-    # Same input twice in same second yields different timestamps but same hash prefix
     p1 = session_manager.compute_session_paths(r"Z:\foo\Smith Depo.pdf")
     p2 = session_manager.compute_session_paths(r"Z:\foo\Smith Depo.pdf")
+    # The hash prefix (first segment of the basename) is derived from the input
+    # path, so repeated calls on the same input share it. The timestamp and
+    # nonce that follow differ, so the full filenames are unique.
     assert p1.session_path.name.split("_", 1)[0] == p2.session_path.name.split("_", 1)[0]
+    assert p1.session_path != p2.session_path  # full path differs (nonce)
     assert p1.cached_text_path.suffix == ".txt"
     assert p1.session_path.suffix == ".json"
     assert p1.session_path.parent == tmp_path
+
+
+def test_compute_session_paths_distinct_inputs_produce_distinct_paths(tmp_path, monkeypatch):
+    monkeypatch.setattr(session_manager, "SESSION_DIR", tmp_path)
+    p1 = session_manager.compute_session_paths(r"Z:\foo\A.pdf")
+    p2 = session_manager.compute_session_paths(r"Z:\foo\B.pdf")
+    assert p1.session_path.name.split("_", 1)[0] != p2.session_path.name.split("_", 1)[0]
 
 
 def test_write_and_read_session_round_trip(tmp_path, monkeypatch):

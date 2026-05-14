@@ -9,6 +9,7 @@ session, generates the summary, and cleans up.
 import hashlib
 import json
 import os
+import secrets
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -28,7 +29,8 @@ def compute_session_paths(input_path: str) -> SessionPaths:
     """Build a unique (session_json, cached_text) path pair for an input file."""
     digest = hashlib.sha1(os.fspath(input_path).encode("utf-8")).hexdigest()[:12]
     ts = time.strftime("%Y%m%d_%H%M%S")
-    base = f"{digest}_{ts}"
+    nonce = secrets.token_hex(3)
+    base = f"{digest}_{ts}_{nonce}"
     SESSION_DIR.mkdir(parents=True, exist_ok=True)
     return SessionPaths(
         session_path=SESSION_DIR / f"{base}.json",
