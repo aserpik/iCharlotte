@@ -427,6 +427,152 @@ def process_topics(input_path: str, logger) -> bool:
 
 
 # =============================================================================
+# Phase 2: Topic-Locked Summary
+# =============================================================================
+
+def _build_topic_locked_prompt(base_prompt: str, *, topic_list: list, bullets_per_topic: int,
+                                deponent_label: str, custom_rules: str) -> str:
+    """Render the topic-locked summary prompt with user-supplied substitutions."""
+    rendered_topics = "\n".join(f"- {t}" for t in topic_list)
+    return (base_prompt
+            .replace("{deponent_label}", deponent_label)
+            .replace("{bullets_per_topic}", str(bullets_per_topic))
+            .replace("{topic_list}", rendered_topics)
+            .replace("{custom_rules}", custom_rules or "(none)"))
+
+
+def _register_outputs(input_path, summary, deponent_name, deponent_type, output_file, logger):
+    """Wrapper around CaseDataManager + DocumentRegistry writes. Best-effort; logs but does not fail the run."""
+    try:
+        data_manager = CaseDataManager()
+        file_num = extract_file_number(input_path)
+        if file_num:
+            clean_name = re.sub(r"[^a-zA-Z0-9_]", "_", (deponent_name or "unknown").lower())
+            var_key = f"depo_summary_{clean_name}"
+            data_manager.save_variable(
+                file_num, var_key, summary,
+                source="deposition_agent",
+                extra_tags=["Deposition", deponent_type] if deponent_type else ["Deposition"],
+            )
+    except Exception as e:
+        logger.warning(f"Could not save to case data: {e}")
+
+    try:
+        file_num = extract_file_number(input_path)
+        if not file_num:
+            return
+        depo_type_map = {
+            "Plaintiff": "Deposition - Plaintiff",
+            "Defendant": "Deposition - Defendant",
+            "Witness": "Deposition - Witness",
+            "Expert Witness": "Deposition - Expert",
+            "Expert/Physician": "Deposition - Expert",
+            "Treating Physician": "Deposition - Expert",
+            "Corporate Representative": "Deposition - Corporate Representative",
+        }
+        registry_doc_type = depo_type_map.get(deponent_type, "Deposition - Witness")
+        from document_registry import DocumentClassifier
+        classifier = DocumentClassifier(logger=logger)
+        base_name = os.path.splitext(os.path.basename(input_path))[0]
+        standardized_name = classifier.generate_name(summary, registry_doc_type, fallback_name=base_name)
+        registry = DocumentRegistry()
+        registry.register_document(
+            file_number=file_num,
+            name=standardized_name,
+            document_type=registry_doc_type,
+            source_path=input_path,
+            summary_location=output_file,
+            agent="summarize_deposition",
+            char_count=len(summary),
+        )
+    except Exception as e:
+        logger.warning(f"Could not register document: {e}")
+
+
+def process_summary(session_path: str, logger) -> bool:
+    """Phase 2: read session, generate topic-locked summary, save docx, cleanup."""
+    from pathlib import Path
+    memory_monitor = MemoryMonitor(warn_threshold_mb=1500, abort_threshold_mb=2000, logger=logger.info)
+    llm_caller = LLMCaller(logger=logger)
+
+    session_path = Path(session_path)
+    logger.progress(5, "Loading session...")
+    try:
+        session = session_manager.read_session(session_path)
+    except Exception as e:
+        logger.error(f"Failed to load session: {e}")
+        return False
+
+    if session.get("phase") != "ready_for_summary" or not session.get("user_config"):
+        logger.pass_failed("Phase 2 Init", "Session is not ready_for_summary", recoverable=False)
+        return False
+
+    cached_path = Path(session["cached_text_path"])
+    if not cached_path.exists():
+        logger.pass_failed("Phase 2 Init", f"Cached transcript missing: {cached_path}", recoverable=False)
+        return False
+
+    logger.progress(10, "Reading cached transcript...")
+    text = cached_path.read_text(encoding="utf-8")
+
+    cfg = session["user_config"]
+    final_topics = [t for t in cfg.get("selected_topics", [])] + [t for t in cfg.get("added_topics", [])]
+    if not final_topics:
+        logger.pass_failed("Phase 2 Init", "No topics selected", recoverable=False)
+        return False
+
+    with open(NARRATIVE_PROMPT_FILE, "r", encoding="utf-8") as f:
+        base_prompt = f.read()
+
+    prompt = _build_topic_locked_prompt(
+        base_prompt,
+        topic_list=final_topics,
+        bullets_per_topic=cfg.get("bullets_per_topic", 5),
+        deponent_label=cfg.get("deponent_label") or session.get("deponent_type", "Deponent"),
+        custom_rules=cfg.get("custom_rules", ""),
+    )
+
+    logger.progress(30, "Generating summary...")
+    try:
+        with memory_monitor.track_operation("Narrative Summary"):
+            summary = llm_caller.call(prompt, text, task_type="summary")
+        if not summary:
+            raise SummaryPassError("LLM returned empty summary")
+    except Exception as e:
+        logger.pass_failed("Narrative Summary", str(e), recoverable=False)
+        return False
+    logger.progress(70, f"Summary generated: {len(summary)} chars")
+
+    if cfg.get("cross_check_enabled"):
+        try:
+            with open(CROSS_CHECK_PROMPT_FILE, "r", encoding="utf-8") as f:
+                cross_prompt = f.read()
+            cross_prompt = cross_prompt.replace("{summary}", summary).replace("{original}", text[:75000])
+            logger.progress(75, "Running cross-check...")
+            verified = llm_caller.call(cross_prompt, "", task_type="cross_check")
+            if verified and len(verified) > len(summary) * 0.8:
+                summary = verified
+        except Exception as e:
+            logger.warning(f"Cross-check failed; using original summary: {e}")
+    logger.progress(85, "Cross-check complete")
+
+    output_dir = get_output_directory(session["input_path"])
+    os.makedirs(output_dir, exist_ok=True)
+    output_file = os.path.join(output_dir, "Deposition_summaries.docx")
+    logger.progress(90, f"Saving to {os.path.basename(output_file)}...")
+    if not save_to_docx(summary, output_file, session["deponent_name"], session["deposition_date"], logger):
+        return False
+    logger.progress(95, "Document saved")
+
+    _register_outputs(session["input_path"], summary, session["deponent_name"],
+                       session.get("deponent_type"), output_file, logger)
+
+    session_manager.cleanup_session(session_path)
+    logger.progress(100, "Deposition summarization complete")
+    return True
+
+
+# =============================================================================
 # Exhibit Extraction
 # =============================================================================
 
