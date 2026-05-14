@@ -244,3 +244,39 @@ def test_phase2_prompt_includes_all_selected_plus_added_topics_in_order(tmp_path
     assert "Mr. Smith" in prompt
     assert "7" in prompt  # bullets per topic
     assert "Use past tense." in prompt
+
+
+def test_phase2_prompt_substitution_strips_user_braces(tmp_path, monkeypatch):
+    """User-typed {placeholder} text in deponent_label or custom_rules must not leak across slots."""
+    session_path = _write_ready_session(
+        tmp_path, cross_check=False,
+        selected=["Topic A"], added=[],
+        bullets=5,
+        label="Mr. {topic_list} Smith",  # adversarial input
+        rules="Avoid {bullets_per_topic} or {deponent_label} references.",
+    )
+
+    monkeypatch.setattr(summarize_deposition, "save_to_docx", lambda *a, **kw: True)
+    monkeypatch.setattr(summarize_deposition, "_register_outputs", lambda *a, **kw: None, raising=False)
+
+    captured = {}
+
+    def fake_call(self, prompt, text, task_type=None, **kw):
+        captured["prompt"] = prompt
+        return "**Topic A**\n- B."
+
+    monkeypatch.setattr(summarize_deposition.LLMCaller, "call", fake_call)
+
+    logger = summarize_deposition.AgentLogger("DepositionTest", log_to_file=False)
+    summarize_deposition.process_summary(str(session_path), logger)
+
+    prompt = captured["prompt"]
+    # Neither the literal placeholder strings nor the curly braces from user input
+    # should remain in the final prompt.
+    assert "{topic_list}" not in prompt
+    assert "{bullets_per_topic}" not in prompt
+    assert "{deponent_label}" not in prompt
+    assert "{custom_rules}" not in prompt
+    # The braces from the user input were stripped, so we expect:
+    assert "Mr. topic_list Smith" in prompt
+    assert "Avoid bullets_per_topic or deponent_label references." in prompt

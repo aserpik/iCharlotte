@@ -430,13 +430,21 @@ def process_topics(input_path: str, logger) -> bool:
 
 def _build_topic_locked_prompt(base_prompt: str, *, topic_list: list, bullets_per_topic: int,
                                 deponent_label: str, custom_rules: str) -> str:
-    """Render the topic-locked summary prompt with user-supplied substitutions."""
+    """Render the topic-locked summary prompt with user-supplied substitutions.
+
+    User-supplied strings (deponent_label, custom_rules) are stripped of literal
+    `{` and `}` characters to prevent them from collapsing into other placeholder
+    slots when subsequent .replace() calls run.
+    """
+    def _strip_braces(s: str) -> str:
+        return (s or "").replace("{", "").replace("}", "")
+
     rendered_topics = "\n".join(f"- {t}" for t in topic_list)
     return (base_prompt
-            .replace("{deponent_label}", deponent_label)
+            .replace("{deponent_label}", _strip_braces(deponent_label))
             .replace("{bullets_per_topic}", str(bullets_per_topic))
             .replace("{topic_list}", rendered_topics)
-            .replace("{custom_rules}", custom_rules or "(none)"))
+            .replace("{custom_rules}", _strip_braces(custom_rules) or "(none)"))
 
 
 def _register_outputs(input_path, summary, deponent_name, deponent_type, output_file, logger):
