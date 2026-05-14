@@ -1431,71 +1431,66 @@ def process_directory(dir_path: str, logger: AgentLogger):
 
 
 def main():
-    """Main entry point."""
+    """Main entry point. Accepts --phase=topics <input> or --phase=summary <session_path>."""
     if len(sys.argv) < 2:
-        print("Error: No file path provided.", flush=True)
+        print("Error: No file path or session path provided.", flush=True)
         sys.exit(1)
 
-    # Parse arguments
-    raw_args = sys.argv[1:]
+    args = sys.argv[1:]
 
-    # Handle quoted paths with spaces
-    combined_arg = " ".join(raw_args)
-    clean_combined = combined_arg.strip().strip('"').strip("'")
+    # Parse --phase argument (default: topics)
+    phase = "topics"
+    positional = []
+    for a in args:
+        if a.startswith("--phase="):
+            phase = a.split("=", 1)[1].strip().lower()
+        else:
+            positional.append(a)
 
-    if os.path.exists(clean_combined):
-        file_paths = [clean_combined]
+    if not positional:
+        print("Error: missing input path.", flush=True)
+        sys.exit(1)
+
+    # Handle quoted paths with spaces (preserve existing behavior)
+    combined = " ".join(positional).strip().strip('"').strip("'")
+    if os.path.exists(combined):
+        target = combined
     else:
-        file_paths = raw_args
+        target = positional[0]
+    target = os.path.abspath(target.strip().strip('"').strip("'"))
 
-    # Dispatcher mode: multiple files
-    if len(file_paths) > 1:
-        print(f"Detected {len(file_paths)} files. Launching separate agents...", flush=True)
-        for path in file_paths:
-            try:
-                if os.name == 'nt':
-                    subprocess.Popen([sys.executable, sys.argv[0], path], creationflags=0x08000000)
-                else:
-                    subprocess.Popen([sys.executable, sys.argv[0], path])
-            except Exception as e:
-                print(f"Failed to spawn agent for {path}: {e}", flush=True)
-        sys.exit(0)
-
-    # Single file/directory mode
-    input_path = file_paths[0].strip().strip('"').strip("'")
-    input_path = os.path.abspath(input_path)
-
-    if not os.path.exists(input_path):
-        print(f"Error: File not found: {input_path}", flush=True)
+    if not os.path.exists(target):
+        print(f"Error: path not found: {target}", flush=True)
         sys.exit(1)
 
-    # Extract file number for logger context
-    file_number = extract_file_number(input_path)
-
-    # Initialize logger
+    file_number = extract_file_number(target) if phase == "topics" else None
     logger = AgentLogger("Deposition", file_number=file_number)
 
-    # Also create legacy log_event for backward compatibility
-    log_event = create_legacy_log_event("Deposition", LEGACY_LOG_FILE)
+    if phase == "topics":
+        # Directory dispatcher mode is only meaningful for phase 1.
+        if os.path.isdir(target):
+            logger.info("Input is a directory. Spawning per-file phase-1 agents...")
+            for root, _, files in os.walk(target):
+                for f in files:
+                    if not f.lower().endswith((".pdf", ".docx")):
+                        continue
+                    if "Deposition_summaries" in f:
+                        continue
+                    p = os.path.join(root, f)
+                    creationflags = 0x08000000 if os.name == "nt" else 0
+                    subprocess.Popen([sys.executable, sys.argv[0], "--phase=topics", p],
+                                     creationflags=creationflags if os.name == "nt" else 0)
+            sys.exit(0)
 
-    logger.info(f"Starting deposition agent for: {input_path}")
+        ok = process_topics(target, logger)
+        sys.exit(0 if ok else 1)
 
-    # Directory handling
-    if os.path.isdir(input_path):
-        logger.info(f"Input is a directory. Scanning for files...")
-        process_directory(input_path, logger)
-        logger.info("Directory processing complete.")
-        sys.exit(0)
+    if phase == "summary":
+        ok = process_summary(target, logger)
+        sys.exit(0 if ok else 1)
 
-    # Single file processing
-    success = process_document(input_path, logger)
-
-    if success:
-        logger.info("Deposition agent finished successfully.")
-        sys.exit(0)
-    else:
-        logger.error("Deposition agent finished with errors.")
-        sys.exit(1)
+    print(f"Error: unknown --phase value: {phase}", flush=True)
+    sys.exit(2)
 
 
 if __name__ == '__main__':
