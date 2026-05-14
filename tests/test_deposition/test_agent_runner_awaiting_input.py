@@ -60,27 +60,25 @@ def test_resume_with_config_starts_phase_two_process(qtbot, monkeypatch):
     started_with = {}
 
     class FakeProcess:
+        # Class-level MagicMocks so each instance shares the spec but instance methods still work.
+        # The .connect on these will be a callable MagicMock, matching what real QProcess signals support.
         def __init__(self):
-            self.started = False
+            self.readyReadStandardOutput = MagicMock()
+            self.readyReadStandardError = MagicMock()
+            self.finished = MagicMock()
+
         def start(self, cmd, args):
             started_with["cmd"] = cmd
             started_with["args"] = args
-            self.started = True
-        def readyReadStandardOutput(self):  # signal stub
-            pass
-        def readyReadStandardError(self):
-            pass
-        def finished(self):
-            pass
+
         def state(self):
             return 0
+
         def kill(self):
             pass
+
         def deleteLater(self):
             pass
-        # Allow .connect on the signal stubs
-        def __getattr__(self, name):
-            return MagicMock()
 
     monkeypatch.setattr("icharlotte_core.ui.widgets.QProcess", FakeProcess)
 

@@ -628,16 +628,9 @@ class AgentRunner(QObject):
 
         # Fresh QProcess instance for phase 2
         self.process = QProcess()
-        # Connect signals defensively — tests may inject fakes that don't expose .connect.
-        for signal_name, slot in (
-            ("readyReadStandardOutput", self.handle_stdout),
-            ("readyReadStandardError", self.handle_stderr),
-            ("finished", self.handle_finished),
-        ):
-            try:
-                getattr(self.process, signal_name).connect(slot)
-            except (AttributeError, TypeError):
-                pass
+        self.process.readyReadStandardOutput.connect(self.handle_stdout)
+        self.process.readyReadStandardError.connect(self.handle_stderr)
+        self.process.finished.connect(self.handle_finished)
 
         # Allow handle_finished to emit finished(True) on phase-2 completion
         self.session_path = None
