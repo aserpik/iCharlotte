@@ -51,3 +51,41 @@ def test_agent_runner_emits_finished_when_no_pause(qtbot):
     runner.handle_finished(0, QProcess.ExitStatus.NormalExit)
 
     assert finished_calls == [True]
+
+
+def test_resume_with_config_starts_phase_two_process(qtbot, monkeypatch):
+    runner = AgentRunner("python", ["--phase=topics", "X.pdf"])
+    runner.session_path = r"C:\tmp\session.json"
+
+    started_with = {}
+
+    class FakeProcess:
+        def __init__(self):
+            self.started = False
+        def start(self, cmd, args):
+            started_with["cmd"] = cmd
+            started_with["args"] = args
+            self.started = True
+        def readyReadStandardOutput(self):  # signal stub
+            pass
+        def readyReadStandardError(self):
+            pass
+        def finished(self):
+            pass
+        def state(self):
+            return 0
+        def kill(self):
+            pass
+        def deleteLater(self):
+            pass
+        # Allow .connect on the signal stubs
+        def __getattr__(self, name):
+            return MagicMock()
+
+    monkeypatch.setattr("icharlotte_core.ui.widgets.QProcess", FakeProcess)
+
+    runner.resume_with_config(r"C:\tmp\session.json")
+
+    assert started_with["cmd"] == "python"
+    assert "--phase=summary" in started_with["args"]
+    assert r"C:\tmp\session.json" in started_with["args"]

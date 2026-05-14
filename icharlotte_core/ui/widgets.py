@@ -618,6 +618,35 @@ class AgentRunner(QObject):
         self.log_update.emit(f"\n--- RETRY REQUESTED FOR PASS: {pass_name} ---\n")
         # Future: Restart process with --retry-pass argument
 
+    def resume_with_config(self, session_path: str):
+        """Launch phase 2 against the same widget. Phase 1's QProcess has already exited."""
+        import time
+        # Build phase-2 args: keep the script path (args[0]) and any other non-input args,
+        # then append --phase=summary <session_path>.
+        script = self.args[0] if self.args else ""
+        phase2_args = [script, "--phase=summary", session_path]
+
+        # Fresh QProcess instance for phase 2
+        self.process = QProcess()
+        # Connect signals defensively — tests may inject fakes that don't expose .connect.
+        for signal_name, slot in (
+            ("readyReadStandardOutput", self.handle_stdout),
+            ("readyReadStandardError", self.handle_stderr),
+            ("finished", self.handle_finished),
+        ):
+            try:
+                getattr(self.process, signal_name).connect(slot)
+            except (AttributeError, TypeError):
+                pass
+
+        # Allow handle_finished to emit finished(True) on phase-2 completion
+        self.session_path = None
+        self.last_output_time = time.time()
+
+        log_info(f"AgentRunner resuming phase 2: {self.command} {' '.join(phase2_args)}")
+        self.process.start(self.command, phase2_args)
+        self.watchdog_timer.start()
+
     def handle_stdout(self):
         import time
         data = self.process.readAllStandardOutput()
