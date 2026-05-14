@@ -108,3 +108,30 @@ def test_dialog_atomic_write_preserves_original_on_failure(qtbot, tmp_path, monk
     # Session file untouched
     after = session_path.read_text(encoding="utf-8")
     assert before == after
+
+
+def test_dialog_accept_blocks_when_no_topics_selected(qtbot, tmp_path, monkeypatch):
+    """If the user unchecks all topics and adds none, accept must not write user_config."""
+    from PySide6.QtWidgets import QMessageBox
+
+    session_path = _make_session(tmp_path)
+    before = session_path.read_text(encoding="utf-8")
+
+    dlg = DepoSummaryConfigDialog(session_path)
+    qtbot.addWidget(dlg)
+
+    for row in dlg.topic_rows:
+        row.checkbox.setChecked(False)
+    dlg.added_topics_edit.setPlainText("")
+
+    # Stub QMessageBox.warning so the test doesn't block on a real dialog.
+    warning_called = []
+    monkeypatch.setattr(QMessageBox, "warning",
+                        lambda *a, **kw: warning_called.append(a) or QMessageBox.Ok)
+
+    dlg.accept()
+
+    assert warning_called, "QMessageBox.warning should have been shown"
+    # Session JSON must be unchanged: phase still 'awaiting_input', user_config still None.
+    after = session_path.read_text(encoding="utf-8")
+    assert before == after

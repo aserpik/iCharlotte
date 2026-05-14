@@ -5,7 +5,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox, QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit,
-    QPlainTextEdit, QScrollArea, QSpinBox, QVBoxLayout, QWidget,
+    QMessageBox, QPlainTextEdit, QScrollArea, QSpinBox, QVBoxLayout, QWidget,
 )
 
 from icharlotte_core.deposition import session_manager
@@ -117,6 +117,13 @@ class DepoSummaryConfigDialog(QDialog):
             for line in self.added_topics_edit.toPlainText().splitlines()
             if line.strip()
         ]
+        if not selected_topics and not added_topics:
+            QMessageBox.warning(
+                self,
+                "No topics selected",
+                "Select at least one topic, or add a custom topic, before generating the summary.",
+            )
+            return
         cfg = {
             "selected_topics": selected_topics,
             "added_topics": added_topics,
