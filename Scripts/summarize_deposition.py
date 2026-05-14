@@ -36,6 +36,7 @@ from icharlotte_core.exceptions import (
     SummaryPassError, CrossCheckPassError, MemoryLimitError
 )
 from icharlotte_core.docx_writer import get_docx_lock, LockTimeoutError
+from icharlotte_core.deposition import session_manager
 
 # Import Case Data Manager
 try:
@@ -59,6 +60,7 @@ SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 EXTRACTION_PROMPT_FILE = os.path.join(SCRIPTS_DIR, "DEPOSITION_EXTRACTION_PROMPT.txt")
 NARRATIVE_PROMPT_FILE = os.path.join(SCRIPTS_DIR, "SUMMARIZE_DEPOSITION_PROMPT.txt")
 CROSS_CHECK_PROMPT_FILE = os.path.join(SCRIPTS_DIR, "DEPOSITION_CROSS_CHECK_PROMPT.txt")
+TOPIC_DISCOVERY_PROMPT_FILE = os.path.join(SCRIPTS_DIR, "DEPOSITION_TOPIC_DISCOVERY_PROMPT.txt")
 
 # Legacy log file for backward compatibility
 LEGACY_LOG_FILE = r"C:\GeminiTerminal\Summarize_Deposition_activity.log"
@@ -272,6 +274,156 @@ class DeponentExtractor:
             return min(12, max(8, pages // 12))
         else:
             return min(20, max(12, pages // 15))
+
+
+# =============================================================================
+# Phase 1: Topic Discovery
+# =============================================================================
+
+import json as _json  # local alias to avoid shadowing in helpers
+
+
+def _parse_topic_response(response: str) -> list:
+    """Parse the LLM topic-discovery response into a list of topic dicts.
+
+    Falls back to bullet-list parsing if the response is not valid JSON.
+    Always returns at most 25 topics, sorted by rank (ascending).
+    """
+    response = (response or "").strip()
+    topics: list = []
+
+    # Strip code fences if present
+    if response.startswith("```"):
+        lines = response.splitlines()
+        # Drop the opening ``` line (and ```json variants) and the closing ``` if any.
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        response = "\n".join(lines).strip()
+
+    # Try JSON first
+    try:
+        parsed = _json.loads(response)
+        if isinstance(parsed, list):
+            for i, entry in enumerate(parsed, 1):
+                if not isinstance(entry, dict):
+                    continue
+                title = str(entry.get("title", "")).strip()
+                if not title:
+                    continue
+                rank = entry.get("rank", i)
+                try:
+                    rank = int(rank)
+                except (TypeError, ValueError):
+                    rank = i
+                density = str(entry.get("discussion_density", "medium")).strip().lower()
+                if density not in ("high", "medium", "low"):
+                    density = "medium"
+                topics.append({
+                    "id": len(topics) + 1,
+                    "title": title,
+                    "rank": rank,
+                    "discussion_density": density,
+                })
+    except _json.JSONDecodeError:
+        pass
+
+    # Fallback: bullet-list parsing
+    if not topics:
+        for line in response.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            for prefix in ("- ", "* ", "• "):
+                if stripped.startswith(prefix):
+                    stripped = stripped[len(prefix):].strip()
+                    break
+            # Drop leading numbering like "1." or "1)"
+            stripped = re.sub(r"^\d+[\.\)]\s*", "", stripped)
+            if not stripped:
+                continue
+            topics.append({
+                "id": len(topics) + 1,
+                "title": stripped,
+                "rank": len(topics) + 1,
+                "discussion_density": "medium",
+            })
+
+    # Sort by rank and truncate
+    topics.sort(key=lambda t: t["rank"])
+    topics = topics[:25]
+    # Re-stamp ids and ranks to match final order
+    for i, t in enumerate(topics, 1):
+        t["id"] = i
+        t["rank"] = i
+    return topics
+
+
+def process_topics(input_path: str, logger) -> bool:
+    """Phase 1: extract text, discover topics, write session JSON, await input."""
+    memory_monitor = MemoryMonitor(warn_threshold_mb=1500, abort_threshold_mb=2000, logger=logger.info)
+    llm_caller = LLMCaller(logger=logger)
+
+    logger.progress(2, "Initializing topic discovery...")
+
+    if not os.path.exists(TOPIC_DISCOVERY_PROMPT_FILE):
+        logger.error(f"Missing prompt file: {TOPIC_DISCOVERY_PROMPT_FILE}")
+        return False
+    with open(TOPIC_DISCOVERY_PROMPT_FILE, "r", encoding="utf-8") as f:
+        topic_prompt = f.read()
+
+    logger.progress(5, "Extracting transcript text...")
+    try:
+        with memory_monitor.track_operation("Text Extraction"):
+            processor = DocumentProcessor(ocr_config=OCRConfig(adaptive=True), logger=logger)
+            result = processor.extract_with_dynamic_ocr(input_path)
+            if not result.success:
+                raise ExtractionError(f"Failed to extract text: {result.error}", file_path=input_path)
+            text = result.text
+    except Exception as e:
+        logger.pass_failed("Text Extraction", str(e), recoverable=False)
+        return False
+
+    logger.progress(20, f"Extracted {len(text)} chars; caching transcript")
+
+    paths = session_manager.compute_session_paths(input_path)
+    paths.cached_text_path.write_text(text, encoding="utf-8")
+
+    deponent_name = DeponentExtractor.extract_deponent_name(text) or os.path.splitext(os.path.basename(input_path))[0]
+    deposition_date = DeponentExtractor.extract_deposition_date(text)
+    deponent_type = DeponentExtractor.detect_deponent_type(text, deponent_name)
+    file_number = extract_file_number(input_path)
+
+    logger.progress(40, "Calling LLM for topic discovery...")
+    try:
+        response = llm_caller.call(topic_prompt, text, task_type="summary")
+    except Exception as e:
+        logger.pass_failed("Topic Discovery", str(e), recoverable=False)
+        return False
+
+    topics = _parse_topic_response(response)
+    if not topics:
+        logger.error("Topic discovery returned no usable topics")
+        return False
+
+    session_data = {
+        "version": 1,
+        "phase": "awaiting_input",
+        "input_path": str(input_path),
+        "cached_text_path": str(paths.cached_text_path),
+        "deponent_name": deponent_name,
+        "deposition_date": deposition_date,
+        "deponent_type": deponent_type,
+        "file_number": file_number,
+        "topics": topics,
+        "user_config": None,
+    }
+    session_manager.write_session(paths.session_path, session_data)
+
+    logger.progress(95, f"Discovered {len(topics)} topics; awaiting user input")
+    print(f"AWAITING_INPUT:{paths.session_path}", flush=True)
+    return True
 
 
 # =============================================================================
