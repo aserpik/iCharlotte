@@ -824,20 +824,15 @@ def main():
     logger = AgentLogger("Deposition", file_number=file_number)
 
     if phase == "topics":
-        # Directory dispatcher mode is only meaningful for phase 1.
+        # Directory inputs are not supported in the interactive flow — the
+        # detached subprocesses would print AWAITING_INPUT: to nowhere and the
+        # iCharlotte UI would never see them. Send single files instead.
         if os.path.isdir(target):
-            logger.info("Input is a directory. Spawning per-file phase-1 agents...")
-            for root, _, files in os.walk(target):
-                for f in files:
-                    if not f.lower().endswith((".pdf", ".docx")):
-                        continue
-                    if "Deposition_summaries" in f:
-                        continue
-                    p = os.path.join(root, f)
-                    creationflags = 0x08000000 if os.name == "nt" else 0
-                    subprocess.Popen([sys.executable, sys.argv[0], "--phase=topics", p],
-                                     creationflags=creationflags if os.name == "nt" else 0)
-            sys.exit(0)
+            logger.error(
+                "Directory inputs are not supported by the interactive deposition agent. "
+                "Run one file at a time, or use the iCharlotte UI which spawns per-file agents."
+            )
+            sys.exit(2)
 
         ok = process_topics(target, logger)
         sys.exit(0 if ok else 1)
