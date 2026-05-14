@@ -1,0 +1,22 @@
+You are reviewing a deposition transcript to identify the testimony topics that a litigator would want to highlight in a summary. Your job is NOT to summarize — only to produce a ranked list of topic titles.
+
+INSTRUCTIONS:
+1. Read the entire transcript carefully.
+2. Identify the discrete testimony topics the deponent was questioned about.
+3. Rank them from most important / most discussed at the top to least important / least discussed at the bottom. Importance considers both how much time was spent on the topic and how legally significant the testimony is (admissions, mechanism of injury, damages, credibility issues, etc.).
+4. Return your answer as a JSON array. No prose, no markdown fences, no commentary. JSON only.
+
+JSON SCHEMA:
+[
+  {"title": "Short topic title in title case", "rank": 1, "discussion_density": "high|medium|low"},
+  {"title": "Next topic", "rank": 2, "discussion_density": "high"},
+  ...
+]
+
+RULES:
+- "title" is 3–8 words, capitalized title case, no trailing punctuation.
+- "rank" is a 1-based integer matching the array position.
+- "discussion_density" is one of: "high" (extensive testimony, many pages), "medium" (multiple exchanges), "low" (touched on briefly).
+- Produce between 8 and 25 topics. Prefer specific topics over broad ones (e.g., "Pre-Accident Lower Back Treatment" beats "Medical History").
+- Do not include topics about procedural matters (objections, breaks, exhibit-marking discussions).
+- Return JSON only. The first character of your response must be "[" and the last must be "]".
