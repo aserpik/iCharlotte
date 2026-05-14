@@ -2112,6 +2112,15 @@ class MainWindow(QMainWindow):
         runner.finished.connect(lambda: self.cleanup_runner(runner))
         runner.finished.connect(lambda _=None: self._drain_agent_queue())
 
+        # Wire the READY button for the deposition agent's interactive flow.
+        # AgentRunner.awaiting_input fires when phase 1 emits AWAITING_INPUT:<path>,
+        # which makes StatusWidget show the READY button. Clicking it emits ready_clicked.
+        if script_name == "summarize_deposition.py":
+            status_widget.ready_clicked.connect(
+                lambda session_path, runner=runner, widget=status_widget:
+                    self._open_depo_summary_dialog(session_path, runner, widget)
+            )
+
         # Store retry info on widget for serialization
         status_widget._retry_command = command
         status_widget._retry_args = list(args)
@@ -2145,6 +2154,23 @@ class MainWindow(QMainWindow):
 
         runner.start()
         return runner
+
+    def _open_depo_summary_dialog(self, session_path, agent_runner, status_widget):
+        """Open the deposition summary config dialog. On Accept, resume phase 2."""
+        from icharlotte_core.ui.depo_summary_config_dialog import DepoSummaryConfigDialog
+        try:
+            dlg = DepoSummaryConfigDialog(session_path, parent=self)
+        except Exception as e:
+            log_error(f"Failed to open deposition config dialog: {e}")
+            return
+
+        if dlg.exec() == QDialog.Accepted:
+            status_widget.clear_ready_state()
+            try:
+                agent_runner.resume_with_config(session_path)
+            except Exception as e:
+                log_error(f"Failed to resume phase 2: {e}")
+        # On Cancel, leave the READY button visible so the user can re-open the dialog.
 
     def _log_processing_entry(self, script_name, file_path, success):
         """Log a processing entry when an agent finishes.
