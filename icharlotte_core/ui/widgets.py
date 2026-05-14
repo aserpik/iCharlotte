@@ -436,6 +436,7 @@ class AgentRunner(QObject):
     log_update = Signal(str)
     output_file_found = Signal(str)
     finished = Signal(bool)
+    awaiting_input = Signal(str)  # session_path — phase-1 paused, ready for user input
 
     # Pass-level signals (NEW)
     pass_started = Signal(str, int, int)  # name, number, total
@@ -456,6 +457,7 @@ class AgentRunner(QObject):
         self.last_progress = 0
         self.last_status = "Starting..."
         self.output_file = None
+        self.session_path = None
         self.success = None  # None=Running, True=Success, False=Fail
 
         # Pass tracking
@@ -642,6 +644,15 @@ class AgentRunner(QObject):
             self.watchdog_timer.stop()
 
             success = (exit_code == 0 and exit_status == QProcess.ExitStatus.NormalExit)
+
+            # Phase-1 paused-exit: exit 0 after AWAITING_INPUT means "paused for user input",
+            # not "done". Keep the widget alive; do NOT emit finished.
+            if success and self.session_path is not None and self.success is None:
+                self.watchdog_timer.stop()
+                self.process.deleteLater()
+                # success stays None — UI treats this as still-running until phase 2 resolves.
+                return
+
             self.success = success
 
             script_name = self.args[0] if self.args else "unknown"
@@ -831,6 +842,14 @@ class AgentRunner(QObject):
                 if path:
                     self.output_file = path
                     self.output_file_found.emit(path)
+                continue
+
+            # Format: AWAITING_INPUT:<session_path>
+            if line.startswith("AWAITING_INPUT:"):
+                path = line[len("AWAITING_INPUT:"):].strip()
+                if path:
+                    self.session_path = path
+                    self.awaiting_input.emit(path)
                 continue
 
         # Scan for output file paths (legacy patterns)
