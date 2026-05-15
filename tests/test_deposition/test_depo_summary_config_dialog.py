@@ -9,6 +9,8 @@ import pytest
 
 pytest.importorskip("pytestqt")
 
+from PySide6.QtCore import Qt
+
 from icharlotte_core.deposition import session_manager
 from icharlotte_core.ui.depo_summary_config_dialog import DepoSummaryConfigDialog
 
@@ -41,9 +43,9 @@ def test_dialog_loads_session_and_populates_topics(qtbot, tmp_path):
     dlg = DepoSummaryConfigDialog(session_path)
     qtbot.addWidget(dlg)
 
-    titles = [row.title_edit.text() for row in dlg.topic_rows_in_order()]
+    titles = [item.text() for item in dlg.topic_rows_in_order()]
     assert titles == ["Pre-Accident History", "Mechanism Of Injury", "Damages"]
-    assert all(row.checkbox.isChecked() for row in dlg.topic_rows_in_order())
+    assert all(item.checkState() == Qt.Checked for item in dlg.topic_rows_in_order())
     assert dlg.deponent_label_edit.text() == "Plaintiff"
     assert dlg.bullets_spinbox.value() == 5
     assert dlg.cross_check_checkbox.isChecked()
@@ -55,9 +57,9 @@ def test_dialog_accept_writes_user_config_back_to_session(qtbot, tmp_path):
     qtbot.addWidget(dlg)
 
     # Uncheck topic 2, rename topic 1, add a custom topic, change settings.
-    rows = list(dlg.topic_rows_in_order())
-    rows[1].checkbox.setChecked(False)
-    rows[0].title_edit.setText("Pre-Accident Lower Back Treatment")
+    items = list(dlg.topic_rows_in_order())
+    items[1].setCheckState(Qt.Unchecked)
+    items[0].setText("Pre-Accident Lower Back Treatment")
     dlg.added_topics_edit.setPlainText("Communications With Treating Providers\n")
     dlg.bullets_spinbox.setValue(7)
     dlg.deponent_label_edit.setText("Mr. Smith")
@@ -83,7 +85,7 @@ def test_dialog_cancel_does_not_modify_session(qtbot, tmp_path):
 
     dlg = DepoSummaryConfigDialog(session_path)
     qtbot.addWidget(dlg)
-    list(dlg.topic_rows_in_order())[0].checkbox.setChecked(False)
+    list(dlg.topic_rows_in_order())[0].setCheckState(Qt.Unchecked)
     dlg.bullets_spinbox.setValue(99)
     dlg.reject()
 
@@ -121,8 +123,8 @@ def test_dialog_accept_blocks_when_no_topics_selected(qtbot, tmp_path, monkeypat
     dlg = DepoSummaryConfigDialog(session_path)
     qtbot.addWidget(dlg)
 
-    for row in dlg.topic_rows_in_order():
-        row.checkbox.setChecked(False)
+    for item in dlg.topic_rows_in_order():
+        item.setCheckState(Qt.Unchecked)
     dlg.added_topics_edit.setPlainText("")
 
     # Stub QMessageBox.warning so the test doesn't block on a real dialog.
@@ -145,16 +147,9 @@ def test_dialog_topic_drag_reorder_changes_selected_topics_order(qtbot, tmp_path
     qtbot.addWidget(dlg)
 
     # Initial fixture order: Pre-Accident History, Mechanism Of Injury, Damages.
-    # Move "Damages" (row 2) to row 0. takeItem destroys the row widget, so we
-    # rebuild it as a fresh _TopicRow to mirror what happens during a real drag.
-    from icharlotte_core.ui.depo_summary_config_dialog import _TopicRow
-    from PySide6.QtWidgets import QListWidgetItem
-    dlg.topics_list.takeItem(2)
-    new_row = _TopicRow("Damages")
-    new_item = QListWidgetItem()
-    new_item.setSizeHint(new_row.sizeHint())
-    dlg.topics_list.insertItem(0, new_item)
-    dlg.topics_list.setItemWidget(new_item, new_row)
+    # Move "Damages" (row 2) to row 0.
+    item = dlg.topics_list.takeItem(2)
+    dlg.topics_list.insertItem(0, item)
 
     dlg.accept()
 

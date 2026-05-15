@@ -12,18 +12,6 @@ from PySide6.QtWidgets import (
 from icharlotte_core.deposition import session_manager
 
 
-class _TopicRow(QWidget):
-    def __init__(self, title: str, parent=None):
-        super().__init__(parent)
-        layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        self.checkbox = QCheckBox()
-        self.checkbox.setChecked(True)
-        self.title_edit = QLineEdit(title)
-        layout.addWidget(self.checkbox)
-        layout.addWidget(self.title_edit, 1)
-
-
 class DepoSummaryConfigDialog(QDialog):
     def __init__(self, session_path, parent=None):
         super().__init__(parent)
@@ -44,18 +32,23 @@ class DepoSummaryConfigDialog(QDialog):
         )
         root.addWidget(QLabel(header_text))
 
-        # Topics list with drag-reorder
-        root.addWidget(QLabel("Topics (drag to reorder, uncheck to omit, edit text to rename):"))
+        # Topics list with native drag-reorder, checkboxes, and double-click rename.
+        # No setItemWidget — custom widgets absorb mouse events and break drag.
+        root.addWidget(QLabel("Topics (drag to reorder, uncheck to omit, double-click to rename):"))
         self.topics_list = QListWidget()
         self.topics_list.setDragDropMode(QListWidget.InternalMove)
         self.topics_list.setSelectionMode(QListWidget.SingleSelection)
         self.topics_list.setDefaultDropAction(Qt.MoveAction)
         for t in self._session.get("topics", []):
-            row = _TopicRow(t.get("title", ""))
-            item = QListWidgetItem()
-            item.setSizeHint(row.sizeHint())
+            item = QListWidgetItem(t.get("title", ""))
+            item.setFlags(
+                item.flags()
+                | Qt.ItemIsUserCheckable
+                | Qt.ItemIsEditable
+                | Qt.ItemIsDragEnabled
+            )
+            item.setCheckState(Qt.Checked)
             self.topics_list.addItem(item)
-            self.topics_list.setItemWidget(item, row)
         root.addWidget(self.topics_list, 1)
 
         # Summary bias row
@@ -125,7 +118,7 @@ class DepoSummaryConfigDialog(QDialog):
 
         settings_row.addSpacing(20)
         settings_row.addWidget(QLabel("Deponent label:"))
-        self.deponent_label_edit = QLineEdit(self._session.get("deponent_type", ""))
+        self.deponent_label_edit = QLineEdit("Plaintiff")
         settings_row.addWidget(self.deponent_label_edit, 1)
 
         settings_row.addSpacing(20)
@@ -153,10 +146,12 @@ class DepoSummaryConfigDialog(QDialog):
         root.addWidget(buttons)
 
     def topic_rows_in_order(self):
-        """Yield each topic _TopicRow widget in current visual order."""
+        """Yield each topic QListWidgetItem in current visual order.
+
+        Items expose .text() for the title and .checkState() for the checkbox state.
+        """
         for i in range(self.topics_list.count()):
-            item = self.topics_list.item(i)
-            yield self.topics_list.itemWidget(item)
+            yield self.topics_list.item(i)
 
     def _on_bias_combo_changed(self, _index):
         is_custom = self.bias_combo.currentData() == "custom"
@@ -237,9 +232,9 @@ class DepoSummaryConfigDialog(QDialog):
 
     def accept(self):
         selected_topics = [
-            row.title_edit.text().strip()
-            for row in self.topic_rows_in_order()
-            if row.checkbox.isChecked() and row.title_edit.text().strip()
+            item.text().strip()
+            for item in self.topic_rows_in_order()
+            if item.checkState() == Qt.Checked and item.text().strip()
         ]
         added_topics = [
             line.strip()
