@@ -2,11 +2,11 @@
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QHBoxLayout, QLabel,
-    QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPlainTextEdit,
-    QSpinBox, QVBoxLayout, QWidget,
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFileDialog, QHBoxLayout,
+    QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPlainTextEdit,
+    QPushButton, QSpinBox, QVBoxLayout, QWidget,
 )
 
 from icharlotte_core.deposition import session_manager
@@ -33,7 +33,7 @@ class DepoSummaryConfigDialog(QDialog):
         self.setWindowTitle("Configure Deposition Summary")
         self.setModal(True)
         self.setWindowModality(Qt.ApplicationModal)
-        self.resize(700, 600)
+        self.resize(800, 750)
 
         root = QVBoxLayout(self)
 
@@ -79,6 +79,32 @@ class DepoSummaryConfigDialog(QDialog):
         root.addLayout(bias_row)
 
         self.bias_combo.currentIndexChanged.connect(self._on_bias_combo_changed)
+
+        # Context documents drop zone
+        ctx_header = QHBoxLayout()
+        ctx_header.addWidget(QLabel("Context documents (drop .pdf, .doc, .docx here):"))
+        ctx_header.addStretch(1)
+        self._ctx_add_btn = QPushButton("Add files…")
+        self._ctx_add_btn.clicked.connect(self._on_add_context_files)
+        ctx_header.addWidget(self._ctx_add_btn)
+        root.addLayout(ctx_header)
+
+        self.context_docs_list = QListWidget()
+        self.context_docs_list.setFixedHeight(80)
+        self.context_docs_list.setAcceptDrops(True)
+        self.context_docs_list.dragEnterEvent = self._context_drag_enter
+        self.context_docs_list.dragMoveEvent = self._context_drag_enter
+        self.context_docs_list.dropEvent = self._context_drop
+        root.addWidget(self.context_docs_list)
+
+        self._ctx_status_label = QLabel("")
+        self._ctx_status_label.setStyleSheet("color: #c62828; font-style: italic; font-size: 11px;")
+        root.addWidget(self._ctx_status_label)
+
+        self._context_doc_paths: list[Path] = []
+        self._ctx_status_clear_timer = QTimer(self)
+        self._ctx_status_clear_timer.setSingleShot(True)
+        self._ctx_status_clear_timer.timeout.connect(lambda: self._ctx_status_label.setText(""))
 
         # Additional topics
         root.addWidget(QLabel("Additional topics (one per line):"))
@@ -138,6 +164,77 @@ class DepoSummaryConfigDialog(QDialog):
         if not is_custom:
             self.bias_custom_edit.clear()
 
+    _CONTEXT_DOC_EXTS = (".pdf", ".doc", ".docx")
+
+    def _context_drag_enter(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def _context_drop(self, event):
+        urls = event.mimeData().urls()
+        QTimer.singleShot(0, lambda: self._add_context_paths_from_urls(urls))
+        event.acceptProposedAction()
+
+    def _add_context_paths_from_urls(self, urls):
+        accepted, rejected = [], []
+        for url in urls:
+            if not url.isLocalFile():
+                rejected.append(url.toString())
+                continue
+            p = Path(url.toLocalFile())
+            if p.suffix.lower() in self._CONTEXT_DOC_EXTS and p.exists():
+                accepted.append(p)
+            else:
+                rejected.append(p.name)
+        for p in accepted:
+            self._append_context_path(p)
+        if rejected:
+            self._show_ctx_status(
+                f"Unsupported file type — skipped: {', '.join(rejected[:3])}"
+                + (" …" if len(rejected) > 3 else "")
+            )
+
+    def _append_context_path(self, path: Path):
+        if path in self._context_doc_paths:
+            return  # de-dupe
+        self._context_doc_paths.append(path)
+        item = QListWidgetItem()
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(4, 0, 4, 0)
+        row_layout.addWidget(QLabel(path.name), 1)
+        remove_btn = QPushButton("×")
+        remove_btn.setFixedSize(20, 20)
+        remove_btn.setStyleSheet("QPushButton { color: #c62828; font-weight: bold; }")
+        remove_btn.clicked.connect(lambda _checked=False, p=path: self._remove_context_path(p))
+        row_layout.addWidget(remove_btn)
+        item.setSizeHint(row.sizeHint())
+        self.context_docs_list.addItem(item)
+        self.context_docs_list.setItemWidget(item, row)
+
+    def _remove_context_path(self, path: Path):
+        if path not in self._context_doc_paths:
+            return
+        idx = self._context_doc_paths.index(path)
+        self._context_doc_paths.pop(idx)
+        self.context_docs_list.takeItem(idx)
+
+    def _on_add_context_files(self):
+        paths, _filter = QFileDialog.getOpenFileNames(
+            self, "Add context documents", "",
+            "Documents (*.pdf *.doc *.docx)",
+        )
+        for p in paths:
+            path = Path(p)
+            if path.suffix.lower() in self._CONTEXT_DOC_EXTS and path.exists():
+                self._append_context_path(path)
+
+    def _show_ctx_status(self, msg: str):
+        self._ctx_status_label.setText(msg)
+        self._ctx_status_clear_timer.start(3000)
+
     def accept(self):
         selected_topics = [
             row.title_edit.text().strip()
@@ -156,6 +253,7 @@ class DepoSummaryConfigDialog(QDialog):
                 "Select at least one topic, or add a custom topic, before generating the summary.",
             )
             return
+        context_doc_paths = [str(p.resolve()) for p in self._context_doc_paths if p.exists()]
         cfg = {
             "selected_topics": selected_topics,
             "added_topics": added_topics,
@@ -163,6 +261,7 @@ class DepoSummaryConfigDialog(QDialog):
             "deponent_label": self.deponent_label_edit.text().strip() or "Deponent",
             "custom_rules": self.custom_rules_edit.toPlainText().strip(),
             "cross_check_enabled": self.cross_check_checkbox.isChecked(),
+            "context_doc_paths": context_doc_paths,
             "bias": self.bias_combo.currentData() or "neutral",
             "bias_custom": (self.bias_custom_edit.text().strip()
                             if self.bias_combo.currentData() == "custom" else ""),

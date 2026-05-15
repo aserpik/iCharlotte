@@ -221,3 +221,102 @@ def test_dialog_bias_switching_away_from_custom_clears_custom_field(qtbot, tmp_p
     cfg = session_manager.read_session(session_path)["user_config"]
     assert cfg["bias"] == "pro_defense"
     assert cfg["bias_custom"] == ""
+
+
+def test_dialog_context_docs_accept_via_add_button(qtbot, tmp_path):
+    """Programmatically exercise the same path the 'Add files…' button does."""
+    session_path = _make_session(tmp_path)
+    pdf_path = tmp_path / "complaint.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\n")
+    docx_path = tmp_path / "med_summary.docx"
+    docx_path.write_bytes(b"PK\x03\x04")
+
+    dlg = DepoSummaryConfigDialog(session_path)
+    qtbot.addWidget(dlg)
+    dlg._append_context_path(pdf_path)
+    dlg._append_context_path(docx_path)
+    assert dlg.context_docs_list.count() == 2
+
+    dlg.accept()
+    cfg = session_manager.read_session(session_path)["user_config"]
+    paths = cfg["context_doc_paths"]
+    assert any("complaint.pdf" in p for p in paths)
+    assert any("med_summary.docx" in p for p in paths)
+
+
+def test_dialog_context_docs_reject_unsupported_extensions(qtbot, tmp_path):
+    """Dropping a .txt file is rejected and surfaces a status message."""
+    from PySide6.QtCore import QUrl
+    session_path = _make_session(tmp_path)
+    txt_path = tmp_path / "notes.txt"
+    txt_path.write_text("nope", encoding="utf-8")
+
+    dlg = DepoSummaryConfigDialog(session_path)
+    qtbot.addWidget(dlg)
+    dlg._add_context_paths_from_urls([QUrl.fromLocalFile(str(txt_path))])
+
+    assert dlg.context_docs_list.count() == 0
+    assert "Unsupported" in dlg._ctx_status_label.text()
+    assert "notes.txt" in dlg._ctx_status_label.text()
+
+
+def test_dialog_context_docs_remove_button_drops_path(qtbot, tmp_path):
+    session_path = _make_session(tmp_path)
+    pdf_a = tmp_path / "a.pdf"
+    pdf_a.write_bytes(b"%PDF-1.4\n")
+    pdf_b = tmp_path / "b.pdf"
+    pdf_b.write_bytes(b"%PDF-1.4\n")
+
+    dlg = DepoSummaryConfigDialog(session_path)
+    qtbot.addWidget(dlg)
+    dlg._append_context_path(pdf_a)
+    dlg._append_context_path(pdf_b)
+    dlg._remove_context_path(pdf_a)
+    assert dlg.context_docs_list.count() == 1
+    assert pdf_a not in dlg._context_doc_paths
+    assert pdf_b in dlg._context_doc_paths
+
+    dlg.accept()
+    cfg = session_manager.read_session(session_path)["user_config"]
+    assert len(cfg["context_doc_paths"]) == 1
+    assert "b.pdf" in cfg["context_doc_paths"][0]
+
+
+def test_dialog_context_docs_drop_via_mime(qtbot, tmp_path):
+    """Simulate a drop event built from QMimeData."""
+    from PySide6.QtCore import QMimeData, QPoint, QUrl
+    from PySide6.QtGui import QDropEvent
+    from PySide6.QtCore import Qt as _Qt
+
+    session_path = _make_session(tmp_path)
+    pdf_path = tmp_path / "ev.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\n")
+
+    dlg = DepoSummaryConfigDialog(session_path)
+    qtbot.addWidget(dlg)
+
+    mime = QMimeData()
+    mime.setUrls([QUrl.fromLocalFile(str(pdf_path))])
+    event = QDropEvent(
+        QPoint(0, 0), _Qt.CopyAction, mime, _Qt.LeftButton, _Qt.NoModifier
+    )
+    dlg._context_drop(event)
+    qtbot.wait(50)  # pump event loop so the deferred QTimer.singleShot(0, ...) fires
+
+    assert dlg.context_docs_list.count() == 1
+    assert pdf_path in dlg._context_doc_paths
+
+
+def test_dialog_context_docs_missing_at_accept_are_silently_dropped(qtbot, tmp_path):
+    session_path = _make_session(tmp_path)
+    pdf_path = tmp_path / "gone.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\n")
+
+    dlg = DepoSummaryConfigDialog(session_path)
+    qtbot.addWidget(dlg)
+    dlg._append_context_path(pdf_path)
+    pdf_path.unlink()  # remove file after it was added
+
+    dlg.accept()
+    cfg = session_manager.read_session(session_path)["user_config"]
+    assert cfg["context_doc_paths"] == []
