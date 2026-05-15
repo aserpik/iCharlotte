@@ -158,6 +158,9 @@ def _write_ready_session(tmp_path, *, cross_check, selected, added, bullets=5, l
             "deponent_label": label,
             "custom_rules": rules,
             "cross_check_enabled": cross_check,
+            "bias": "neutral",
+            "bias_custom": "",
+            "context_doc_paths": [],
         },
     })
     return session_path
@@ -280,3 +283,57 @@ def test_phase2_prompt_substitution_strips_user_braces(tmp_path, monkeypatch):
     # The braces from the user input were stripped, so we expect:
     assert "Mr. topic_list Smith" in prompt
     assert "Avoid bullets_per_topic or deponent_label references." in prompt
+
+
+@pytest.mark.parametrize("bias_value,bias_custom,expected_substring", [
+    ("neutral", "", "neutral, balanced tone"),
+    ("pro_plaintiff", "", "most favorable to the plaintiff"),
+    ("pro_defense", "", "most favorable to the defense"),
+    ("custom", "Highlight inconsistencies in injury testimony.",
+     "Highlight inconsistencies in injury testimony."),
+])
+def test_phase2_resolves_bias_directive_for_each_preset(
+    tmp_path, monkeypatch, bias_value, bias_custom, expected_substring
+):
+    """Each bias preset routes the expected directive language into the prompt."""
+    session_path = tmp_path / "session.json"
+    cached_path = tmp_path / "session.txt"
+    cached_path.write_text(FAKE_TRANSCRIPT, encoding="utf-8")
+    session_manager.write_session(session_path, {
+        "version": 1,
+        "phase": "ready_for_summary",
+        "input_path": str(tmp_path / "X.pdf"),
+        "cached_text_path": str(cached_path),
+        "deponent_name": "X",
+        "deposition_date": "Jan 1, 2024",
+        "deponent_type": "Plaintiff",
+        "file_number": "0000.000",
+        "topics": [{"id": 1, "title": "T", "rank": 1, "discussion_density": "high"}],
+        "user_config": {
+            "selected_topics": ["T"],
+            "added_topics": [],
+            "bullets_per_topic": 5,
+            "deponent_label": "Plaintiff",
+            "custom_rules": "",
+            "cross_check_enabled": False,
+            "bias": bias_value,
+            "bias_custom": bias_custom,
+            "context_doc_paths": [],
+        },
+    })
+
+    monkeypatch.setattr(summarize_deposition, "save_to_docx", lambda *a, **kw: True)
+    monkeypatch.setattr(summarize_deposition, "_register_outputs", lambda *a, **kw: None,
+                        raising=False)
+
+    captured = {}
+
+    def fake_call(self, prompt, text, task_type=None, **kw):
+        captured["prompt"] = prompt
+        return "**T**\n- B."
+
+    monkeypatch.setattr(summarize_deposition.LLMCaller, "call", fake_call)
+
+    logger = summarize_deposition.AgentLogger("BiasTest", log_to_file=False)
+    summarize_deposition.process_summary(str(session_path), logger)
+    assert expected_substring in captured["prompt"]

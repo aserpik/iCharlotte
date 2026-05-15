@@ -3,6 +3,10 @@ You are summarizing a deposition transcript using a fixed set of topic headings 
 DEPONENT LABEL: {deponent_label}
 BULLETS PER TOPIC: {bullets_per_topic}
 
+SUMMARY BIAS / EDITORIAL LENS:
+{bias_directive}
+{context_section}
+
 TOPIC HEADINGS (use exactly these, in this order):
 {topic_list}
 
@@ -14,8 +18,9 @@ OUTPUT RULES:
 5. Refer to the deponent as "{deponent_label}" throughout. Do not use the deponent's full name except in the opening sentence.
 6. Summarize testimony directly. Do not use introductory clauses like "Regarding," "Concerning," "With respect to," or "When asked about." Write "Plaintiff testified he broke his leg," not "Regarding his injuries, Plaintiff testified he broke his leg."
 7. Avoid repeating phrases that flag content as testimony. Write "Joe texted Plaintiff photos," not "Plaintiff testified that Joe texted her photos."
-8. Include testimony favorable to the defense where present.
-9. Do not add introductory or concluding paragraphs beyond rule 1's opening sentence. Do not add an exhibits section, impeachment section, or any section not in the topic list.
+8. Apply the SUMMARY BIAS instruction above when selecting which testimony to emphasize, while never inventing or distorting what the deponent actually said.
+9. When ADDITIONAL CASE CONTEXT is provided, use it to inform your selection and phrasing of testimony, especially to identify contradictions or admissions that bear on the case. The deposition transcript itself remains the only source for direct testimony content — do not attribute statements from context documents to the deponent.
+10. Do not add introductory or concluding paragraphs beyond rule 1's opening sentence. Do not add an exhibits section, impeachment section, or any section not in the topic list.
 
 CUSTOM RULES FROM THE ATTORNEY (apply in addition to the rules above):
 {custom_rules}

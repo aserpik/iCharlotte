@@ -428,22 +428,63 @@ def process_topics(input_path: str, logger) -> bool:
 # Phase 2: Topic-Locked Summary
 # =============================================================================
 
+_BIAS_DIRECTIVES = {
+    "neutral": (
+        "Maintain a neutral, balanced tone. Include both favorable and unfavorable "
+        "testimony equally."
+    ),
+    "pro_plaintiff": (
+        "Emphasize testimony most favorable to the plaintiff's case. Include testimony "
+        "favorable to the defense only when it directly contradicts the plaintiff's claims."
+    ),
+    "pro_defense": (
+        "Emphasize testimony most favorable to the defense. Include testimony favorable "
+        "to the plaintiff only when it directly bears on the defense's case."
+    ),
+}
+
+
+def _resolve_bias_directive(cfg: dict) -> str:
+    """Map cfg.bias to the directive string injected into the prompt."""
+    bias = cfg.get("bias", "neutral")
+    if bias == "custom":
+        return (cfg.get("bias_custom") or "").strip() or _BIAS_DIRECTIVES["neutral"]
+    return _BIAS_DIRECTIVES.get(bias, _BIAS_DIRECTIVES["neutral"])
+
+
 def _build_topic_locked_prompt(base_prompt: str, *, topic_list: list, bullets_per_topic: int,
-                                deponent_label: str, custom_rules: str) -> str:
+                                deponent_label: str, custom_rules: str,
+                                bias_directive: str = "",
+                                context_documents: list = None) -> str:
     """Render the topic-locked summary prompt with user-supplied substitutions.
 
-    User-supplied strings (deponent_label, custom_rules) are stripped of literal
-    `{` and `}` characters to prevent them from collapsing into other placeholder
-    slots when subsequent .replace() calls run.
+    User-supplied strings (deponent_label, custom_rules, bias_directive) are stripped
+    of literal `{` and `}` characters to prevent placeholder-leak across slots.
     """
     def _strip_braces(s: str) -> str:
         return (s or "").replace("{", "").replace("}", "")
 
     rendered_topics = "\n".join(f"- {t}" for t in topic_list)
+
+    if context_documents:
+        ctx_blocks = []
+        for doc in context_documents:
+            ctx_blocks.append(
+                f"=== CONTEXT DOC: {doc['filename']} ===\n{doc['text']}"
+            )
+        context_section = (
+            "\n\nADDITIONAL CASE CONTEXT (read these in addition to the deposition "
+            "transcript to better inform your summary):\n\n" + "\n\n".join(ctx_blocks)
+        )
+    else:
+        context_section = ""
+
     return (base_prompt
             .replace("{deponent_label}", _strip_braces(deponent_label))
             .replace("{bullets_per_topic}", str(bullets_per_topic))
             .replace("{topic_list}", rendered_topics)
+            .replace("{bias_directive}", _strip_braces(bias_directive))
+            .replace("{context_section}", context_section)
             .replace("{custom_rules}", _strip_braces(custom_rules) or "(none)"))
 
 
@@ -530,12 +571,15 @@ def process_summary(session_path: str, logger) -> bool:
     with open(NARRATIVE_PROMPT_FILE, "r", encoding="utf-8") as f:
         base_prompt = f.read()
 
+    bias_directive = _resolve_bias_directive(cfg)
     prompt = _build_topic_locked_prompt(
         base_prompt,
         topic_list=final_topics,
         bullets_per_topic=cfg.get("bullets_per_topic", 5),
         deponent_label=cfg.get("deponent_label") or session.get("deponent_type", "Deponent"),
         custom_rules=cfg.get("custom_rules", ""),
+        bias_directive=bias_directive,
+        context_documents=[],  # Ext-Task 5 wires real extraction
     )
 
     logger.progress(30, "Generating summary...")
