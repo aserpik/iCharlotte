@@ -337,3 +337,169 @@ def test_phase2_resolves_bias_directive_for_each_preset(
     logger = summarize_deposition.AgentLogger("BiasTest", log_to_file=False)
     summarize_deposition.process_summary(str(session_path), logger)
     assert expected_substring in captured["prompt"]
+
+
+def test_phase2_concatenates_context_documents_into_prompt(tmp_path, monkeypatch):
+    """Two context docs (one PDF, one DOCX) are extracted and injected into the prompt."""
+    pdf_path = tmp_path / "complaint.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\n")
+    docx_path = tmp_path / "med.docx"
+    docx_path.write_bytes(b"PK\x03\x04")
+
+    # Mock both extractors
+    from types import SimpleNamespace
+    monkeypatch.setattr(
+        summarize_deposition.DocumentProcessor,
+        "extract_with_dynamic_ocr",
+        lambda self, p: SimpleNamespace(
+            success=True, text="PDF context text", char_count=16, page_count=1,
+            ocr_pages=[], ocr_percentage=0.0, error=None,
+        ),
+    )
+    monkeypatch.setattr(
+        "icharlotte_core.document_processor.extract_docx_text",
+        lambda p: "DOCX context text",
+    )
+
+    session_path = _write_ready_session(
+        tmp_path, cross_check=False, selected=["T"], added=[],
+    )
+    session = session_manager.read_session(session_path)
+    session["user_config"]["context_doc_paths"] = [str(pdf_path), str(docx_path)]
+    session_manager.write_session(session_path, session)
+
+    monkeypatch.setattr(summarize_deposition, "save_to_docx", lambda *a, **kw: True)
+    monkeypatch.setattr(summarize_deposition, "_register_outputs", lambda *a, **kw: None,
+                        raising=False)
+
+    captured = {}
+
+    def fake_call(self, prompt, text, task_type=None, **kw):
+        captured["prompt"] = prompt
+        return "**T**\n- B."
+
+    monkeypatch.setattr(summarize_deposition.LLMCaller, "call", fake_call)
+
+    logger = summarize_deposition.AgentLogger("CtxTest", log_to_file=False)
+    summarize_deposition.process_summary(str(session_path), logger)
+
+    p = captured["prompt"]
+    assert "=== CONTEXT DOC: complaint.pdf ===" in p
+    assert "PDF context text" in p
+    assert "=== CONTEXT DOC: med.docx ===" in p
+    assert "DOCX context text" in p
+
+
+def test_phase2_per_doc_char_cap_truncates_long_docs(tmp_path, monkeypatch):
+    pdf_path = tmp_path / "big.pdf"
+    pdf_path.write_bytes(b"%PDF-1.4\n")
+
+    huge = "X" * 200_000
+    from types import SimpleNamespace
+    monkeypatch.setattr(
+        summarize_deposition.DocumentProcessor,
+        "extract_with_dynamic_ocr",
+        lambda self, p: SimpleNamespace(
+            success=True, text=huge, char_count=len(huge), page_count=100,
+            ocr_pages=[], ocr_percentage=0.0, error=None,
+        ),
+    )
+
+    session_path = _write_ready_session(
+        tmp_path, cross_check=False, selected=["T"], added=[],
+    )
+    session = session_manager.read_session(session_path)
+    session["user_config"]["context_doc_paths"] = [str(pdf_path)]
+    session_manager.write_session(session_path, session)
+
+    monkeypatch.setattr(summarize_deposition, "save_to_docx", lambda *a, **kw: True)
+    monkeypatch.setattr(summarize_deposition, "_register_outputs", lambda *a, **kw: None,
+                        raising=False)
+
+    captured = {}
+    monkeypatch.setattr(
+        summarize_deposition.LLMCaller, "call",
+        lambda self, prompt, text, task_type=None, **kw: (captured.update(prompt=prompt) or "**T**\n- B."),
+    )
+
+    summarize_deposition.process_summary(
+        str(session_path),
+        summarize_deposition.AgentLogger("TruncTest", log_to_file=False),
+    )
+    assert "[...truncated at 100000 chars]" in captured["prompt"]
+
+
+def test_phase2_missing_context_doc_logged_and_skipped(tmp_path, monkeypatch):
+    session_path = _write_ready_session(
+        tmp_path, cross_check=False, selected=["T"], added=[],
+    )
+    session = session_manager.read_session(session_path)
+    session["user_config"]["context_doc_paths"] = [str(tmp_path / "ghost.pdf")]
+    session_manager.write_session(session_path, session)
+
+    monkeypatch.setattr(summarize_deposition, "save_to_docx", lambda *a, **kw: True)
+    monkeypatch.setattr(summarize_deposition, "_register_outputs", lambda *a, **kw: None,
+                        raising=False)
+    captured = {}
+    monkeypatch.setattr(
+        summarize_deposition.LLMCaller, "call",
+        lambda self, prompt, text, task_type=None, **kw: (captured.update(prompt=prompt) or "**T**\n- B."),
+    )
+
+    logger = summarize_deposition.AgentLogger("MissTest", log_to_file=False)
+    ok = summarize_deposition.process_summary(str(session_path), logger)
+    assert ok is True
+    assert "=== CONTEXT DOC:" not in captured["prompt"]
+
+
+def test_phase2_no_context_docs_leaves_context_section_empty(tmp_path, monkeypatch):
+    session_path = _write_ready_session(
+        tmp_path, cross_check=False, selected=["T"], added=[],
+    )
+
+    monkeypatch.setattr(summarize_deposition, "save_to_docx", lambda *a, **kw: True)
+    monkeypatch.setattr(summarize_deposition, "_register_outputs", lambda *a, **kw: None,
+                        raising=False)
+    captured = {}
+    monkeypatch.setattr(
+        summarize_deposition.LLMCaller, "call",
+        lambda self, prompt, text, task_type=None, **kw: (captured.update(prompt=prompt) or "**T**\n- B."),
+    )
+
+    summarize_deposition.process_summary(
+        str(session_path),
+        summarize_deposition.AgentLogger("EmptyCtxTest", log_to_file=False),
+    )
+    # The injected context block has a distinctive lead-in; rule 9 of the prompt
+    # template mentions "ADDITIONAL CASE CONTEXT" by name, so we look for the
+    # block-specific phrase instead.
+    assert "read these in addition to" not in captured["prompt"]
+    assert "=== CONTEXT DOC:" not in captured["prompt"]
+
+
+def test_phase2_doc_extension_unsupported_skipped(tmp_path, monkeypatch):
+    txt_path = tmp_path / "notes.txt"
+    txt_path.write_text("not a supported doc", encoding="utf-8")
+
+    session_path = _write_ready_session(
+        tmp_path, cross_check=False, selected=["T"], added=[],
+    )
+    session = session_manager.read_session(session_path)
+    session["user_config"]["context_doc_paths"] = [str(txt_path)]
+    session_manager.write_session(session_path, session)
+
+    monkeypatch.setattr(summarize_deposition, "save_to_docx", lambda *a, **kw: True)
+    monkeypatch.setattr(summarize_deposition, "_register_outputs", lambda *a, **kw: None,
+                        raising=False)
+    captured = {}
+    monkeypatch.setattr(
+        summarize_deposition.LLMCaller, "call",
+        lambda self, prompt, text, task_type=None, **kw: (captured.update(prompt=prompt) or "**T**\n- B."),
+    )
+
+    ok = summarize_deposition.process_summary(
+        str(session_path),
+        summarize_deposition.AgentLogger("ExtTest", log_to_file=False),
+    )
+    assert ok is True
+    assert "=== CONTEXT DOC:" not in captured["prompt"]

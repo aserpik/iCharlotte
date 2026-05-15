@@ -89,6 +89,9 @@ def test_full_flow_in_process(tmp_path, monkeypatch, capsys):
         "deponent_label": "Plaintiff",
         "custom_rules": "",
         "cross_check_enabled": False,
+        "bias": "neutral",
+        "bias_custom": "",
+        "context_doc_paths": [],
     })
 
     # Phase 2

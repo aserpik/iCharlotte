@@ -428,6 +428,85 @@ def process_topics(input_path: str, logger) -> bool:
 # Phase 2: Topic-Locked Summary
 # =============================================================================
 
+_CONTEXT_DOC_PER_DOC_CHAR_CAP = 100_000
+
+
+def _extract_doc_via_word_com(path: str, logger) -> str:
+    """Extract text from a legacy .doc via Word COM. Returns empty string on failure.
+
+    Mirrors the ChatTab._extract_doc_text pattern: attach to the user's running Word
+    instance (NEVER call word.Quit() or set word.Visible). Open the doc read-only and
+    only close the Document we opened.
+    """
+    try:
+        import win32com.client  # type: ignore
+    except ImportError:
+        logger.warning("win32com not available; cannot extract .doc files")
+        return ""
+    word = None
+    doc = None
+    try:
+        word = win32com.client.Dispatch("Word.Application")
+        doc = word.Documents.Open(
+            FileName=os.path.abspath(path),
+            ReadOnly=True,
+            AddToRecentFiles=False,
+            ConfirmConversions=False,
+        )
+        text = doc.Content.Text or ""
+        return text
+    except Exception as e:
+        logger.warning(f".doc extraction failed for {path}: {e}")
+        return ""
+    finally:
+        if doc is not None:
+            try:
+                doc.Close(SaveChanges=False)
+            except Exception:
+                pass
+        # Intentionally do NOT word.Quit() — attached to user's running Word
+
+
+def _extract_context_documents(paths, logger) -> list:
+    """Extract text from each context document. Returns [{filename, text}, ...].
+
+    Per-doc failures (missing, unsupported, empty, extraction error) log a warning
+    and skip that doc. Per-doc character cap of 100,000 with a truncation marker.
+    """
+    from pathlib import Path as _Path
+    results = []
+    for path in paths:
+        p = _Path(path)
+        if not p.exists():
+            logger.warning(f"Context doc missing, skipping: {path}")
+            continue
+        ext = p.suffix.lower()
+        try:
+            if ext == ".pdf":
+                processor = DocumentProcessor(ocr_config=OCRConfig(adaptive=True), logger=logger)
+                result = processor.extract_with_dynamic_ocr(str(p))
+                text = result.text if result.success else ""
+            elif ext == ".docx":
+                from icharlotte_core.document_processor import extract_docx_text
+                text = extract_docx_text(str(p))
+            elif ext == ".doc":
+                text = _extract_doc_via_word_com(str(p), logger)
+            else:
+                logger.warning(f"Unsupported context doc extension {ext}, skipping: {path}")
+                continue
+        except Exception as e:
+            logger.warning(f"Context doc extraction failed for {path}: {e}")
+            continue
+        if not text:
+            logger.warning(f"Context doc produced no text, skipping: {path}")
+            continue
+        if len(text) > _CONTEXT_DOC_PER_DOC_CHAR_CAP:
+            text = (text[:_CONTEXT_DOC_PER_DOC_CHAR_CAP]
+                    + f"\n\n[...truncated at {_CONTEXT_DOC_PER_DOC_CHAR_CAP} chars]")
+        results.append({"filename": p.name, "text": text})
+    return results
+
+
 _BIAS_DIRECTIVES = {
     "neutral": (
         "Maintain a neutral, balanced tone. Include both favorable and unfavorable "
@@ -568,6 +647,17 @@ def process_summary(session_path: str, logger) -> bool:
         logger.pass_failed("Phase 2 Init", "No topics selected", recoverable=False)
         return False
 
+    context_doc_paths = cfg.get("context_doc_paths") or []
+    if context_doc_paths:
+        for i, p in enumerate(context_doc_paths, 1):
+            logger.progress(
+                5 + min(4, (i * 4) // max(1, len(context_doc_paths))),
+                f"Extracting context: {os.path.basename(p)} ({i}/{len(context_doc_paths)})...",
+            )
+        context_documents = _extract_context_documents(context_doc_paths, logger)
+    else:
+        context_documents = []
+
     with open(NARRATIVE_PROMPT_FILE, "r", encoding="utf-8") as f:
         base_prompt = f.read()
 
@@ -579,7 +669,7 @@ def process_summary(session_path: str, logger) -> bool:
         deponent_label=cfg.get("deponent_label") or session.get("deponent_type", "Deponent"),
         custom_rules=cfg.get("custom_rules", ""),
         bias_directive=bias_directive,
-        context_documents=[],  # Ext-Task 5 wires real extraction
+        context_documents=context_documents,
     )
 
     logger.progress(30, "Generating summary...")
