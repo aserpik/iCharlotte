@@ -4,9 +4,9 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QCheckBox, QDialog, QDialogButtonBox, QHBoxLayout, QLabel, QLineEdit,
-    QListWidget, QListWidgetItem, QMessageBox, QPlainTextEdit, QSpinBox,
-    QVBoxLayout, QWidget,
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QHBoxLayout, QLabel,
+    QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPlainTextEdit,
+    QSpinBox, QVBoxLayout, QWidget,
 )
 
 from icharlotte_core.deposition import session_manager
@@ -57,6 +57,28 @@ class DepoSummaryConfigDialog(QDialog):
             self.topics_list.addItem(item)
             self.topics_list.setItemWidget(item, row)
         root.addWidget(self.topics_list, 1)
+
+        # Summary bias row
+        bias_row = QHBoxLayout()
+        bias_row.addWidget(QLabel("Summary bias:"))
+        self.bias_combo = QComboBox()
+        for label, value in (
+            ("Neutral", "neutral"),
+            ("Most favorable to plaintiff", "pro_plaintiff"),
+            ("Most favorable to defense", "pro_defense"),
+            ("Custom…", "custom"),
+        ):
+            self.bias_combo.addItem(label, value)
+        bias_row.addWidget(self.bias_combo)
+        self.bias_custom_edit = QLineEdit()
+        self.bias_custom_edit.setPlaceholderText(
+            "Describe the editorial lens (e.g., 'Highlight any inconsistencies in injury testimony')"
+        )
+        self.bias_custom_edit.setVisible(False)
+        bias_row.addWidget(self.bias_custom_edit, 1)
+        root.addLayout(bias_row)
+
+        self.bias_combo.currentIndexChanged.connect(self._on_bias_combo_changed)
 
         # Additional topics
         root.addWidget(QLabel("Additional topics (one per line):"))
@@ -110,6 +132,12 @@ class DepoSummaryConfigDialog(QDialog):
             item = self.topics_list.item(i)
             yield self.topics_list.itemWidget(item)
 
+    def _on_bias_combo_changed(self, _index):
+        is_custom = self.bias_combo.currentData() == "custom"
+        self.bias_custom_edit.setVisible(is_custom)
+        if not is_custom:
+            self.bias_custom_edit.clear()
+
     def accept(self):
         selected_topics = [
             row.title_edit.text().strip()
@@ -135,6 +163,9 @@ class DepoSummaryConfigDialog(QDialog):
             "deponent_label": self.deponent_label_edit.text().strip() or "Deponent",
             "custom_rules": self.custom_rules_edit.toPlainText().strip(),
             "cross_check_enabled": self.cross_check_checkbox.isChecked(),
+            "bias": self.bias_combo.currentData() or "neutral",
+            "bias_custom": (self.bias_custom_edit.text().strip()
+                            if self.bias_combo.currentData() == "custom" else ""),
         }
         session_manager.update_user_config(self.session_path, cfg)
         super().accept()

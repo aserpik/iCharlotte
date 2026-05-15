@@ -161,3 +161,63 @@ def test_dialog_topic_drag_reorder_changes_selected_topics_order(qtbot, tmp_path
     loaded = session_manager.read_session(session_path)
     cfg = loaded["user_config"]
     assert cfg["selected_topics"] == ["Damages", "Pre-Accident History", "Mechanism Of Injury"]
+
+
+def test_dialog_bias_combo_defaults_to_neutral_and_writes_neutral_to_session(qtbot, tmp_path):
+    session_path = _make_session(tmp_path)
+    dlg = DepoSummaryConfigDialog(session_path)
+    qtbot.addWidget(dlg)
+
+    assert dlg.bias_combo.currentData() == "neutral"
+    assert dlg.bias_custom_edit.isVisible() is False
+
+    dlg.accept()
+    cfg = session_manager.read_session(session_path)["user_config"]
+    assert cfg["bias"] == "neutral"
+    assert cfg["bias_custom"] == ""
+
+
+def test_dialog_bias_custom_reveals_text_field_and_round_trips(qtbot, tmp_path):
+    session_path = _make_session(tmp_path)
+    dlg = DepoSummaryConfigDialog(session_path)
+    qtbot.addWidget(dlg)
+    dlg.show()
+
+    custom_idx = next(
+        i for i in range(dlg.bias_combo.count())
+        if dlg.bias_combo.itemData(i) == "custom"
+    )
+    dlg.bias_combo.setCurrentIndex(custom_idx)
+    assert dlg.bias_custom_edit.isVisible() is True
+
+    dlg.bias_custom_edit.setText("Highlight inconsistencies in injury testimony.")
+    dlg.accept()
+
+    cfg = session_manager.read_session(session_path)["user_config"]
+    assert cfg["bias"] == "custom"
+    assert cfg["bias_custom"] == "Highlight inconsistencies in injury testimony."
+
+
+def test_dialog_bias_switching_away_from_custom_clears_custom_field(qtbot, tmp_path):
+    session_path = _make_session(tmp_path)
+    dlg = DepoSummaryConfigDialog(session_path)
+    qtbot.addWidget(dlg)
+
+    custom_idx = next(
+        i for i in range(dlg.bias_combo.count())
+        if dlg.bias_combo.itemData(i) == "custom"
+    )
+    pro_def_idx = next(
+        i for i in range(dlg.bias_combo.count())
+        if dlg.bias_combo.itemData(i) == "pro_defense"
+    )
+    dlg.bias_combo.setCurrentIndex(custom_idx)
+    dlg.bias_custom_edit.setText("Some custom directive")
+    dlg.bias_combo.setCurrentIndex(pro_def_idx)
+    assert dlg.bias_custom_edit.isVisible() is False
+    assert dlg.bias_custom_edit.text() == ""
+
+    dlg.accept()
+    cfg = session_manager.read_session(session_path)["user_config"]
+    assert cfg["bias"] == "pro_defense"
+    assert cfg["bias_custom"] == ""
