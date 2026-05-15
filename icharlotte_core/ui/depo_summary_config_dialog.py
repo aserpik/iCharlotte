@@ -1,5 +1,7 @@
 """Modal dialog the user fills out after phase 1 of the deposition agent."""
 
+import os
+import re
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer
@@ -216,9 +218,27 @@ class DepoSummaryConfigDialog(QDialog):
         self._context_doc_paths.pop(idx)
         self.context_docs_list.takeItem(idx)
 
+    def _compute_case_folder(self) -> str:
+        """Return the case (matter) root folder derived from the session's input path.
+
+        Walks up the deposition's path looking for a folder whose name starts with
+        exactly 3 digits (the matter folder convention, e.g., '084 - Dudash').
+        Falls back to the deposition's immediate parent folder if no match is found,
+        or empty string if no input_path is available.
+        """
+        input_path = self._session.get("input_path", "")
+        if not input_path:
+            return ""
+        parts = os.path.normpath(input_path).split(os.sep)
+        for i in range(len(parts) - 1, -1, -1):
+            if re.match(r'^\d{3}(\D|$)', parts[i]):
+                return os.sep.join(parts[:i + 1])
+        return os.path.dirname(input_path)
+
     def _on_add_context_files(self):
+        initial_dir = self._compute_case_folder() or ""
         paths, _filter = QFileDialog.getOpenFileNames(
-            self, "Add context documents", "",
+            self, "Add context documents", initial_dir,
             "Documents (*.pdf *.doc *.docx)",
         )
         for p in paths:

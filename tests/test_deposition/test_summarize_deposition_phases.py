@@ -191,8 +191,8 @@ def test_phase2_reads_session_and_generates_summary(tmp_path, monkeypatch):
     assert ok is True
     assert mock_call.call_count == 1  # cross-check disabled
     assert called_with["content"] == canned_summary
-    # Session + cached text cleaned up on success
-    assert not session_path.exists()
+    # Session is intentionally kept alive after success — see test_phase2_keeps_session_alive_after_success.
+    assert session_path.exists()
 
 
 def test_phase2_cross_check_runs_only_when_enabled(tmp_path, monkeypatch):
@@ -503,3 +503,27 @@ def test_phase2_doc_extension_unsupported_skipped(tmp_path, monkeypatch):
     )
     assert ok is True
     assert "=== CONTEXT DOC:" not in captured["prompt"]
+
+
+def test_phase2_keeps_session_alive_after_success(tmp_path, monkeypatch):
+    """After Phase 2 succeeds, the session JSON and cached transcript remain on disk
+    so the user can re-open the popup to generate another version."""
+    session_path = _write_ready_session(
+        tmp_path, cross_check=False, selected=["T"], added=[],
+    )
+    cached_path = Path(session_manager.read_session(session_path)["cached_text_path"])
+
+    monkeypatch.setattr(summarize_deposition, "save_to_docx", lambda *a, **kw: True)
+    monkeypatch.setattr(summarize_deposition, "_register_outputs", lambda *a, **kw: None,
+                        raising=False)
+    monkeypatch.setattr(
+        summarize_deposition.LLMCaller, "call",
+        lambda self, prompt, text, task_type=None, **kw: "**T**\n- B.",
+    )
+
+    logger = summarize_deposition.AgentLogger("KeepAliveTest", log_to_file=False)
+    ok = summarize_deposition.process_summary(str(session_path), logger)
+    assert ok is True
+    # Session + cached text MUST still exist after a successful phase 2.
+    assert session_path.exists()
+    assert cached_path.exists()

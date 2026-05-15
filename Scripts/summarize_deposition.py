@@ -707,7 +707,8 @@ def process_summary(session_path: str, logger) -> bool:
     _register_outputs(session["input_path"], summary, session["deponent_name"],
                        session.get("deponent_type"), output_file, logger)
 
-    session_manager.cleanup_session(session_path)
+    # Session intentionally kept on disk so the user can re-open the popup and
+    # generate additional summary versions from the same phase-1 topics.
     logger.progress(100, "Deposition summarization complete")
     return True
 

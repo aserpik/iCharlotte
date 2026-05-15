@@ -315,3 +315,27 @@ def test_dialog_context_docs_missing_at_accept_are_silently_dropped(qtbot, tmp_p
     dlg.accept()
     cfg = session_manager.read_session(session_path)["user_config"]
     assert cfg["context_doc_paths"] == []
+
+
+def test_dialog_compute_case_folder_extracts_matter_root(qtbot, tmp_path):
+    """Helper returns the case root (matter folder) given the deposition input path."""
+    session_path = _make_session(tmp_path)
+    # _make_session sets input_path to "tmp_path/Smith.pdf" — no matter folder pattern.
+    # Override input_path with a realistic case structure for this test.
+    session = session_manager.read_session(session_path)
+    session["input_path"] = r"Z:\Shared\Current Clients\3800- NATIONWIDE\3850\084 - Dudash\Depositions\Smith Depo.pdf"
+    session_manager.write_session(session_path, session)
+
+    dlg = DepoSummaryConfigDialog(session_path)
+    qtbot.addWidget(dlg)
+    assert dlg._compute_case_folder().endswith("084 - Dudash")
+
+
+def test_dialog_compute_case_folder_falls_back_to_parent_when_no_matter_pattern(qtbot, tmp_path):
+    session_path = _make_session(tmp_path)
+    # The fixture's input_path is just "<tmp>/Smith.pdf" — no folder named with 3 digits.
+    dlg = DepoSummaryConfigDialog(session_path)
+    qtbot.addWidget(dlg)
+    fallback = dlg._compute_case_folder()
+    # Should be the tmp_path itself (parent of the fake pdf)
+    assert fallback == str(tmp_path)

@@ -484,6 +484,7 @@ class AgentRunner(QObject):
         self.last_status = "Starting..."
         self.output_file = None
         self.session_path = None
+        self._completed_session_path = None  # tracks the session for the just-completed phase 2
         self.success = None  # None=Running, True=Success, False=Fail
 
         # Pass tracking
@@ -666,6 +667,9 @@ class AgentRunner(QObject):
         self.process.readyReadStandardError.connect(self.handle_stderr)
         self.process.finished.connect(self.handle_finished)
 
+        # Remember the session so handle_finished can re-emit awaiting_input after phase 2,
+        # allowing the user to generate additional summary versions.
+        self._completed_session_path = session_path
         # Allow handle_finished to emit finished(True) on phase-2 completion
         self.session_path = None
         self.last_output_time = time.time()
@@ -708,6 +712,16 @@ class AgentRunner(QObject):
                 self.process.deleteLater()
                 # success stays None — UI treats this as still-running until phase 2 resolves.
                 return
+
+            # Phase-2 success path: re-emit awaiting_input so the status widget re-shows READY,
+            # letting the user generate another summary version from the same session.
+            if success and self._completed_session_path is not None:
+                resurrected_path = self._completed_session_path
+                self._completed_session_path = None
+                self.session_path = resurrected_path
+                # Note: we still emit finished(True) below so the widget shows "Completed",
+                # but the awaiting_input re-emission shows READY alongside the Open Output button.
+                self.awaiting_input.emit(resurrected_path)
 
             self.success = success
 

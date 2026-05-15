@@ -97,5 +97,5 @@ def test_full_flow_in_process(tmp_path, monkeypatch, capsys):
     # Phase 2
     assert summarize_deposition.process_summary(str(session_path), logger) is True
 
-    # Session cleaned up
-    assert not session_path.exists()
+    # Session intentionally kept alive so the user can generate additional versions.
+    assert session_path.exists()

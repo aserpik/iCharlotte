@@ -87,3 +87,40 @@ def test_resume_with_config_starts_phase_two_process(qtbot, monkeypatch):
     assert started_with["cmd"] == "python"
     assert "--phase=summary" in started_with["args"]
     assert r"C:\tmp\session.json" in started_with["args"]
+
+
+def test_agent_runner_reemits_awaiting_input_after_phase2_success(qtbot, monkeypatch):
+    """After resume_with_config + a successful phase 2 exit, the runner re-emits
+    awaiting_input so the status widget can re-show the READY button."""
+    runner = AgentRunner("python", ["--phase=topics", "X.pdf"])
+
+    awaiting_calls = []
+    finished_calls = []
+    runner.awaiting_input.connect(awaiting_calls.append)
+    runner.finished.connect(finished_calls.append)
+
+    # Mock QProcess so resume_with_config doesn't actually launch a subprocess
+    class FakeProcess:
+        def __init__(self):
+            self.readyReadStandardOutput = MagicMock()
+            self.readyReadStandardError = MagicMock()
+            self.finished = MagicMock()
+        def start(self, *a, **kw): pass
+        def state(self): return 0
+        def kill(self): pass
+        def deleteLater(self): pass
+
+    monkeypatch.setattr("icharlotte_core.ui.widgets.QProcess", FakeProcess)
+
+    runner.resume_with_config(r"C:\tmp\session.json")
+    # Restore the real QProcess before invoking handle_finished, which references
+    # QProcess.ExitStatus internally.
+    monkeypatch.undo()
+    # Now simulate phase 2 finishing successfully
+    from PySide6.QtCore import QProcess
+    runner.handle_finished(0, QProcess.ExitStatus.NormalExit)
+
+    # The runner should have BOTH emitted finished(True) AND awaiting_input(session_path)
+    assert finished_calls == [True]
+    assert awaiting_calls == [r"C:\tmp\session.json"]
+    assert runner.session_path == r"C:\tmp\session.json"
