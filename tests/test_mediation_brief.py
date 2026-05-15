@@ -139,6 +139,38 @@ class TestCaptionHandling(unittest.TestCase):
             sig_paras = gen.prepare_caption_template(caption_path, output_path)
             self.assertEqual(len(sig_paras), 0)
 
+    def test_footer_replacement_handles_run_nested_in_hyperlink(self):
+        # Repro for "Assembly error: Element is not a child of this node":
+        # caption-page footers commonly contain a w:r nested inside w:hyperlink
+        # (e.g. the case-name hyperlink in pleading-paper templates). The footer
+        # replacement code must not assume runs are direct children of w:p.
+        from docx import Document
+        from lxml import etree
+        from icharlotte_core.mediation_brief import MediationBriefGenerator
+
+        W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        gen = MediationBriefGenerator()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            doc = Document()
+            doc.add_paragraph("Body content")
+
+            footer = doc.sections[0].footer
+            footer_para = footer.paragraphs[0]
+            para_elem = footer_para._element
+
+            hyperlink = etree.SubElement(para_elem, f"{{{W_NS}}}hyperlink")
+            run = etree.SubElement(hyperlink, f"{{{W_NS}}}r")
+            t = etree.SubElement(run, f"{{{W_NS}}}t")
+            t.text = "Smith v. Jones - Case No. 12345"
+
+            path = os.path.join(tmpdir, "caption_with_nested_footer.docx")
+            doc.save(path)
+
+            reopened = Document(path)
+            # Must not raise "Element is not a child of this node"
+            gen._replace_caption_page_footers(reopened)
+
 
 class TestSectionGeneration(unittest.TestCase):
 

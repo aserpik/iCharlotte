@@ -46,6 +46,48 @@ class TestExtractResult:
         assert result.ocr_percentage == 0.0
 
 
+class TestIsWordIndexText:
+    """Tests for word-index page detection used to skip OCR."""
+
+    def _make_index_text(self, n_refs: int = 30) -> str:
+        # Realistic word-index page: word followed by line:col refs, no Q/A.
+        words = ["accident", "vehicle", "intersection", "deposition", "morning"]
+        lines = []
+        for i, w in enumerate(words):
+            refs = " ".join(f"{(j*3+i+1) % 200}:{(j*5+i) % 25 + 1}"
+                            for j in range(n_refs // len(words) + 1))
+            lines.append(f"{w}  {refs}")
+        return "\n".join(lines)
+
+    def test_detects_word_index_page(self):
+        text = self._make_index_text(n_refs=40)
+        assert DocumentProcessor._is_word_index_text(text) is True
+
+    def test_rejects_qa_transcript_page(self):
+        text = (
+            "Q. Where were you at the time of the accident?\n"
+            " A. I was at the intersection of Main and 5th, "
+            "approximately 3:15 in the afternoon.\n"
+            " Q. And what direction were you traveling?\n"
+            " A. I was heading north on Main Street."
+        )
+        assert DocumentProcessor._is_word_index_text(text) is False
+
+    def test_rejects_short_or_empty_text(self):
+        assert DocumentProcessor._is_word_index_text("") is False
+        assert DocumentProcessor._is_word_index_text("Page 117") is False
+
+    def test_rejects_page_with_few_refs(self):
+        # Has line:col refs but below the threshold — likely a citation page.
+        text = "See exhibit at 12:5 and 15:22 for details."
+        assert DocumentProcessor._is_word_index_text(text) is False
+
+    def test_strips_timestamps_before_counting_refs(self):
+        # Timestamps like 09:24:00 AM must not be counted as word:line refs.
+        text = "Reporter's certificate, taken 09:24:00 AM through 04:15:00 PM."
+        assert DocumentProcessor._is_word_index_text(text) is False
+
+
 class TestVerificationDetector:
     """Tests for verification page detection."""
 

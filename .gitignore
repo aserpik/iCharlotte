@@ -3,6 +3,7 @@
 *.log.*
 logs/*.fd*
 logs/crashes/
+logs/depo_sessions/
 
 # SQLite WAL/SHM sidecar files
 *.db-shm

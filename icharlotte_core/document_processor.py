@@ -275,25 +275,85 @@ class DocumentProcessor:
         return max(self.ocr_config.min_threshold,
                    min(int(base), self.ocr_config.max_threshold))
 
-    def _extract_from_pdf(self, file_path: str, ocr_enabled: bool = True) -> ExtractResult:
-        """Extract text from a PDF file with optional OCR fallback."""
+    @staticmethod
+    def _is_word_index_text(text: str) -> bool:
+        """Detect deposition word index pages by structure.
+
+        Word index pages list every word in the transcript with line:column
+        refs like "absent 12:5 14:23". They have no Q/A markers and many
+        such refs. Same heuristic as testimony_formatter._build_page_map.
+        """
+        if not text:
+            return False
+        if re.search(r'\n[\s\xa0]+Q\.', text) or re.search(r'\n[\s\xa0]+A\.', text):
+            return False
+        cleaned = re.sub(r'\d{1,2}:\d{2}:\d{2}\s*[AP]M', '', text)
+        word_refs = re.findall(r'\b\d{1,3}:\d{1,2}\b', cleaned)
+        return len(word_refs) >= 10
+
+    def _extract_from_pdf(self, file_path: str, ocr_enabled: bool = True,
+                          skip_word_index_pages: bool = True) -> ExtractResult:
+        """Extract text from a PDF file with optional OCR fallback.
+
+        When pypdf returns sparse text on a page, fitz/PyMuPDF is consulted
+        before falling back to OCR — fitz often reads text pypdf cannot
+        (non-standard encodings, embedded text layers). If the resulting
+        text matches the deposition word-index pattern, the page is emitted
+        as empty and OCR is skipped.
+        """
         reader = PdfReader(file_path)
         total_pages = len(reader.pages)
         self._log(f"PDF has {total_pages} pages.{' (OCR disabled)' if not ocr_enabled else ''}")
 
+        # Open with fitz for pre-OCR fallback. fitz reads many PDFs pypdf cannot.
+        fitz_doc = None
+        try:
+            import fitz  # PyMuPDF
+            fitz_doc = fitz.open(file_path)
+        except Exception as e:
+            self._log(f"fitz unavailable for fallback extraction: {e}", "debug")
+
         text_parts = []
         ocr_pages = []
+        word_index_skipped = 0
+        fitz_recovered = 0
         threshold = self.ocr_config.base_threshold
 
-        for i, page in enumerate(reader.pages):
-            # Memory management
-            if i % self.ocr_config.gc_interval == 0:
-                gc.collect()
+        try:
+            for i, page in enumerate(reader.pages):
+                # Memory management
+                if i % self.ocr_config.gc_interval == 0:
+                    gc.collect()
 
-            page_text = page.extract_text() or ""
+                page_text = page.extract_text() or ""
 
-            # Check if OCR is needed
-            if len(page_text.strip()) < threshold:
+                # Native pypdf text is sufficient — use it.
+                if len(page_text.strip()) >= threshold:
+                    text_parts.append(page_text)
+                    continue
+
+                # Sparse pypdf text — try fitz fallback before OCR.
+                fitz_text = ""
+                if fitz_doc is not None and i < len(fitz_doc):
+                    try:
+                        fitz_text = fitz_doc[i].get_text("text") or ""
+                    except Exception as e:
+                        self._log(f"fitz failed on page {i+1}: {e}", "debug")
+
+                # Word index detection runs against whichever extraction has text.
+                check_text = fitz_text if len(fitz_text) > len(page_text) else page_text
+                if skip_word_index_pages and self._is_word_index_text(check_text):
+                    self._log(f"Page {i+1} detected as deposition word index — skipping OCR.")
+                    text_parts.append("")
+                    word_index_skipped += 1
+                    continue
+
+                # Fitz recovered useful text — use it instead of OCR.
+                if len(fitz_text.strip()) >= threshold:
+                    text_parts.append(fitz_text)
+                    fitz_recovered += 1
+                    continue
+
                 if not ocr_enabled:
                     # OCR suppressed — accept the native (possibly empty) text and move on.
                     # Callers that need exhibit content must opt in via ocr_enabled=True.
@@ -310,8 +370,17 @@ class DocumentProcessor:
                 else:
                     self._log(f"OCR did not improve page {i+1}. Using original.", "warning")
                     text_parts.append(page_text)
-            else:
-                text_parts.append(page_text)
+        finally:
+            if fitz_doc is not None:
+                try:
+                    fitz_doc.close()
+                except Exception:
+                    pass
+
+        if word_index_skipped:
+            self._log(f"Skipped {word_index_skipped} word-index page(s) without OCR.")
+        if fitz_recovered:
+            self._log(f"Recovered {fitz_recovered} page(s) via fitz fallback (no OCR needed).")
 
         full_text = "\n".join(text_parts)
         char_count = len(full_text)

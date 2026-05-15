@@ -705,9 +705,14 @@ FORMATTING RULES:
                     if para_elem is None or id(para_elem) in replaced_paras:
                         continue
                     replaced_paras.add(id(para_elem))
-                    # Clear all runs in this paragraph
+                    # Clear all runs in this paragraph. Runs may be nested inside
+                    # other elements (w:hyperlink, w:smartTag, w:sdt, etc.), so
+                    # remove via each run's actual parent rather than assuming
+                    # the enclosing w:p is the direct parent.
                     for run_elem in list(para_elem.iter(W_R)):
-                        para_elem.remove(run_elem)
+                        run_parent = run_elem.getparent()
+                        if run_parent is not None:
+                            run_parent.remove(run_elem)
                     # Add the brief title
                     para_elem.append(_make_bold_run("DEFENDANT'S "))
                     para_elem.append(_make_bold_run("CONFIDENTIAL", underline=True))
