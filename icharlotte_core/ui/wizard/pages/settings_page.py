@@ -84,6 +84,8 @@ class SettingsPage(QWidget):
         self._update_proceed_enabled()
 
     def _update_proceed_enabled(self) -> None:
+        if not hasattr(self, "proceed_btn"):
+            return
         self.proceed_btn.setEnabled(len(self._files) > 0)
 
     def _on_proceed(self) -> None:
