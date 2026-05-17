@@ -455,6 +455,11 @@ class MainWindow(QMainWindow):
         if self.case_path:
             self.populate_tree()
             self.load_status_history()
+            # Restore wizard task tabs for the initial case (if any).
+            try:
+                self._restore_task_tabs_for_case()
+            except Exception as e:
+                log_event(f"[wizard] startup restore failed: {e}")
 
         # Register global hotkeys (Win+F for Open File, Win+C for Change File)
         self._setup_global_hotkeys()
@@ -1021,6 +1026,129 @@ class MainWindow(QMainWindow):
         if not self.tabs.isTabVisible(self.tabs.currentIndex()):
             self.tabs.setCurrentIndex(0)
 
+    # --- Wizard Mode: per-case task-tab snapshot/restore ---
+
+    def _iter_task_tabs(self) -> list:
+        """Return (index, widget) for every TaskTab currently in self.tabs."""
+        out = []
+        for i in range(self.tabs.count()):
+            w = self.tabs.widget(i)
+            if w is not None and w.property("wizard_task_id") is not None:
+                out.append((i, w))
+        return out
+
+    def _relpath_under(self, root: str, path: str) -> str:
+        try:
+            return os.path.relpath(path, root)
+        except ValueError:
+            return path
+
+    def _snapshot_open_task_tabs(self) -> list:
+        """Build the persistence-ready snapshot of currently-open task tabs."""
+        if not self.case_path:
+            return []
+        snapshots = []
+        for _, tab in self._iter_task_tabs():
+            # Determine page label.
+            page_idx = tab.currentIndex()
+            if page_idx == 1:  # PAGE_STATUS — cancel and store as settings
+                if getattr(tab, "_worker", None) is not None:
+                    try:
+                        tab._worker.cancel()
+                    except Exception:
+                        pass
+                page = "settings"
+            elif page_idx == 2:  # PAGE_OUTPUT
+                page = "output"
+            else:
+                page = "settings"
+
+            files_rel = [self._relpath_under(self.case_path, f) for f in tab.files]
+            output_path = tab.output_page.output_path if page == "output" else None
+            output_path_rel = self._relpath_under(self.case_path, output_path) if output_path else None
+
+            snapshots.append({
+                "task_id": tab.spec.task_id,
+                "instance_suffix": tab.property("wizard_instance_suffix") or "",
+                "files": files_rel,
+                "settings": tab.settings_page.to_dict(),
+                "page": page,
+                "output_path": output_path_rel,
+            })
+        return snapshots
+
+    def _remove_all_task_tabs(self) -> None:
+        # Iterate in reverse so indices stay stable.
+        for idx, widget in reversed(self._iter_task_tabs()):
+            self.tabs.removeTab(idx)
+            widget.deleteLater()
+
+    def _save_wizard_state_for_current_case(self) -> None:
+        if not self.case_path:
+            return
+        from icharlotte_core.ui.wizard.persistence import WizardStatePersistence
+        p = WizardStatePersistence(self.case_path)
+        p.set_open_tabs(self._snapshot_open_task_tabs())
+        p.save()
+
+    def _restore_task_tabs_for_case(self) -> None:
+        if not self.case_path:
+            return
+        from icharlotte_core.ui.wizard.persistence import WizardStatePersistence
+        from icharlotte_core.ui.wizard.registry import get_task, TASK_REGISTRY
+        from icharlotte_core.ui.wizard.task_tab import TaskTab, PAGE_OUTPUT, PAGE_SETTINGS
+
+        p = WizardStatePersistence(self.case_path)
+        for entry in p.get_open_tabs():
+            task_id = entry.get("task_id")
+            if task_id not in TASK_REGISTRY:
+                continue
+            spec = get_task(task_id)
+            files_abs = [
+                f if os.path.isabs(f) else os.path.join(self.case_path, f)
+                for f in entry.get("files", [])
+            ]
+            tab = TaskTab(
+                spec=spec,
+                files=files_abs,
+                case_path=self.case_path,
+                file_number=self.file_number,
+                parent=self,
+            )
+            suffix = entry.get("instance_suffix", "") or ""
+            tab.setProperty("wizard_task_id", spec.task_id)
+            tab.setProperty("wizard_instance_suffix", suffix)
+            title = f"{spec.title} {suffix}".strip()
+
+            # Restore settings dict if present.
+            settings_dict = entry.get("settings") or {}
+            try:
+                tab.settings_page.from_dict(settings_dict)
+            except Exception:
+                pass
+
+            self.tabs.addTab(tab, title)
+
+            # Restore page.
+            page = entry.get("page", "settings")
+            if page == "output":
+                out_rel = entry.get("output_path")
+                out_abs = os.path.join(self.case_path, out_rel) if out_rel else None
+                if out_abs and os.path.exists(out_abs):
+                    tab.output_page.load_output(out_abs)
+                    tab.setCurrentIndex(PAGE_OUTPUT)
+                else:
+                    tab.setCurrentIndex(PAGE_SETTINGS)
+            else:
+                tab.setCurrentIndex(PAGE_SETTINGS)
+        self._hide_fixed_close_buttons()
+
+    def _index_of_tab(self, tab_text: str) -> int:
+        for i in range(self.tabs.count()):
+            if self.tabs.tabText(i) == tab_text:
+                return i
+        return -1
+
     def setup_view_menu(self):
         self.view_btn = QToolButton()
         self.view_btn.setText("View ▾")
@@ -1456,52 +1584,69 @@ class MainWindow(QMainWindow):
     def load_case_by_number(self, file_number):
         log_debug(f"load_case_by_number: switching to {file_number}")
         new_path = get_case_path(file_number)
-
-        if new_path:
-            log_debug(f"load_case_by_number: path={new_path}")
-            self.save_status_history()
-            # Save chat conversation before switching cases
-            if hasattr(self, 'chat_tab') and self.chat_tab:
-                self.chat_tab.save_current_state()
-            self.file_number = file_number
-            self.case_path = new_path
-            self._update_window_title()
-            self.populate_tree()
-            self.clear_all_status()
-
-            # Reset agent buttons, then restore running state for agents on this case
-            for btn in self.agent_buttons.values():
-                btn.set_running(False)
-            for script, case_num in self.running_agents.items():
-                if case_num == file_number and script in self.agent_buttons:
-                    self.agent_buttons[script].set_running(True)
-
-            self.load_status_history()
-
-            # Switch to Case View tab (Index 1)
-            self.tabs.setCurrentIndex(1)
-
-            # Reset Tabs
-            if hasattr(self, 'index_tab'):
-                self.index_tab.load_data(self.file_number)
-            if hasattr(self, 'chat_tab'):
-                self.chat_tab.load_case(self.file_number)
-            if hasattr(self, 'liability_tab'):
-                self.liability_tab.reset_state()
-            if hasattr(self, 'email_tab'):
-                self.email_tab.search_bar.clear()
-                self.email_tab.check_db_init()
-                self.email_tab.perform_search()
-            if hasattr(self, 'email_update_tab'):
-                self.email_update_tab.on_case_changed(file_number)
-            if hasattr(self, 'deposition_tab'):
-                self.deposition_tab.load_case(file_number)
-            if hasattr(self, 'discovery_tab'):
-                self.discovery_tab.load_case(file_number)
-
-            log_event(f"Switched to case {self.file_number}")
-        else:
+        if not new_path:
             QMessageBox.critical(self, "Error", f"Could not find case directory for {file_number}")
+            return
+
+        log_debug(f"load_case_by_number: path={new_path}")
+        # ---- WIZARD: snapshot current case's task tabs, then remove them ----
+        try:
+            self._save_wizard_state_for_current_case()
+        except Exception as e:
+            log_event(f"[wizard] snapshot failed: {e}")
+        self._remove_all_task_tabs()
+
+        self.save_status_history()
+        if hasattr(self, 'chat_tab') and self.chat_tab:
+            self.chat_tab.save_current_state()
+        self.file_number = file_number
+        self.case_path = new_path
+        self._update_window_title()
+        self.populate_tree()
+        self.clear_all_status()
+
+        for btn in self.agent_buttons.values():
+            btn.set_running(False)
+        for script, case_num in self.running_agents.items():
+            if case_num == file_number and script in self.agent_buttons:
+                self.agent_buttons[script].set_running(True)
+
+        self.load_status_history()
+
+        # Activate the appropriate tab for the current mode.
+        if self.mode_controller.is_wizard:
+            wizard_idx = self._index_of_tab("Wizard")
+            if wizard_idx >= 0:
+                self.tabs.setCurrentIndex(wizard_idx)
+        else:
+            case_view_idx = self._index_of_tab("Case View")
+            if case_view_idx >= 0:
+                self.tabs.setCurrentIndex(case_view_idx)
+
+        if hasattr(self, 'index_tab'):
+            self.index_tab.load_data(self.file_number)
+        if hasattr(self, 'chat_tab'):
+            self.chat_tab.load_case(self.file_number)
+        if hasattr(self, 'liability_tab'):
+            self.liability_tab.reset_state()
+        if hasattr(self, 'email_tab'):
+            self.email_tab.search_bar.clear()
+            self.email_tab.check_db_init()
+            self.email_tab.perform_search()
+        if hasattr(self, 'email_update_tab'):
+            self.email_update_tab.on_case_changed(file_number)
+        if hasattr(self, 'deposition_tab'):
+            self.deposition_tab.load_case(file_number)
+        if hasattr(self, 'discovery_tab'):
+            self.discovery_tab.load_case(file_number)
+
+        # ---- WIZARD: restore the new case's task tabs ----
+        try:
+            self._restore_task_tabs_for_case()
+        except Exception as e:
+            log_event(f"[wizard] restore failed: {e}")
+
+        log_event(f"Switched to case {self.file_number}")
 
     def view_docket(self):
         if not self.case_path:
@@ -2383,6 +2528,10 @@ class MainWindow(QMainWindow):
             log_event(f"Error loading status history: {e}", "error")
 
     def closeEvent(self, event):
+        try:
+            self._save_wizard_state_for_current_case()
+        except Exception as e:
+            log_event(f"[wizard] close-save failed: {e}")
         self.save_status_history()
         # Save chat conversation before closing
         if hasattr(self, 'chat_tab') and self.chat_tab:
