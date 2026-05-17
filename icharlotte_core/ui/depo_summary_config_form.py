@@ -8,14 +8,16 @@ import os
 import re
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QSettings, QTimer
 from PySide6.QtWidgets import (
     QCheckBox, QComboBox, QFileDialog, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPlainTextEdit,
-    QPushButton, QSpinBox, QVBoxLayout, QWidget,
+    QPushButton, QSpinBox, QSplitter, QVBoxLayout, QWidget,
 )
 
 from icharlotte_core.deposition import session_manager
+
+_SETTINGS_KEY = "wizard/depo_settings/form_splitter_state"
 
 
 class DepoSummaryConfigForm(QWidget):
@@ -43,20 +45,36 @@ class DepoSummaryConfigForm(QWidget):
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(4)
 
+        # Fixed header — sits above the splitter, not resizable.
         header_text = (
             f"Configure summary for <b>{self._session.get('deponent_name', '')}</b> "
             f"({self._session.get('deponent_type', '')}, "
             f"{self._session.get('deposition_date', 'date unknown')})"
         )
-        root.addWidget(QLabel(header_text))
+        header_label = QLabel(header_text)
+        header_label.setContentsMargins(0, 0, 0, 4)
+        root.addWidget(header_label)
 
-        # Topics list with native drag-reorder, checkboxes, and double-click rename.
-        root.addWidget(QLabel("Topics (drag to reorder, uncheck to omit, double-click to rename):"))
+        # ---- Inner splitter ----
+        self.form_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.form_splitter.setObjectName("form_splitter")
+        self.form_splitter.setChildrenCollapsible(False)
+
+        # Section 0: Topics list
+        topics_section = QWidget()
+        topics_layout = QVBoxLayout(topics_section)
+        topics_layout.setContentsMargins(0, 4, 0, 4)
+        topics_layout.setSpacing(2)
+        topics_lbl = QLabel("Topics (drag to reorder, uncheck to omit, double-click to rename):")
+        topics_lbl.setContentsMargins(0, 0, 0, 2)
+        topics_layout.addWidget(topics_lbl)
         self.topics_list = QListWidget()
         self.topics_list.setDragDropMode(QListWidget.InternalMove)
         self.topics_list.setSelectionMode(QListWidget.SingleSelection)
         self.topics_list.setDefaultDropAction(Qt.MoveAction)
+        self.topics_list.setMinimumHeight(50)
         for t in self._session.get("topics", []):
             item = QListWidgetItem(t.get("title", ""))
             item.setFlags(
@@ -67,11 +85,15 @@ class DepoSummaryConfigForm(QWidget):
             )
             item.setCheckState(Qt.Checked)
             self.topics_list.addItem(item)
-        root.addWidget(self.topics_list, 1)
+        topics_layout.addWidget(self.topics_list)
+        self.form_splitter.addWidget(topics_section)
 
-        # Summary bias row
-        bias_row = QHBoxLayout()
-        bias_row.addWidget(QLabel("Summary bias:"))
+        # Section 1: Bias row (non-collapsible, fixed-ish single row)
+        bias_section = QWidget()
+        bias_layout = QHBoxLayout(bias_section)
+        bias_layout.setContentsMargins(0, 0, 0, 0)
+        bias_layout.setSpacing(8)
+        bias_layout.addWidget(QLabel("Summary bias:"))
         self.bias_combo = QComboBox()
         for label, value in (
             ("Neutral", "neutral"),
@@ -80,79 +102,130 @@ class DepoSummaryConfigForm(QWidget):
             ("Custom…", "custom"),
         ):
             self.bias_combo.addItem(label, value)
-        bias_row.addWidget(self.bias_combo)
+        bias_layout.addWidget(self.bias_combo)
         self.bias_custom_edit = QLineEdit()
         self.bias_custom_edit.setPlaceholderText(
             "Describe the editorial lens (e.g., 'Highlight any inconsistencies in injury testimony')"
         )
         self.bias_custom_edit.setVisible(False)
-        bias_row.addWidget(self.bias_custom_edit, 1)
-        root.addLayout(bias_row)
+        bias_layout.addWidget(self.bias_custom_edit, 1)
+        self.form_splitter.addWidget(bias_section)
+        self.form_splitter.setCollapsible(1, False)
 
         self.bias_combo.currentIndexChanged.connect(self._on_bias_combo_changed)
 
-        # Context documents drop zone
+        # Section 2: Additional topics
+        added_section = QWidget()
+        added_layout = QVBoxLayout(added_section)
+        added_layout.setContentsMargins(0, 4, 0, 4)
+        added_layout.setSpacing(2)
+        added_lbl = QLabel("Additional topics (one per line):")
+        added_lbl.setContentsMargins(0, 0, 0, 2)
+        added_layout.addWidget(added_lbl)
+        self.added_topics_edit = QPlainTextEdit()
+        self.added_topics_edit.setPlaceholderText(
+            "One topic per line. These are appended after the checked topics above, in order."
+        )
+        self.added_topics_edit.setMinimumHeight(50)
+        added_layout.addWidget(self.added_topics_edit)
+        self.form_splitter.addWidget(added_section)
+
+        # Section 3: Settings row (non-collapsible, fixed-ish single row)
+        settings_section = QWidget()
+        settings_layout = QHBoxLayout(settings_section)
+        settings_layout.setContentsMargins(0, 0, 0, 0)
+        settings_layout.setSpacing(8)
+        settings_layout.addWidget(QLabel("Bullets per topic:"))
+        self.bullets_spinbox = QSpinBox()
+        self.bullets_spinbox.setRange(1, 15)
+        self.bullets_spinbox.setValue(5)
+        settings_layout.addWidget(self.bullets_spinbox)
+        settings_layout.addSpacing(20)
+        settings_layout.addWidget(QLabel("Deponent label:"))
+        self.deponent_label_edit = QLineEdit("Plaintiff")
+        settings_layout.addWidget(self.deponent_label_edit, 1)
+        settings_layout.addSpacing(20)
+        self.cross_check_checkbox = QCheckBox("Run cross-check pass")
+        self.cross_check_checkbox.setChecked(True)
+        settings_layout.addWidget(self.cross_check_checkbox)
+        self.form_splitter.addWidget(settings_section)
+        self.form_splitter.setCollapsible(3, False)
+
+        # Section 4: Custom rules
+        rules_section = QWidget()
+        rules_layout = QVBoxLayout(rules_section)
+        rules_layout.setContentsMargins(0, 4, 0, 4)
+        rules_layout.setSpacing(2)
+        rules_lbl = QLabel("Custom rules:")
+        rules_lbl.setContentsMargins(0, 0, 0, 2)
+        rules_layout.addWidget(rules_lbl)
+        self.custom_rules_edit = QPlainTextEdit()
+        self.custom_rules_edit.setPlaceholderText(
+            "Any extra instructions for the summary (tense, citation style, things to avoid, etc.)."
+        )
+        self.custom_rules_edit.setMinimumHeight(50)
+        rules_layout.addWidget(self.custom_rules_edit)
+        self.form_splitter.addWidget(rules_section)
+
+        # Section 5: Context documents
+        ctx_section = QWidget()
+        ctx_layout = QVBoxLayout(ctx_section)
+        ctx_layout.setContentsMargins(0, 4, 0, 4)
+        ctx_layout.setSpacing(2)
+
         ctx_header = QHBoxLayout()
-        ctx_header.addWidget(QLabel("Context documents (drop .pdf, .doc, .docx here):"))
+        ctx_header.setContentsMargins(0, 0, 0, 0)
+        ctx_header.setSpacing(8)
+        ctx_hdr_lbl = QLabel("Context documents (drop .pdf, .doc, .docx here):")
+        ctx_hdr_lbl.setContentsMargins(0, 0, 0, 2)
+        ctx_header.addWidget(ctx_hdr_lbl)
         ctx_header.addStretch(1)
         self._ctx_add_btn = QPushButton("Add files…")
         self._ctx_add_btn.clicked.connect(self._on_add_context_files)
         ctx_header.addWidget(self._ctx_add_btn)
-        root.addLayout(ctx_header)
+        ctx_layout.addLayout(ctx_header)
 
         self.context_docs_list = QListWidget()
-        self.context_docs_list.setFixedHeight(80)
+        self.context_docs_list.setMinimumHeight(50)
         self.context_docs_list.setAcceptDrops(True)
         self.context_docs_list.dragEnterEvent = self._context_drag_enter
         self.context_docs_list.dragMoveEvent = self._context_drag_enter
         self.context_docs_list.dropEvent = self._context_drop
-        root.addWidget(self.context_docs_list)
+        ctx_layout.addWidget(self.context_docs_list)
 
         self._ctx_status_label = QLabel("")
         self._ctx_status_label.setStyleSheet("color: #c62828; font-style: italic; font-size: 11px;")
-        root.addWidget(self._ctx_status_label)
+        ctx_layout.addWidget(self._ctx_status_label)
 
+        self.form_splitter.addWidget(ctx_section)
+
+        root.addWidget(self.form_splitter, 1)
+
+        # ---- Deferred state init ----
         self._context_doc_paths: list[Path] = []
         self._ctx_status_clear_timer = QTimer(self)
         self._ctx_status_clear_timer.setSingleShot(True)
         self._ctx_status_clear_timer.timeout.connect(lambda: self._ctx_status_label.setText(""))
 
-        # Additional topics
-        root.addWidget(QLabel("Additional topics (one per line):"))
-        self.added_topics_edit = QPlainTextEdit()
-        self.added_topics_edit.setPlaceholderText(
-            "One topic per line. These are appended after the checked topics above, in order."
-        )
-        self.added_topics_edit.setFixedHeight(70)
-        root.addWidget(self.added_topics_edit)
+        # ---- Restore / initialise splitter sizes ----
+        self._restore_splitter()
+        self.form_splitter.splitterMoved.connect(self._save_splitter)
 
-        # Settings row
-        settings_row = QHBoxLayout()
-        settings_row.addWidget(QLabel("Bullets per topic:"))
-        self.bullets_spinbox = QSpinBox()
-        self.bullets_spinbox.setRange(1, 15)
-        self.bullets_spinbox.setValue(5)
-        settings_row.addWidget(self.bullets_spinbox)
+    # ---- Splitter persistence ----
 
-        settings_row.addSpacing(20)
-        settings_row.addWidget(QLabel("Deponent label:"))
-        self.deponent_label_edit = QLineEdit("Plaintiff")
-        settings_row.addWidget(self.deponent_label_edit, 1)
+    def _restore_splitter(self):
+        settings = QSettings("iCharlotte", "iCharlotte")
+        state = settings.value(_SETTINGS_KEY)
+        if state:
+            self.form_splitter.restoreState(state)
+        else:
+            # First-run defaults (pixels): topics=130, bias=32, added=70,
+            # settings=32, rules=80, context=80
+            self.form_splitter.setSizes([130, 32, 70, 32, 80, 80])
 
-        settings_row.addSpacing(20)
-        self.cross_check_checkbox = QCheckBox("Run cross-check pass")
-        self.cross_check_checkbox.setChecked(True)
-        settings_row.addWidget(self.cross_check_checkbox)
-        root.addLayout(settings_row)
-
-        # Custom rules
-        root.addWidget(QLabel("Custom rules:"))
-        self.custom_rules_edit = QPlainTextEdit()
-        self.custom_rules_edit.setPlaceholderText(
-            "Any extra instructions for the summary (tense, citation style, things to avoid, etc.)."
-        )
-        self.custom_rules_edit.setFixedHeight(90)
-        root.addWidget(self.custom_rules_edit)
+    def _save_splitter(self):
+        settings = QSettings("iCharlotte", "iCharlotte")
+        settings.setValue(_SETTINGS_KEY, self.form_splitter.saveState())
 
     # ---- Public API ----
 
