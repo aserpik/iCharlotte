@@ -148,6 +148,7 @@ class TaskTab(QStackedWidget):
         """Phase 1 complete — store session path and switch status page to awaiting mode."""
         self._awaiting_session_path = session_path
         self.status_page.show_awaiting_input(session_path)
+        self.status_page.pause_eta()
 
     def _on_configure_requested(self) -> None:
         """User clicked 'Configure Topics & Continue' — open DepoSummaryConfigDialog."""
@@ -162,6 +163,7 @@ class TaskTab(QStackedWidget):
             return
 
         if dlg.exec() == QDialog.DialogCode.Accepted:
+            self.status_page.resume_eta()
             # Re-show progress bar for Phase 2.
             self.status_page.awaiting_input_widget.setVisible(False)
             self.status_page.progress_bar.setRange(0, 0)
