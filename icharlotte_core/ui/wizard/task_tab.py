@@ -58,6 +58,10 @@ class TaskTab(QStackedWidget):
         return list(self._files)
 
     @property
+    def spec(self):
+        return self._spec
+
+    @property
     def current_page(self) -> int:
         return self.currentIndex()
 

@@ -18,3 +18,10 @@ def test_show_output_transitions(qtbot):
     tab._show_output("/tmp/fake_output.docx")
     assert tab.current_page == PAGE_OUTPUT
     assert tab.output_page.output_path == "/tmp/fake_output.docx"
+
+
+def test_spec_property_returns_spec(qtbot):
+    spec = get_task("summarize_documents")
+    tab = TaskTab(spec, files=["/tmp/x.pdf"], case_path="/tmp/case", file_number="0000.000")
+    qtbot.addWidget(tab)
+    assert tab.spec is spec

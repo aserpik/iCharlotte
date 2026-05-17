@@ -1410,7 +1410,13 @@ class MainWindow(QMainWindow):
             return
         if widget.property("wizard_task_id") is None:
             return  # not a task tab; ignore
-        # Phase 4: just remove. Cancellation hook arrives in Phase 5.
+        # Cancel any running worker before removing the tab.
+        worker = getattr(widget, "_worker", None)
+        if worker is not None:
+            try:
+                worker.cancel()
+            except Exception:
+                pass
         self.tabs.removeTab(index)
         widget.deleteLater()
 
