@@ -1228,6 +1228,17 @@ class MainWindow(QMainWindow):
                 return i
         return -1
 
+    def _switch_to_status_tab(self) -> None:
+        """Switch to the Status tab by name, only if it's currently visible.
+
+        Tab indices shifted when the Wizard tab was inserted at index 1, so
+        hardcoded indices silently jump to the wrong tab. Wizard mode hides
+        Status; in that mode this is a no-op (wizard pages own their own UI).
+        """
+        idx = self._index_of_tab("Status")
+        if idx >= 0 and self.tabs.isTabVisible(idx):
+            self.tabs.setCurrentIndex(idx)
+
     def setup_view_menu(self):
         self.view_btn = QToolButton()
         self.view_btn.setText("View ▾")
@@ -1383,7 +1394,34 @@ class MainWindow(QMainWindow):
         if not files:
             return  # user cancelled → no tab created
 
-        # Compute title with suffix for multi-instance.
+        if task_id == "summarize_depositions":
+            # One tab per transcript so each has its own speculative Phase 1 worker.
+            first_new_index = None
+            for file_path in files:
+                existing_titles = [self.tabs.tabText(i) for i in range(self.tabs.count())]
+                suffix = next_instance_suffix(spec.title, existing_titles)
+                title = f"{spec.title} {suffix}".strip()
+                task_tab = TaskTab(
+                    spec=spec,
+                    files=[file_path],
+                    case_path=self.case_path,
+                    file_number=self.file_number,
+                    parent=self,
+                )
+                task_tab.setProperty("wizard_task_id", spec.task_id)
+                task_tab.setProperty("wizard_instance_suffix", suffix)
+                task_tab.task_completed.connect(self._on_task_completed)
+                new_index = self.tabs.addTab(task_tab, title)
+                if first_new_index is None:
+                    first_new_index = new_index
+                task_tab.start_speculative_run()
+                log_event(f"[wizard] opened deposition tab '{title}' (speculative Phase 1)")
+            if first_new_index is not None:
+                self.tabs.setCurrentIndex(first_new_index)
+            self._hide_fixed_close_buttons()
+            return
+
+        # All other tasks: bundle files into a single sequential tab.
         existing_titles = [self.tabs.tabText(i) for i in range(self.tabs.count())]
         suffix = next_instance_suffix(spec.title, existing_titles)
         title = f"{spec.title} {suffix}".strip()
@@ -1851,7 +1889,7 @@ class MainWindow(QMainWindow):
 
     def run_separator_path(self, path, sensitivity=2):
         # Switch to Status Tab to show progress
-        self.tabs.setCurrentIndex(1)
+        self._switch_to_status_tab()
         
         status_widget = StatusWidget("Separator Agent", f"Analyzing {os.path.basename(path)}")
         self.status_list_layout.insertWidget(0, status_widget)
@@ -2165,7 +2203,7 @@ class MainWindow(QMainWindow):
         worker.finished_signal.connect(lambda: self._cleanup_report_worker(worker))
 
         # Switch to status tab area
-        self.tabs.setCurrentIndex(1)
+        self._switch_to_status_tab()
 
         worker.start()
 
@@ -2730,7 +2768,7 @@ class MainWindow(QMainWindow):
         self.clear_all_checkboxes() # Clears the task data and UI
 
         if count > 0:
-            self.tabs.setCurrentIndex(1)
+            self._switch_to_status_tab()
         else:
             QMessageBox.warning(self, "No Selection", "No files selected for processing. (Did you queue any tasks?)")
 
