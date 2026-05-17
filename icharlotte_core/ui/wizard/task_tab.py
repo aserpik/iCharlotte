@@ -20,6 +20,7 @@ class TaskTab(QStackedWidget):
     """Stateful container for one running task. Owns its own worker."""
 
     closed = Signal()  # emitted when the tab is being removed
+    task_completed = Signal(dict)  # recent-tasks entry dict
 
     def __init__(
         self,
@@ -105,7 +106,17 @@ class TaskTab(QStackedWidget):
         self._worker.start()
 
     def _on_worker_finished(self, output_path: str) -> None:
+        from datetime import datetime
         self._worker = None
+        entry = {
+            "task_id": self._spec.task_id,
+            "title": self._spec.title,
+            "files": list(self._files),
+            "settings": self.settings_page.to_dict(),
+            "output_path": output_path,
+            "completed_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        self.task_completed.emit(entry)
         self._show_output(output_path)
 
     def _on_worker_failed(self, err: str) -> None:

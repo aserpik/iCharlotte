@@ -1091,6 +1091,23 @@ class MainWindow(QMainWindow):
         p.set_open_tabs(self._snapshot_open_task_tabs())
         p.save()
 
+    def _on_task_completed(self, entry: dict) -> None:
+        if not self.case_path:
+            return
+        from icharlotte_core.ui.wizard.persistence import WizardStatePersistence
+        # Store files & output_path as case-relative.
+        entry = dict(entry)
+        entry["files"] = [self._relpath_under(self.case_path, f) for f in entry.get("files", [])]
+        if entry.get("output_path"):
+            entry["output_path"] = self._relpath_under(self.case_path, entry["output_path"])
+        p = WizardStatePersistence(self.case_path)
+        p.add_recent_task(entry)
+        p.save()
+        # Tell the Wizard tab to refresh its Recent Tasks list.
+        if hasattr(self, "wizard_tab") and self.wizard_tab is not None:
+            if hasattr(self.wizard_tab, "refresh_recent_tasks"):
+                self.wizard_tab.refresh_recent_tasks(p.get_recent_tasks())
+
     def _restore_task_tabs_for_case(self) -> None:
         if not self.case_path:
             return
@@ -1118,6 +1135,7 @@ class MainWindow(QMainWindow):
             suffix = entry.get("instance_suffix", "") or ""
             tab.setProperty("wizard_task_id", spec.task_id)
             tab.setProperty("wizard_instance_suffix", suffix)
+            tab.task_completed.connect(self._on_task_completed)
             title = f"{spec.title} {suffix}".strip()
 
             # Restore settings dict if present.
@@ -1318,6 +1336,7 @@ class MainWindow(QMainWindow):
         )
         task_tab.setProperty("wizard_task_id", spec.task_id)
         task_tab.setProperty("wizard_instance_suffix", suffix)
+        task_tab.task_completed.connect(self._on_task_completed)
         new_index = self.tabs.addTab(task_tab, title)
         self.tabs.setCurrentIndex(new_index)
         log_event(f"[wizard] opened task tab '{title}' with {len(files)} file(s)")
