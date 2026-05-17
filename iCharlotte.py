@@ -919,14 +919,7 @@ class MainWindow(QMainWindow):
         self.btn_open_root.clicked.connect(self.open_root_folder)
         self.corner_layout.addWidget(self.btn_open_root)
 
-        # Change File button (green - primary)
-        self.btn_change_file = QPushButton("Change File")
-        self.btn_change_file.setStyleSheet(primary_btn_style.format(
-            bg="#388E3C", hover="#2E7D32", pressed="#1B5E20"
-        ))
-        self.btn_change_file.setToolTip("Switch to different case (Win+C)")
-        self.btn_change_file.clicked.connect(self.change_file)
-        self.corner_layout.addWidget(self.btn_change_file)
+        # Change File button removed in favor of Master List mode toggle (Wizard).
 
         # View menu button
         self.setup_view_menu()
