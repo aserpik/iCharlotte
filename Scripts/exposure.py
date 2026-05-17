@@ -49,8 +49,8 @@ except ImportError:
 
 # --- Configuration ---
 # Hardcoded log path as per instructions
-LOG_FILE = r"C:\GeminiTerminal\exposure_activity.log"
-PROMPT_FILE = r"C:\GeminiTerminal\Scripts\EXPOSURE_PROMPT.txt"
+LOG_FILE = os.path.join(os.getcwd(), "exposure_activity.log")
+PROMPT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "EXPOSURE_PROMPT.txt")
 
 # Set up logging
 logging.basicConfig(

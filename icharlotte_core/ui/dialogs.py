@@ -376,11 +376,12 @@ LEGACY_PROMPT_MAP = {
     "SUMMARIZE_DEPOSITION_PROMPT.txt": ("deposition", "summary"),
     "DEPOSITION_EXTRACTION_PROMPT.txt": ("deposition", "extraction"),
     "DEPOSITION_CROSS_CHECK_PROMPT.txt": ("deposition", "cross_check"),
+    "DEPOSITION_TOPIC_DISCOVERY_PROMPT.txt": ("deposition", "topic_discovery"),
     "LIABILITY_PROMPT.txt": ("liability", "main"),
     "EXPOSURE_PROMPT.txt": ("exposure", "main"),
     "MED_RECORD_PROMPT.txt": ("med_record", "main"),
     "MED_CHRON_PROMPT.txt": ("med_chron", "main"),
-    "EXTRACTION_PASS_PROMPT.txt": ("extraction", "main"),
+    "EXTRACTION_PASS_PROMPT.txt": ("discovery", "extraction"),
     "SUMMARIZE_DISCOVERY_PROMPT.txt": ("discovery", "summary"),
 }
 
@@ -393,7 +394,7 @@ WORKBENCH_TO_AGENT_ID = {
     "exposure": "agent_exposure",
     "med_record": "agent_med_rec",
     "med_chron": "agent_med_chron",
-    "extraction": "agent_separate",
+    "separate": "agent_separate",
     "email_update": "func_email_compose",
     "chat": "func_chat",
     "mediation_brief": "agent_mediation_brief",
@@ -1452,7 +1453,7 @@ class PromptsDialog(QDialog):
 
         # Add predefined agents
         for agent in ['summarize', 'discovery', 'deposition',
-                      'liability', 'exposure', 'med_record', 'med_chron', 'extraction',
+                      'liability', 'exposure', 'med_record', 'med_chron', 'separate',
                       'email_update', 'chat',
                       'word_assistant', 'legal_research', 'mediation_brief']:
             agents.add(agent)
@@ -2310,7 +2311,7 @@ TASK_TYPE_DESCRIPTIONS = {
 AGENT_CATEGORIES = [
     ("Document Processing Agents", [
         "agent_separate", "agent_summarize", "agent_sum_disc", "agent_sum_depo",
-        "agent_med_rec", "agent_med_chron", "agent_organize"
+        "agent_med_rec", "agent_med_chron"
     ]),
     ("Case Agents", [
         "agent_docket", "agent_complaint",

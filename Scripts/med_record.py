@@ -76,8 +76,81 @@ except ImportError:
 SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 PROMPT_FILE = os.path.join(SCRIPTS_DIR, "MED_RECORD_PROMPT.txt")
 
+# --- OCR Configuration ---
+PDF_POINTS_PER_INCH = 72              # PDF coordinate system constant
+
+OCR_SPARSE_THRESHOLD = 50             # Native chars below this triggers OCR fallback
+OCR_TARGET_DPI = 300                  # Tesseract's sweet spot
+OCR_MIN_DPI = 144                     # Floor: below this, OCR quality degrades fast
+OCR_MAX_PIXEL_DIM = 4500              # Cap longest pixel dimension to bound memory
+OCR_TESSERACT_CONFIG = '--psm 6 --oem 1'  # PSM 6 = uniform block; OEM 1 = LSTM-only
+
 # --- Global Logger ---
 _logger = None
+
+
+def _compute_ocr_zoom(page) -> float:
+    """Pick a fitz zoom factor for OCR rendering.
+
+    Targets ~OCR_TARGET_DPI but caps the longest output pixel dimension at
+    OCR_MAX_PIXEL_DIM so oversized pages (engineering drawings, large medical
+    imaging) don't blow up memory. Floors at OCR_MIN_DPI.
+    """
+    target_zoom = OCR_TARGET_DPI / PDF_POINTS_PER_INCH
+    min_zoom = OCR_MIN_DPI / PDF_POINTS_PER_INCH
+
+    rect = getattr(page, "rect", None)
+    if rect is not None and getattr(rect, "width", 0) > 0 and getattr(rect, "height", 0) > 0:
+        longest_dim_pts = max(rect.width, rect.height)
+        cap_zoom = OCR_MAX_PIXEL_DIM / longest_dim_pts
+        target_zoom = min(target_zoom, cap_zoom)
+
+    return max(min_zoom, target_zoom)
+
+
+def _preprocess_for_ocr(img):
+    """Grayscale + autocontrast + sharpen — small but consistent Tesseract
+    accuracy gain on faxed/scanned medical pages. Falls through on any error.
+    """
+    try:
+        from PIL import ImageOps, ImageFilter
+        img = img.convert("L")
+        img = ImageOps.autocontrast(img, cutoff=1)
+        img = img.filter(ImageFilter.SHARPEN)
+    except Exception:
+        pass
+    return img
+
+
+def _format_page_block(page_num: int, text: str, error) -> str:
+    """Render one page's section of the assembled output with anchor markers.
+
+    error truthy -> "[EXTRACTION FAILED: ...]" marker (transparent gap).
+    empty/whitespace text without error -> "[EMPTY]" marker.
+    Otherwise: normal page anchor wrapping the text.
+    """
+    if error:
+        return f"=== PAGE {page_num} [EXTRACTION FAILED: {error}] ===\n"
+    if not text or not text.strip():
+        return f"=== PAGE {page_num} [EMPTY] ===\n"
+    return f"=== PAGE {page_num} ===\n{text.rstrip()}\n\n"
+
+
+def _assemble_pages(page_results, num_pages: int) -> str:
+    """Stitch per-page results into final text in page order with anchors.
+
+    page_results: dict mapping page_num (1-based) -> (text, error_or_None).
+    Pages missing from the dict are marked as failed (e.g., aborted by the
+    memory guard), so gaps are never silent.
+    """
+    parts = []
+    for i in range(1, num_pages + 1):
+        if i in page_results:
+            text, error = page_results[i]
+            parts.append(_format_page_block(i, text, error))
+        else:
+            parts.append(_format_page_block(i, "", "no result returned"))
+    return "".join(parts)
 
 def get_agent_logger(file_number: str = None) -> 'AgentLogger':
     """Get or create the agent logger."""
@@ -132,42 +205,58 @@ def log_event(message, level="info", progress=None):
                 logger.info(message)
 
 def get_page_text_fast(pdf_path, page_num):
-    """
-    Extracts text from a single page using PyMuPDF (fitz).
-    If text is sparse, it renders the page image and uses OCR (Tesseract).
-    page_num is 1-based.
+    """Extract text from a single page (1-based) of a PDF.
+
+    Native text first, then OCR fallback for sparse pages with image
+    preprocessing and a Tesseract config tuned for typical medical-records
+    content (uniform block, LSTM engine).
+
+    Returns (page_num, text, error). error is None on success, or a short
+    description if the page could not be processed.
     """
     try:
         # Open PDF (thread-safe if opened locally)
         doc = fitz.open(pdf_path)
+    except Exception as e:
+        log_event(f"Error opening PDF for page {page_num}: {e}", level="warning")
+        return (page_num, "", f"open failed: {e}")
+
+    try:
         page = doc.load_page(page_num - 1)
-        
-        # 1. Try direct text extraction (VERY FAST)
-        text = page.get_text("text")
-        
-        # 2. If sparse, fall back to OCR
-        if len(text.strip()) < 50 and OCR_AVAILABLE:
-            # Render page to image (pixmap)
-            # matrix=2.0 (144 dpi) -> 300 dpi approx
-            mat = fitz.Matrix(2, 2) 
+
+        # 1. Try direct text extraction (very fast)
+        text = page.get_text("text") or ""
+
+        # 2. If sparse, fall back to OCR with preprocessing
+        if len(text.strip()) < OCR_SPARSE_THRESHOLD and OCR_AVAILABLE:
+            zoom = _compute_ocr_zoom(page)
+            mat = fitz.Matrix(zoom, zoom)
             pix = page.get_pixmap(matrix=mat)
-            
-            # Convert to PIL Image
+
             img_data = pix.tobytes("png")
             img = Image.open(io.BytesIO(img_data))
-            
-            # Run OCR
-            ocr_text = pytesseract.image_to_string(img)
-            
+            img = _preprocess_for_ocr(img)
+
+            try:
+                ocr_text = pytesseract.image_to_string(img, config=OCR_TESSERACT_CONFIG)
+            except Exception as ocr_err:
+                log_event(f"OCR failed on page {page_num}: {ocr_err}", level="warning")
+                ocr_text = ""
+
+            # Keep OCR result only if it produced more usable text than native
             if len(ocr_text.strip()) > len(text.strip()):
                 text = ocr_text
 
-        doc.close()
-        return (page_num, text)
-        
+        return (page_num, text, None)
+
     except Exception as e:
         log_event(f"Error processing page {page_num}: {e}", level="warning")
-        return (page_num, "")
+        return (page_num, "", str(e))
+    finally:
+        try:
+            doc.close()
+        except Exception:
+            pass
 
 def extract_text_parallel(file_path):
     """Extracts text from PDF using parallel processing with memory monitoring."""
@@ -195,7 +284,7 @@ def extract_text_parallel(file_path):
         max_workers = min(max_workers, 4)
         log_event(f"Large PDF detected, reducing workers to {max_workers}")
 
-    page_texts = {}
+    page_results = {}  # page_num -> (text, error_or_None)
     memory_guard = MemoryGuard(
         warn_threshold_mb=1500,
         abort_threshold_mb=2500,
@@ -212,11 +301,20 @@ def extract_text_parallel(file_path):
 
             processed_count = 0
             for future in concurrent.futures.as_completed(future_to_page):
+                p_num = future_to_page[future]
                 try:
-                    p_num, text = future.result()
-                    page_texts[p_num] = text
+                    result = future.result()
+                    # Worker returns (page_num, text, error). Tolerate legacy
+                    # 2-tuple form if any caller hasn't been upgraded.
+                    if len(result) == 3:
+                        _, text, error = result
+                    else:
+                        _, text = result
+                        error = None
+                    page_results[p_num] = (text, error)
                 except Exception as exc:
-                    log_event(f"Page generated an exception: {exc}", level="error")
+                    log_event(f"Page {p_num} generated an exception: {exc}", level="error")
+                    page_results[p_num] = ("", str(exc))
 
                 processed_count += 1
 
@@ -240,11 +338,8 @@ def extract_text_parallel(file_path):
                 if processed_count % 100 == 0:
                     gc.collect()
 
-    # Reassemble in order
-    full_text = ""
-    for i in range(1, num_pages + 1):
-        if i in page_texts:
-            full_text += page_texts[i] + "\n"
+    # Reassemble in page order with anchors and explicit failure markers
+    full_text = _assemble_pages(page_results, num_pages)
 
     log_event(f"Extraction complete: {len(full_text)} characters", progress=40)
     checkpoint("Extraction complete")

@@ -1,0 +1,45 @@
+sandbox_mode = "workspace-write"
+
+[mcp_servers.filesystem]
+args = [
+    "/c",
+    "npx",
+    "-y",
+    "@modelcontextprotocol/server-filesystem",
+    'C:\geminiterminal2',
+]
+command = "cmd"
+
+[mcp_servers.git-mcp]
+args = [
+    "-m",
+    "mcp_server_git",
+    "--repository",
+    'C:\geminiterminal2',
+]
+command = "python"
+
+[mcp_servers.sequential-thinking]
+args = [
+    "/c",
+    "npx",
+    "-y",
+    "@modelcontextprotocol/server-sequential-thinking",
+]
+command = "cmd"
+
+[mcp_servers.sqlite]
+args = [
+    "/c",
+    "npx",
+    "-y",
+    "mcp-server-sqlite-npx",
+    'C:\geminiterminal2\.gemini\case_data\master_cases.db',
+]
+command = "cmd"
+
+[shell_environment_policy]
+inherit = "core"
+
+[shell_environment_policy.set]
+CLAUDE_AUTOCOMPACT_PCT_OVERRIDE = "99"

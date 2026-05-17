@@ -44,8 +44,8 @@ except ImportError:
 
 
 # --- Configuration ---
-LOG_FILE = r"C:\GeminiTerminal\Med_Chron_activity.log"
-PROMPT_FILE = r"C:\GeminiTerminal\Scripts\MED_CHRON_PROMPT.txt"
+LOG_FILE = os.path.join(os.getcwd(), "Med_Chron_activity.log")
+PROMPT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "MED_CHRON_PROMPT.txt")
 
 # Set up logging
 logging.basicConfig(

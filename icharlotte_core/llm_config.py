@@ -61,7 +61,6 @@ AGENT_DEFINITIONS = [
     ("agent_depo_extract", "Depo Extract", "Deposition testimony extraction by topic", "extraction"),
     ("agent_med_rec", "Medical Records", "Medical record processing", "extraction"),
     ("agent_med_chron", "Medical Chronology", "Medical chronology generation", "extraction"),
-    ("agent_organize", "Organize", "Document organization and categorization", "quick"),
     # Case Agents
     ("agent_docket", "Docket", "Docket download and processing", "extraction"),
     ("agent_complaint", "Complaint", "Complaint document analysis", "extraction"),

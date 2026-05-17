@@ -137,7 +137,7 @@ class AgentSettingsDB:
 
     DEFAULT_SETTINGS = {
         "docket.py": {"auto_run_days": 30, "save_pdf": True},
-        "ocr.py": {"language": "eng", "deskew": True}
+        "summarize.py": {"max_pages": 0, "output_format": "markdown"}
     }
 
     def __init__(self, data_dir=None):
@@ -193,38 +193,38 @@ class TestProcessingLogDB(unittest.TestCase):
         """Test adding a processing log entry."""
         entry = self.db.add_entry(
             file_path="/test/file.pdf",
-            task_type="OCR",
+            task_type="Summarize",
             status="success",
-            output_path="/test/file_ocr.txt",
+            output_path="/test/file_summary.md",
             duration_sec=5.5
         )
 
         self.assertIsNotNone(entry)
         self.assertEqual(entry["file_path"], "/test/file.pdf")
-        self.assertEqual(entry["task_type"], "OCR")
+        self.assertEqual(entry["task_type"], "Summarize")
         self.assertEqual(entry["status"], "success")
         self.assertEqual(entry["duration_sec"], 5.5)
 
     def test_get_file_processing_status(self):
         """Test getting processing status for a file."""
-        self.db.add_entry("/test/file.pdf", "OCR", "success")
         self.db.add_entry("/test/file.pdf", "Summarize", "success")
-        self.db.add_entry("/test/other.pdf", "OCR", "failed")
+        self.db.add_entry("/test/file.pdf", "Med Rec", "success")
+        self.db.add_entry("/test/other.pdf", "Summarize", "failed")
 
         status = self.db.get_file_processing_status("/test/file.pdf")
         self.assertEqual(len(status), 2)
 
     def test_get_all_logs(self):
         """Test getting all logs."""
-        self.db.add_entry("/test/file1.pdf", "OCR", "success")
-        self.db.add_entry("/test/file2.pdf", "OCR", "failed")
+        self.db.add_entry("/test/file1.pdf", "Summarize", "success")
+        self.db.add_entry("/test/file2.pdf", "Summarize", "failed")
 
         logs = self.db.get_all_logs()
         self.assertEqual(len(logs), 2)
 
     def test_clear_logs(self):
         """Test clearing all logs."""
-        self.db.add_entry("/test/file.pdf", "OCR", "success")
+        self.db.add_entry("/test/file.pdf", "Summarize", "success")
         self.db.clear_logs()
 
         logs = self.db.get_all_logs()
@@ -232,7 +232,7 @@ class TestProcessingLogDB(unittest.TestCase):
 
     def test_persistence(self):
         """Test that logs persist to disk."""
-        self.db.add_entry("/test/file.pdf", "OCR", "success")
+        self.db.add_entry("/test/file.pdf", "Summarize", "success")
 
         # Create new instance
         db2 = ProcessingLogDB("2024.001", self.test_dir)
@@ -243,7 +243,7 @@ class TestProcessingLogDB(unittest.TestCase):
         """Test adding an error entry."""
         entry = self.db.add_entry(
             file_path="/test/file.pdf",
-            task_type="OCR",
+            task_type="Summarize",
             status="failed",
             error_message="File not found"
         )
@@ -365,7 +365,7 @@ class TestIntegration(unittest.TestCase):
 
         # Create processing log
         proc_log = ProcessingLogDB(file_number, self.test_dir)
-        proc_log.add_entry("/test/file.pdf", "OCR", "success", duration_sec=5.0)
+        proc_log.add_entry("/test/file.pdf", "Med Rec", "success", duration_sec=5.0)
         proc_log.add_entry("/test/file.pdf", "Summarize", "success", duration_sec=10.0)
 
         # Create file tags
@@ -398,7 +398,7 @@ class TestIntegration(unittest.TestCase):
         files = ["/test/file1.pdf", "/test/file2.pdf", "/test/file3.pdf"]
 
         for f in files:
-            proc_log.add_entry(f, "OCR", "success")
+            proc_log.add_entry(f, "Summarize", "success")
             tags_db.add_tag(f, "processed")
 
         # Verify counts

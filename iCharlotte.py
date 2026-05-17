@@ -706,20 +706,6 @@ class MainWindow(QMainWindow):
         self.search_input.textChanged.connect(self.filter_tree)
         header_layout.addWidget(self.search_input)
 
-        self.smart_select_btn = QPushButton("Select...")
-        self.smart_select_menu = QMenu(self)
-
-        act_pdfs = QAction("All PDFs -> OCR", self)
-        act_pdfs.triggered.connect(lambda: self.smart_select("pdf_ocr"))
-        self.smart_select_menu.addAction(act_pdfs)
-
-        act_unprocessed = QAction("Unprocessed Files -> OCR", self)
-        act_unprocessed.triggered.connect(lambda: self.smart_select("unprocessed_ocr"))
-        self.smart_select_menu.addAction(act_unprocessed)
-
-        self.smart_select_btn.setMenu(self.smart_select_menu)
-        header_layout.addWidget(self.smart_select_btn)
-
         # Advanced Filter Toggle
         self.filter_toggle_btn = QPushButton("▼ Filters")
         self.filter_toggle_btn.setCheckable(True)
@@ -760,10 +746,6 @@ class MainWindow(QMainWindow):
             {"id": "sum_depo", "name": "Sum. Depo.", "script": "summarize_deposition.py", "color": "#ff9800", "short": "DEPO"},
             {"id": "med_rec", "name": "Med Rec", "script": "med_record.py", "color": "#9c27b0", "short": "MED"},
             {"id": "med_chron", "name": "Med Chron", "script": "med_chron.py", "color": "#00bcd4", "short": "CHRON"},
-            {"id": "ocr", "name": "OCR", "script": "ocr.py", "color": "#795548", "short": "OCR"},
-            {"id": "organize", "name": "Organize", "script": "organizer.py", "color": "#607d8b", "short": "ORG"},
-            {"id": "timeline", "name": "Timeline", "script": "extract_timeline.py", "color": "#3f51b5", "short": "TIME"},
-            {"id": "contradict", "name": "Conflicts", "script": "detect_contradictions.py", "color": "#f44336", "short": "CONF"},
         ]
 
         # Enhanced File Tree with additional columns
@@ -796,11 +778,6 @@ class MainWindow(QMainWindow):
         self.process_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 10px;")
         self.process_btn.clicked.connect(self.process_checked_items)
         btn_layout.addWidget(self.process_btn)
-
-        self.organize_btn = QPushButton("Quick Organize (AI)")
-        self.organize_btn.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold; padding: 10px;")
-        self.organize_btn.clicked.connect(self.organize_checked_items)
-        btn_layout.addWidget(self.organize_btn)
 
         center_layout.addLayout(btn_layout)
 
@@ -1301,38 +1278,6 @@ class MainWindow(QMainWindow):
                     parent.setHidden(False)
                     parent.setExpanded(True) # Expand path to match
                     parent = parent.parent()
-
-    def smart_select(self, mode):
-        self.tree.blockSignals(True)
-        iterator = QTreeWidgetItemIterator(self.tree)
-        while iterator.value():
-            item = iterator.value()
-            path = item.data(0, Qt.ItemDataRole.UserRole)
-            is_file = item.data(0, Qt.ItemDataRole.UserRole + 1) == "file"
-
-            if is_file and path:
-                if mode == "pdf_ocr":
-                    if path.lower().endswith(".pdf"):
-                        current_tasks = item.data(0, Qt.ItemDataRole.UserRole + 2) or []
-                        if "ocr" not in current_tasks:
-                            current_tasks.append("ocr")
-                            item.setData(0, Qt.ItemDataRole.UserRole + 2, current_tasks)
-                            self.update_item_tasks_ui(item)
-
-                elif mode == "unprocessed_ocr":
-                    # Only select unprocessed PDF files for OCR
-                    if path.lower().endswith(".pdf"):
-                        # Check if already processed
-                        proc_status = item.text(4)  # Status column
-                        if not proc_status or "OCR" not in proc_status:
-                            current_tasks = item.data(0, Qt.ItemDataRole.UserRole + 2) or []
-                            if "ocr" not in current_tasks:
-                                current_tasks.append("ocr")
-                                item.setData(0, Qt.ItemDataRole.UserRole + 2, current_tasks)
-                                self.update_item_tasks_ui(item)
-
-            iterator += 1
-        self.tree.blockSignals(False)
 
     def toggle_expand(self):
         if self.expand_btn.isChecked():
@@ -1992,14 +1937,11 @@ class MainWindow(QMainWindow):
                 proc_log = ProcessingLogDB(self.file_number)
                 file_status = proc_log.get_file_processing_status(file_path)
 
-                has_ocr = any("ocr" in log.get("task_type", "").lower() and log.get("status") == "success" for log in file_status)
                 has_summary = any("summar" in log.get("task_type", "").lower() and log.get("status") == "success" for log in file_status)
                 is_unprocessed = not file_status or not any(log.get("status") == "success" for log in file_status)
 
                 status_match = False
                 if "unprocessed" in status_filter and is_unprocessed:
-                    status_match = True
-                if "ocr" in status_filter and has_ocr:
                     status_match = True
                 if "summarized" in status_filter and has_summary:
                     status_match = True
@@ -2400,101 +2342,6 @@ class MainWindow(QMainWindow):
 
             return self.add_status_task(name, details, sys.executable, args)
 
-    def organize_checked_items(self):
-        log_event("Organizing checked items...")
-        paths = []
-        
-        iterator = QTreeWidgetItemIterator(self.tree)
-        while iterator.value():
-            item = iterator.value()
-            path = item.data(0, Qt.ItemDataRole.UserRole)
-            item_type = item.data(0, Qt.ItemDataRole.UserRole + 1)
-            task_ids = item.data(0, Qt.ItemDataRole.UserRole + 2) or []
-            
-            if path and item_type == "file" and "organize" in task_ids:
-                paths.append(path)
-            
-            iterator += 1
-            
-        if not paths:
-            QMessageBox.warning(self, "No Selection", "No files selected for organization.")
-            return
-
-        script_path = os.path.join(SCRIPTS_DIR, "organizer.py")
-        args = ["-u", script_path, "--dry-run"] + paths
-        
-        self.tabs.setCurrentIndex(1) # Switch to status
-        status_widget = StatusWidget("Organizer (Analyze)", f"Analyzing {len(paths)} files...")
-        self.status_list_layout.insertWidget(0, status_widget)
-        
-        runner = AgentRunner(sys.executable, args, status_widget)
-        self.agent_runners.append(runner)
-        
-        self.organize_output = ""
-        def collect_stdout(text):
-            self.organize_output += text
-            
-        runner.log_update.connect(collect_stdout)
-        
-        def on_finished(success):
-            if success:
-                try:
-                    output = self.organize_output.strip()
-                    start_marker = "<<<JSON_START>>>"
-                    end_marker = "<<<JSON_END>>>"
-                    
-                    m_start = output.find(start_marker)
-                    m_end = output.find(end_marker)
-                    
-                    if m_start != -1 and m_end != -1:
-                        json_str = output[m_start + len(start_marker):m_end].strip()
-                        suggestions = json.loads(json_str)
-                        self.index_tab.add_organization_suggestions(suggestions)
-                        self.tabs.setCurrentWidget(self.index_tab)
-                    else:
-                        # Fallback: Try to find the JSON array directly (prone to errors with logs)
-                        start = output.find("[")
-                        end = output.rfind("]") + 1
-                        if start != -1 and end != -1:
-                            json_str = output[start:end]
-                            suggestions = json.loads(json_str)
-                            self.index_tab.add_organization_suggestions(suggestions)
-                            self.tabs.setCurrentWidget(self.index_tab)
-                        else:
-                            QMessageBox.critical(self, "Error", "Could not parse organizer output (No JSON found).")
-                except Exception as e:
-                    QMessageBox.critical(self, "Error", f"Failed to parse suggestions: {e}\n\nOutput: {self.organize_output[:500]}")
-            else:
-                QMessageBox.critical(self, "Error", "Organization analysis failed.")
-            self.cleanup_runner(runner)
-
-        runner.finished.connect(on_finished)
-        runner.start()
-        self.clear_all_checkboxes()
-
-    def apply_organization(self, approved):
-        script_path = os.path.join(SCRIPTS_DIR, "organizer.py")
-        json_data = json.dumps(approved)
-        
-        status_widget = StatusWidget("Organizer (Apply)", f"Moving {len(approved)} files...")
-        self.status_list_layout.insertWidget(0, status_widget)
-        
-        args = ["-u", script_path, "--apply", json_data]
-        
-        runner = AgentRunner(sys.executable, args, status_widget)
-        self.agent_runners.append(runner)
-        
-        def on_finished(success):
-            if success:
-                self.populate_tree()
-                QMessageBox.information(self, "Success", "Files organized successfully.")
-            else:
-                QMessageBox.critical(self, "Error", "Failed to apply organization changes.")
-            self.cleanup_runner(runner)
-            
-        runner.finished.connect(on_finished)
-        runner.start()
-
     def process_checked_items(self):
         log_event("Processing checked items...")
         
@@ -2511,9 +2358,6 @@ class MainWindow(QMainWindow):
                 continue
 
             for tid in task_ids:
-                if tid == "organize":
-                    continue # Handled by the Organize button specifically
-                    
                 agent = next((a for a in self.AGENTS if a["id"] == tid), None)
                 if not agent: continue
                 
@@ -2663,9 +2507,7 @@ class MainWindow(QMainWindow):
             for log in logs:
                 if log.get("status") == "success":
                     task = log.get("task_type", "").lower()
-                    if "ocr" in task:
-                        successful.add("OCR")
-                    elif "discovery" in task or "disc" in task:
+                    if "discovery" in task or "disc" in task:
                         successful.add("S-DISC")
                     elif "deposition" in task or "depo" in task:
                         successful.add("S-DEPO")
@@ -2673,8 +2515,6 @@ class MainWindow(QMainWindow):
                         successful.add("MED-REC")
                     elif "summar" in task:
                         successful.add("SUM")
-                    elif "timeline" in task:
-                        successful.add("TL")
                     elif "chron" in task:
                         successful.add("CHR")
 

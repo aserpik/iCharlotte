@@ -48,8 +48,8 @@ except ImportError:
 
 # ... (Logging config remains same) ...
 # Hardcoded log path as per instructions
-LOG_FILE = r"C:\GeminiTerminal\liability_activity.log"
-PROMPT_FILE = r"C:\GeminiTerminal\Scripts\liability_prompt.txt"
+LOG_FILE = os.path.join(os.getcwd(), "liability_activity.log")
+PROMPT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "LIABILITY_PROMPT.txt")
 
 # Set up logging
 logging.basicConfig(

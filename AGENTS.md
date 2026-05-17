@@ -1,6 +1,6 @@
-# CLAUDE.md - iCharlotte Project Context
+# AGENTS.md - iCharlotte Project Context
 
-This file provides context for Claude to understand the iCharlotte suite.
+This file provides context for Codex to understand the iCharlotte suite.
 
 ## Project Overview
 
@@ -10,7 +10,7 @@ iCharlotte is a legal document management and automation suite for law firm case
 - **Backend/Main UI:** Python 3.x, PyQt6/PySide6, SQLite
 - **NoteTaker App:** Electron, React, TypeScript, TipTap, react-pdf-highlighter
 - **Document Processing:** pypdf, python-docx, Tesseract OCR, PyMuPDF
-- **LLM Providers:** Google Gemini, Anthropic Claude, OpenAI (with automatic fallback)
+- **LLM Providers:** Google Gemini, Anthropic Codex, OpenAI (with automatic fallback)
 - **Communication:** QWebChannel bridge for JS/Python interoperability
 - **External Integration:** Outlook (win32com), Google Calendar API
 
@@ -86,7 +86,7 @@ Persistent conversation-based chat:
 - **Message**: Individual message with metadata, attachments, edit history
 - **QuickPrompt**: Template prompts (Summary, Liability, Timeline, Deposition, etc.)
 - **ChatPersistence**: JSON storage per case (`{case_number}_chat.json`)
-- **TokenCounter**: Estimation for Claude, GPT, Gemini models
+- **TokenCounter**: Estimation for Codex, GPT, Gemini models
 
 ### Database Layer
 

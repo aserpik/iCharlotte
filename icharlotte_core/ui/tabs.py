@@ -2335,8 +2335,6 @@ class IndexTab(QWidget):
         super().__init__(parent)
         self.file_number = None
         self.index_data = {}  # {pdf_path: [docs]}
-        self.suggestions = {} # Grouped by original folder: {folder_path: [suggestions]}
-        self.current_org_folder = None
         self.current_pdf_path = None
         self.marked_start_page = None
         self.icon_provider = QFileIconProvider()
@@ -2533,61 +2531,6 @@ class IndexTab(QWidget):
         self.doc_splitter.setSizes([200, 400, 500])
         self.doc_splitter.setCollapsible(0, True)
 
-        # --- Sub-Tab 2: File Organization ---
-        self.file_org_widget = QWidget()
-        self.sub_tabs.addTab(self.file_org_widget, "File Organization")
-        org_main_layout = QHBoxLayout(self.file_org_widget)
-        
-        org_splitter = QSplitter(Qt.Orientation.Horizontal)
-        org_main_layout.addWidget(org_splitter)
-        
-        # Left: Processed Folders
-        org_left_widget = QWidget()
-        org_left_layout = QVBoxLayout(org_left_widget)
-        org_left_layout.addWidget(QLabel("Processed Folders:"))
-        self.org_folder_list = QListWidget()
-        self.org_folder_list.currentItemChanged.connect(self.on_org_folder_selected)
-        org_left_layout.addWidget(self.org_folder_list)
-        org_splitter.addWidget(org_left_widget)
-        
-        # Right: Suggestions Table
-        org_right_widget = QWidget()
-        org_right_layout = QVBoxLayout(org_right_widget)
-        
-        # Selection Toggles
-        toggle_layout = QHBoxLayout()
-        btn_select_all = QPushButton("Select All")
-        btn_select_all.clicked.connect(partial(self.set_org_checkboxes, Qt.CheckState.Checked))
-        btn_unselect_all = QPushButton("Unselect All")
-        btn_unselect_all.clicked.connect(partial(self.set_org_checkboxes, Qt.CheckState.Unchecked))
-        toggle_layout.addWidget(btn_select_all)
-        toggle_layout.addWidget(btn_unselect_all)
-        toggle_layout.addStretch()
-        org_right_layout.addLayout(toggle_layout)
-        
-        self.org_table = QTableWidget()
-        self.org_table.setColumnCount(7)
-        self.org_table.setHorizontalHeaderLabels(["", "Original File", "Apply Name", "Suggested Name", "Apply Folder", "Suggested Folder", "Reasoning"])
-        self.org_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
-        self.org_table.setColumnWidth(0, 30)
-        self.org_table.setColumnWidth(1, 150)
-        self.org_table.setColumnWidth(2, 80)
-        self.org_table.setColumnWidth(3, 200)
-        self.org_table.setColumnWidth(4, 80)
-        self.org_table.setColumnWidth(5, 150)
-        self.org_table.horizontalHeader().setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)
-        org_right_layout.addWidget(self.org_table)
-        
-        org_btn_layout = QHBoxLayout()
-        self.apply_org_btn = QPushButton("Apply Selected Changes")
-        self.apply_org_btn.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold; padding: 10px;")
-        self.apply_org_btn.clicked.connect(self.apply_organization_changes)
-        org_btn_layout.addWidget(self.apply_org_btn)
-        org_right_layout.addLayout(org_btn_layout)
-        
-        org_splitter.addWidget(org_right_widget)
-        org_splitter.setSizes([300, 900])
-
     def toggle_pdf_list_collapse(self):
         """Toggle collapse/expand of the processed PDFs panel."""
         sizes = self.doc_splitter.sizes()
@@ -2608,176 +2551,12 @@ class IndexTab(QWidget):
             self.expand_pdf_btn.setVisible(True)
             self._pdf_list_collapsed = True
 
-    def set_org_checkboxes(self, state):
-        for i in range(self.org_table.rowCount()):
-            chk = self.org_table.item(i, 0)
-            if chk:
-                chk.setCheckState(state)
-
-    def on_org_folder_selected(self, current, previous):
-        if not current:
-            self.org_table.setRowCount(0)
-            return
-            
-        folder_path = current.data(Qt.ItemDataRole.UserRole)
-        self.current_org_folder = folder_path
-        self.populate_org_table(folder_path)
-
-    def populate_org_table(self, folder_path):
-        suggestions = self.suggestions.get(folder_path, [])
-        self.org_table.setRowCount(len(suggestions))
-        
-        for i, s in enumerate(suggestions):
-            orig_path = s.get("original_path", "")
-            orig_name = os.path.basename(orig_path)
-            
-            # Col 0: Select Checkbox
-            chk_all = QTableWidgetItem()
-            chk_all.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-            chk_all.setCheckState(Qt.CheckState.Checked)
-            self.org_table.setItem(i, 0, chk_all)
-            
-            # Col 1: Original File
-            item_orig = QTableWidgetItem(orig_name)
-            item_orig.setFlags(item_orig.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            item_orig.setData(Qt.ItemDataRole.UserRole, orig_path)
-            item_orig.setToolTip(orig_path)
-            self.org_table.setItem(i, 1, item_orig)
-            
-            # Col 2: Apply Name Checkbox
-            chk_name = QTableWidgetItem()
-            chk_name.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-            chk_name.setCheckState(Qt.CheckState.Checked)
-            self.org_table.setItem(i, 2, chk_name)
-            
-            # Col 3: Suggested Name
-            self.org_table.setItem(i, 3, QTableWidgetItem(s.get("suggested_name", "")))
-            
-            # Col 4: Apply Folder Checkbox
-            chk_folder = QTableWidgetItem()
-            chk_folder.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-            chk_folder.setCheckState(Qt.CheckState.Checked)
-            self.org_table.setItem(i, 4, chk_folder)
-            
-            # Col 5: Suggested Folder
-            self.org_table.setItem(i, 5, QTableWidgetItem(s.get("suggested_folder", "")))
-            
-            # Col 6: Reasoning
-            reasoning = s.get("reasoning", "")
-            if s.get("error"):
-                reasoning = f"ERROR: {reasoning}"
-            item_reason = QTableWidgetItem(reasoning)
-            item_reason.setFlags(item_reason.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            self.org_table.setItem(i, 6, item_reason)
-
-    def add_organization_suggestions(self, suggestions):
-        # Group suggestions by original folder
-        new_grouped = self.suggestions if self.suggestions else {}
-        for s in suggestions:
-            orig_path = s.get("original_path", "")
-            folder = os.path.dirname(orig_path)
-            if folder not in new_grouped:
-                new_grouped[folder] = []
-            
-            # Update existing or add new
-            existing_idx = next((i for i, item in enumerate(new_grouped[folder]) if item.get("original_path") == orig_path), -1)
-            if existing_idx != -1:
-                new_grouped[folder][existing_idx] = s
-            else:
-                new_grouped[folder].append(s)
-            
-        self.suggestions = new_grouped
-        self.save_org_data()
-        self.refresh_org_folder_list()
-        self.sub_tabs.setCurrentIndex(1) # Switch to Organization tab
-
-    def apply_organization_changes(self):
-        if not self.current_org_folder:
-            return
-            
-        suggestions_for_folder = self.suggestions.get(self.current_org_folder, [])
-        approved = []
-        
-        for i in range(self.org_table.rowCount()):
-            if self.org_table.item(i, 0).checkState() == Qt.CheckState.Checked:
-                orig_path = self.org_table.item(i, 1).data(Qt.ItemDataRole.UserRole)
-                
-                # Find matching suggestion metadata (like doc_type)
-                s_meta = next((s for s in suggestions_for_folder if s.get("original_path") == orig_path), {})
-                
-                # Apply Name
-                if self.org_table.item(i, 2).checkState() == Qt.CheckState.Checked:
-                    suggested_name = self.org_table.item(i, 3).text()
-                else:
-                    suggested_name = os.path.basename(orig_path)
-                    
-                # Apply Folder
-                if self.org_table.item(i, 4).checkState() == Qt.CheckState.Checked:
-                    suggested_folder = self.org_table.item(i, 5).text()
-                    # Use main window's case path if available, else local folder
-                    target_dir = self.window().case_path if hasattr(self.window(), 'case_path') else os.path.dirname(orig_path)
-                else:
-                    suggested_folder = "" # Stay in original folder
-                    target_dir = os.path.dirname(orig_path)
-
-                approved.append({
-                    "original_path": orig_path,
-                    "doc_type": s_meta.get("doc_type"),
-                    "suggested_name": suggested_name,
-                    "suggested_folder": suggested_folder,
-                    "target_dir": target_dir
-                })
-        
-        if not approved:
-            QMessageBox.information(self, "Info", "No changes selected.")
-            return
-            
-        # We need to reach the MainWindow to call apply_organization
-        main_win = self.window()
-        if hasattr(main_win, 'apply_organization'):
-            main_win.apply_organization(approved)
-            
-            # Remove the processed items from suggestions
-            processed_paths = [a['original_path'] for a in approved]
-            self.suggestions[self.current_org_folder] = [
-                s for s in self.suggestions[self.current_org_folder] 
-                if s['original_path'] not in processed_paths
-            ]
-            
-            # If folder is now empty, remove it
-            if not self.suggestions[self.current_org_folder]:
-                del self.suggestions[self.current_org_folder]
-                
-            self.save_org_data()
-            self.refresh_org_folder_list()
-        else:
-            QMessageBox.critical(self, "Error", "Main window does not support apply_organization.")
-
-    def refresh_org_folder_list(self):
-        self.org_folder_list.clear()
-        for folder in sorted(self.suggestions.keys()):
-            from PySide6.QtWidgets import QListWidgetItem
-            display_name = os.path.basename(folder) if folder else "Root"
-            item = QListWidgetItem(display_name)
-            item.setData(Qt.ItemDataRole.UserRole, folder)
-            item.setToolTip(folder)
-            self.org_folder_list.addItem(item)
-            
-        if self.org_folder_list.count() > 0:
-            self.org_folder_list.setCurrentRow(0)
-        else:
-            self.org_table.setRowCount(0)
-            self.current_org_folder = None
-
     def load_data(self, file_number):
         self.file_number = file_number
         self.index_data = {}
-        self.suggestions = {}
         self.pdf_list.clear()
-        self.org_folder_list.clear()
         self.doc_table.setRowCount(0)
-        self.org_table.setRowCount(0)
-        
+
         # Load Index Data
         idx_path = os.path.join(GEMINI_DATA_DIR, f"{file_number}_index.json")
         if os.path.exists(idx_path):
@@ -2786,46 +2565,23 @@ class IndexTab(QWidget):
                     self.index_data = json.load(f)
             except Exception as e:
                 log_event(f"Error loading index: {e}", "error")
-        
+
         for path in self.index_data:
             item = QListWidgetItem(path)
             item.setIcon(self.icon_provider.icon(QFileInfo(path)))
             self.pdf_list.addItem(item)
-            
-        # Load Organization Data
-        org_path = os.path.join(GEMINI_DATA_DIR, f"{file_number}_org.json")
-        if os.path.exists(org_path):
-            try:
-                with open(org_path, 'r') as f:
-                    self.suggestions = json.load(f)
-            except Exception as e:
-                log_event(f"Error loading organization data: {e}", "error")
-        
-        self.refresh_org_folder_list()
 
     def save_data(self):
         if not self.file_number: return
         if not os.path.exists(GEMINI_DATA_DIR):
             os.makedirs(GEMINI_DATA_DIR)
-        
+
         json_path = os.path.join(GEMINI_DATA_DIR, f"{self.file_number}_index.json")
         try:
             with open(json_path, 'w') as f:
                 json.dump(self.index_data, f, indent=4)
         except Exception as e:
             log_event(f"Error saving index: {e}", "error")
-
-    def save_org_data(self):
-        if not self.file_number: return
-        if not os.path.exists(GEMINI_DATA_DIR):
-            os.makedirs(GEMINI_DATA_DIR)
-            
-        json_path = os.path.join(GEMINI_DATA_DIR, f"{self.file_number}_org.json")
-        try:
-            with open(json_path, 'w') as f:
-                json.dump(self.suggestions, f, indent=4)
-        except Exception as e:
-            log_event(f"Error saving organization data: {e}", "error")
 
     def add_pdf(self, path, docs):
         self.index_data[path] = docs

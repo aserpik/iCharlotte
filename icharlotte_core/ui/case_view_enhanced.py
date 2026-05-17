@@ -171,10 +171,6 @@ class AgentSettingsDB:
             "max_pages": 0,  # 0 = no limit
             "output_format": "markdown"
         },
-        "ocr.py": {
-            "language": "eng",
-            "deskew": True
-        },
     }
 
     def __init__(self):
@@ -585,13 +581,12 @@ class AdvancedFilterWidget(QFrame):
         status_group = QGroupBox("Processing Status")
         status_layout = QVBoxLayout(status_group)
         self.status_unprocessed = QCheckBox("Unprocessed")
-        self.status_ocr = QCheckBox("OCR'd")
         self.status_summarized = QCheckBox("Summarized")
         self.status_all = QCheckBox("All")
         self.status_all.setChecked(True)
 
         self.status_all.stateChanged.connect(self._on_all_status_changed)
-        for cb in [self.status_unprocessed, self.status_ocr, self.status_summarized]:
+        for cb in [self.status_unprocessed, self.status_summarized]:
             cb.stateChanged.connect(self._emit_filter)
             status_layout.addWidget(cb)
         status_layout.addWidget(self.status_all)
@@ -668,7 +663,6 @@ class AdvancedFilterWidget(QFrame):
     def _on_all_status_changed(self, state):
         if state == Qt.CheckState.Checked.value:
             self.status_unprocessed.setChecked(False)
-            self.status_ocr.setChecked(False)
             self.status_summarized.setChecked(False)
         self._emit_filter()
 
@@ -747,8 +741,6 @@ class AdvancedFilterWidget(QFrame):
         else:
             if self.status_unprocessed.isChecked():
                 filters["processing_status"].append("unprocessed")
-            if self.status_ocr.isChecked():
-                filters["processing_status"].append("ocr")
             if self.status_summarized.isChecked():
                 filters["processing_status"].append("summarized")
 
@@ -976,7 +968,7 @@ class FilePreviewWidget(QFrame):
             self._close_pdf()
             pass  # Fall back on any error
 
-        # Fallback: show text info with OCR if available
+        # Fallback: show basic file info
         self.nav_bar.hide()
         self._show_pdf_text_fallback(file_path)
 
@@ -1149,29 +1141,15 @@ class FilePreviewWidget(QFrame):
         v_scroll.setValue(max(0, min(new_v, v_scroll.maximum())))
 
     def _show_pdf_text_fallback(self, file_path):
-        """Fallback PDF preview showing OCR text if available."""
+        """Fallback PDF preview showing basic file info."""
         info_text = f"PDF File: {os.path.basename(file_path)}\n\n"
 
-        # Try to get page count
         try:
             page_count = self._get_pdf_page_count(file_path)
             if page_count:
-                info_text += f"Pages: {page_count}\n\n"
+                info_text += f"Pages: {page_count}\n"
         except:
             pass
-
-        # Check for existing OCR text
-        text_path = file_path.replace('.pdf', '_ocr.txt').replace('.PDF', '_ocr.txt')
-        if os.path.exists(text_path):
-            try:
-                with open(text_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read(10000)
-                info_text += "--- OCR Text Preview ---\n\n"
-                info_text += content
-            except:
-                pass
-        else:
-            info_text += "(No OCR text available - Run OCR to enable text preview)"
 
         self.text_preview.setPlainText(info_text)
         self.preview_stack.setCurrentWidget(self.text_preview)
@@ -1414,7 +1392,7 @@ class OutputBrowserWidget(QDialog):
         filter_layout = QHBoxLayout()
         filter_layout.addWidget(QLabel("Type:"))
         self.type_filter = QComboBox()
-        self.type_filter.addItems(["All", "Summaries", "Reports", "Timelines", "OCR Text"])
+        self.type_filter.addItems(["All", "Summaries", "Reports"])
         self.type_filter.currentIndexChanged.connect(self._filter_outputs)
         filter_layout.addWidget(self.type_filter)
         left_layout.addLayout(filter_layout)
@@ -1514,10 +1492,6 @@ class OutputBrowserWidget(QDialog):
         self.export_reports.setChecked(True)
         layout.addWidget(self.export_reports)
 
-        self.export_timelines = QCheckBox("Include Timelines")
-        self.export_timelines.setChecked(True)
-        layout.addWidget(self.export_timelines)
-
         layout.addSpacing(20)
 
         # Format selection
@@ -1555,10 +1529,6 @@ class OutputBrowserWidget(QDialog):
                     output_type = "Summaries"
                 elif 'report' in lower:
                     output_type = "Reports"
-                elif 'timeline' in lower:
-                    output_type = "Timelines"
-                elif '_ocr' in lower or lower.endswith('.txt'):
-                    output_type = "OCR Text"
                 else:
                     output_type = "Other"
 
@@ -1900,8 +1870,6 @@ class OutputBrowserWidget(QDialog):
                 include = True
             elif self.export_reports.isChecked() and output["type"] == "Reports":
                 include = True
-            elif self.export_timelines.isChecked() and output["type"] == "Timelines":
-                include = True
 
             if include:
                 try:
@@ -1955,7 +1923,7 @@ class ProcessingLogWidget(QDialog):
         filter_layout.addWidget(self.status_filter)
 
         self.task_filter = QComboBox()
-        self.task_filter.addItems(["All Tasks", "OCR", "Summarize", "Timeline", "Other"])
+        self.task_filter.addItems(["All Tasks", "Summarize", "Other"])
         self.task_filter.currentIndexChanged.connect(self._apply_filter)
         filter_layout.addWidget(self.task_filter)
 
@@ -2324,12 +2292,8 @@ class EnhancedFileTreeWidget(QTreeWidget):
         for log in logs:
             if log["status"] == "success":
                 task = log["task_type"].lower()
-                if "ocr" in task:
-                    successful.add("OCR")
-                elif "summar" in task:
+                if "summar" in task:
                     successful.add("SUM")
-                elif "timeline" in task:
-                    successful.add("TL")
 
         return ", ".join(sorted(successful)) if successful else ""
 

@@ -308,33 +308,6 @@
       "timeout_seconds": 120,
       "use_default": true
     },
-    "agent_organize": {
-      "agent_id": "agent_organize",
-      "display_name": "Organize",
-      "description": "Document organization and categorization",
-      "model_sequence": [],
-      "max_retries": 3,
-      "timeout_seconds": 120,
-      "use_default": true
-    },
-    "agent_timeline": {
-      "agent_id": "agent_timeline",
-      "display_name": "Timeline",
-      "description": "Date and event extraction for timelines",
-      "model_sequence": [],
-      "max_retries": 3,
-      "timeout_seconds": 120,
-      "use_default": true
-    },
-    "agent_contradict": {
-      "agent_id": "agent_contradict",
-      "display_name": "Contradictions",
-      "description": "Detect factual contradictions across documents",
-      "model_sequence": [],
-      "max_retries": 3,
-      "timeout_seconds": 120,
-      "use_default": true
-    },
     "agent_docket": {
       "agent_id": "agent_docket",
       "display_name": "Docket",
