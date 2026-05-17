@@ -18,6 +18,7 @@ class BaseWorker(QObject):
     finished = Signal(str)       # output_path (.docx)
     failed = Signal(str)         # error message
     cancelled = Signal()         # emitted after cancel takes effect
+    awaiting_input = Signal(str) # session_path emitted when agent pauses awaiting user config (depositions Phase 1 done)
 
     def __init__(
         self,

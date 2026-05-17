@@ -2,7 +2,7 @@
 
 Phase 5 wires in the real SubprocessWorker (replaces Phase 4 fake worker).
 """
-from typing import List
+from typing import List, Optional
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QStackedWidget, QWidget
@@ -37,6 +37,7 @@ class TaskTab(QStackedWidget):
         self._file_number = file_number
         self._worker = None
         self._worker_thread = None  # reserved if we move to QThread later
+        self._awaiting_session_path: Optional[str] = None
 
         self.settings_page = SettingsPage(spec, files=self._files)
         self.status_page = StatusPage()
@@ -48,6 +49,7 @@ class TaskTab(QStackedWidget):
 
         self.settings_page.proceed_requested.connect(self._on_proceed)
         self.status_page.cancel_requested.connect(self._on_cancel)
+        self.status_page.configure_requested.connect(self._on_configure_requested)
         self.output_page.edit_settings_requested.connect(self._on_edit_settings)
         self.output_page.rerun_requested.connect(self._on_rerun)
 
@@ -93,6 +95,7 @@ class TaskTab(QStackedWidget):
     def _start_run(self, settings_dict: dict) -> None:
         from .runners.subprocess_worker import SubprocessWorker
 
+        self._awaiting_session_path = None
         self.status_page.on_status(f"Starting {self._spec.title}…")
         self._worker = SubprocessWorker(
             script_name=self._spec.script_name,
@@ -107,11 +110,13 @@ class TaskTab(QStackedWidget):
         self._worker.finished.connect(self._on_worker_finished)
         self._worker.failed.connect(self._on_worker_failed)
         self._worker.cancelled.connect(self._on_worker_cancelled)
+        self._worker.awaiting_input.connect(self._on_worker_awaiting_input)
         self._worker.start()
 
     def _on_worker_finished(self, output_path: str) -> None:
         from datetime import datetime
         self._worker = None
+        self._awaiting_session_path = None
         entry = {
             "task_id": self._spec.task_id,
             "title": self._spec.title,
@@ -125,6 +130,7 @@ class TaskTab(QStackedWidget):
 
     def _on_worker_failed(self, err: str) -> None:
         self._worker = None
+        self._awaiting_session_path = None
         self.status_page.on_status(f"FAILED: {err}")
         self.status_page.cancel_btn.setText("Back to Settings")
         self.status_page.cancel_btn.setEnabled(True)
@@ -136,4 +142,32 @@ class TaskTab(QStackedWidget):
 
     def _on_worker_cancelled(self) -> None:
         self._worker = None
+        self._awaiting_session_path = None
         self.setCurrentIndex(PAGE_SETTINGS)
+
+    # ---- Two-phase deposition ----
+
+    def _on_worker_awaiting_input(self, session_path: str) -> None:
+        """Phase 1 complete — store session path and switch status page to awaiting mode."""
+        self._awaiting_session_path = session_path
+        self.status_page.show_awaiting_input(session_path)
+
+    def _on_configure_requested(self) -> None:
+        """User clicked 'Configure Topics & Continue' — open DepoSummaryConfigDialog."""
+        if self._worker is None or self._awaiting_session_path is None:
+            return
+        from PySide6.QtWidgets import QDialog
+        from icharlotte_core.ui.depo_summary_config_dialog import DepoSummaryConfigDialog
+        try:
+            dlg = DepoSummaryConfigDialog(self._awaiting_session_path, parent=self)
+        except Exception as e:
+            self.status_page.on_status(f"Failed to open topic config dialog: {e}")
+            return
+
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            # Re-show progress bar for Phase 2.
+            self.status_page.awaiting_input_widget.setVisible(False)
+            self.status_page.progress_bar.setRange(0, 0)
+            self.status_page.status_label.setText("Running Phase 2 — generating summary…")
+            self._worker.resume_with_config(self._awaiting_session_path)
+        # On Cancel: leave the awaiting widget visible so the user can retry.
