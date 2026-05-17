@@ -9,11 +9,18 @@ from icharlotte_core.ui.wizard.mode_controller import ModeController, MODE_ADVAN
 
 @pytest.fixture(autouse=True)
 def _qsettings_org(monkeypatch, tmp_path):
-    """Isolate QSettings to a temp file per test."""
-    QCoreApplication.setOrganizationName("iCharlotteTest")
-    QCoreApplication.setApplicationName(f"WizardTest-{tmp_path.name}")
+    """Isolate QSettings to a temp dir per test.
+
+    Redirects the IniFormat/UserScope path so that both QSettings() and
+    QSettings("iCharlotte", "iCharlotte") write to the same tmpdir and
+    do not touch the real user profile.
+    """
+    QCoreApplication.setOrganizationName("iCharlotte")
+    QCoreApplication.setApplicationName("iCharlotte")
     QSettings.setDefaultFormat(QSettings.Format.IniFormat)
-    s = QSettings()
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+    # Clear any pre-existing values at this path before each test.
+    s = QSettings("iCharlotte", "iCharlotte")
     s.clear()
     s.sync()
     yield

@@ -22,7 +22,7 @@ class ModeController(QObject):
 
     def __init__(self, parent: QObject | None = None):
         super().__init__(parent)
-        self._settings = QSettings()
+        self._settings = QSettings("iCharlotte", "iCharlotte")
         self._mode = self._read_mode()
 
     def _read_mode(self) -> str:
