@@ -19,6 +19,7 @@ class TaskSpec:
     title: str
     description: str
     icon_glyph: str
+    script_name: str
     default_folders: List[str] = field(default_factory=list)
 
 
@@ -28,6 +29,7 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         title="Summarize Documents",
         description="Produce a concise summary of one or more case documents.",
         icon_glyph="\U0001F4C4",  # 📄
+        script_name="summarize.py",
         default_folders=[],
     ),
     "summarize_discovery": TaskSpec(
@@ -35,6 +37,7 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         title="Summarize Discovery",
         description="Summarize discovery responses with structure and citations.",
         icon_glyph="\U0001F4CB",  # 📋
+        script_name="summarize_discovery.py",
         default_folders=["DISCOVERY/RESPONSES", "DISCOVERY"],
     ),
     "summarize_depositions": TaskSpec(
@@ -42,6 +45,7 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         title="Summarize Depositions",
         description="Generate a structured summary of one or more depositions.",
         icon_glyph="\U0001F399",  # 🎙
+        script_name="summarize_deposition.py",
         default_folders=["DISCOVERY/TRANSCRIPTS", "DISCOVERY"],
     ),
     "medical_records": TaskSpec(
@@ -49,6 +53,7 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         title="Medical Records Review",
         description="Extract and summarize medical records into a chronology.",
         icon_glyph="\U0001F3E5",  # 🏥
+        script_name="med_record.py",
         default_folders=["RECORDS"],
     ),
 }

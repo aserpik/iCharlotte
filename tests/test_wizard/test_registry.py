@@ -38,3 +38,10 @@ def test_default_folders_per_task():
 def test_get_task_unknown_raises():
     with pytest.raises(KeyError):
         get_task("not_a_real_task")
+
+
+def test_each_task_has_script_name():
+    assert get_task("summarize_documents").script_name == "summarize.py"
+    assert get_task("summarize_discovery").script_name == "summarize_discovery.py"
+    assert get_task("summarize_depositions").script_name == "summarize_deposition.py"
+    assert get_task("medical_records").script_name == "med_record.py"
