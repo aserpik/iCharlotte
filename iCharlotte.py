@@ -564,6 +564,10 @@ class MainWindow(QMainWindow):
         checkpoint("setup_ui starting - creating tabs")
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
+        self.tabs.setTabsClosable(True)
+        self.tabs.tabCloseRequested.connect(self._on_tab_close_requested)
+        # Hide close buttons on the fixed Master List / Wizard / Advanced tabs.
+        # (We'll re-hide after every addTab via _hide_fixed_close_buttons.)
 
         # Make tabs expand to fill available width (no scroll arrows needed)
         self.tabs.tabBar().setExpanding(True)
@@ -982,6 +986,7 @@ class MainWindow(QMainWindow):
         self._zoom_filter = ZoomEventFilter(self.tabs, self)
         QApplication.instance().installEventFilter(self._zoom_filter)
 
+        self._hide_fixed_close_buttons()
         checkpoint("setup_ui complete - all tabs created")
 
     # --- Wizard Mode: tab visibility orchestration ---
@@ -1150,9 +1155,10 @@ class MainWindow(QMainWindow):
         self.tree.blockSignals(False)
 
     def _open_task_tab(self, task_id: str) -> None:
-        """Phase 3 version: pops the file dialog. Phase 4 will create a real TaskTab."""
         from icharlotte_core.ui.wizard.registry import get_task
         from icharlotte_core.ui.wizard.file_picker import resolve_default_folder
+        from icharlotte_core.ui.wizard.task_tab import TaskTab
+        from icharlotte_core.ui.wizard.instance_naming import next_instance_suffix
         from PySide6.QtWidgets import QFileDialog
 
         if not self.case_path:
@@ -1169,7 +1175,42 @@ class MainWindow(QMainWindow):
         )
         if not files:
             return  # user cancelled → no tab created
-        log_event(f"[wizard] {task_id}: selected {len(files)} files from {start_dir}")
+
+        # Compute title with suffix for multi-instance.
+        existing_titles = [self.tabs.tabText(i) for i in range(self.tabs.count())]
+        suffix = next_instance_suffix(spec.title, existing_titles)
+        title = f"{spec.title} {suffix}".strip()
+
+        task_tab = TaskTab(spec=spec, files=files, parent=self)
+        task_tab.setProperty("wizard_task_id", spec.task_id)
+        task_tab.setProperty("wizard_instance_suffix", suffix)
+        new_index = self.tabs.addTab(task_tab, title)
+        self.tabs.setCurrentIndex(new_index)
+        log_event(f"[wizard] opened task tab '{title}' with {len(files)} file(s)")
+        self._hide_fixed_close_buttons()
+
+    def _on_tab_close_requested(self, index: int) -> None:
+        """Only TaskTabs are closeable (they carry a 'wizard_task_id' property)."""
+        widget = self.tabs.widget(index)
+        if widget is None:
+            return
+        if widget.property("wizard_task_id") is None:
+            return  # not a task tab; ignore
+        # Phase 4: just remove. Cancellation hook arrives in Phase 5.
+        self.tabs.removeTab(index)
+        widget.deleteLater()
+
+    def _hide_fixed_close_buttons(self) -> None:
+        """Hide close buttons on tabs that are not TaskTabs."""
+        from PySide6.QtWidgets import QTabBar
+        bar = self.tabs.tabBar()
+        for i in range(self.tabs.count()):
+            widget = self.tabs.widget(i)
+            is_task_tab = widget is not None and widget.property("wizard_task_id") is not None
+            for side in (QTabBar.ButtonPosition.RightSide, QTabBar.ButtonPosition.LeftSide):
+                btn = bar.tabButton(i, side)
+                if btn is not None:
+                    btn.setVisible(is_task_tab)
 
     def on_tree_item_clicked(self, item, column):
         if column == 1:  # Queued Tasks column (index 1)
