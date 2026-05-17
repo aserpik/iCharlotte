@@ -38,3 +38,21 @@ class DepoSummaryConfigDialog(QDialog):
         if not self.form.commit_user_config():
             return  # validation failed — form already showed error, don't close
         super().accept()
+
+    def __getattr__(self, name):
+        """Delegate attribute lookup to the embedded form.
+
+        This preserves the dialog's API surface for tests and code that
+        directly accessed form widgets via dlg.topics_list, dlg.bias_combo, etc.
+        after the form-extraction refactor (commit fdf0a04).
+
+        __getattr__ is only called when normal attribute lookup has failed,
+        so we guard against infinite recursion before self.form is assigned.
+        """
+        if name == "form":
+            raise AttributeError(name)
+        try:
+            form = object.__getattribute__(self, "form")
+        except AttributeError:
+            raise AttributeError(name)
+        return getattr(form, name)
