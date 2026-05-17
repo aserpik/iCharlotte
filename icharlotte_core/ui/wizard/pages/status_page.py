@@ -1,4 +1,6 @@
 """StatusPage — progress bar + log + Cancel button while a task is running."""
+import time
+
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
@@ -23,17 +25,48 @@ class StatusPage(QWidget):
         outer.setContentsMargins(24, 24, 24, 24)
         outer.setSpacing(12)
 
+        # 1. Status label
         self.status_label = QLabel("Starting…")
         self.status_label.setStyleSheet("font-size: 13px; font-weight: 600;")
         outer.addWidget(self.status_label)
 
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 0)  # indeterminate by default
-        outer.addWidget(self.progress_bar)
+        # 2. Progress row: bar + percent + ETA
+        progress_row = QHBoxLayout()
+        progress_row.setSpacing(8)
 
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        progress_row.addWidget(self.progress_bar, 1)
+
+        self.percent_label = QLabel("")
+        self.percent_label.setStyleSheet("font-weight: 600; min-width: 40px;")
+        progress_row.addWidget(self.percent_label)
+
+        self.eta_label = QLabel("")
+        self.eta_label.setStyleSheet("color: #666; font-size: 11px;")
+        progress_row.addWidget(self.eta_label)
+
+        outer.addLayout(progress_row)
+
+        # 3. Log toggle button
+        self.log_toggle_btn = QPushButton("Show details ▾")
+        self.log_toggle_btn.setCheckable(True)
+        self.log_toggle_btn.setChecked(False)
+        self.log_toggle_btn.setStyleSheet(
+            "QPushButton { background: #f5f5f5; border: 1px solid #ccc; padding: 4px 10px;"
+            " border-radius: 3px; text-align: left; }"
+            "QPushButton:hover { background: #e8e8e8; }"
+        )
+        self.log_toggle_btn.setMaximumWidth(140)
+        self.log_toggle_btn.toggled.connect(self._on_log_toggle_clicked)
+        outer.addWidget(self.log_toggle_btn)
+
+        # 4. Log view (hidden by default)
         self.log_view = QPlainTextEdit()
         self.log_view.setReadOnly(True)
         self.log_view.setStyleSheet("font-family: Consolas, 'Courier New', monospace; font-size: 11px;")
+        self.log_view.setVisible(False)
         outer.addWidget(self.log_view, 1)
 
         # --- Awaiting-input widget (hidden until Phase 1 of depo flow completes) ---
@@ -64,14 +97,33 @@ class StatusPage(QWidget):
         btn_row.addWidget(self.cancel_btn)
         outer.addLayout(btn_row)
 
+        # ETA tracking state
+        self._run_start_monotonic: float | None = None
+        self._last_pct: int = 0
+
+    # ---- Toggle ----
+
+    def _on_log_toggle_clicked(self, checked: bool) -> None:
+        self.log_view.setVisible(checked)
+        self.log_toggle_btn.setText("Hide details ▴" if checked else "Show details ▾")
+
+    # ---- Reset ----
+
     def reset(self) -> None:
         self.status_label.setText("Starting…")
-        self.progress_bar.setRange(0, 0)
+        self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
+        self.percent_label.setText("")
+        self.eta_label.setText("")
         self.log_view.clear()
+        self.log_view.setVisible(False)
+        self.log_toggle_btn.setChecked(False)
+        self.log_toggle_btn.setText("Show details ▾")
         self.cancel_btn.setEnabled(True)
         self.cancel_btn.setText("Cancel")
         self.awaiting_input_widget.setVisible(False)
+        self._run_start_monotonic = None
+        self._last_pct = 0
 
     # ---- Awaiting-input mode ----
 
@@ -90,11 +142,44 @@ class StatusPage(QWidget):
         self.log_view.verticalScrollBar().setValue(self.log_view.verticalScrollBar().maximum())
 
     def on_progress(self, pct: int) -> None:
-        if pct < 0 or pct > 100:
-            return
+        if pct < 0:
+            pct = 0
+        if pct > 100:
+            pct = 100
+        # Start the ETA timer on the first real progress event.
+        if self._run_start_monotonic is None and pct > 0:
+            self._run_start_monotonic = time.monotonic()
         if self.progress_bar.maximum() == 0:
             self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(pct)
+        self.percent_label.setText(f"{pct}%")
+        self.eta_label.setText(self._format_eta(pct))
+        self._last_pct = pct
+
+    # ---- ETA helpers ----
+
+    def _format_eta(self, pct: int) -> str:
+        # Skip ETA for the noisy early phase (< 5%) and when finished.
+        if self._run_start_monotonic is None or pct < 5 or pct >= 100:
+            return ""
+        elapsed = time.monotonic() - self._run_start_monotonic
+        if elapsed < 1.0:
+            return ""
+        # Linear extrapolation.
+        total = elapsed / pct * 100
+        remaining = max(0.0, total - elapsed)
+        return f"~{self._format_duration(remaining)} remaining"
+
+    @staticmethod
+    def _format_duration(seconds: float) -> str:
+        seconds = int(round(seconds))
+        if seconds < 60:
+            return f"{seconds}s"
+        m, s = divmod(seconds, 60)
+        if m < 60:
+            return f"{m}m {s}s"
+        h, m = divmod(m, 60)
+        return f"{h}h {m}m"
 
     def _on_cancel(self) -> None:
         self.cancel_btn.setEnabled(False)

@@ -37,7 +37,7 @@ from .base import BaseWorker
 
 
 _AI_OUTPUT_SUBPATH = os.path.join("NOTES", "AI Output")
-_PROGRESS_RE = re.compile(r"^PROGRESS:\s*(\d+)\s*$")
+_PROGRESS_RE = re.compile(r"^PROGRESS:\s*(\d+)\s*(?::(.*))?$")
 _AWAITING_RE = re.compile(r"^AWAITING_INPUT:(.+)$")
 
 
@@ -149,15 +149,21 @@ class SubprocessWorker(BaseWorker):
             line = line_bytes.decode("utf-8", errors="replace").rstrip("\r")
             self._handle_line(line)
 
+    def _scaled_pct(self, raw_pct: int) -> int:
+        total = max(1, len(self.files))
+        scaled = (self._file_idx * 100 + raw_pct) / total
+        return max(0, min(100, int(scaled)))
+
     def _handle_line(self, line: str) -> None:
-        # PROGRESS:N
+        # PROGRESS:N  or  PROGRESS:N:message
         m = _PROGRESS_RE.match(line)
         if m:
             try:
                 raw = int(m.group(1))
-                # Scale to aggregate progress across all files.
-                scaled = (self._file_idx * 100 + raw) // max(len(self.files), 1)
-                self.progress.emit(scaled)
+                self.progress.emit(self._scaled_pct(raw))
+                msg = (m.group(2) or "").strip()
+                if msg:
+                    self.status.emit(msg)
             except ValueError:
                 pass
             return
