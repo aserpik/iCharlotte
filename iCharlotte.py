@@ -608,10 +608,7 @@ class MainWindow(QMainWindow):
         from icharlotte_core.ui.wizard.wizard_tab import WizardTab
         self.wizard_tab = WizardTab(self)
         self.tabs.addTab(self.wizard_tab, "Wizard")
-        # Temporary log-only handler. Phase 4 replaces this with task-tab creation.
-        self.wizard_tab.task_requested.connect(
-            lambda task_id: log_event(f"Wizard card clicked: {task_id}")
-        )
+        self.wizard_tab.task_requested.connect(self._open_task_tab)
 
         # --- Tab 2: Case View ---
         case_view_widget = QWidget()
@@ -1151,6 +1148,28 @@ class MainWindow(QMainWindow):
             self.update_item_tasks_ui(item)
             iterator += 1
         self.tree.blockSignals(False)
+
+    def _open_task_tab(self, task_id: str) -> None:
+        """Phase 3 version: pops the file dialog. Phase 4 will create a real TaskTab."""
+        from icharlotte_core.ui.wizard.registry import get_task
+        from icharlotte_core.ui.wizard.file_picker import resolve_default_folder
+        from PySide6.QtWidgets import QFileDialog
+
+        if not self.case_path:
+            QMessageBox.information(self, "No case loaded", "Open a case from the Master List first.")
+            return
+
+        spec = get_task(task_id)
+        start_dir = resolve_default_folder(self.case_path, spec.default_folders)
+        files, _ = QFileDialog.getOpenFileNames(
+            self,
+            f"Select files for {spec.title}",
+            start_dir,
+            "All files (*.*)",
+        )
+        if not files:
+            return  # user cancelled → no tab created
+        log_event(f"[wizard] {task_id}: selected {len(files)} files from {start_dir}")
 
     def on_tree_item_clicked(self, item, column):
         if column == 1:  # Queued Tasks column (index 1)
