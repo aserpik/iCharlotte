@@ -352,7 +352,14 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
                 logger=logger
             )
             logger.progress(10, "Running text extraction (OCR if needed)...")
-            result = processor.extract_with_dynamic_ocr(input_path)
+
+            def _extraction_progress(page_num: int, total_pages: int) -> None:
+                """Interpolate page progress into the 10→22 percent range."""
+                if total_pages > 0:
+                    scaled = 10 + int((page_num / total_pages) * 12)
+                    logger.progress(scaled, f"Extracting page {page_num} of {total_pages}")
+
+            result = processor.extract_with_dynamic_ocr(input_path, progress_callback=_extraction_progress)
 
             if not result.success:
                 raise ExtractionError(f"Failed to extract text: {result.error}", file_path=input_path)
