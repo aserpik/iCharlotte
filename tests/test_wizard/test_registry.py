@@ -45,3 +45,10 @@ def test_each_task_has_script_name():
     assert get_task("summarize_discovery").script_name == "summarize_discovery.py"
     assert get_task("summarize_depositions").script_name == "summarize_deposition.py"
     assert get_task("medical_records").script_name == "med_record.py"
+
+
+def test_each_task_has_settings_page_cls():
+    from icharlotte_core.ui.wizard.pages.settings_page import SettingsPage
+    for spec in list_tasks():
+        assert spec.settings_page_cls is not None
+        assert issubclass(spec.settings_page_cls, SettingsPage)

@@ -8,9 +8,16 @@ Each task contributes:
   - default_folders    : ordered list of relative subfolders (under case root)
                          tried in order when opening the pre-Settings file
                          dialog; empty list means default to case root.
+  - settings_page_cls  : SettingsPage subclass to instantiate for this task.
+                         Defaults to base SettingsPage (placeholder).
 """
 from dataclasses import dataclass, field
 from typing import List
+
+
+def _default_settings_page_cls():
+    from .pages.settings_page import SettingsPage
+    return SettingsPage
 
 
 @dataclass(frozen=True)
@@ -21,6 +28,7 @@ class TaskSpec:
     icon_glyph: str
     script_name: str
     default_folders: List[str] = field(default_factory=list)
+    settings_page_cls: type = field(default_factory=_default_settings_page_cls)
 
 
 TASK_REGISTRY: dict[str, TaskSpec] = {

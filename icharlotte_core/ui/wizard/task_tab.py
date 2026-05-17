@@ -35,8 +35,9 @@ class TaskTab(QStackedWidget):
         self._worker = None
         self._worker_thread = None  # reserved if we move to QThread later
         self._awaiting_session_path: Optional[str] = None
+        self._settings_owns_worker = False
 
-        self.settings_page = SettingsPage(spec, files=self._files, case_root=case_path or None)
+        self.settings_page = spec.settings_page_cls(spec, files=self._files, case_root=case_path or None)
         self.status_page = StatusPage()
         self.output_page = OutputPage()
 
@@ -49,6 +50,10 @@ class TaskTab(QStackedWidget):
         self.status_page.configure_requested.connect(self._on_configure_requested)
         self.output_page.edit_settings_requested.connect(self._on_edit_settings)
         self.output_page.rerun_requested.connect(self._on_rerun)
+
+        # Opportunistically wire phase2_requested if the settings page exposes it.
+        if hasattr(self.settings_page, "phase2_requested"):
+            self.settings_page.phase2_requested.connect(self.advance_to_status_with_phase2)
 
     # ---- Public API ----
 
@@ -83,51 +88,145 @@ class TaskTab(QStackedWidget):
     def _on_rerun(self) -> None:
         self._on_proceed(self.settings_page.to_dict())
 
-    def _show_output(self, output_path: str) -> None:
-        self.output_page.load_output(output_path)
-        self.setCurrentIndex(PAGE_OUTPUT)
+    # ---- Speculative run (for SettingsPage subclasses that own the worker) ----
+
+    def start_speculative_run(self) -> None:
+        """Launch the worker immediately without switching pages.
+
+        The settings page takes ownership via attach_worker() and drives the
+        status/progress/awaiting_input signals itself.  TaskTab only wires the
+        terminal signals (finished/failed/cancelled).
+        """
+        from .runners.subprocess_worker import SubprocessWorker
+
+        self._settings_owns_worker = True
+        self._awaiting_session_path = None
+
+        worker = SubprocessWorker(
+            script_name=self._spec.script_name,
+            case_path=self._case_path,
+            file_number=self._file_number,
+            files=self._files,
+            settings={},
+            parent=self,
+        )
+
+        # Let the settings page own the mid-flight signals.
+        self.settings_page.attach_worker(worker)
+
+        # TaskTab only handles terminal signals.
+        worker.finished.connect(self._on_worker_finished)
+        worker.failed.connect(self._on_worker_failed)
+        worker.cancelled.connect(self._on_worker_cancelled)
+
+        self._worker = worker
+        worker.start()
+
+    def advance_to_status_with_phase2(self, session_path: str) -> None:
+        """Switch to the Status page and kick off Phase 2.
+
+        Called via the phase2_requested signal emitted by DepositionSettingsPage
+        after the user commits their topic configuration.
+        """
+        if self._worker is None:
+            return
+        self._settings_owns_worker = False
+        self.status_page.reset()
+        self.setCurrentIndex(PAGE_STATUS)
+
+        # Wire the status/progress signals now that status page is visible.
+        self._worker.status.connect(self.status_page.on_status)
+        self._worker.progress.connect(self.status_page.on_progress)
+
+        self.status_page.on_status("Running Phase 2 — generating summary…")
+        self.status_page.progress_bar.setRange(0, 0)
+        self._worker.resume_with_config(session_path)
 
     # ---- Worker ----
 
     def _start_run(self, settings_dict: dict) -> None:
         from .runners.subprocess_worker import SubprocessWorker
+        from .runners.parallel_subprocess_worker import (
+            ParallelSubprocessWorker,
+            _TWO_PHASE_SCRIPTS,
+        )
 
         self._awaiting_session_path = None
         self.status_page.on_status(f"Starting {self._spec.title}…")
-        self._worker = SubprocessWorker(
-            script_name=self._spec.script_name,
-            case_path=self._case_path,
-            file_number=self._file_number,
-            files=self._files,
-            settings=settings_dict,
-            parent=self,
+
+        # Use parallel runner when we have >1 file AND the agent isn't two-phase
+        # (two-phase = AWAITING_INPUT/Phase-2 flow; only summarize_deposition today).
+        use_parallel = (
+            len(self._files) > 1
+            and self._spec.script_name not in _TWO_PHASE_SCRIPTS
         )
-        self._worker.status.connect(self.status_page.on_status)
-        self._worker.progress.connect(self.status_page.on_progress)
+
+        if use_parallel:
+            self._worker = ParallelSubprocessWorker(
+                script_name=self._spec.script_name,
+                case_path=self._case_path,
+                file_number=self._file_number,
+                files=self._files,
+                settings=settings_dict,
+                max_concurrent=3,
+                parent=self,
+            )
+        else:
+            self._worker = SubprocessWorker(
+                script_name=self._spec.script_name,
+                case_path=self._case_path,
+                file_number=self._file_number,
+                files=self._files,
+                settings=settings_dict,
+                parent=self,
+            )
+
+        if not self._settings_owns_worker:
+            self._worker.status.connect(self.status_page.on_status)
+            self._worker.progress.connect(self.status_page.on_progress)
+            self._worker.awaiting_input.connect(self._on_worker_awaiting_input)
         self._worker.finished.connect(self._on_worker_finished)
         self._worker.failed.connect(self._on_worker_failed)
         self._worker.cancelled.connect(self._on_worker_cancelled)
-        self._worker.awaiting_input.connect(self._on_worker_awaiting_input)
         self._worker.start()
 
     def _on_worker_finished(self, output_path: str) -> None:
         from datetime import datetime
+        # Capture all produced outputs BEFORE we drop the worker reference.
+        all_output_paths = list(getattr(self._worker, "output_paths", []) or [])
+        if output_path and output_path not in all_output_paths:
+            all_output_paths.append(output_path)
+
         self._worker = None
         self._awaiting_session_path = None
+        self._settings_owns_worker = False
         entry = {
             "task_id": self._spec.task_id,
             "title": self._spec.title,
             "files": list(self._files),
             "settings": self.settings_page.to_dict(),
             "output_path": output_path,
+            "output_paths": all_output_paths,
             "completed_at": datetime.now().isoformat(timespec="seconds"),
         }
         self.task_completed.emit(entry)
-        self._show_output(output_path)
+
+        if len(all_output_paths) > 1:
+            self.output_page.load_outputs(all_output_paths)
+        else:
+            self.output_page.load_output(output_path)
+        self.setCurrentIndex(PAGE_OUTPUT)
+
+    def _show_output(self, output_path: str) -> None:
+        """Single-output convenience used by tests. Production code path is
+        in _on_worker_finished which can surface multiple parallel outputs."""
+        self.output_page.load_output(output_path)
+        self.setCurrentIndex(PAGE_OUTPUT)
 
     def _on_worker_failed(self, err: str) -> None:
         self._worker = None
         self._awaiting_session_path = None
+        self._settings_owns_worker = False
         self.status_page.on_status(f"FAILED: {err}")
         self.status_page.cancel_btn.setText("Back to Settings")
         self.status_page.cancel_btn.setEnabled(True)
@@ -140,12 +239,15 @@ class TaskTab(QStackedWidget):
     def _on_worker_cancelled(self) -> None:
         self._worker = None
         self._awaiting_session_path = None
+        self._settings_owns_worker = False
         self.setCurrentIndex(PAGE_SETTINGS)
 
-    # ---- Two-phase deposition ----
+    # ---- Two-phase deposition (legacy popup flow for Advanced Mode) ----
 
     def _on_worker_awaiting_input(self, session_path: str) -> None:
         """Phase 1 complete — store session path and switch status page to awaiting mode."""
+        if self._settings_owns_worker:
+            return  # settings page is handling this itself
         self._awaiting_session_path = session_path
         self.status_page.show_awaiting_input(session_path)
         self.status_page.pause_eta()

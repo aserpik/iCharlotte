@@ -146,3 +146,11 @@ class SettingsPage(QWidget):
     def from_dict(self, data: dict) -> None:
         """Placeholder — real subclasses will restore form state."""
         return None
+
+    def attach_worker(self, worker) -> bool:
+        """Override to take control of worker signals (e.g., for speculative runs).
+
+        Return True if the settings page is handling the worker; in that case
+        TaskTab will skip wiring status/progress/awaiting_input to the status page.
+        """
+        return False
