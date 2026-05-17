@@ -194,22 +194,48 @@ class StatusPage(QWidget):
             elapsed -= (now - self._pause_start)
         if elapsed < 1.0:
             return ""
-        # Prefer rolling-window rate (last 30s) when we have enough data.
-        rate: float = 0.0
+
+        # Lifetime rate (pct-per-second over entire run).
+        lifetime_rate = pct / elapsed  # elapsed >= 1.0 and pct >= 5, so always > 0
+        remaining_lifetime = max(0.0, (100 - pct) / lifetime_rate)
+
+        # Rolling-window rate (last 30s) — only valid when window has enough span.
+        window_rate: float | None = None
         if len(self._rate_window) >= 2:
             oldest_t, oldest_pct = self._rate_window[0]
             newest_t, newest_pct = self._rate_window[-1]
             window_span = newest_t - oldest_t
             pct_delta = newest_pct - oldest_pct
             if window_span >= 5.0 and pct_delta > 0:
-                rate = pct_delta / window_span
-        # Fall back to lifetime rate when window is too sparse.
-        if rate <= 0 and elapsed > 0:
-            rate = pct / elapsed
-        if rate <= 0:
-            return ""
-        remaining = max(0.0, (100 - pct) / rate)
-        return f"~{self._format_duration(remaining)} remaining"
+                window_rate = pct_delta / window_span
+
+        # Build candidate remaining-time estimates.
+        candidates: list[float] = [remaining_lifetime]
+        if window_rate is not None and window_rate > 0:
+            candidates.append(max(0.0, (100 - pct) / window_rate))
+
+        # Single candidate: just show it.
+        if len(candidates) == 1:
+            secs = candidates[0]
+            if secs < 1.0:
+                return "~< 1s remaining"
+            return f"~{self._format_duration(secs)} remaining"
+
+        # Two candidates: collapse if they agree within 20%, else show range.
+        lo, hi = min(candidates), max(candidates)
+        if hi - lo <= 0.2 * hi:
+            # Rates agree — show midpoint.
+            mid = (lo + hi) / 2.0
+            if mid < 1.0:
+                return "~< 1s remaining"
+            return f"~{self._format_duration(mid)} remaining"
+
+        # Rates disagree — show range.
+        if hi < 1.0:
+            return "~< 1s remaining"
+        lo_str = self._format_duration(lo) if lo >= 1.0 else "< 1s"
+        hi_str = self._format_duration(hi)
+        return f"~{lo_str} – {hi_str} remaining"
 
     @staticmethod
     def _format_duration(seconds: float) -> str:
