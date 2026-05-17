@@ -604,7 +604,16 @@ class MainWindow(QMainWindow):
         self.master_tab = MasterCaseTab(self, mode_controller=self.mode_controller)
         self.tabs.addTab(self.master_tab, "Master List")
 
-        # --- Tab 1: Case View ---
+        # --- Tab 1 (Wizard Mode only): Wizard ---
+        from icharlotte_core.ui.wizard.wizard_tab import WizardTab
+        self.wizard_tab = WizardTab(self)
+        self.tabs.addTab(self.wizard_tab, "Wizard")
+        # Temporary log-only handler. Phase 4 replaces this with task-tab creation.
+        self.wizard_tab.task_requested.connect(
+            lambda task_id: log_event(f"Wizard card clicked: {task_id}")
+        )
+
+        # --- Tab 2: Case View ---
         case_view_widget = QWidget()
         self.tabs.addTab(case_view_widget, "Case View")
 
@@ -1004,9 +1013,9 @@ class MainWindow(QMainWindow):
             tab_text = self.tabs.tabText(i)
             if tab_text in self._WIZARD_HIDDEN_TABS:
                 self.tabs.setTabVisible(i, not is_wizard)
-            # Master List (and future Wizard tab + task tabs) stay visible
-            # in both modes; they're handled by their own logic.
-        # If the current tab just got hidden, fall back to Master List.
+            elif tab_text == "Wizard":
+                self.tabs.setTabVisible(i, is_wizard)
+            # Master List + task tabs (managed separately) stay visible.
         if not self.tabs.isTabVisible(self.tabs.currentIndex()):
             self.tabs.setCurrentIndex(0)
 
