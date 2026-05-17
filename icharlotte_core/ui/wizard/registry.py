@@ -12,12 +12,17 @@ Each task contributes:
                          Defaults to base SettingsPage (placeholder).
 """
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Optional
 
 
 def _default_settings_page_cls():
     from .pages.settings_page import SettingsPage
     return SettingsPage
+
+
+def _deposition_settings_page_cls():
+    from .pages.deposition_settings_page import DepositionSettingsPage
+    return DepositionSettingsPage
 
 
 @dataclass(frozen=True)
@@ -28,7 +33,16 @@ class TaskSpec:
     icon_glyph: str
     script_name: str
     default_folders: List[str] = field(default_factory=list)
-    settings_page_cls: type = field(default_factory=_default_settings_page_cls)
+    # None means "use default SettingsPage"; resolved lazily in TaskTab.
+    # Set to a factory callable that returns the class to avoid circular imports.
+    _settings_page_cls_factory: Optional[object] = field(default=None, repr=False, compare=False)
+
+    @property
+    def settings_page_cls(self) -> type:
+        """Return the SettingsPage subclass for this task."""
+        if self._settings_page_cls_factory is not None:
+            return self._settings_page_cls_factory()
+        return _default_settings_page_cls()
 
 
 TASK_REGISTRY: dict[str, TaskSpec] = {
@@ -55,6 +69,7 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         icon_glyph="\U0001F399",  # 🎙
         script_name="summarize_deposition.py",
         default_folders=["DISCOVERY/TRANSCRIPTS", "DISCOVERY"],
+        _settings_page_cls_factory=_deposition_settings_page_cls,
     ),
     "medical_records": TaskSpec(
         task_id="medical_records",
