@@ -80,8 +80,10 @@ class OutputPage(QWidget):
             try:
                 html = load_docx_as_html(output_path)
                 self.editor.blockSignals(True)
-                self.editor.setHtml(html)
-                self.editor.blockSignals(False)
+                try:
+                    self.editor.setHtml(html)
+                finally:
+                    self.editor.blockSignals(False)
             except Exception as e:
                 self.editor.setPlainText(f"(Failed to render {output_path}:\n{e})")
         else:

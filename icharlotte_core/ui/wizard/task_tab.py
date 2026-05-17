@@ -1,7 +1,4 @@
-"""TaskTab — QStackedWidget orchestrating Settings → Status → Output for one task.
-
-Phase 5 wires in the real SubprocessWorker (replaces Phase 4 fake worker).
-"""
+"""TaskTab — QStackedWidget orchestrating Settings → Status → Output for one task."""
 from typing import List, Optional
 
 from PySide6.QtCore import Signal
@@ -39,7 +36,7 @@ class TaskTab(QStackedWidget):
         self._worker_thread = None  # reserved if we move to QThread later
         self._awaiting_session_path: Optional[str] = None
 
-        self.settings_page = SettingsPage(spec, files=self._files)
+        self.settings_page = SettingsPage(spec, files=self._files, case_root=case_path or None)
         self.status_page = StatusPage()
         self.output_page = OutputPage()
 
@@ -90,7 +87,7 @@ class TaskTab(QStackedWidget):
         self.output_page.load_output(output_path)
         self.setCurrentIndex(PAGE_OUTPUT)
 
-    # ---- Worker (Phase 5 real subprocess) ----
+    # ---- Worker ----
 
     def _start_run(self, settings_dict: dict) -> None:
         from .runners.subprocess_worker import SubprocessWorker

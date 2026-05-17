@@ -76,3 +76,6 @@ aux
 AUX
 prn
 PRN
+
+# Wizard Mode per-case metadata
+**/.icharlotte/

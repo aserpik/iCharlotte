@@ -2,7 +2,7 @@
 
 This is a placeholder for the per-task settings UI; real per-task
 settings are defined in follow-up specs. For now it shows:
-  - The list of selected input files (with a Remove button per row).
+  - The list of selected input files with Add Files... / Remove buttons.
   - A 'Settings for <task title> — to be defined' label.
   - A Proceed button bottom-right.
 """
@@ -11,6 +11,7 @@ from typing import List
 
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
+    QFileDialog,
     QHBoxLayout,
     QLabel,
     QListWidget,
@@ -28,10 +29,17 @@ class SettingsPage(QWidget):
 
     proceed_requested = Signal(dict)  # settings dict (placeholder)
 
-    def __init__(self, spec: TaskSpec, files: List[str], parent: QWidget | None = None):
+    def __init__(
+        self,
+        spec: TaskSpec,
+        files: List[str],
+        case_root: str | None = None,
+        parent: QWidget | None = None,
+    ):
         super().__init__(parent)
         self._spec = spec
         self._files: List[str] = list(files)
+        self._case_root: str | None = case_root
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(24, 24, 24, 24)
@@ -43,8 +51,22 @@ class SettingsPage(QWidget):
         outer.addWidget(files_label)
         self.files_label = files_label
 
+        # Add Files... / Remove button row
+        file_btn_row = QHBoxLayout()
+        self.add_files_btn = QPushButton("Add Files...")
+        self.add_files_btn.clicked.connect(self._on_add_files)
+        file_btn_row.addWidget(self.add_files_btn)
+        self.remove_btn = QPushButton("Remove")
+        self.remove_btn.setEnabled(False)
+        self.remove_btn.clicked.connect(self._on_remove_files)
+        file_btn_row.addWidget(self.remove_btn)
+        file_btn_row.addStretch()
+        outer.addLayout(file_btn_row)
+
         self.files_list = QListWidget()
         self.files_list.setMaximumHeight(150)
+        self.files_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
+        self.files_list.itemSelectionChanged.connect(self._on_selection_changed)
         self._refresh_files_list()
         outer.addWidget(self.files_list)
 
@@ -87,6 +109,26 @@ class SettingsPage(QWidget):
         if not hasattr(self, "proceed_btn"):
             return
         self.proceed_btn.setEnabled(len(self._files) > 0)
+
+    def _on_selection_changed(self) -> None:
+        self.remove_btn.setEnabled(len(self.files_list.selectedItems()) > 0)
+
+    def _on_add_files(self) -> None:
+        start_dir = self._case_root or ""
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Add files", start_dir, "All files (*.*)"
+        )
+        existing = set(self._files)
+        for p in paths:
+            if p not in existing:
+                self._files.append(p)
+                existing.add(p)
+        self._refresh_files_list()
+
+    def _on_remove_files(self) -> None:
+        selected_rows = {idx.row() for idx in self.files_list.selectedIndexes()}
+        self._files = [p for i, p in enumerate(self._files) if i not in selected_rows]
+        self._refresh_files_list()
 
     def _on_proceed(self) -> None:
         self.proceed_requested.emit(self.to_dict())

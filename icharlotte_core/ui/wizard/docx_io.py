@@ -7,15 +7,10 @@ or HTML <hN>), bold, italic, underline, and bullet/numbered lists. Tables,
 images, and other complex structures may render approximately and may
 be dropped on save (see spec known limitations).
 """
-import re
-
 import mammoth
 from docx import Document
 from docx.shared import Pt
 from PySide6.QtGui import QTextDocument, QTextBlock, QTextCharFormat, QTextBlockFormat
-
-
-_HEADING_STYLE_RE = re.compile(r"^heading\s+(\d+)$", re.IGNORECASE)
 
 
 def load_docx_as_html(path: str) -> str:
@@ -49,19 +44,8 @@ def save_qtextdocument_as_docx(qdoc: QTextDocument, out_path: str) -> None:
 
 
 def _detect_heading_level(block: QTextBlock) -> int | None:
-    """Detect heading level from QTextBlockFormat properties (set by setHtml on <hN>)."""
+    """Detect heading level from QTextBlockFormat.headingLevel() (Qt 6)."""
     fmt: QTextBlockFormat = block.blockFormat()
-    style_name = fmt.property(QTextBlockFormat.UserProperty + 1)  # may be None
-    if isinstance(style_name, str):
-        m = _HEADING_STYLE_RE.match(style_name)
-        if m:
-            try:
-                lvl = int(m.group(1))
-                return max(1, min(9, lvl))
-            except ValueError:
-                return None
-    # Fall back to heading-detection by paragraph format heading level
-    # (Qt 6 has `headingLevel()` on QTextBlockFormat).
     if hasattr(fmt, "headingLevel"):
         lvl = fmt.headingLevel()
         if lvl and lvl > 0:
