@@ -443,6 +443,10 @@ class MainWindow(QMainWindow):
         self.mode_controller = ModeController(parent=self)
         self.setup_ui()
 
+        # Apply current mode and react to future mode changes.
+        self.mode_controller.mode_changed.connect(self._apply_mode_visibility)
+        self._apply_mode_visibility(self.mode_controller.mode)
+
         # Restore tab if specified
         if initial_tab is not None and 0 <= initial_tab < self.tabs.count():
             self.tabs.setCurrentIndex(initial_tab)
@@ -973,6 +977,38 @@ class MainWindow(QMainWindow):
         QApplication.instance().installEventFilter(self._zoom_filter)
 
         checkpoint("setup_ui complete - all tabs created")
+
+    # --- Wizard Mode: tab visibility orchestration ---
+
+    # Names of tabs to HIDE when in Wizard Mode.
+    # Master List is always visible. The Wizard tab and any task tabs are
+    # added/managed separately in Phase 2+.
+    _WIZARD_HIDDEN_TABS = {
+        "Case View",
+        "Status",
+        "Index",
+        "Chat",
+        "Email",
+        "Email Update",
+        "Depositions",
+        "Discovery",
+        "Liability & Exposure",
+        "Templates / Resources",
+        "Logs",
+    }
+
+    def _apply_mode_visibility(self, mode: str) -> None:
+        """Show/hide tabs based on current mode."""
+        is_wizard = (mode == "wizard")
+        for i in range(self.tabs.count()):
+            tab_text = self.tabs.tabText(i)
+            if tab_text in self._WIZARD_HIDDEN_TABS:
+                self.tabs.setTabVisible(i, not is_wizard)
+            # Master List (and future Wizard tab + task tabs) stay visible
+            # in both modes; they're handled by their own logic.
+        # If the current tab just got hidden, fall back to Master List.
+        if not self.tabs.isTabVisible(self.tabs.currentIndex()):
+            self.tabs.setCurrentIndex(0)
 
     def setup_view_menu(self):
         self.view_btn = QToolButton()
