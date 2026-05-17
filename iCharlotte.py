@@ -460,6 +460,14 @@ class MainWindow(QMainWindow):
                 self._restore_task_tabs_for_case()
             except Exception as e:
                 log_event(f"[wizard] startup restore failed: {e}")
+            # Refresh Wizard tab's Recent Tasks list for the startup case.
+            if hasattr(self, "wizard_tab") and self.wizard_tab is not None:
+                from icharlotte_core.ui.wizard.persistence import WizardStatePersistence
+                try:
+                    p = WizardStatePersistence(self.case_path)
+                    self.wizard_tab.refresh_recent_tasks(p.get_recent_tasks())
+                except Exception as e:
+                    log_event(f"[wizard] startup refresh recent_tasks failed: {e}")
 
         # Register global hotkeys (Win+F for Open File, Win+C for Change File)
         self._setup_global_hotkeys()
@@ -618,6 +626,7 @@ class MainWindow(QMainWindow):
         self.wizard_tab = WizardTab(self)
         self.tabs.addTab(self.wizard_tab, "Wizard")
         self.wizard_tab.task_requested.connect(self._open_task_tab)
+        self.wizard_tab.reopen_requested.connect(self._on_reopen_recent_task)
 
         # --- Tab 2: Case View ---
         case_view_widget = QWidget()
@@ -1107,6 +1116,58 @@ class MainWindow(QMainWindow):
         if hasattr(self, "wizard_tab") and self.wizard_tab is not None:
             if hasattr(self.wizard_tab, "refresh_recent_tasks"):
                 self.wizard_tab.refresh_recent_tasks(p.get_recent_tasks())
+
+    def _on_reopen_recent_task(self, entry: dict) -> None:
+        from icharlotte_core.ui.wizard.registry import get_task, TASK_REGISTRY
+        from icharlotte_core.ui.wizard.task_tab import TaskTab, PAGE_OUTPUT, PAGE_SETTINGS
+        from icharlotte_core.ui.wizard.instance_naming import next_instance_suffix
+
+        task_id = entry.get("task_id")
+        if task_id not in TASK_REGISTRY:
+            QMessageBox.warning(self, "Unknown task", f"This case references an unknown task: {task_id!r}")
+            return
+        spec = get_task(task_id)
+
+        out_rel = entry.get("output_path") or ""
+        out_abs = os.path.join(self.case_path, out_rel) if out_rel and self.case_path else out_rel
+        files = [
+            os.path.join(self.case_path, f) if self.case_path and not os.path.isabs(f) else f
+            for f in entry.get("files", [])
+        ]
+
+        existing_titles = [self.tabs.tabText(i) for i in range(self.tabs.count())]
+        suffix = next_instance_suffix(spec.title, existing_titles)
+        title = f"{spec.title} {suffix}".strip()
+
+        task_tab = TaskTab(
+            spec=spec,
+            files=files,
+            case_path=self.case_path,
+            file_number=self.file_number,
+            parent=self,
+        )
+        task_tab.setProperty("wizard_task_id", spec.task_id)
+        task_tab.setProperty("wizard_instance_suffix", suffix)
+        try:
+            task_tab.settings_page.from_dict(entry.get("settings") or {})
+        except Exception:
+            pass
+        new_index = self.tabs.addTab(task_tab, title)
+        task_tab.task_completed.connect(self._on_task_completed)
+
+        if out_abs and os.path.exists(out_abs):
+            task_tab.output_page.load_output(out_abs)
+            task_tab.setCurrentIndex(PAGE_OUTPUT)
+        else:
+            QMessageBox.information(
+                self,
+                "Output missing",
+                f"The saved output file no longer exists.\nYou can re-run with the saved settings.",
+            )
+            task_tab.setCurrentIndex(PAGE_SETTINGS)
+
+        self.tabs.setCurrentIndex(new_index)
+        self._hide_fixed_close_buttons()
 
     def _restore_task_tabs_for_case(self) -> None:
         if not self.case_path:
@@ -1664,6 +1725,15 @@ class MainWindow(QMainWindow):
             self._restore_task_tabs_for_case()
         except Exception as e:
             log_event(f"[wizard] restore failed: {e}")
+
+        # Refresh Wizard tab's Recent Tasks list for the new case.
+        if hasattr(self, "wizard_tab") and self.wizard_tab is not None:
+            from icharlotte_core.ui.wizard.persistence import WizardStatePersistence
+            try:
+                p = WizardStatePersistence(self.case_path)
+                self.wizard_tab.refresh_recent_tasks(p.get_recent_tasks())
+            except Exception as e:
+                log_event(f"[wizard] refresh recent_tasks failed: {e}")
 
         log_event(f"Switched to case {self.file_number}")
 
