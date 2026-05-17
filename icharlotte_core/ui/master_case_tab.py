@@ -17,6 +17,8 @@ from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.utils import log_event, get_case_path, BASE_PATH_WIN, parse_hearing_data
 from icharlotte_core.sent_items_monitor import SentItemsMonitorWorker
 from icharlotte_core.docket_refresh_worker import DocketRefreshWorker
+from icharlotte_core.ui.wizard.mode_toggle import ModeToggle
+from icharlotte_core.ui.wizard.mode_controller import ModeController
 
 
 class CalendarDialog(QDialog):
@@ -387,9 +389,10 @@ class TodoItemWidget(QWidget):
 
 
 class MasterCaseTab(QWidget):
-    def __init__(self, main_window=None):
+    def __init__(self, main_window=None, mode_controller: ModeController | None = None):
         super().__init__()
         self.main_window = main_window
+        self.mode_controller = mode_controller
         self.db = MasterCaseDatabase()
 
         self.save_timer = QTimer()
@@ -428,6 +431,12 @@ class MasterCaseTab(QWidget):
         self.scan_btn = QPushButton("Scan Outlook for Cases")
         self.scan_btn.clicked.connect(self.start_scan)
         top_bar.addWidget(self.scan_btn)
+
+        # Mode toggle — right-aligned in the header row.
+        if self.mode_controller is not None:
+            self.mode_toggle = ModeToggle(self.mode_controller, parent=self)
+            top_bar.addStretch()
+            top_bar.addWidget(self.mode_toggle)
 
         main_layout.addLayout(top_bar)
 

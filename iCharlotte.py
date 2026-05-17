@@ -438,6 +438,9 @@ class MainWindow(QMainWindow):
         self._icon_cache = {}
         self._folder_icon = self.icon_provider.icon(QFileIconProvider.IconType.Folder)
         self._file_icon = self.icon_provider.icon(QFileIconProvider.IconType.File)
+        # Wizard mode controller (global Advanced/Wizard toggle).
+        from icharlotte_core.ui.wizard.mode_controller import ModeController
+        self.mode_controller = ModeController(parent=self)
         self.setup_ui()
 
         # Restore tab if specified
@@ -594,7 +597,7 @@ class MainWindow(QMainWindow):
 
         # --- Tab 0: Master List ---
         checkpoint("Creating MasterCaseTab")
-        self.master_tab = MasterCaseTab(self)
+        self.master_tab = MasterCaseTab(self, mode_controller=self.mode_controller)
         self.tabs.addTab(self.master_tab, "Master List")
 
         # --- Tab 1: Case View ---
