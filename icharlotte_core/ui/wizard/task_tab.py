@@ -1,12 +1,11 @@
 """TaskTab — QStackedWidget orchestrating Settings → Status → Output for one task.
 
-Phase 4 ships with a 'fake worker' that just sleeps and emits a synthetic
-output path. Phase 5 replaces that with real subprocess-based runners.
+Phase 5 wires in the real SubprocessWorker (replaces Phase 4 fake worker).
 """
 from typing import List
 
-from PySide6.QtCore import QTimer, Signal
-from PySide6.QtWidgets import QStackedWidget
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QStackedWidget, QWidget
 
 from icharlotte_core.ui.wizard.pages.settings_page import SettingsPage
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
@@ -25,14 +24,18 @@ class TaskTab(QStackedWidget):
     def __init__(
         self,
         spec,
-        files=None,
-        parent=None,
+        files: List[str] | None = None,
+        case_path: str = "",
+        file_number: str = "",
+        parent: QWidget | None = None,
     ):
         super().__init__(parent)
         self._spec = spec
         self._files: List[str] = list(files) if files else []
+        self._case_path = case_path
+        self._file_number = file_number
         self._worker = None
-        self._fake_worker_delay_ms = 2000  # Phase 4 fake-run duration
+        self._worker_thread = None  # reserved if we move to QThread later
 
         self.settings_page = SettingsPage(spec, files=self._files)
         self.status_page = StatusPage()
@@ -65,11 +68,10 @@ class TaskTab(QStackedWidget):
         self._start_run(settings_dict)
 
     def _on_cancel(self) -> None:
-        if self._worker is not None and hasattr(self._worker, "cancel"):
+        if self._worker is not None:
             self._worker.cancel()
-        # Phase 4 fake worker has no cancel — just snap back to Settings.
-        self._worker = None
-        self.setCurrentIndex(PAGE_SETTINGS)
+        else:
+            self.setCurrentIndex(PAGE_SETTINGS)
 
     def _on_edit_settings(self) -> None:
         self.setCurrentIndex(PAGE_SETTINGS)
@@ -81,15 +83,42 @@ class TaskTab(QStackedWidget):
         self.output_page.load_output(output_path)
         self.setCurrentIndex(PAGE_OUTPUT)
 
-    # ---- Worker (Phase 4 fake) ----
+    # ---- Worker (Phase 5 real subprocess) ----
 
     def _start_run(self, settings_dict: dict) -> None:
-        self.status_page.on_status(f"Running {self._spec.title}…")
-        self.status_page.on_status(f"Inputs: {len(self._files)} file(s)")
-        # Phase 4 fake: after a short delay, "finish" with a stub path.
-        delay = max(0, self._fake_worker_delay_ms)
-        if self._files:
-            stub_output = self._files[0]  # not a real .docx; replaced in Phase 5
-        else:
-            stub_output = ""
-        QTimer.singleShot(delay, lambda: self._show_output(stub_output))
+        from .runners.subprocess_worker import SubprocessWorker
+
+        self.status_page.on_status(f"Starting {self._spec.title}…")
+        self._worker = SubprocessWorker(
+            script_name=self._spec.script_name,
+            case_path=self._case_path,
+            file_number=self._file_number,
+            files=self._files,
+            settings=settings_dict,
+            parent=self,
+        )
+        self._worker.status.connect(self.status_page.on_status)
+        self._worker.progress.connect(self.status_page.on_progress)
+        self._worker.finished.connect(self._on_worker_finished)
+        self._worker.failed.connect(self._on_worker_failed)
+        self._worker.cancelled.connect(self._on_worker_cancelled)
+        self._worker.start()
+
+    def _on_worker_finished(self, output_path: str) -> None:
+        self._worker = None
+        self._show_output(output_path)
+
+    def _on_worker_failed(self, err: str) -> None:
+        self._worker = None
+        self.status_page.on_status(f"FAILED: {err}")
+        self.status_page.cancel_btn.setText("Back to Settings")
+        self.status_page.cancel_btn.setEnabled(True)
+        try:
+            self.status_page.cancel_btn.clicked.disconnect()
+        except RuntimeError:
+            pass
+        self.status_page.cancel_btn.clicked.connect(lambda: self.setCurrentIndex(PAGE_SETTINGS))
+
+    def _on_worker_cancelled(self) -> None:
+        self._worker = None
+        self.setCurrentIndex(PAGE_SETTINGS)

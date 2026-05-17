@@ -1181,7 +1181,13 @@ class MainWindow(QMainWindow):
         suffix = next_instance_suffix(spec.title, existing_titles)
         title = f"{spec.title} {suffix}".strip()
 
-        task_tab = TaskTab(spec=spec, files=files, parent=self)
+        task_tab = TaskTab(
+            spec=spec,
+            files=files,
+            case_path=self.case_path,
+            file_number=self.file_number,
+            parent=self,
+        )
         task_tab.setProperty("wizard_task_id", spec.task_id)
         task_tab.setProperty("wizard_instance_suffix", suffix)
         new_index = self.tabs.addTab(task_tab, title)
