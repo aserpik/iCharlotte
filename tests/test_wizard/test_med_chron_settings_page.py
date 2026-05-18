@@ -126,3 +126,44 @@ def test_commit_flips_phase_to_ready_to_run(qtbot, tmp_path):
     data = session_manager.read_session(session_path)
     assert data["phase"] == "ready_to_run"
     assert data["user_config"]["selected_catalog_ids"] == ["rewrite_chronology"]
+
+
+def test_settings_page_proceed_disabled_until_phase1_completes(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.med_chron_settings_page import MedChronSettingsPage
+    from icharlotte_core.ui.wizard.registry import TaskSpec
+
+    spec = TaskSpec(
+        task_id="med_chron_analysis",
+        title="Med Chron Analysis",
+        description="…",
+        icon_glyph="🩺",
+        script_name="med_chron.py",
+    )
+    page = MedChronSettingsPage(spec, files=[str(tmp_path / "rec.docx")])
+    qtbot.addWidget(page)
+    assert page.proceed_btn.isEnabled() is False
+
+
+def test_settings_page_swaps_to_form_on_awaiting_input(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.med_chron_settings_page import MedChronSettingsPage
+    from icharlotte_core.ui.wizard.registry import TaskSpec
+
+    spec = TaskSpec(
+        task_id="med_chron_analysis",
+        title="Med Chron Analysis",
+        description="…",
+        icon_glyph="🩺",
+        script_name="med_chron.py",
+    )
+    page = MedChronSettingsPage(spec, files=[str(tmp_path / "rec.docx")])
+    qtbot.addWidget(page)
+
+    # Build a valid session for the form to read (use _write_session helper from earlier in the file).
+    session_path = _write_session(tmp_path)
+
+    # Simulate Phase 1 completion.
+    page._on_phase1_complete(str(session_path))
+
+    assert page._stack.currentIndex() == 1   # form page
+    assert page.proceed_btn.isEnabled() is True
+    assert page._form is not None
