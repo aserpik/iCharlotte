@@ -708,14 +708,20 @@ def process_legacy(input_path: str, *, output_dir_override: str | None = None) -
     ``med_chron_<safe_filename>.docx`` so external callers keep working.
     """
     if os.path.isdir(input_path):
+        script_path = os.path.abspath(__file__)
+        files_to_process = []
         for root, _, files in os.walk(input_path):
             for file in files:
                 if file.lower().endswith(('.pdf', '.docx')) and "med_chron" not in file.lower():
-                    try:
-                        subprocess.run([sys.executable, sys.argv[0], os.path.join(root, file)],
-                                       check=True)
-                    except subprocess.CalledProcessError as e:
-                        log_event(f"Subprocess failed for {file}: {e}", level="error")
+                    files_to_process.append(os.path.join(root, file))
+        if not files_to_process:
+            log_event("No suitable files found in directory.", level="warning")
+            return 0
+        for file_path in files_to_process:
+            try:
+                subprocess.run([sys.executable, script_path, file_path], check=True)
+            except subprocess.CalledProcessError as e:
+                log_event(f"Subprocess failed for {file_path}: {e}", level="error")
         return 0
 
     raw_text = extract_text(input_path)
