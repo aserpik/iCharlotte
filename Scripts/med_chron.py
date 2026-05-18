@@ -5,6 +5,7 @@ import datetime
 import re
 import subprocess
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from google import genai
 import gc
 from docx import Document
@@ -527,6 +528,224 @@ def process_prep(input_path: str, output_dir: str) -> int:
     )
     print(f"AWAITING_INPUT:{paths.session_path}", flush=True)
     return 0
+
+
+# =============================================================================
+# Phase 2: Run selected analyses
+# =============================================================================
+
+from dataclasses import dataclass
+from icharlotte_core.llm_config import LLMCaller
+
+
+def _slug(value: str) -> str:
+    """Lowercase + sanitize for use in filenames/run ids."""
+    cleaned = re.sub(r"[^a-zA-Z0-9_\-]+", "_", value or "")
+    return cleaned.strip("_").lower()
+
+
+def _safe_basename(input_path: str) -> str:
+    base = os.path.splitext(os.path.basename(input_path))[0]
+    return _slug(base)
+
+
+@dataclass
+class RunSpec:
+    id: str
+    title: str
+    prompt_text: str
+    input_text: str
+    output_path: str
+
+
+@dataclass
+class RunResult:
+    spec: RunSpec
+    success: bool
+    error: str = ""
+    output_chars: int = 0
+
+
+def _build_run_list(session: dict, narrative: str, full: str,
+                    safe_basename: str, output_dir: str) -> list[RunSpec]:
+    """Translate user_config + catalog into concrete RunSpec instances."""
+    scripts_dir = os.path.dirname(os.path.abspath(__file__))
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    from MED_CHRON_ANALYSES.catalog import CATALOG_BY_ID, load_prompt
+
+    cfg = session["user_config"]
+    runs: list[RunSpec] = []
+
+    for cat_id in cfg.get("selected_catalog_ids", []):
+        if cat_id not in CATALOG_BY_ID:
+            log_event(f"Skipping unknown catalog id: {cat_id}", level="warning")
+            continue
+        d = CATALOG_BY_ID[cat_id]
+        runs.append(RunSpec(
+            id=cat_id,
+            title=d.title,
+            prompt_text=load_prompt(d.prompt_file),
+            input_text=narrative if not d.uses_tables else full,
+            output_path=os.path.join(
+                output_dir, f"med_chron_{cat_id}_{safe_basename}.docx"
+            ),
+        ))
+
+    wrapper = None
+    for i, c in enumerate(cfg.get("custom_analyses", []), 1):
+        if wrapper is None:
+            wrapper = load_prompt("_custom_wrapper.txt")
+        label_slug = _slug(c["label"])
+        runs.append(RunSpec(
+            id=f"custom_{i}_{label_slug}",
+            title=c["label"],
+            prompt_text=wrapper.replace("{user_instruction}", c["instruction"]),
+            input_text=full,
+            output_path=os.path.join(
+                output_dir, f"med_chron_custom_{i}_{label_slug}_{safe_basename}.docx"
+            ),
+        ))
+
+    return runs
+
+
+def _drop_rewrite_if_narrative_missing(runs: list[RunSpec], narrative: str) -> list[RunSpec]:
+    if narrative.strip():
+        return runs
+    kept = []
+    for r in runs:
+        if r.id == "rewrite_chronology":
+            log_event(
+                "Skipping Rewrite Chronology — no pre/post-injury synopsis "
+                "headings found in this document.",
+                level="warning",
+            )
+            continue
+        kept.append(r)
+    return kept
+
+
+def _run_one_analysis(spec: RunSpec, llm_caller: LLMCaller,
+                       provider_name: str) -> RunResult:
+    """Execute a single analysis. Caller MUST NOT let exceptions escape."""
+    try:
+        log_event(f"[{spec.id}] starting LLM call ({len(spec.input_text)} chars)")
+        result = llm_caller.call(
+            prompt=spec.prompt_text,
+            text=spec.input_text,
+            task_type="summary",
+        )
+        if not result:
+            return RunResult(spec=spec, success=False, error="LLM returned empty result")
+
+        os.makedirs(os.path.dirname(spec.output_path), exist_ok=True)
+        save_to_docx_at_path(result, spec.output_path, provider_name, spec.title)
+        log_event(f"[{spec.id}] done: {len(result)} chars → {spec.output_path}")
+        return RunResult(spec=spec, success=True, output_chars=len(result))
+    except Exception as e:
+        log_event(f"[{spec.id}] failed: {e}", level="error")
+        return RunResult(spec=spec, success=False, error=str(e))
+
+
+def save_to_docx_at_path(content: str, output_path: str,
+                         provider_name: str, analysis_title: str) -> None:
+    """Write content to output_path with the existing Med-Cron styling.
+
+    If the destination is locked (e.g., open in Word), auto-version up to
+    10 attempts: ``out.docx`` -> ``out v.2.docx`` -> ``out v.3.docx``.
+    """
+    from docx import Document
+    from docx.shared import Pt
+
+    base, ext = os.path.splitext(output_path)
+    attempt = 1
+    last_err = None
+    while attempt <= 10:
+        candidate = output_path if attempt == 1 else f"{base} v.{attempt}{ext}"
+        try:
+            doc = Document()
+            style = doc.styles['Normal']
+            style.font.name = 'Times New Roman'
+            style.font.size = Pt(12)
+            style.paragraph_format.line_spacing = 1.0
+
+            p = doc.add_paragraph()
+            run = p.add_run(f"{analysis_title} — {provider_name}")
+            run.bold = True
+            run.underline = True
+            run.font.name = 'Times New Roman'
+            run.font.size = Pt(12)
+
+            doc.add_paragraph(f"Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            add_markdown_to_doc(doc, content)
+            doc.save(candidate)
+            return
+        except (PermissionError, IOError) as e:
+            last_err = e
+            attempt += 1
+    raise RuntimeError(f"Could not save after {attempt - 1} attempts: {last_err}")
+
+
+def process_run(session_path: str, output_dir: str) -> int:
+    """Phase 2: load session, fan out analyses in parallel, write docx each.
+
+    Returns 0 if at least one analysis succeeded, 1 if all failed or the
+    session is malformed.
+    """
+    from icharlotte_core.med_chron import session_manager
+
+    try:
+        session = session_manager.read_session(session_path)
+    except Exception as e:
+        log_event(f"Could not load session at {session_path}: {e}", level="error")
+        return 1
+
+    if session.get("phase") != "ready_to_run":
+        log_event(
+            f"Session phase is {session.get('phase')!r}; expected ready_to_run",
+            level="error",
+        )
+        return 1
+
+    narrative = Path(session["narrative_text_path"]).read_text(encoding="utf-8")
+    full = Path(session["full_text_path"]).read_text(encoding="utf-8")
+    safe_basename = _safe_basename(session["input_path"])
+
+    runs = _build_run_list(session, narrative, full, safe_basename, output_dir)
+    runs = _drop_rewrite_if_narrative_missing(runs, narrative)
+
+    if not runs:
+        log_event("No runs scheduled (after skip rules). Nothing to do.", level="warning")
+        return 1
+
+    llm_caller = LLMCaller()
+    provider_name = session.get("provider_name") or "Unknown Provider"
+
+    successes = 0
+    failures = 0
+    total = len(runs)
+
+    log_event(f"Starting {total} analyses (max 4 concurrent)")
+    with ThreadPoolExecutor(max_workers=min(total, 4)) as ex:
+        futures = {
+            ex.submit(_run_one_analysis, r, llm_caller, provider_name): r
+            for r in runs
+        }
+        done = 0
+        for f in as_completed(futures):
+            result = f.result()
+            done += 1
+            if result.success:
+                successes += 1
+            else:
+                failures += 1
+            pct = int(20 + (done * 70 / total))
+            print(f"PROGRESS:{pct}:{done}/{total} done ({failures} failed)", flush=True)
+
+    log_event(f"Phase 2 complete: {successes}/{total} succeeded, {failures} failed")
+    print(f"PROGRESS:100:{successes}/{total} analyses complete ({failures} failed)", flush=True)
+    return 0 if successes > 0 else 1
 
 
 def main():
