@@ -51,12 +51,20 @@ class SubprocessWorker(BaseWorker):
         file_number: str,
         files: List[str],
         settings: dict,
+        phase1_args: List[str] | None = None,
+        phase2_flag: str = "--phase=summary",
         parent=None,
     ):
         super().__init__(case_path, file_number, files, settings, parent)
         self._script_name = script_name
+        self._phase1_args = list(phase1_args or [])
+        self._phase2_flag = phase2_flag
         self._process: Optional[QProcess] = None
-        self._pre_existing_outputs: set = set()
+        # Map of path -> mtime captured BEFORE each run. A run "produced" a docx
+        # if its mtime advanced (overwrite/append) or the path didn't exist
+        # in the snapshot (new file). Path-only diff misses append-in-place,
+        # which is the default behavior of summarize.py / summarize_deposition.py.
+        self._pre_existing_outputs: dict = {}
         self._stdout_buf = bytearray()
         self._file_idx: int = 0
         self._awaiting_session_path: Optional[str] = None
@@ -76,7 +84,8 @@ class SubprocessWorker(BaseWorker):
         self._pre_existing_outputs = self._scan_outputs()
         self._awaiting_session_path = None
         self._stdout_buf = bytearray()
-        self._launch_process([self._script_path(), file_path])
+        argv = [self._script_path()] + self._phase1_args + [file_path]
+        self._launch_process(argv)
 
     def _launch_process(self, extra_argv: List[str]) -> None:
         """Create and start a QProcess with `python -u <extra_argv>`."""
@@ -127,12 +136,12 @@ class SubprocessWorker(BaseWorker):
     # ---- Phase 2 resume (deposition two-phase flow) ----
 
     def resume_with_config(self, session_path: str) -> None:
-        """Start Phase 2: `python -u <script> --phase=summary <session_path>`."""
+        """Start Phase 2 with the configured phase2_flag."""
         self._awaiting_session_path = None
         self._stdout_buf = bytearray()
         # Refresh snapshot so we detect the Phase 2 .docx.
         self._pre_existing_outputs = self._scan_outputs()
-        self._launch_process([self._script_path(), "--phase=summary", session_path])
+        self._launch_process([self._script_path(), self._phase2_flag, session_path])
 
     # ---- Stdout / events ----
 
@@ -197,16 +206,28 @@ class SubprocessWorker(BaseWorker):
             self.awaiting_input.emit(self._awaiting_session_path)
             return  # do NOT scan for .docx; do NOT advance to next file
 
-        # --- Normal completion: look for new .docx ---
-        new_outputs = self._scan_outputs() - self._pre_existing_outputs
-        if not new_outputs:
-            self.failed.emit("Agent reported success but no new .docx appeared in NOTES/AI Output/.")
+        # --- Normal completion: detect produced .docx by mtime ---
+        # A path counts as "produced" if it didn't exist in the pre-run snapshot
+        # OR its mtime advanced during the run (covers append-in-place).
+        current = self._scan_outputs()
+        candidates = [
+            (path, mtime)
+            for path, mtime in current.items()
+            if path not in self._pre_existing_outputs
+            or mtime > self._pre_existing_outputs[path]
+        ]
+        if not candidates:
+            self.failed.emit(
+                "Agent reported success but no .docx in NOTES/AI Output/ was created or updated."
+            )
             return
 
-        newest = max(new_outputs, key=lambda p: os.path.getmtime(p))
-        # Track the globally newest output across all file runs.
-        if self._newest_output is None or os.path.getmtime(newest) > os.path.getmtime(self._newest_output):
-            self._newest_output = newest
+        newest_path, newest_mtime = max(candidates, key=lambda t: t[1])
+        if (
+            self._newest_output is None
+            or newest_mtime > os.path.getmtime(self._newest_output)
+        ):
+            self._newest_output = newest_path
 
         # Advance to the next file, or finish.
         self._advance()
@@ -229,12 +250,18 @@ class SubprocessWorker(BaseWorker):
 
     # ---- Output discovery ----
 
-    def _scan_outputs(self) -> set:
+    def _scan_outputs(self) -> dict:
+        """Return {path: mtime} for every .docx currently in NOTES/AI Output/."""
         out_dir = os.path.join(self.case_path, _AI_OUTPUT_SUBPATH)
         if not os.path.isdir(out_dir):
-            return set()
-        results: set = set()
+            return {}
+        results: dict = {}
         for name in os.listdir(out_dir):
-            if name.lower().endswith(".docx"):
-                results.add(os.path.join(out_dir, name))
+            if not name.lower().endswith(".docx"):
+                continue
+            path = os.path.join(out_dir, name)
+            try:
+                results[path] = os.path.getmtime(path)
+            except OSError:
+                pass
         return results

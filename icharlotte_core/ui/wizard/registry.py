@@ -33,6 +33,8 @@ class TaskSpec:
     icon_glyph: str
     script_name: str
     default_folders: List[str] = field(default_factory=list)
+    phase1_args: List[str] = field(default_factory=list)
+    phase2_flag: str = "--phase=summary"
     # None means "use default SettingsPage"; resolved lazily in TaskTab.
     # Set to a factory callable that returns the class to avoid circular imports.
     _settings_page_cls_factory: Optional[object] = field(default=None, repr=False, compare=False)
@@ -78,6 +80,30 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         icon_glyph="\U0001F3E5",  # 🏥
         script_name="med_record.py",
         default_folders=["RECORDS"],
+    ),
+    "med_record_extractor": TaskSpec(
+        task_id="med_record_extractor",
+        title="Med Record Extractor",
+        description="Pull pages from medical record PDFs based on pasted chronology entries.",
+        icon_glyph="\U0001F4D1",  # 📑
+        script_name="",  # in-process QThread worker
+        default_folders=[],
+    ),
+    "subpoena_tracker": TaskSpec(
+        task_id="subpoena_tracker",
+        title="Subpoena Tracker",
+        description="Cross-reference issued subpoenas with received records and chronologies.",
+        icon_glyph="\U0001F4DC",  # 📜
+        script_name="",  # in-process QThread worker
+        default_folders=[],
+    ),
+    "chat": TaskSpec(
+        task_id="chat",
+        title="Chat",
+        description="Open an AI chat session for this case.",
+        icon_glyph="\U0001F4AC",  # 💬
+        script_name="",  # no script — opens an interactive ChatTab
+        default_folders=[],
     ),
 }
 

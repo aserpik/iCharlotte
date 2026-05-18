@@ -108,6 +108,8 @@ class TaskTab(QStackedWidget):
             file_number=self._file_number,
             files=self._files,
             settings={},
+            phase1_args=list(self._spec.phase1_args),
+            phase2_flag=self._spec.phase2_flag,
             parent=self,
         )
 
@@ -126,10 +128,33 @@ class TaskTab(QStackedWidget):
         """Switch to the Status page and kick off Phase 2.
 
         Called via the phase2_requested signal emitted by DepositionSettingsPage
-        after the user commits their topic configuration.
+        after the user commits their topic configuration. Handles two cases:
+
+        - Initial speculative-run path: the worker started for Phase 1 is still
+          alive; we just connect status signals and call resume_with_config.
+        - Re-run path: _on_worker_finished cleared self._worker after the
+          previous Phase 2 completed, but the session directory and the
+          settings page's inline form are still intact. We build a fresh
+          SubprocessWorker that skips Phase 1 and resumes against the
+          existing session_path.
         """
         if self._worker is None:
-            return
+            from .runners.subprocess_worker import SubprocessWorker
+
+            self._worker = SubprocessWorker(
+                script_name=self._spec.script_name,
+                case_path=self._case_path,
+                file_number=self._file_number,
+                files=self._files,
+                settings={},
+                phase1_args=list(self._spec.phase1_args),
+                phase2_flag=self._spec.phase2_flag,
+                parent=self,
+            )
+            self._worker.finished.connect(self._on_worker_finished)
+            self._worker.failed.connect(self._on_worker_failed)
+            self._worker.cancelled.connect(self._on_worker_cancelled)
+
         self._settings_owns_worker = False
         self.status_page.reset()
         self.setCurrentIndex(PAGE_STATUS)
@@ -178,6 +203,8 @@ class TaskTab(QStackedWidget):
                 file_number=self._file_number,
                 files=self._files,
                 settings=settings_dict,
+                phase1_args=list(self._spec.phase1_args),
+                phase2_flag=self._spec.phase2_flag,
                 parent=self,
             )
 
@@ -188,7 +215,42 @@ class TaskTab(QStackedWidget):
         self._worker.finished.connect(self._on_worker_finished)
         self._worker.failed.connect(self._on_worker_failed)
         self._worker.cancelled.connect(self._on_worker_cancelled)
+        # Parallel runs stream per-file completions; the sequential worker
+        # doesn't have this signal, so guard with hasattr.
+        if hasattr(self._worker, "file_completed"):
+            self._worker.file_completed.connect(self._on_worker_file_completed)
+
+        self._total_files_for_run = len(self._files)
+        self._files_done_for_run = 0
+        self.output_page.set_progress_hint("")
         self._worker.start()
+
+    def _on_worker_file_completed(self, output_path: str) -> None:
+        """A single file's agent has finished in a parallel run.
+
+        On the first completion we transition to the Output page so the user
+        can start reviewing. Subsequent completions are appended to the
+        picker without disrupting the currently-viewed file. The inline
+        progress hint is updated to reflect how many are still running.
+        """
+        self._files_done_for_run += 1
+        remaining = max(0, self._total_files_for_run - self._files_done_for_run)
+
+        if self.currentIndex() != PAGE_OUTPUT:
+            # First file done — switch to Output page so the user can read it.
+            self.output_page.load_outputs([output_path])
+            self.setCurrentIndex(PAGE_OUTPUT)
+        else:
+            # Already viewing outputs; just grow the picker.
+            self.output_page.append_output(output_path)
+
+        if remaining > 0:
+            word = "file" if remaining == 1 else "files"
+            self.output_page.set_progress_hint(
+                f"Still processing {remaining} more {word}…"
+            )
+        else:
+            self.output_page.set_progress_hint("")
 
     def _on_worker_finished(self, output_path: str) -> None:
         from datetime import datetime
@@ -211,11 +273,23 @@ class TaskTab(QStackedWidget):
         }
         self.task_completed.emit(entry)
 
-        if len(all_output_paths) > 1:
-            self.output_page.load_outputs(all_output_paths)
-        else:
-            self.output_page.load_output(output_path)
-        self.setCurrentIndex(PAGE_OUTPUT)
+        # If the user has been viewing streamed outputs, the picker already
+        # has them; just make sure any late-arriving paths are present and
+        # the progress hint is cleared. Otherwise (sequential worker, or a
+        # parallel run that finished before the first file_completed could
+        # fire — shouldn't happen, but be defensive), do a full load.
+        currently_on_output = self.currentIndex() == PAGE_OUTPUT
+        existing = set(self.output_page.output_paths)
+        for p in all_output_paths:
+            if p not in existing:
+                self.output_page.append_output(p)
+        if not currently_on_output:
+            if len(all_output_paths) > 1:
+                self.output_page.load_outputs(all_output_paths)
+            else:
+                self.output_page.load_output(output_path)
+            self.setCurrentIndex(PAGE_OUTPUT)
+        self.output_page.set_progress_hint("")
 
     def _show_output(self, output_path: str) -> None:
         """Single-output convenience used by tests. Production code path is
@@ -227,6 +301,7 @@ class TaskTab(QStackedWidget):
         self._worker = None
         self._awaiting_session_path = None
         self._settings_owns_worker = False
+        self.output_page.set_progress_hint("")
         self.status_page.on_status(f"FAILED: {err}")
         self.status_page.cancel_btn.setText("Back to Settings")
         self.status_page.cancel_btn.setEnabled(True)
@@ -240,6 +315,7 @@ class TaskTab(QStackedWidget):
         self._worker = None
         self._awaiting_session_path = None
         self._settings_owns_worker = False
+        self.output_page.set_progress_hint("")
         self.setCurrentIndex(PAGE_SETTINGS)
 
     # ---- Two-phase deposition (legacy popup flow for Advanced Mode) ----
