@@ -51,7 +51,7 @@ def compute_session_paths(input_path: str, output_dir: str) -> SessionPaths:
     )
 
 
-def write_session(session_path, data: dict) -> None:
+def write_session(session_path: str | Path, data: dict) -> None:
     """Atomically write the session JSON via tmp file + os.replace."""
     session_path = Path(session_path)
     session_path.parent.mkdir(parents=True, exist_ok=True)
@@ -60,11 +60,12 @@ def write_session(session_path, data: dict) -> None:
     os.replace(tmp, session_path)
 
 
-def read_session(session_path) -> dict:
+def read_session(session_path: str | Path) -> dict:
+    """Read and return the session JSON. Raises FileNotFoundError if the file is absent."""
     return json.loads(Path(session_path).read_text(encoding="utf-8"))
 
 
-def update_user_config(session_path, user_config: dict) -> None:
+def update_user_config(session_path: str | Path, user_config: dict) -> None:
     """Load, set user_config, flip phase to 'ready_to_run', write atomically."""
     data = read_session(session_path)
     data["user_config"] = user_config

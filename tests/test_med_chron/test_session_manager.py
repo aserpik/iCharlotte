@@ -35,7 +35,7 @@ def test_hash_changes_when_mtime_changes(tmp_path):
 
     p1 = session_manager.compute_session_paths(str(inp), str(out_dir))
     # Force a different mtime
-    import os, time
+    import os
     new_time = inp.stat().st_mtime_ns + 1_000_000_000
     os.utime(inp, ns=(new_time, new_time))
     p2 = session_manager.compute_session_paths(str(inp), str(out_dir))
