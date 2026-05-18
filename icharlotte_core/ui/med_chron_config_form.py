@@ -7,6 +7,12 @@ Reads the Phase 1 session JSON, presents:
 
 On commit_user_config(), validates selection and writes user_config back
 to the session, flipping phase to ``ready_to_run``.
+
+Custom analyses persist globally: rows that the user fills in are saved
+to ``custom_analyses_store`` on every commit and pre-populated when the
+form is next opened. Each row has an "Include in this run" checkbox so
+the user can skip a saved analysis once without deleting it from the
+global store.
 """
 
 from pathlib import Path
@@ -17,11 +23,11 @@ from PySide6.QtWidgets import (
     QPushButton, QScrollArea, QVBoxLayout, QWidget,
 )
 
-from icharlotte_core.med_chron import session_manager
+from icharlotte_core.med_chron import custom_analyses_store, session_manager
 
 
 class CustomAnalysisRow(QWidget):
-    """One row in the custom-analyses list: label + instruction + remove btn."""
+    """One row in the custom-analyses list: include-checkbox + label + instruction + remove btn."""
 
     def __init__(self, parent: QWidget, on_remove):
         super().__init__(parent)
@@ -32,6 +38,10 @@ class CustomAnalysisRow(QWidget):
         layout.setSpacing(4)
 
         top = QHBoxLayout()
+        self.include_cb = QCheckBox()
+        self.include_cb.setChecked(True)
+        self.include_cb.setToolTip("Include this analysis in the current run")
+        top.addWidget(self.include_cb)
         top.addWidget(QLabel("Label:"))
         self.label_edit = QLineEdit()
         self.label_edit.setPlaceholderText("Short name (e.g. 'Left-knee mentions')")
@@ -39,6 +49,7 @@ class CustomAnalysisRow(QWidget):
         self.remove_btn = QPushButton("−")
         self.remove_btn.setFixedSize(24, 24)
         self.remove_btn.setStyleSheet("QPushButton { color: #c62828; font-weight: bold; }")
+        self.remove_btn.setToolTip("Remove this analysis (also deletes from global save)")
         self.remove_btn.clicked.connect(self._handle_remove)
         top.addWidget(self.remove_btn)
         layout.addLayout(top)
@@ -61,6 +72,9 @@ class CustomAnalysisRow(QWidget):
 
     def instruction(self) -> str:
         return self.instruction_edit.toPlainText().strip()
+
+    def is_included(self) -> bool:
+        return self.include_cb.isChecked()
 
     def is_empty(self) -> bool:
         return not self.label() and not self.instruction()
@@ -139,6 +153,13 @@ class MedChronConfigForm(QWidget):
 
         self.custom_rows: list[CustomAnalysisRow] = []
 
+        # Pre-populate previously-saved custom analyses so the user does
+        # not have to re-type recurring requests.
+        for saved in custom_analyses_store.load():
+            row = self.add_custom_row()
+            row.label_edit.setText(saved.get("label", ""))
+            row.instruction_edit.setPlainText(saved.get("instruction", ""))
+
         add_btn = QPushButton("+ Add custom analysis")
         add_btn.clicked.connect(self.add_custom_row)
         root.addWidget(add_btn)
@@ -167,46 +188,66 @@ class MedChronConfigForm(QWidget):
     def _selected_catalog_ids(self) -> list[str]:
         return [cid for cid, cb in self.catalog_checkboxes.items() if cb.isChecked()]
 
-    def _validated_custom_rows(self) -> tuple[list[dict], str]:
-        """Return (clean_rows, error_msg). Empty rows are silently dropped.
+    def _validated_custom_rows(self) -> tuple[list[dict], list[dict], str]:
+        """Return ``(all_valid_rows, included_rows, error_msg)``.
 
-        Partially-filled rows (one of label/instruction missing) are an error.
+        - ``all_valid_rows`` — every non-empty, fully-filled row. This is
+          what gets persisted to the global store so the user keeps them
+          for next time even if the include-checkbox is unchecked.
+        - ``included_rows`` — subset of ``all_valid_rows`` whose include
+          checkbox is checked. This is what actually runs in Phase 2.
+        - ``error_msg`` — non-empty if a row is partially filled.
         """
-        clean = []
+        all_valid: list[dict] = []
+        included: list[dict] = []
         for r in self.custom_rows:
             if r.is_empty():
                 continue
             lbl, instr = r.label(), r.instruction()
             if not lbl or not instr:
-                return [], (
+                return [], [], (
                     "Custom analyses need both a label and an instruction. "
                     "Fill in (or remove) the partially-completed row."
                 )
-            clean.append({"label": lbl, "instruction": instr})
-        return clean, ""
+            entry = {"label": lbl, "instruction": instr}
+            all_valid.append(entry)
+            if r.is_included():
+                included.append(entry)
+        return all_valid, included, ""
 
     def commit_user_config(self) -> bool:
-        """Validate and write user_config. Returns True on success."""
+        """Validate, persist saved analyses globally, and write user_config.
+
+        Returns True on success.
+        """
         self._error_label.setVisible(False)
 
         selected = self._selected_catalog_ids()
-        clean_custom, err = self._validated_custom_rows()
+        all_valid_custom, included_custom, err = self._validated_custom_rows()
         if err:
             self._error_label.setText(err)
             self._error_label.setVisible(True)
             return False
-        if not selected and not clean_custom:
+        if not selected and not included_custom:
             self._error_label.setText(
                 "Select at least one analysis, or add a custom analysis."
             )
             self._error_label.setVisible(True)
             return False
 
+        # Auto-save the full list of valid custom rows (including unchecked
+        # ones) to the global store so they reappear next time.
+        try:
+            custom_analyses_store.save(all_valid_custom)
+        except OSError:
+            # Persisting globally is best-effort; the run can still proceed.
+            pass
+
         session_manager.update_user_config(
             self.session_path,
             {
                 "selected_catalog_ids": selected,
-                "custom_analyses": clean_custom,
+                "custom_analyses": included_custom,
             },
         )
         return True
