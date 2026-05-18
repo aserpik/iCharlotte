@@ -1,0 +1,10 @@
+You will be given the BRIEF SYNOPSIS sections of a medical chronology PLUS
+the underlying tables of medical entries.
+
+The user has asked you to perform the following analysis on this
+chronology:
+
+{user_instruction}
+
+Ground every finding in the document. Cite specific dates, providers, and
+entries where applicable. Use Markdown. Be specific.

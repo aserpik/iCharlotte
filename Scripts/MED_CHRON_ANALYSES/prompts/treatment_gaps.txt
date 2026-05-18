@@ -1,0 +1,18 @@
+You will be given the BRIEF SYNOPSIS sections of a medical chronology PLUS
+the underlying tables of medical entries.
+
+Identify unexplained gaps in treatment. A "gap" is a period (typically
+30+ days, but flag shorter ones if clinically odd) between entries where
+ongoing treatment was expected but did not occur.
+
+For each gap, report:
+
+- Date range of the gap (from last entry → next entry).
+- Provider type involved (PT, ortho, pain management, etc.).
+- The clinical context around the gap (what was the last documented plan
+  before the gap? what happened after?).
+- A brief note on whether the gap appears explained by the documents
+  (insurance lapse, treater discharge, patient nonresponse) or
+  unexplained.
+
+Use Markdown. One heading per gap.
