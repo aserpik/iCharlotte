@@ -161,6 +161,7 @@ class MedChronConfigForm(QWidget):
         if row in self.custom_rows:
             self.custom_rows.remove(row)
         self._custom_container_layout.removeWidget(row)
+        row.setParent(None)
         row.deleteLater()
 
     def _selected_catalog_ids(self) -> list[str]:
