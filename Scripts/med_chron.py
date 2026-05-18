@@ -408,8 +408,8 @@ def process_prep(input_path: str, output_dir: str) -> int:
     # --- Full text (narrative + tables) ---
     full_text = _extract_full_text(input_path, prefetched_pdf_text=raw_text)
     if not full_text:
-        # Fall back to the raw_text we already have
-        full_text = raw_text or ""
+        log_event(f"Could not extract full text from {input_path}", level="error")
+        return 1
     paths.full_text_path.write_text(full_text, encoding="utf-8")
 
     # --- Session JSON ---
@@ -534,7 +534,7 @@ def _drop_rewrite_if_narrative_missing(runs: list[RunSpec], narrative: str) -> l
 
 
 def _run_one_analysis(spec: RunSpec, llm_caller: LLMCaller,
-                       provider_name: str) -> RunResult:
+                       provider_name: str, file_number: str | None = None) -> RunResult:
     """Execute a single analysis. Caller MUST NOT let exceptions escape."""
     try:
         log_event(f"[{spec.id}] starting LLM call ({len(spec.input_text)} chars)")
@@ -549,6 +549,21 @@ def _run_one_analysis(spec: RunSpec, llm_caller: LLMCaller,
         os.makedirs(os.path.dirname(spec.output_path), exist_ok=True)
         save_to_docx_at_path(result, spec.output_path, provider_name, spec.title)
         log_event(f"[{spec.id}] done: {len(result)} chars → {spec.output_path}")
+
+        # Best-effort: persist to case database. A DB failure doesn't fail the analysis.
+        if file_number:
+            try:
+                safe_provider = re.sub(r"[^a-zA-Z0-9_]", "_", (provider_name or "unknown").lower())
+                CaseDataManager().save_variable(
+                    file_number,
+                    f"med_chron_{spec.id}_{safe_provider}",
+                    result,
+                    source="med_chron_agent",
+                    extra_tags=["Evidence", "Medical Records", spec.title],
+                )
+            except Exception as db_err:
+                log_event(f"[{spec.id}] CaseDataManager save failed (non-fatal): {db_err}", level="warning")
+
         return RunResult(spec=spec, success=True, output_chars=len(result))
     except Exception as e:
         log_event(f"[{spec.id}] failed: {e}", level="error")
@@ -632,6 +647,7 @@ def process_run(session_path: str, output_dir: str) -> int:
 
     llm_caller = LLMCaller()
     provider_name = session.get("provider_name") or "Unknown Provider"
+    file_number = session.get("file_number")
 
     successes = 0
     failures = 0
@@ -640,7 +656,7 @@ def process_run(session_path: str, output_dir: str) -> int:
     log_event(f"Starting {total} analyses (max 4 concurrent)")
     with ThreadPoolExecutor(max_workers=min(total, 4)) as ex:
         futures = {
-            ex.submit(_run_one_analysis, r, llm_caller, provider_name): r
+            ex.submit(_run_one_analysis, r, llm_caller, provider_name, file_number): r
             for r in runs
         }
         done = 0
