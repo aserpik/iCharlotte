@@ -142,39 +142,6 @@ def extract_text(file_path):
         log_event(f"Error extracting text from {file_path}: {e}", level="error")
         return None
 
-def call_gemini(prompt, text):
-    """Calls Gemini API."""
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        log_event("Error: GEMINI_API_KEY environment variable not set.", level="error")
-        return None
-
-    client = genai.Client(api_key=api_key)
-
-    full_prompt = f"{prompt}\n\nDOCUMENT CONTENT:\n{text}"
-    
-    model_sequence = [
-        "gemini-3-flash-preview", 
-        "gemini-2.5-flash"
-    ]
-
-    for model_name in model_sequence:
-        log_event(f"Attempting to use model: {model_name}")
-        try:
-            response = client.models.generate_content(
-                model=model_name,
-                contents=full_prompt
-            )
-            if response and response.text:
-                log_event(f"Success with model: {model_name}")
-                return response.text
-        except Exception as e:
-            log_event(f"Failed with model {model_name}: {e}", level="warning")
-            continue
-    
-    log_event("Error: All model attempts failed.", level="error")
-    return None
-
 def add_markdown_to_doc(doc, content):
     """Parses basic Markdown and applies formatting."""
     lines = content.split('\n')
@@ -291,65 +258,6 @@ def sanitize_filename(name):
     # Trim whitespace
     name = name.strip()
     return name
-
-def save_to_docx(content, output_dir, provider_name, original_filename):
-    """Saves to DOCX with unique filename med_chron_{filename}.docx."""
-    
-    # Use unique filename to avoid collision in parallel execution
-    safe_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", os.path.splitext(original_filename)[0])
-    filename = f"med_chron_{safe_name}.docx"
-    output_path = os.path.join(output_dir, filename)
-
-    try:
-        if os.path.exists(output_path):
-             # If exists (re-run on same file?), we overwrite or append? 
-             # Let's overwrite for a single file agent to avoid duplication on re-runs.
-             doc = Document()
-             log_event(f"Overwriting/Creating file: {output_path}")
-        else:
-             doc = Document()
-             log_event(f"Creating new file: {output_path}")
-
-        # Styles
-        style = doc.styles['Normal']
-        style.font.name = 'Times New Roman'
-        style.font.size = Pt(12)
-        style.paragraph_format.line_spacing = 1.0
-        
-        for i in range(1, 10):
-            if f'Heading {i}' in doc.styles:
-                h = doc.styles[f'Heading {i}']
-                h.font.name = 'Times New Roman'
-                h.font.size = Pt(12)
-                h.paragraph_format.line_spacing = 1.0
-
-        for s in ['List Bullet', 'List Number']:
-            if s in doc.styles:
-                l = doc.styles[s]
-                l.font.name = 'Times New Roman'
-                l.font.size = Pt(12)
-                l.paragraph_format.line_spacing = 1.0
-
-        # Title
-        p = doc.add_paragraph()
-        run = p.add_run(f"Medical Record Chronology - {provider_name}")
-        run.bold = True
-        run.underline = True
-        run.font.name = 'Times New Roman'
-        run.font.size = Pt(12)
-
-        doc.add_paragraph(f"Source: {original_filename}")
-        doc.add_paragraph(f"Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        
-        add_markdown_to_doc(doc, content)
-            
-        doc.save(output_path)
-        log_event(f"Saved to: {output_path}")
-        return True
-
-    except Exception as e:
-        log_event(f"Error saving DOCX: {e}", level="error")
-        return False
 
 def filter_content(text):
     """Filters text to only include content under specific headings."""
@@ -751,136 +659,168 @@ def process_run(session_path: str, output_dir: str) -> int:
     return 0 if successes > 0 else 1
 
 
-def main():
-    if len(sys.argv) < 2:
-        log_event("Error: No file path provided.", level="error")
-        sys.exit(1)
+def _resolve_output_dir(input_path: str) -> str:
+    """Compute the case AI-OUTPUT directory using the existing rules.
 
-    # Attempt to handle unquoted paths with spaces by joining all arguments
-    input_path = " ".join(sys.argv[1:])
-    
-    # If the joined path doesn't exist, but the first argument does, 
-    # it might be a single file with tricky chars or we're in a directory where 
-    # sys.argv[1] was actually correct and the rest were garbage.
-    if not os.path.exists(input_path) and os.path.exists(sys.argv[1]):
-        input_path = sys.argv[1]
-    
-    # Handle absolute path conversion
-    input_path = os.path.abspath(input_path)
-
-    if not os.path.exists(input_path):
-        log_event(f"Error: File not found: {input_path}", level="error")
-        sys.exit(1)
-
-    log_event(f"--- Starting Med Chron Agent for: {input_path} ---")
-
-    if os.path.isdir(input_path):
-        log_event(f"Input is a directory. Scanning: {input_path}")
-        files_to_process = []
-        for root, _, files in os.walk(input_path):
-            for file in files:
-                if file.lower().endswith(('.pdf', '.docx')):
-                    if "med_chron" in file.lower(): continue
-                    files_to_process.append(os.path.join(root, file))
-        
-        if not files_to_process:
-            log_event("No suitable files found.")
-            sys.exit(0)
-        
-        for file_path in files_to_process:
-            try:
-                subprocess.run([sys.executable, sys.argv[0], file_path], check=True)
-            except subprocess.CalledProcessError as e:
-                log_event(f"Subprocess failed for {file_path}: {e}", level="error")
-        sys.exit(0)
-    
-    # Single File
-    text = extract_text(input_path)
-    if not text:
-        sys.exit(1)
-        
-    # Apply Filtering
-    filtered_text = filter_content(text)
-    if not filtered_text:
-        log_event("No valid content found under specified headings.")
-        sys.exit(0)
-
-    try:
-        with open(PROMPT_FILE, "r", encoding="utf-8") as f:
-            prompt_instruction = f.read()
-    except Exception as e:
-        log_event(f"Error reading prompt file: {e}", level="error")
-        sys.exit(1)
-
-    # Determine Provider Name from Filename
-    filename = os.path.basename(input_path)
-    provider_name = extract_provider_from_filename(filename)
-    log_event(f"Identified Provider from Filename: {provider_name}")
-
-    final_content = call_gemini(prompt_instruction, filtered_text)
-    if not final_content:
-        sys.exit(1)
-
-    # Save to Case Data
-    data_manager = CaseDataManager()
-    file_num_match = re.search(r"(\d{4}\.\d{3})", input_path)
-    if file_num_match:
-        file_num = file_num_match.group(1)
-        
-        # Create a variable key based on provider name if possible
-        safe_provider = re.sub(r"[^a-zA-Z0-9_]", "_", provider_name.lower())
-        var_key = f"med_chron_{safe_provider}"
-        
-        log_event(f"Saving medical chronology to case variable: {var_key}")
-        data_manager.save_variable(file_num, var_key, final_content, source="med_chron_agent", extra_tags=["Evidence", "Medical Records", "Chronology"])
-    else:
-        log_event("Could not extract file number from path. Skipping variable save.", level="warning")
-
-    # Determine Output Directory
+    Lifted from the old main() so all three phases share one implementation.
+    """
     parts = input_path.split(os.sep)
     output_dir = None
     case_root_parts = None
 
-    # Priority 1: Find folder starting with exactly 3 digits (Case Folder)
+    # Priority 1: folder starting with exactly 3 digits.
     for i in range(len(parts) - 1, -1, -1):
         if re.match(r'^\d{3}(\D|$)', parts[i]):
-            log_event(f"Identified Case Folder by 3-digit pattern: {parts[i]}")
-            case_root_parts = parts[:i+1]
+            case_root_parts = parts[:i + 1]
             break
 
-    # Priority 2: Standard "Current Clients" structure (Client/Case)
+    # Priority 2: "Current Clients" / Client / Matter pattern.
     if not case_root_parts:
         for i, part in enumerate(parts):
             if part.lower() == "current clients":
                 if i + 2 < len(parts):
-                    log_event("Identified Case Folder by Standard Structure (Current Clients + 2)")
-                    case_root_parts = parts[:i+3]
+                    case_root_parts = parts[:i + 3]
                 break
-    
+
     if case_root_parts:
         output_dir = os.sep.join(case_root_parts + ["NOTES", "AI OUTPUT"])
 
     if not output_dir:
-        # Fallback 1: If "NOTES" is already in the path, use it.
         for i in range(len(parts) - 1, -1, -1):
             if parts[i].upper() == "NOTES":
-                output_dir = os.path.join(os.sep.join(parts[:i+1]), "AI OUTPUT")
+                output_dir = os.path.join(os.sep.join(parts[:i + 1]), "AI OUTPUT")
                 break
-    
+
     if not output_dir:
-        # Fallback 2: Sibling NOTES to the file's parent folder
         input_dir = os.path.dirname(input_path)
         parent_dir = os.path.dirname(input_dir)
         output_dir = os.path.join(parent_dir, "NOTES", "AI OUTPUT")
 
-    if not os.path.exists(output_dir):
-        try:
-            os.makedirs(output_dir)
-        except Exception:
-            pass
+    os.makedirs(output_dir, exist_ok=True)
+    return output_dir
 
-    save_to_docx(final_content, output_dir, provider_name, filename)
-    log_event("--- Agent Finished ---")
+
+def process_legacy(input_path: str, *, output_dir_override: str | None = None) -> int:
+    """Legacy single-rewrite mode: ``python med_chron.py <file>`` with no --phase.
+
+    Used by the older IndexTab agent runner. Runs only the Rewrite analysis
+    on the narrative-only text, writing to the existing filename pattern
+    ``med_chron_<safe_filename>.docx`` so external callers keep working.
+    """
+    if os.path.isdir(input_path):
+        for root, _, files in os.walk(input_path):
+            for file in files:
+                if file.lower().endswith(('.pdf', '.docx')) and "med_chron" not in file.lower():
+                    try:
+                        subprocess.run([sys.executable, sys.argv[0], os.path.join(root, file)],
+                                       check=True)
+                    except subprocess.CalledProcessError as e:
+                        log_event(f"Subprocess failed for {file}: {e}", level="error")
+        return 0
+
+    raw_text = extract_text(input_path)
+    if not raw_text:
+        log_event(f"Could not extract text from {input_path}", level="error")
+        return 1
+    narrative = filter_content(raw_text)
+    if not narrative:
+        log_event("No valid content under PRE/POST-INJURY headings.", level="warning")
+        return 0
+
+    scripts_dir = os.path.dirname(os.path.abspath(__file__))
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    from MED_CHRON_ANALYSES.catalog import load_prompt
+
+    prompt = load_prompt("rewrite_chronology.txt")
+    llm = LLMCaller()
+    content = llm.call(prompt=prompt, text=narrative, task_type="summary")
+    if not content:
+        return 1
+
+    filename = os.path.basename(input_path)
+    provider_name = extract_provider_from_filename(filename)
+    output_dir = output_dir_override or _resolve_output_dir(input_path)
+    safe_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", os.path.splitext(filename)[0])
+    output_path = os.path.join(output_dir, f"med_chron_{safe_name}.docx")
+    save_to_docx_at_path(content, output_path, provider_name,
+                          "Medical Record Chronology")
+
+    # Existing CaseDataManager wiring (best-effort).
+    try:
+        data_manager = CaseDataManager()
+        file_num_match = re.search(r"(\d{4}\.\d{3})", input_path)
+        if file_num_match:
+            safe_provider = re.sub(r"[^a-zA-Z0-9_]", "_", provider_name.lower())
+            data_manager.save_variable(
+                file_num_match.group(1),
+                f"med_chron_{safe_provider}",
+                content,
+                source="med_chron_agent",
+                extra_tags=["Evidence", "Medical Records", "Chronology"],
+            )
+    except Exception as e:
+        log_event(f"Could not save to case data: {e}", level="warning")
+
+    log_event(f"Legacy rewrite done → {output_path}")
+    return 0
+
+
+def main():
+    """CLI dispatcher.
+
+    Modes:
+      med_chron.py <file>                       → legacy single-rewrite
+      med_chron.py --phase=prep <file>          → Phase 1 (prep)
+      med_chron.py --phase=run  <session.json>  → Phase 2 (run)
+    """
+    args = sys.argv[1:]
+    if not args:
+        log_event("Error: No file path provided.", level="error")
+        sys.exit(1)
+
+    phase = None
+    positional = []
+    output_dir_override = None
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a.startswith("--phase="):
+            phase = a.split("=", 1)[1].strip().lower()
+            i += 1
+        elif a == "--output_path" and i + 1 < len(args):
+            output_dir_override = args[i + 1]
+            i += 2
+        else:
+            positional.append(a)
+            i += 1
+
+    combined = " ".join(positional).strip().strip('"').strip("'")
+    if positional and os.path.exists(combined):
+        target = combined
+    elif positional and os.path.exists(positional[0]):
+        target = positional[0]
+    else:
+        log_event(f"Error: path not found: {combined or '(empty)'}", level="error")
+        sys.exit(1)
+    target = os.path.abspath(target)
+
+    if phase == "prep":
+        out_dir = output_dir_override or _resolve_output_dir(target)
+        rc = process_prep(target, out_dir)
+        sys.exit(rc)
+
+    if phase == "run":
+        # target is a session.json path. Output dir is the cache dir's
+        # great-grandparent — i.e., the original NOTES/AI OUTPUT folder.
+        out_dir = output_dir_override or str(Path(target).parent.parent.parent)
+        rc = process_run(target, out_dir)
+        sys.exit(rc)
+
+    # No --phase flag: legacy single-rewrite mode.
+    rc = process_legacy(target, output_dir_override=output_dir_override)
+    sys.exit(rc)
+
 
 if __name__ == '__main__':
     main()
