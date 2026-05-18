@@ -220,3 +220,67 @@ def test_max_workers_capped_at_4(tmp_path):
             med_chron.process_run(str(session_path), str(tmp_path / "out"))
 
     assert captured["max_workers"] == 4  # min(10, 4) → 4
+
+
+def test_full_prep_to_run_pipeline(tmp_path):
+    """End-to-end: prep produces session, simulate user_config, run produces docx."""
+    from docx import Document
+
+    # Build a chronology with both narrative and table content.
+    src = tmp_path / "1234-001_ E2E PT.docx"
+    doc = Document()
+    doc.add_paragraph(
+        "BRIEF SYNOPSIS OF PRE-INJURY MEDICAL RECORD: "
+        "No prior complaints."
+    )
+    doc.add_paragraph(
+        "BRIEF SYNOPSIS OF POST-INJURY MEDICAL RECORD: "
+        "Lumbar strain treated by PT."
+    )
+    table = doc.add_table(rows=2, cols=2)
+    table.cell(0, 0).text = "Date"
+    table.cell(0, 1).text = "Provider"
+    table.cell(1, 0).text = "2024-02-01"
+    table.cell(1, 1).text = "E2E_TABLE_TOKEN"
+    doc.save(str(src))
+
+    out_dir = tmp_path / "NOTES" / "AI OUTPUT"
+
+    # Phase 1
+    assert med_chron.process_prep(str(src), str(out_dir)) == 0
+
+    paths = session_manager.compute_session_paths(str(src), str(out_dir))
+
+    # Simulate the UI writing user_config.
+    session_manager.update_user_config(
+        paths.session_path,
+        {
+            "selected_catalog_ids": ["rewrite_chronology", "inconsistencies"],
+            "custom_analyses": [
+                {"label": "E2E custom", "instruction": "Find E2E_TABLE_TOKEN."},
+            ],
+        },
+    )
+
+    # Phase 2 with stubbed LLM
+    seen_texts = []
+    def stub(prompt, text, **kw):
+        seen_texts.append(text)
+        return "# stub\nbody"
+
+    with patch.object(med_chron.LLMCaller, "call", side_effect=stub):
+        assert med_chron.process_run(str(paths.session_path), str(out_dir)) == 0
+
+    out_docs = sorted(p.name for p in out_dir.glob("*.docx"))
+    # 3 analyses → 3 docx files at out_dir root
+    assert len(out_docs) == 3
+    assert any("rewrite_chronology" in n for n in out_docs)
+    assert any("inconsistencies" in n for n in out_docs)
+    assert any("custom_1_e2e_custom" in n for n in out_docs)
+
+    # Confirm narrative-only vs full-text routing.
+    # The rewrite call sees no table token; the others do.
+    rewrite_text = [t for t in seen_texts if "E2E_TABLE_TOKEN" not in t]
+    full_text = [t for t in seen_texts if "E2E_TABLE_TOKEN" in t]
+    assert len(rewrite_text) == 1  # rewrite only
+    assert len(full_text) == 2     # inconsistencies + custom
