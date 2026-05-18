@@ -11,6 +11,8 @@ import gc
 from docx import Document
 from docx.shared import Pt, Inches
 from pypdf import PdfReader
+from dataclasses import dataclass
+from icharlotte_core.llm_config import LLMCaller
 
 # Import Case Data Manager
 try:
@@ -534,9 +536,6 @@ def process_prep(input_path: str, output_dir: str) -> int:
 # Phase 2: Run selected analyses
 # =============================================================================
 
-from dataclasses import dataclass
-from icharlotte_core.llm_config import LLMCaller
-
 
 def _slug(value: str) -> str:
     """Lowercase + sanitize for use in filenames/run ids."""
@@ -708,9 +707,13 @@ def process_run(session_path: str, output_dir: str) -> int:
         )
         return 1
 
-    narrative = Path(session["narrative_text_path"]).read_text(encoding="utf-8")
-    full = Path(session["full_text_path"]).read_text(encoding="utf-8")
-    safe_basename = _safe_basename(session["input_path"])
+    try:
+        narrative = Path(session["narrative_text_path"]).read_text(encoding="utf-8")
+        full = Path(session["full_text_path"]).read_text(encoding="utf-8")
+        safe_basename = _safe_basename(session["input_path"])
+    except (KeyError, FileNotFoundError, OSError) as e:
+        log_event(f"Session is corrupt or cache files missing: {e}", level="error")
+        return 1
 
     runs = _build_run_list(session, narrative, full, safe_basename, output_dir)
     runs = _drop_rewrite_if_narrative_missing(runs, narrative)
