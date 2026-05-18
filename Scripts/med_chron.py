@@ -4,7 +4,6 @@ import logging
 import datetime
 import re
 import subprocess
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from google import genai
 import gc
@@ -386,13 +385,14 @@ def filter_content(text):
         
     return "\n\n".join(filtered_chunks)
 
-def _extract_full_text(file_path: str) -> str:
+def _extract_full_text(file_path: str, prefetched_pdf_text: str | None = None) -> str:
     """Extract narrative + table text from a chronology file.
 
     .docx -> ``icharlotte_core.document_processor.extract_docx_text``
              (canonical extractor that includes tables as pipe-separated rows).
-    .pdf  -> ``extract_text`` (same as narrative path; PDFs don't have a
-             paragraphs-vs-tables split in extraction).
+    .pdf  -> ``prefetched_pdf_text`` if provided (avoids double-OCR), else
+             falls back to ``extract_text``. PDFs don't have a paragraphs-vs-
+             tables split in extraction.
     .doc  -> Word COM read-only, never calls word.Quit().
     """
     ext = os.path.splitext(file_path)[1].lower()
@@ -400,6 +400,8 @@ def _extract_full_text(file_path: str) -> str:
         from icharlotte_core.document_processor import extract_docx_text
         return extract_docx_text(file_path)
     if ext == ".pdf":
+        if prefetched_pdf_text is not None:
+            return prefetched_pdf_text
         return extract_text(file_path) or ""
     if ext == ".doc":
         return _extract_doc_via_word_com(file_path)
@@ -493,7 +495,7 @@ def process_prep(input_path: str, output_dir: str) -> int:
     paths.narrative_text_path.write_text(narrative, encoding="utf-8")
 
     # --- Full text (narrative + tables) ---
-    full_text = _extract_full_text(input_path)
+    full_text = _extract_full_text(input_path, prefetched_pdf_text=raw_text)
     if not full_text:
         # Fall back to the raw_text we already have
         full_text = raw_text or ""
