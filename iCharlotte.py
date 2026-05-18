@@ -1220,6 +1220,16 @@ class MainWindow(QMainWindow):
                     tab.setCurrentIndex(PAGE_SETTINGS)
             else:
                 tab.setCurrentIndex(PAGE_SETTINGS)
+
+            # Mirror the open path: per-file tasks run Phase 1 speculatively on
+            # the settings page. Without this, a restored tab on PAGE_SETTINGS
+            # shows "Discovering topics…" at 0% forever — no worker is alive.
+            if (task_id in ("summarize_depositions", "med_chron_analysis")
+                    and tab.currentIndex() == PAGE_SETTINGS):
+                try:
+                    tab.start_speculative_run()
+                except Exception as e:
+                    log_event(f"[wizard] restore speculative_run failed: {e}", "error")
         self._hide_fixed_close_buttons()
 
     def _index_of_tab(self, tab_text: str) -> int:
@@ -1394,8 +1404,8 @@ class MainWindow(QMainWindow):
         if not files:
             return  # user cancelled → no tab created
 
-        if task_id == "summarize_depositions":
-            # One tab per transcript so each has its own speculative Phase 1 worker.
+        if task_id in ("summarize_depositions", "med_chron_analysis"):
+            # One tab per file so each has its own speculative Phase 1 worker.
             first_new_index = None
             for file_path in files:
                 existing_titles = [self.tabs.tabText(i) for i in range(self.tabs.count())]
@@ -1415,7 +1425,7 @@ class MainWindow(QMainWindow):
                 if first_new_index is None:
                     first_new_index = new_index
                 task_tab.start_speculative_run()
-                log_event(f"[wizard] opened deposition tab '{title}' (speculative Phase 1)")
+                log_event(f"[wizard] opened '{title}' (speculative Phase 1)")
             if first_new_index is not None:
                 self.tabs.setCurrentIndex(first_new_index)
             self._hide_fixed_close_buttons()

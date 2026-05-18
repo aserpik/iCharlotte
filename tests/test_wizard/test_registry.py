@@ -9,13 +9,17 @@ from icharlotte_core.ui.wizard.registry import (
 )
 
 
-def test_four_initial_tasks_registered():
+def test_initial_tasks_registered():
     ids = {t.task_id for t in list_tasks()}
     assert ids == {
         "summarize_documents",
         "summarize_discovery",
         "summarize_depositions",
         "medical_records",
+        "med_chron_analysis",
+        "med_record_extractor",
+        "subpoena_tracker",
+        "chat",
     }
 
 

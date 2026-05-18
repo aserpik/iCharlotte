@@ -25,6 +25,11 @@ def _deposition_settings_page_cls():
     return DepositionSettingsPage
 
 
+def _med_chron_settings_page_cls():
+    from .pages.med_chron_settings_page import MedChronSettingsPage
+    return MedChronSettingsPage
+
+
 @dataclass(frozen=True)
 class TaskSpec:
     task_id: str
@@ -80,6 +85,17 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         icon_glyph="\U0001F3E5",  # 🏥
         script_name="med_record.py",
         default_folders=["RECORDS"],
+    ),
+    "med_chron_analysis": TaskSpec(
+        task_id="med_chron_analysis",
+        title="Med Chron Analysis",
+        description="Run selectable analyses on a medical chronology.",
+        icon_glyph="\U0001FA7A",  # 🩺
+        script_name="med_chron.py",
+        default_folders=["NOTES/AI OUTPUT", "RECORDS"],
+        phase1_args=["--phase=prep"],
+        phase2_flag="--phase=run",
+        _settings_page_cls_factory=_med_chron_settings_page_cls,
     ),
     "med_record_extractor": TaskSpec(
         task_id="med_record_extractor",
