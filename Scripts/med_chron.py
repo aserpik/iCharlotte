@@ -12,6 +12,13 @@ from docx import Document
 from docx.shared import Pt, Inches
 from pypdf import PdfReader
 from dataclasses import dataclass
+
+# Make ``icharlotte_core`` importable when this script is run directly
+# (``python Scripts/med_chron.py ...``). The wizard subprocess invocation
+# always runs Python with cwd == project root, but the IndexTab agent
+# runner and any direct CLI use need the project root explicitly added.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from icharlotte_core.llm_config import LLMCaller
 
 # Import Case Data Manager
