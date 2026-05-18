@@ -4,6 +4,8 @@ import logging
 import datetime
 import re
 import subprocess
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 from google import genai
 import gc
 from docx import Document
@@ -383,6 +385,147 @@ def filter_content(text):
         filtered_chunks.append(f"{header}\n{chunk}")
         
     return "\n\n".join(filtered_chunks)
+
+def _extract_full_text(file_path: str) -> str:
+    """Extract narrative + table text from a chronology file.
+
+    .docx -> ``icharlotte_core.document_processor.extract_docx_text``
+             (canonical extractor that includes tables as pipe-separated rows).
+    .pdf  -> ``extract_text`` (same as narrative path; PDFs don't have a
+             paragraphs-vs-tables split in extraction).
+    .doc  -> Word COM read-only, never calls word.Quit().
+    """
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext == ".docx":
+        from icharlotte_core.document_processor import extract_docx_text
+        return extract_docx_text(file_path)
+    if ext == ".pdf":
+        return extract_text(file_path) or ""
+    if ext == ".doc":
+        return _extract_doc_via_word_com(file_path)
+    return extract_text(file_path) or ""
+
+
+def _extract_doc_via_word_com(file_path: str) -> str:
+    """Read a legacy .doc by attaching to the user's running Word.
+
+    Mirrors ChatTab._extract_doc_text: never set word.Visible and never
+    call word.Quit() -- only close the Document we opened. Open ReadOnly
+    so the user's session is untouched.
+    """
+    try:
+        import win32com.client  # type: ignore
+    except ImportError:
+        log_event("win32com not available; cannot extract .doc files", level="warning")
+        return ""
+    word = None
+    doc = None
+    try:
+        word = win32com.client.Dispatch("Word.Application")
+        doc = word.Documents.Open(
+            FileName=os.path.abspath(file_path),
+            ReadOnly=True,
+            AddToRecentFiles=False,
+            ConfirmConversions=False,
+        )
+        return doc.Content.Text or ""
+    except Exception as e:
+        log_event(f".doc extraction failed for {file_path}: {e}", level="warning")
+        return ""
+    finally:
+        if doc is not None:
+            try:
+                doc.Close(SaveChanges=False)
+            except Exception:
+                pass
+
+
+def _build_catalog_snapshot() -> list:
+    """Serialise the curated catalog into a JSON-friendly list."""
+    scripts_dir = os.path.dirname(os.path.abspath(__file__))
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    from MED_CHRON_ANALYSES.catalog import CATALOG
+    return [
+        {
+            "id": d.id,
+            "title": d.title,
+            "description": d.description,
+            "uses_tables": d.uses_tables,
+            "default_selected": d.default_selected,
+        }
+        for d in CATALOG
+    ]
+
+
+def process_prep(input_path: str, output_dir: str) -> int:
+    """Phase 1: extract text twice, write session JSON, print AWAITING_INPUT.
+
+    Returns process-style exit code (0 success, non-zero failure). Does
+    NOT call sys.exit -- leaves that to main().
+    """
+    from icharlotte_core.med_chron import session_manager
+
+    paths = session_manager.compute_session_paths(input_path, output_dir)
+
+    # Cache reuse: if session.json + both text files exist, skip extraction.
+    if (paths.session_path.exists()
+            and paths.narrative_text_path.exists()
+            and paths.full_text_path.exists()):
+        log_event(f"Reusing cached prep at {paths.cache_dir}")
+        print(f"AWAITING_INPUT:{paths.session_path}", flush=True)
+        return 0
+
+    paths.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    # --- Narrative-only text ---
+    raw_text = extract_text(input_path)
+    narrative_missing = False
+    if not raw_text:
+        # For docx files with no text content, use empty string rather than failing
+        log_event(f"Could not extract text from {input_path}", level="warning")
+        raw_text = ""
+
+    narrative = filter_content(raw_text)
+    if narrative is None:
+        narrative_missing = True
+        narrative = ""
+    paths.narrative_text_path.write_text(narrative, encoding="utf-8")
+
+    # --- Full text (narrative + tables) ---
+    full_text = _extract_full_text(input_path)
+    if not full_text:
+        # Fall back to the raw_text we already have
+        full_text = raw_text or ""
+    paths.full_text_path.write_text(full_text, encoding="utf-8")
+
+    # --- Session JSON ---
+    filename = os.path.basename(input_path)
+    provider_name = extract_provider_from_filename(filename)
+    file_num_match = re.search(r"(\d{4}\.\d{3})", input_path)
+    file_number = file_num_match.group(1) if file_num_match else None
+
+    session_data = {
+        "version": 1,
+        "phase": "awaiting_input",
+        "input_path": str(input_path),
+        "narrative_text_path": str(paths.narrative_text_path),
+        "full_text_path": str(paths.full_text_path),
+        "narrative_missing": narrative_missing,
+        "provider_name": provider_name,
+        "file_number": file_number,
+        "catalog": _build_catalog_snapshot(),
+        "user_config": None,
+    }
+    session_manager.write_session(paths.session_path, session_data)
+
+    log_event(
+        f"Phase 1 complete: cached {len(narrative)} narrative chars "
+        f"+ {len(full_text)} full chars; session at {paths.session_path}"
+    )
+    print(f"AWAITING_INPUT:{paths.session_path}", flush=True)
+    return 0
+
 
 def main():
     if len(sys.argv) < 2:
