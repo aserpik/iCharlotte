@@ -151,94 +151,91 @@ def extract_text(file_path):
 
 def add_markdown_to_doc(doc, content):
     """Parses basic Markdown and applies formatting."""
+    from icharlotte_core.docx_writer import (
+        try_consume_markdown_table,
+        add_markdown_table_to_doc,
+        render_inline_markdown,
+    )
+
     lines = content.split('\n')
     active_paragraph = None
-    
+
     # Regex to identify dates at the beginning of a paragraph/sentence
     # Matches: (Optional "On ") (Date String)
     # Date String: Month DD, YYYY
     date_pattern = re.compile(r"^(On )?((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? \d{4})")
 
-    for line in lines:
+    i = 0
+    while i < len(lines):
+        line = lines[i]
         stripped = line.strip()
         if not stripped:
+            i += 1
             continue
-        
+
+        # Markdown table block — emit a real Word table.
+        consumed, header, rows = try_consume_markdown_table(lines, i)
+        if consumed:
+            add_markdown_table_to_doc(doc, header, rows)
+            i += consumed
+            active_paragraph = None
+            continue
+
         if stripped.startswith('#'):
-            text = stripped.lstrip('#').strip()
+            text = stripped.lstrip('#').strip().replace('**', '').replace('__', '')
             if not text.endswith('.'):
                 text += "."
             active_paragraph = doc.add_paragraph()
             run = active_paragraph.add_run(text + " ")
             run.bold = True
+            i += 1
             continue
-        
+
         if stripped.startswith('* ') or stripped.startswith('- '):
             text = stripped[2:].strip()
             p = doc.add_paragraph()
             p.paragraph_format.line_spacing = 1.0
             p.paragraph_format.left_indent = Inches(0.5)
             p.paragraph_format.first_line_indent = Inches(-0.25)
-            
+
             # Use a real bullet character and tab for portability
-            run = p.add_run("•\t")
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(12)
-            
-            # Support bold parsing within list items
-            parts = re.split(r'(\*\*.*?\*\*)', text)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    r = p.add_run(part[2:-2])
-                    r.bold = True
-                else:
-                    r = p.add_run(part)
-                r.font.name = 'Times New Roman'
-                r.font.size = Pt(12)
+            bullet_run = p.add_run("•\t")
+            bullet_run.font.name = 'Times New Roman'
+            bullet_run.font.size = Pt(12)
+
+            render_inline_markdown(p, text)
             active_paragraph = None
+            i += 1
             continue
-        
+
         # Regular paragraph
         if active_paragraph:
             p = active_paragraph
         else:
             p = doc.add_paragraph()
             p.paragraph_format.first_line_indent = Inches(0.5)
-        
-        # Check for date at start of line
+
+        # Check for date at start of line — underline it, then render the rest.
         match = date_pattern.match(stripped)
         if match:
             on_prefix = match.group(1) # "On " or None
             date_str = match.group(2)  # "January 1, 2024"
-            
+
             total_match_len = len(match.group(0))
             remaining_text = stripped[total_match_len:]
-            
+
             if on_prefix:
                 p.add_run(on_prefix)
-            
+
             run = p.add_run(date_str)
             run.underline = True
-            
-            # Process remaining text for bold markers
-            parts = re.split(r'(\**.*?\**)', remaining_text)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    run = p.add_run(part[2:-2])
-                    run.bold = True
-                else:
-                    p.add_run(part)
+
+            render_inline_markdown(p, remaining_text)
         else:
-            # Standard markdown parsing
-            parts = re.split(r'(\**.*?\**)', stripped)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    run = p.add_run(part[2:-2])
-                    run.bold = True
-                else:
-                    p.add_run(part)
-        
+            render_inline_markdown(p, stripped)
+
         active_paragraph = None
+        i += 1
 
 def extract_provider_from_filename(filename):
     """Extracts provider name from filename based on patterns."""
@@ -448,6 +445,51 @@ def process_prep(input_path: str, output_dir: str) -> int:
 
 
 # =============================================================================
+# Context-document rendering for custom analyses
+# =============================================================================
+
+MAX_CONTEXT_CHARS = 120_000  # per-file cap to keep prompts bounded
+
+
+def _render_context_block(context_files: list[str]) -> str:
+    """Return the ADDITIONAL CONTEXT DOCUMENTS block, or '' if no usable files.
+
+    Each file is extracted via ``_extract_full_text``. Failures (missing
+    file, exception, empty text) are logged and silently skipped. If every
+    file fails, returns ''.
+    """
+    if not context_files:
+        return ""
+
+    chunks: list[str] = []
+    for path in context_files:
+        try:
+            if not os.path.exists(path):
+                log_event(f"Context file missing, skipping: {path}", level="warning")
+                continue
+            text = _extract_full_text(path)
+            if not text or not text.strip():
+                log_event(f"Context file empty after extraction, skipping: {path}", level="warning")
+                continue
+            if len(text) > MAX_CONTEXT_CHARS:
+                text = text[:MAX_CONTEXT_CHARS] + f"\n[…context truncated at {MAX_CONTEXT_CHARS:,} characters…]"
+                log_event(f"Context file truncated to {MAX_CONTEXT_CHARS} chars: {path}", level="warning")
+            filename = os.path.basename(path)
+            chunks.append(
+                f"--- BEGIN CONTEXT DOCUMENT: {filename} ---\n{text}\n--- END CONTEXT DOCUMENT ---"
+            )
+        except Exception as e:
+            log_event(f"Failed to extract context file {path}: {e}", level="warning")
+            continue
+
+    if not chunks:
+        return ""
+
+    body = "\n\n".join(chunks)
+    return f"ADDITIONAL CONTEXT DOCUMENTS PROVIDED BY THE USER:\n\n{body}"
+
+
+# =============================================================================
 # Phase 2: Run selected analyses
 # =============================================================================
 
@@ -511,10 +553,14 @@ def _build_run_list(session: dict, narrative: str, full: str,
         if wrapper is None:
             wrapper = load_prompt("_custom_wrapper.txt")
         label_slug = _slug(c["label"])
+        context_block = _render_context_block(c.get("context_files", []) or [])
+        prompt_text = wrapper.replace("{user_instruction}", c["instruction"]).replace(
+            "{context_block}", context_block
+        )
         runs.append(RunSpec(
             id=f"custom_{i}_{label_slug}",
             title=c["label"],
-            prompt_text=wrapper.replace("{user_instruction}", c["instruction"]),
+            prompt_text=prompt_text,
             input_text=full,
             output_path=os.path.join(
                 output_dir, f"med_chron_custom_{i}_{label_slug}_{safe_basename}.docx"
