@@ -6,7 +6,6 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT / "Scripts"))
 
-import json
 from unittest.mock import patch
 
 import med_chron  # noqa: E402
