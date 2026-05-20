@@ -493,17 +493,17 @@ class MedChronConfigForm(QWidget):
         return [cid for cid, cb in self.catalog_checkboxes.items() if cb.isChecked()]
 
     def _validated_custom_rows(self) -> tuple[list[dict], list[dict], str]:
-        """Return ``(all_valid_rows, included_rows, error_msg)``.
+        """Return ``(persisted_rows, run_rows, error_msg)``.
 
-        - ``all_valid_rows`` — every non-empty, fully-filled row. This is
-          what gets persisted to the global store so the user keeps them
-          for next time even if the include-checkbox is unchecked.
-        - ``included_rows`` — subset of ``all_valid_rows`` whose include
-          checkbox is checked. This is what actually runs in Phase 2.
+        - ``persisted_rows`` — ``{label, instruction}`` only, for the global
+          custom_analyses_store. Context files are intentionally excluded so
+          they do not leak between sessions / cases.
+        - ``run_rows`` — ``{label, instruction, context_files}`` for the
+          session JSON; only rows whose include checkbox is checked.
         - ``error_msg`` — non-empty if a row is partially filled.
         """
-        all_valid: list[dict] = []
-        included: list[dict] = []
+        persisted: list[dict] = []
+        run_rows: list[dict] = []
         for r in self.custom_rows:
             if r.is_empty():
                 continue
@@ -513,11 +513,14 @@ class MedChronConfigForm(QWidget):
                     "Custom analyses need both a label and an instruction. "
                     "Fill in (or remove) the partially-completed row."
                 )
-            entry = {"label": lbl, "instruction": instr}
-            all_valid.append(entry)
+            persisted.append({"label": lbl, "instruction": instr})
             if r.is_included():
-                included.append(entry)
-        return all_valid, included, ""
+                run_rows.append({
+                    "label": lbl,
+                    "instruction": instr,
+                    "context_files": r.context_files(),
+                })
+        return persisted, run_rows, ""
 
     def commit_user_config(self) -> bool:
         """Validate, persist saved analyses globally, and write user_config.
@@ -527,22 +530,23 @@ class MedChronConfigForm(QWidget):
         self._error_label.setVisible(False)
 
         selected = self._selected_catalog_ids()
-        all_valid_custom, included_custom, err = self._validated_custom_rows()
+        persisted_custom, run_custom, err = self._validated_custom_rows()
         if err:
             self._error_label.setText(err)
             self._error_label.setVisible(True)
             return False
-        if not selected and not included_custom:
+        if not selected and not run_custom:
             self._error_label.setText(
                 "Select at least one analysis, or add a custom analysis."
             )
             self._error_label.setVisible(True)
             return False
 
-        # Auto-save the full list of valid custom rows (including unchecked
-        # ones) to the global store so they reappear next time.
+        # Persist label + instruction only to the global store. Context
+        # files are intentionally NOT persisted — they belong to this
+        # session / case only.
         try:
-            custom_analyses_store.save(all_valid_custom)
+            custom_analyses_store.save(persisted_custom)
         except OSError:
             # Persisting globally is best-effort; the run can still proceed.
             pass
@@ -551,7 +555,7 @@ class MedChronConfigForm(QWidget):
             self.session_path,
             {
                 "selected_catalog_ids": selected,
-                "custom_analyses": included_custom,
+                "custom_analyses": run_custom,
             },
         )
         return True

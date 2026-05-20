@@ -414,3 +414,142 @@ def test_warning_label_hides_after_bad_file_removed(qtbot, tmp_path):
 
     row._remove_context_file(str(bad))
     assert row._context_warning_label.isHidden() is True
+
+
+# -----------------------------
+# Task 8: dual-shape commit
+# -----------------------------
+
+import json
+
+
+def _write_session(tmp_path, *, narrative_missing=False):
+    cache = tmp_path / ".med_chron" / "abc123"
+    cache.mkdir(parents=True)
+    session_path = cache / "session.json"
+    session_path.write_text(json.dumps({
+        "version": 1,
+        "phase": "awaiting_input",
+        "input_path": str(tmp_path / "rec.docx"),
+        "narrative_text_path": str(cache / "narrative.txt"),
+        "full_text_path": str(cache / "full.txt"),
+        "narrative_missing": narrative_missing,
+        "provider_name": "Acme PT",
+        "file_number": "1234.567",
+        "catalog": [
+            {"id": "rewrite_chronology", "title": "Rewrite Chronology",
+             "description": "...", "uses_tables": False,
+             "default_selected": True},
+        ],
+        "user_config": None,
+    }, indent=2), encoding="utf-8")
+    return session_path
+
+
+def test_commit_writes_context_files_to_session(qtbot, tmp_path):
+    """When a custom analysis has attached context files, commit_user_config
+    must include them in the session JSON's user_config.custom_analyses."""
+    from icharlotte_core.ui.med_chron_config_form import MedChronConfigForm
+    session_path = _write_session(tmp_path)
+    ctx = tmp_path / "status.txt"
+    ctx.write_text("ctx", encoding="utf-8")
+
+    form = MedChronConfigForm(session_path)
+    qtbot.addWidget(form)
+    row = form.add_custom_row()
+    row.label_edit.setText("Defense targets")
+    row.instruction_edit.setPlainText("Identify providers.")
+    row.add_context_files([str(ctx)])
+
+    assert form.commit_user_config() is True
+
+    written = json.loads(session_path.read_text(encoding="utf-8"))
+    customs = written["user_config"]["custom_analyses"]
+    assert len(customs) == 1
+    assert customs[0]["context_files"] == [str(ctx)]
+    assert customs[0]["label"] == "Defense targets"
+
+
+def test_commit_does_not_persist_context_files_to_global_store(qtbot, tmp_path):
+    """The global custom_analyses_store must continue to hold only
+    {label, instruction} — never context_files."""
+    from icharlotte_core.ui.med_chron_config_form import MedChronConfigForm
+    from icharlotte_core.med_chron import custom_analyses_store
+    session_path = _write_session(tmp_path)
+    ctx = tmp_path / "status.txt"
+    ctx.write_text("ctx", encoding="utf-8")
+
+    form = MedChronConfigForm(session_path)
+    qtbot.addWidget(form)
+    row = form.add_custom_row()
+    row.label_edit.setText("Defense targets")
+    row.instruction_edit.setPlainText("Identify providers.")
+    row.add_context_files([str(ctx)])
+
+    form.commit_user_config()
+
+    saved = custom_analyses_store.load()
+    assert len(saved) == 1
+    assert "context_files" not in saved[0]
+    assert saved[0] == {"label": "Defense targets", "instruction": "Identify providers."}
+
+
+def test_reopening_form_loads_saved_analysis_with_empty_context(qtbot, tmp_path):
+    """After a commit, opening a NEW form against a NEW session shows the
+    persisted label/instruction but starts with no attached context files."""
+    from icharlotte_core.ui.med_chron_config_form import MedChronConfigForm
+    session1 = _write_session(tmp_path)
+    ctx = tmp_path / "status.txt"
+    ctx.write_text("ctx", encoding="utf-8")
+
+    form1 = MedChronConfigForm(session1)
+    qtbot.addWidget(form1)
+    row = form1.add_custom_row()
+    row.label_edit.setText("Defense targets")
+    row.instruction_edit.setPlainText("Identify providers.")
+    row.add_context_files([str(ctx)])
+    form1.commit_user_config()
+
+    # Build a second session in a different tmp subdir.
+    session2_dir = tmp_path / "session2"
+    session2_dir.mkdir()
+    session2 = _write_session(session2_dir)
+
+    form2 = MedChronConfigForm(session2)
+    qtbot.addWidget(form2)
+
+    # Pre-populated row should exist with persisted text, but no context files.
+    assert len(form2.custom_rows) == 1
+    row2 = form2.custom_rows[0]
+    assert row2.label() == "Defense targets"
+    assert row2.instruction() == "Identify providers."
+    assert row2.context_files() == []
+
+
+def test_commit_omits_unchecked_rows_from_session(qtbot, tmp_path):
+    """If the include checkbox is unchecked, the row is persisted globally
+    but NOT included in session.json's run-shape list."""
+    from icharlotte_core.ui.med_chron_config_form import MedChronConfigForm
+    from icharlotte_core.med_chron import custom_analyses_store
+    session_path = _write_session(tmp_path)
+    ctx = tmp_path / "status.txt"
+    ctx.write_text("ctx", encoding="utf-8")
+
+    form = MedChronConfigForm(session_path)
+    qtbot.addWidget(form)
+    row = form.add_custom_row()
+    row.label_edit.setText("Defense targets")
+    row.instruction_edit.setPlainText("Identify providers.")
+    row.add_context_files([str(ctx)])
+    row.include_cb.setChecked(False)
+
+    # Need at least ONE thing checked, or commit fails validation.
+    # The default rewrite_chronology checkbox is already checked.
+    form.commit_user_config()
+
+    written = json.loads(session_path.read_text(encoding="utf-8"))
+    assert written["user_config"]["custom_analyses"] == []
+
+    # But persisted to global store.
+    saved = custom_analyses_store.load()
+    assert len(saved) == 1
