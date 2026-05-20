@@ -243,6 +243,16 @@ class CustomAnalysisRow(QWidget):
             self._render_chip_strip()
             self._refresh_context_warning()
 
+    def _on_add_context_clicked(self) -> None:
+        paths, _ = QFileDialog.getOpenFileNames(
+            self,
+            "Select context document(s)",
+            "",
+            "Context documents (*.pdf *.docx *.txt)",
+        )
+        if paths:
+            self.add_context_files(list(paths))
+
     def _remove_context_file(self, path: str) -> None:
         if path in self._context_files:
             self._context_files.remove(path)
@@ -261,12 +271,13 @@ class CustomAnalysisRow(QWidget):
         for p in self._context_files:
             chip = self._build_chip(p)
             self._chip_strip_layout.addWidget(chip)
-        # Trailing "+ Add context" button (wired in Task 6).
+        # Trailing "+ Add context" button.
         if self._add_ctx_btn is None:
             self._add_ctx_btn = QPushButton("+ Add context")
             self._add_ctx_btn.setStyleSheet(
                 "QPushButton { font-size: 11px; padding: 2px 8px; }"
             )
+            self._add_ctx_btn.clicked.connect(self._on_add_context_clicked)
         # Re-parent the button each render so re-adding it works after takeAt cleared the layout.
         self._add_ctx_btn.setParent(self._chip_strip_container)
         self._chip_strip_layout.addWidget(self._add_ctx_btn)

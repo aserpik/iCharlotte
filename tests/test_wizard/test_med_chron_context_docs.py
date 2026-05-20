@@ -339,3 +339,40 @@ def test_custom_row_chip_strip_renders_one_chip_per_file(qtbot, tmp_path):
                 chip_texts.append(child.text())
     assert "a.txt" in chip_texts
     assert "b.txt" in chip_texts
+
+
+# -----------------------------
+# Task 6: + Add context button
+# -----------------------------
+
+def test_add_context_button_opens_filedialog_and_attaches(qtbot, tmp_path, monkeypatch):
+    """Clicking '+ Add context' opens QFileDialog.getOpenFileNames and any
+    selected paths are appended to context_files."""
+    p = tmp_path / "picked.pdf"
+    p.write_bytes(b"%PDF-1.4")
+
+    # Stub QFileDialog.getOpenFileNames to return our test file.
+    from icharlotte_core.ui import med_chron_config_form
+    monkeypatch.setattr(
+        med_chron_config_form.QFileDialog,
+        "getOpenFileNames",
+        staticmethod(lambda *a, **kw: ([str(p)], "")),
+    )
+
+    row = _make_row(qtbot)
+    assert row.context_files() == []
+    row._add_ctx_btn.click()
+    assert row.context_files() == [str(p)]
+
+
+def test_add_context_button_cancelled_does_nothing(qtbot, monkeypatch):
+    from icharlotte_core.ui import med_chron_config_form
+    monkeypatch.setattr(
+        med_chron_config_form.QFileDialog,
+        "getOpenFileNames",
+        staticmethod(lambda *a, **kw: ([], "")),
+    )
+
+    row = _make_row(qtbot)
+    row._add_ctx_btn.click()
+    assert row.context_files() == []
