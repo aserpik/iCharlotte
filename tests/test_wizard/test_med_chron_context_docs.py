@@ -1,5 +1,6 @@
 """Tests for the per-row context-documents UI feature in MedChronConfigForm."""
 
+import json
 import sys
 from pathlib import Path
 
@@ -419,8 +420,6 @@ def test_warning_label_hides_after_bad_file_removed(qtbot, tmp_path):
 # -----------------------------
 # Task 8: dual-shape commit
 # -----------------------------
-
-import json
 
 
 def _write_session(tmp_path, *, narrative_missing=False):
