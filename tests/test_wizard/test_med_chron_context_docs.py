@@ -144,3 +144,97 @@ def test_sniff_text_layer_unsupported_extension(tmp_path):
     has_text, reason = sniff_text_layer(str(p))
     assert has_text is False
     assert ".png" in reason
+
+
+# -----------------------------
+# Task 4: ContextDropTextEdit
+# -----------------------------
+
+def test_context_drop_textedit_accepts_supported_file_urls(qtbot, tmp_path):
+    from PySide6.QtCore import QMimeData, QPoint, Qt, QUrl
+    from PySide6.QtGui import QDragEnterEvent
+    from icharlotte_core.ui.med_chron_config_form import ContextDropTextEdit
+
+    p1 = tmp_path / "a.pdf"
+    p1.write_bytes(b"%PDF-1.4 stub")
+    p2 = tmp_path / "b.docx"
+    p2.write_bytes(b"docx stub")
+
+    w = ContextDropTextEdit()
+    qtbot.addWidget(w)
+
+    received: list[list[str]] = []
+    w.files_dropped.connect(lambda paths: received.append(paths))
+
+    mime = QMimeData()
+    mime.setUrls([QUrl.fromLocalFile(str(p1)), QUrl.fromLocalFile(str(p2))])
+    event = QDragEnterEvent(QPoint(10, 10), Qt.DropAction.CopyAction, mime,
+                            Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    w.dragEnterEvent(event)
+    assert event.isAccepted()
+
+
+def test_context_drop_textedit_rejects_unsupported_file_urls(qtbot, tmp_path):
+    from PySide6.QtCore import QMimeData, QPoint, Qt, QUrl
+    from PySide6.QtGui import QDragEnterEvent
+    from icharlotte_core.ui.med_chron_config_form import ContextDropTextEdit
+
+    p = tmp_path / "bad.png"
+    p.write_bytes(b"\x89PNG\r\n")
+
+    w = ContextDropTextEdit()
+    qtbot.addWidget(w)
+
+    mime = QMimeData()
+    mime.setUrls([QUrl.fromLocalFile(str(p))])
+    event = QDragEnterEvent(QPoint(10, 10), Qt.DropAction.CopyAction, mime,
+                            Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    w.dragEnterEvent(event)
+    # Not accepted as a "file drop", so the base class falls through; since
+    # the base QPlainTextEdit doesn't know how to handle a PNG URL either,
+    # the event is not accepted.
+    assert not event.isAccepted()
+
+
+def test_context_drop_textedit_emits_files_dropped(qtbot, tmp_path):
+    from PySide6.QtCore import QMimeData, QPoint, Qt, QUrl
+    from PySide6.QtGui import QDropEvent
+    from icharlotte_core.ui.med_chron_config_form import ContextDropTextEdit
+
+    p = tmp_path / "good.txt"
+    p.write_text("hi", encoding="utf-8")
+
+    w = ContextDropTextEdit()
+    qtbot.addWidget(w)
+
+    received: list[list[str]] = []
+    w.files_dropped.connect(lambda paths: received.append(paths))
+
+    mime = QMimeData()
+    mime.setUrls([QUrl.fromLocalFile(str(p))])
+    event = QDropEvent(QPoint(10, 10), Qt.DropAction.CopyAction, mime,
+                       Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    w.dropEvent(event)
+    assert received == [[str(p)]]
+
+
+def test_context_drop_textedit_plaintext_drop_still_works(qtbot):
+    """Dropping plain text (not file URLs) should fall through to the base
+    QPlainTextEdit so the user can still drop a snippet."""
+    from PySide6.QtCore import QMimeData, QPoint, Qt
+    from PySide6.QtGui import QDropEvent
+    from icharlotte_core.ui.med_chron_config_form import ContextDropTextEdit
+
+    w = ContextDropTextEdit()
+    qtbot.addWidget(w)
+
+    received: list[list[str]] = []
+    w.files_dropped.connect(lambda paths: received.append(paths))
+
+    mime = QMimeData()
+    mime.setText("some snippet")
+    event = QDropEvent(QPoint(10, 10), Qt.DropAction.CopyAction, mime,
+                       Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    w.dropEvent(event)
+    # files_dropped should NOT fire for plain text
+    assert received == []

@@ -15,13 +15,14 @@ the user can skip a saved analysis once without deleting it from the
 global store.
 """
 
+import os
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import QSettings, Qt
+from PySide6.QtCore import QSettings, Qt, Signal
 from PySide6.QtWidgets import (
-    QCheckBox, QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit,
-    QPushButton, QScrollArea, QSplitter, QVBoxLayout, QWidget,
+    QCheckBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
+    QPlainTextEdit, QPushButton, QScrollArea, QSplitter, QVBoxLayout, QWidget,
 )
 
 from icharlotte_core.med_chron import custom_analyses_store, session_manager
@@ -46,8 +47,6 @@ def sniff_text_layer(path: str) -> tuple[bool, str]:
     - .pdf: at least 200 chars of text extractable from pages 0..2.
     - any error / unknown extension: (False, "...").
     """
-    import os
-
     ext = os.path.splitext(path)[1].lower()
     try:
         if ext == ".txt":
@@ -97,6 +96,55 @@ def sniff_text_layer(path: str) -> tuple[bool, str]:
 
 
 _ANALYSES_SPLITTER_KEY = "med_chron_form/analyses_splitter_sizes"
+
+
+class ContextDropTextEdit(QPlainTextEdit):
+    """QPlainTextEdit that accepts drops of .pdf / .docx / .txt file URLs.
+
+    Emits ``files_dropped(list[str])`` when one or more supported files are
+    dropped on the widget. Non-file drops fall through to the base class so
+    text editing still works.
+    """
+
+    files_dropped = Signal(list)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptDrops(True)
+
+    def _supported_paths(self, mime) -> list[str]:
+        if not mime.hasUrls():
+            return []
+        paths: list[str] = []
+        for url in mime.urls():
+            if not url.isLocalFile():
+                return []
+            p = os.path.normpath(url.toLocalFile())
+            ext = os.path.splitext(p)[1].lower()
+            if ext not in SUPPORTED_CONTEXT_EXTS:
+                return []
+            paths.append(p)
+        return paths
+
+    def dragEnterEvent(self, event):
+        if self._supported_paths(event.mimeData()):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if self._supported_paths(event.mimeData()):
+            event.acceptProposedAction()
+        else:
+            super().dragMoveEvent(event)
+
+    def dropEvent(self, event):
+        paths = self._supported_paths(event.mimeData())
+        if paths:
+            self.files_dropped.emit(paths)
+            event.acceptProposedAction()
+            return
+        super().dropEvent(event)
 
 
 class CustomAnalysisRow(QWidget):
