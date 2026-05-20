@@ -376,3 +376,41 @@ def test_add_context_button_cancelled_does_nothing(qtbot, monkeypatch):
     row = _make_row(qtbot)
     row._add_ctx_btn.click()
     assert row.context_files() == []
+
+
+# -----------------------------
+# Task 7: warning label
+# -----------------------------
+
+def test_warning_label_visible_when_file_lacks_text_layer(qtbot, tmp_path):
+    # An empty .txt fails sniff_text_layer.
+    p = tmp_path / "blank.txt"
+    p.write_text("", encoding="utf-8")
+
+    row = _make_row(qtbot)
+    row.add_context_files([str(p)])
+    assert row._context_warning_label.isHidden() is False
+    assert "blank.txt" in row._context_warning_label.text()
+
+
+def test_warning_label_hidden_when_all_files_have_text(qtbot, tmp_path):
+    p = tmp_path / "good.txt"
+    p.write_text("real content", encoding="utf-8")
+
+    row = _make_row(qtbot)
+    row.add_context_files([str(p)])
+    assert row._context_warning_label.isHidden() is True
+
+
+def test_warning_label_hides_after_bad_file_removed(qtbot, tmp_path):
+    bad = tmp_path / "blank.txt"
+    bad.write_text("", encoding="utf-8")
+    good = tmp_path / "good.txt"
+    good.write_text("real content", encoding="utf-8")
+
+    row = _make_row(qtbot)
+    row.add_context_files([str(bad), str(good)])
+    assert row._context_warning_label.isHidden() is False
+
+    row._remove_context_file(str(bad))
+    assert row._context_warning_label.isHidden() is True
