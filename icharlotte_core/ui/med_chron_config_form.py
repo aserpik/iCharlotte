@@ -155,11 +155,13 @@ class ContextDropTextEdit(QPlainTextEdit):
 
 
 class CustomAnalysisRow(QWidget):
-    """One row in the custom-analyses list: include-checkbox + label + instruction + remove btn."""
+    """One row in the custom-analyses list: include-checkbox + label + instruction + remove btn + context-doc chip strip."""
 
     def __init__(self, parent: QWidget, on_remove):
         super().__init__(parent)
         self._on_remove = on_remove
+        self._context_files: list[str] = []
+        self._add_ctx_btn = None  # built lazily in _render_chip_strip
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
@@ -183,10 +185,30 @@ class CustomAnalysisRow(QWidget):
         layout.addLayout(top)
 
         layout.addWidget(QLabel("Request:"))
-        self.instruction_edit = QPlainTextEdit()
+        self.instruction_edit = ContextDropTextEdit()
         self.instruction_edit.setPlaceholderText("Describe the analysis…")
         self.instruction_edit.setFixedHeight(60)
+        self.instruction_edit.files_dropped.connect(self.add_context_files)
         layout.addWidget(self.instruction_edit)
+
+        # Chip strip for attached context documents.
+        self._chip_strip_container = QWidget()
+        self._chip_strip_layout = QHBoxLayout(self._chip_strip_container)
+        self._chip_strip_layout.setContentsMargins(0, 0, 0, 0)
+        self._chip_strip_layout.setSpacing(4)
+        layout.addWidget(self._chip_strip_container)
+
+        # Warning label for files that look like they need OCR.
+        self._context_warning_label = QLabel("")
+        self._context_warning_label.setStyleSheet(
+            "color: #856404; background-color: #FFF3CD; "
+            "padding: 4px; border-radius: 3px; font-size: 11px;"
+        )
+        self._context_warning_label.setWordWrap(True)
+        self._context_warning_label.setVisible(False)
+        layout.addWidget(self._context_warning_label)
+
+        self._render_chip_strip()
 
         self.setStyleSheet(
             "CustomAnalysisRow { border: 1px solid #ddd; border-radius: 4px; }"
@@ -206,6 +228,92 @@ class CustomAnalysisRow(QWidget):
 
     def is_empty(self) -> bool:
         return not self.label() and not self.instruction()
+
+    def context_files(self) -> list[str]:
+        return list(self._context_files)
+
+    def add_context_files(self, paths: list[str]) -> None:
+        changed = False
+        for p in paths:
+            if p in self._context_files:
+                continue
+            self._context_files.append(p)
+            changed = True
+        if changed:
+            self._render_chip_strip()
+            self._refresh_context_warning()
+
+    def _remove_context_file(self, path: str) -> None:
+        if path in self._context_files:
+            self._context_files.remove(path)
+            self._render_chip_strip()
+            self._refresh_context_warning()
+
+    def _render_chip_strip(self) -> None:
+        # Remove all widgets currently in the strip.
+        while self._chip_strip_layout.count() > 0:
+            item = self._chip_strip_layout.takeAt(0)
+            w = item.widget()
+            if w is not None and w is not self._add_ctx_btn:
+                w.setParent(None)
+                w.deleteLater()
+        # One chip per attached file.
+        for p in self._context_files:
+            chip = self._build_chip(p)
+            self._chip_strip_layout.addWidget(chip)
+        # Trailing "+ Add context" button (wired in Task 6).
+        if self._add_ctx_btn is None:
+            self._add_ctx_btn = QPushButton("+ Add context")
+            self._add_ctx_btn.setStyleSheet(
+                "QPushButton { font-size: 11px; padding: 2px 8px; }"
+            )
+        # Re-parent the button each render so re-adding it works after takeAt cleared the layout.
+        self._add_ctx_btn.setParent(self._chip_strip_container)
+        self._chip_strip_layout.addWidget(self._add_ctx_btn)
+        self._chip_strip_layout.addStretch()
+
+    def _build_chip(self, path: str) -> QWidget:
+        chip = QFrame()
+        chip.setObjectName("ctx_chip")
+        chip.setStyleSheet(
+            "QFrame#ctx_chip { background: #E3F2FD; border: 1px solid #90CAF9; "
+            "border-radius: 10px; padding: 2px 6px; }"
+        )
+        lay = QHBoxLayout(chip)
+        lay.setContentsMargins(4, 0, 4, 0)
+        lay.setSpacing(4)
+        icon = QLabel("\U0001f4ce")
+        icon.setStyleSheet("font-size: 11px;")
+        lay.addWidget(icon)
+        name = QLabel(os.path.basename(path))
+        name.setObjectName("chip_filename")
+        name.setStyleSheet("font-size: 11px; color: #0D47A1;")
+        name.setToolTip(path)
+        lay.addWidget(name)
+        x_btn = QPushButton("✕")
+        x_btn.setFixedSize(16, 16)
+        x_btn.setStyleSheet(
+            "QPushButton { font-size: 10px; color: #555; border: none; }"
+            "QPushButton:hover { color: #c62828; }"
+        )
+        x_btn.setToolTip(f"Remove {os.path.basename(path)}")
+        x_btn.clicked.connect(lambda _=False, p=path: self._remove_context_file(p))
+        lay.addWidget(x_btn)
+        return chip
+
+    def _refresh_context_warning(self) -> None:
+        bad: list[str] = []
+        for p in self._context_files:
+            has_text, _ = sniff_text_layer(p)
+            if not has_text:
+                bad.append(os.path.basename(p))
+        if bad:
+            self._context_warning_label.setText(
+                "⚠ Likely needs OCR at run time: " + ", ".join(bad)
+            )
+            self._context_warning_label.setVisible(True)
+        else:
+            self._context_warning_label.setVisible(False)
 
 
 class MedChronConfigForm(QWidget):

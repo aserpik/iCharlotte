@@ -264,3 +264,78 @@ def test_context_drop_textedit_mixed_drop_rejects_all(qtbot, tmp_path):
                        Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
     w.dropEvent(event)
     assert received == []
+
+
+# -----------------------------
+# Task 5: CustomAnalysisRow chip strip
+# -----------------------------
+
+def _make_row(qtbot):
+    from icharlotte_core.ui.med_chron_config_form import CustomAnalysisRow
+    row = CustomAnalysisRow(None, on_remove=lambda r: None)
+    qtbot.addWidget(row)
+    return row
+
+
+def test_custom_row_starts_with_no_context_files(qtbot):
+    row = _make_row(qtbot)
+    assert row.context_files() == []
+
+
+def test_custom_row_add_context_files_appends_and_dedupes(qtbot, tmp_path):
+    p1 = tmp_path / "a.txt"
+    p1.write_text("hi", encoding="utf-8")
+    p2 = tmp_path / "b.txt"
+    p2.write_text("hi", encoding="utf-8")
+
+    row = _make_row(qtbot)
+    row.add_context_files([str(p1)])
+    row.add_context_files([str(p1), str(p2)])  # p1 is a dup
+    assert row.context_files() == [str(p1), str(p2)]
+
+
+def test_custom_row_remove_context_file_clears_chip(qtbot, tmp_path):
+    p = tmp_path / "a.txt"
+    p.write_text("hi", encoding="utf-8")
+
+    row = _make_row(qtbot)
+    row.add_context_files([str(p)])
+    assert row.context_files() == [str(p)]
+    row._remove_context_file(str(p))
+    assert row.context_files() == []
+
+
+def test_custom_row_is_empty_ignores_context_files(qtbot, tmp_path):
+    """A row with only files attached (no label, no instruction) is still
+    considered empty so the form doesn't try to persist it."""
+    p = tmp_path / "a.txt"
+    p.write_text("hi", encoding="utf-8")
+
+    row = _make_row(qtbot)
+    row.add_context_files([str(p)])
+    assert row.is_empty() is True
+
+
+def test_custom_row_chip_strip_renders_one_chip_per_file(qtbot, tmp_path):
+    p1 = tmp_path / "a.txt"
+    p1.write_text("hi", encoding="utf-8")
+    p2 = tmp_path / "b.txt"
+    p2.write_text("hi", encoding="utf-8")
+
+    row = _make_row(qtbot)
+    row.add_context_files([str(p1), str(p2)])
+
+    # The strip lays chips out in row._chip_strip_layout — each chip has the
+    # filename in its child QLabel. Iterate widgets and collect labels.
+    from PySide6.QtWidgets import QLabel
+    chip_texts = []
+    for i in range(row._chip_strip_layout.count()):
+        w = row._chip_strip_layout.itemAt(i).widget()
+        if w is None:
+            continue
+        # Each chip's filename QLabel uses objectName "chip_filename"
+        for child in w.findChildren(QLabel):
+            if child.objectName() == "chip_filename":
+                chip_texts.append(child.text())
+    assert "a.txt" in chip_texts
+    assert "b.txt" in chip_texts
