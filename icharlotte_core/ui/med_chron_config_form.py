@@ -113,6 +113,13 @@ class ContextDropTextEdit(QPlainTextEdit):
         self.setAcceptDrops(True)
 
     def _supported_paths(self, mime) -> list[str]:
+        """Return paths for the drop if EVERY URL is a supported local file.
+
+        All-or-nothing: a single non-local URL or unsupported extension
+        rejects the whole drop. Mixed drops (e.g., a PDF + a PNG dragged
+        together) are ambiguous, so the safer default is to reject and let
+        the user retry with a clean selection.
+        """
         if not mime.hasUrls():
             return []
         paths: list[str] = []

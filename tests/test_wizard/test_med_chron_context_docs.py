@@ -238,3 +238,29 @@ def test_context_drop_textedit_plaintext_drop_still_works(qtbot):
     w.dropEvent(event)
     # files_dropped should NOT fire for plain text
     assert received == []
+
+
+def test_context_drop_textedit_mixed_drop_rejects_all(qtbot, tmp_path):
+    """Mixed drop (PDF + PNG) is ambiguous; the whole drop is rejected
+    and no files_dropped signal fires."""
+    from PySide6.QtCore import QMimeData, QPoint, Qt, QUrl
+    from PySide6.QtGui import QDropEvent
+    from icharlotte_core.ui.med_chron_config_form import ContextDropTextEdit
+
+    good = tmp_path / "ok.pdf"
+    good.write_bytes(b"%PDF-1.4")
+    bad = tmp_path / "bad.png"
+    bad.write_bytes(b"\x89PNG\r\n")
+
+    w = ContextDropTextEdit()
+    qtbot.addWidget(w)
+
+    received: list[list[str]] = []
+    w.files_dropped.connect(lambda paths: received.append(paths))
+
+    mime = QMimeData()
+    mime.setUrls([QUrl.fromLocalFile(str(good)), QUrl.fromLocalFile(str(bad))])
+    event = QDropEvent(QPoint(10, 10), Qt.DropAction.CopyAction, mime,
+                       Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier)
+    w.dropEvent(event)
+    assert received == []
