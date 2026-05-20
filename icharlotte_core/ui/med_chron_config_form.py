@@ -18,12 +18,64 @@ global store.
 from pathlib import Path
 from typing import Optional
 
+from PySide6.QtCore import QSettings, Qt
 from PySide6.QtWidgets import (
     QCheckBox, QHBoxLayout, QLabel, QLineEdit, QPlainTextEdit,
-    QPushButton, QScrollArea, QVBoxLayout, QWidget,
+    QPushButton, QScrollArea, QSplitter, QVBoxLayout, QWidget,
 )
 
 from icharlotte_core.med_chron import custom_analyses_store, session_manager
+
+
+# ---- Context-document helpers ----
+
+SUPPORTED_CONTEXT_EXTS = (".pdf", ".docx", ".txt")
+MAX_CONTEXT_CHARS = 120_000  # mirrors the Phase 2 cap; only used by callers that want it
+
+
+def sniff_text_layer(path: str) -> tuple[bool, str]:
+    """Return (has_text, reason).
+
+    Cheap, attach-time check: does this file appear to have extractable
+    text without needing OCR? Used by the UI to warn the user.
+
+    - .txt: any non-whitespace in the first 4 KB.
+    - .docx: any non-empty paragraph in the first ~50 paragraphs.
+    - .pdf: at least 200 chars of text extractable from pages 0..2.
+    - any error / unknown extension: (False, "...").
+    """
+    import os
+
+    ext = os.path.splitext(path)[1].lower()
+    try:
+        if ext == ".txt":
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                sample = f.read(4096)
+            return (bool(sample.strip()), "")
+        if ext == ".docx":
+            from docx import Document
+            doc = Document(path)
+            text = "".join(p.text for p in doc.paragraphs[:50])
+            return (len(text.strip()) > 0, "")
+        if ext == ".pdf":
+            from pypdf import PdfReader
+            reader = PdfReader(path)
+            n = min(3, len(reader.pages))
+            text = ""
+            for i in range(n):
+                try:
+                    text += reader.pages[i].extract_text() or ""
+                except Exception:
+                    pass
+            return (len(text.strip()) > 200, "")
+        return (False, f"unsupported extension {ext}")
+    except FileNotFoundError:
+        return (False, "file not found")
+    except Exception as e:
+        return (False, f"could not read file: {e}")
+
+
+_ANALYSES_SPLITTER_KEY = "med_chron_form/analyses_splitter_sizes"
 
 
 class CustomAnalysisRow(QWidget):
@@ -87,6 +139,7 @@ class MedChronConfigForm(QWidget):
         super().__init__(parent)
         self.session_path = Path(session_path)
         self._session = session_manager.read_session(self.session_path)
+        self._settings = QSettings("iCharlotte", "iCharlotte")
 
         root = QVBoxLayout(self)
         root.setContentsMargins(8, 8, 8, 8)
@@ -111,9 +164,27 @@ class MedChronConfigForm(QWidget):
         )
         root.addWidget(self.narrative_missing_banner)
 
-        # Curated catalog section
-        cat_label = QLabel("<b>Curated analyses:</b>")
-        root.addWidget(cat_label)
+        # Vertical splitter: Curated (top) ↔ Custom (bottom).
+        self._analyses_splitter = QSplitter(Qt.Orientation.Vertical)
+        self._analyses_splitter.setChildrenCollapsible(False)
+        self._analyses_splitter.setHandleWidth(6)
+        self._analyses_splitter.setStyleSheet(
+            "QSplitter::handle { background: #e0e0e0; }"
+            " QSplitter::handle:hover { background: #b0b0b0; }"
+            " QSplitter::handle:pressed { background: #909090; }"
+        )
+
+        # --- Curated catalog pane ---
+        curated_section = QWidget()
+        curated_layout = QVBoxLayout(curated_section)
+        curated_layout.setContentsMargins(0, 0, 0, 0)
+        curated_layout.setSpacing(4)
+        curated_layout.addWidget(QLabel("<b>Curated analyses:</b>"))
+
+        curated_inner = QWidget()
+        curated_inner_layout = QVBoxLayout(curated_inner)
+        curated_inner_layout.setContentsMargins(0, 0, 0, 0)
+        curated_inner_layout.setSpacing(0)
 
         self.catalog_checkboxes: dict[str, QCheckBox] = {}
         for entry in self._session.get("catalog", []):
@@ -129,13 +200,26 @@ class MedChronConfigForm(QWidget):
             desc.setStyleSheet("color: #666; font-size: 11px; padding-left: 22px;")
             desc.setWordWrap(True)
             row_layout.addWidget(desc)
-            root.addWidget(row)
+            curated_inner_layout.addWidget(row)
+        curated_inner_layout.addStretch()
 
-        # Custom analyses section
+        curated_scroll = QScrollArea()
+        curated_scroll.setWidget(curated_inner)
+        curated_scroll.setWidgetResizable(True)
+        curated_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        curated_layout.addWidget(curated_scroll, 1)
+        self._analyses_splitter.addWidget(curated_section)
+
+        # --- Custom analyses pane ---
+        custom_section = QWidget()
+        custom_layout = QVBoxLayout(custom_section)
+        custom_layout.setContentsMargins(0, 0, 0, 0)
+        custom_layout.setSpacing(4)
+
         custom_header = QHBoxLayout()
         custom_header.addWidget(QLabel("<b>Custom analyses:</b>"))
         custom_header.addStretch()
-        root.addLayout(custom_header)
+        custom_layout.addLayout(custom_header)
 
         # Scrollable container for custom rows.
         self._custom_container = QWidget()
@@ -144,12 +228,11 @@ class MedChronConfigForm(QWidget):
         self._custom_container_layout.setSpacing(4)
         self._custom_container_layout.addStretch()  # pin rows to top
 
-        scroll = QScrollArea()
-        scroll.setWidget(self._custom_container)
-        scroll.setWidgetResizable(True)
-        scroll.setMinimumHeight(80)
-        scroll.setMaximumHeight(220)
-        root.addWidget(scroll)
+        custom_scroll = QScrollArea()
+        custom_scroll.setWidget(self._custom_container)
+        custom_scroll.setWidgetResizable(True)
+        custom_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        custom_layout.addWidget(custom_scroll, 1)
 
         self.custom_rows: list[CustomAnalysisRow] = []
 
@@ -162,13 +245,39 @@ class MedChronConfigForm(QWidget):
 
         add_btn = QPushButton("+ Add custom analysis")
         add_btn.clicked.connect(self.add_custom_row)
-        root.addWidget(add_btn)
+        custom_layout.addWidget(add_btn)
+
+        self._analyses_splitter.addWidget(custom_section)
+        self._analyses_splitter.setStretchFactor(0, 1)
+        self._analyses_splitter.setStretchFactor(1, 1)
+        self._restore_analyses_splitter_sizes()
+        self._analyses_splitter.splitterMoved.connect(
+            self._save_analyses_splitter_sizes
+        )
+        root.addWidget(self._analyses_splitter, 1)
 
         # Inline validation error label.
         self._error_label = QLabel("")
         self._error_label.setStyleSheet("color: #c62828; font-style: italic;")
         self._error_label.setVisible(False)
         root.addWidget(self._error_label)
+
+    def _restore_analyses_splitter_sizes(self) -> None:
+        saved = self._settings.value(_ANALYSES_SPLITTER_KEY)
+        if saved:
+            try:
+                sizes = [int(x) for x in saved]
+                if len(sizes) == 2 and all(s > 0 for s in sizes):
+                    self._analyses_splitter.setSizes(sizes)
+                    return
+            except (TypeError, ValueError):
+                pass
+        self._analyses_splitter.setSizes([240, 200])
+
+    def _save_analyses_splitter_sizes(self, *_args) -> None:
+        self._settings.setValue(
+            _ANALYSES_SPLITTER_KEY, self._analyses_splitter.sizes()
+        )
 
     def add_custom_row(self) -> "CustomAnalysisRow":
         row = CustomAnalysisRow(self._custom_container, self._remove_custom_row)
