@@ -70,3 +70,77 @@ def test_sniff_text_layer_unreadable_returns_false(tmp_path):
     has_text, reason = sniff_text_layer(str(tmp_path / "ghost.pdf"))
     assert has_text is False
     assert reason  # non-empty reason string
+
+
+def test_sniff_text_layer_docx_with_table_content_only(tmp_path):
+    """python-docx's doc.paragraphs skips tables — sniff must also sample
+    table cells so docs whose content lives in tables (legal chronological
+    summaries, intake forms) aren't falsely flagged as 'no text layer'."""
+    from docx import Document
+    from icharlotte_core.ui.med_chron_config_form import sniff_text_layer
+    p = tmp_path / "tables_only.docx"
+    doc = Document()
+    table = doc.add_table(rows=2, cols=2)
+    table.cell(0, 0).text = "Date"
+    table.cell(0, 1).text = "Provider"
+    table.cell(1, 0).text = "2024-02-01"
+    table.cell(1, 1).text = "Acme PT"
+    doc.save(str(p))
+    has_text, _ = sniff_text_layer(str(p))
+    assert has_text is True
+
+
+def test_sniff_text_layer_pdf_with_text_layer(tmp_path):
+    """A PDF whose first page has > 200 chars of extractable text returns
+    (True, '')."""
+    from pypdf import PdfWriter
+    from icharlotte_core.ui.med_chron_config_form import sniff_text_layer
+
+    try:
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import letter
+    except ImportError:
+        pytest.skip("reportlab not installed — needed to build a text-layer PDF")
+
+    p = tmp_path / "with_text.pdf"
+    c = canvas.Canvas(str(p), pagesize=letter)
+    # > 200 chars of extractable text. Spread across a few lines.
+    long_line = "The defense theory rests on plaintiff's pre-existing degenerative changes documented across multiple imaging studies."
+    y = 750
+    for _ in range(3):
+        c.drawString(72, y, long_line)
+        y -= 20
+    c.save()
+
+    has_text, _ = sniff_text_layer(str(p))
+    assert has_text is True
+
+
+def test_sniff_text_layer_pdf_below_threshold(tmp_path):
+    """A PDF with very little text (under 200 chars) returns (False, reason)."""
+    from icharlotte_core.ui.med_chron_config_form import sniff_text_layer
+
+    try:
+        from reportlab.pdfgen import canvas
+        from reportlab.lib.pagesizes import letter
+    except ImportError:
+        pytest.skip("reportlab not installed — needed to build a text-layer PDF")
+
+    p = tmp_path / "tiny_text.pdf"
+    c = canvas.Canvas(str(p), pagesize=letter)
+    c.drawString(72, 750, "Tiny.")  # only 5 chars
+    c.save()
+
+    has_text, reason = sniff_text_layer(str(p))
+    assert has_text is False
+    assert reason  # non-empty reason
+
+
+def test_sniff_text_layer_unsupported_extension(tmp_path):
+    """An .rtf or .png is reported as unsupported with a descriptive reason."""
+    from icharlotte_core.ui.med_chron_config_form import sniff_text_layer
+    p = tmp_path / "image.png"
+    p.write_bytes(b"\x89PNG\r\n")
+    has_text, reason = sniff_text_layer(str(p))
+    assert has_text is False
+    assert ".png" in reason

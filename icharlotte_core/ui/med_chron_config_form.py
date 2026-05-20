@@ -40,7 +40,9 @@ def sniff_text_layer(path: str) -> tuple[bool, str]:
     text without needing OCR? Used by the UI to warn the user.
 
     - .txt: any non-whitespace in the first 4 KB.
-    - .docx: any non-empty paragraph in the first ~50 paragraphs.
+    - .docx: any non-empty paragraph OR table cell in the first ~50 paragraphs
+      / ~5 tables. (python-docx's `doc.paragraphs` silently skips tables —
+      see CLAUDE.md gotcha — so we also sample table cells.)
     - .pdf: at least 200 chars of text extractable from pages 0..2.
     - any error / unknown extension: (False, "...").
     """
@@ -51,12 +53,29 @@ def sniff_text_layer(path: str) -> tuple[bool, str]:
         if ext == ".txt":
             with open(path, "r", encoding="utf-8", errors="ignore") as f:
                 sample = f.read(4096)
-            return (bool(sample.strip()), "")
+            if sample.strip():
+                return (True, "")
+            return (False, "no text content")
         if ext == ".docx":
             from docx import Document
             doc = Document(path)
             text = "".join(p.text for p in doc.paragraphs[:50])
-            return (len(text.strip()) > 0, "")
+            if not text.strip():
+                # python-docx skips tables — sample a few cells too so we
+                # don't falsely flag table-based docs as "no text layer".
+                for table in doc.tables[:5]:
+                    for row in table.rows[:20]:
+                        for cell in row.cells:
+                            text += cell.text
+                            if text.strip():
+                                break
+                        if text.strip():
+                            break
+                    if text.strip():
+                        break
+            if text.strip():
+                return (True, "")
+            return (False, "no extractable text in paragraphs or tables")
         if ext == ".pdf":
             from pypdf import PdfReader
             reader = PdfReader(path)
@@ -67,7 +86,9 @@ def sniff_text_layer(path: str) -> tuple[bool, str]:
                     text += reader.pages[i].extract_text() or ""
                 except Exception:
                     pass
-            return (len(text.strip()) > 200, "")
+            if len(text.strip()) > 200:
+                return (True, "")
+            return (False, "too little extractable text — OCR may be required")
         return (False, f"unsupported extension {ext}")
     except FileNotFoundError:
         return (False, "file not found")
