@@ -169,24 +169,54 @@ class TaskTab(QStackedWidget):
 
     # ---- Worker ----
 
-    def _start_run(self, settings_dict: dict) -> None:
+    # Scripts that ship their own internal multi-file dispatcher (party
+    # grouping, consolidation passes, etc.) and would have those behaviors
+    # broken by the generic per-file ParallelSubprocessWorker.
+    _DISPATCHER_SCRIPTS = frozenset({"summarize_discovery.py"})
+
+    @staticmethod
+    def _pick_worker_cls(script_name: str, num_files: int) -> type:
+        """Decide which runner class to use for ``script_name`` and
+        ``num_files``.
+
+        - Two-phase agents (AWAITING_INPUT/Phase 2) always run sequentially.
+        - Single-file runs always run sequentially — process_document
+          already handles append-into-existing-party-file natively.
+        - Multi-file dispatcher-aware agents (summarize_discovery.py) use
+          DispatcherSubprocessWorker so the script's own dispatcher
+          handles party grouping + consolidation.
+        - Everything else with >1 file uses the per-file parallel runner.
+        """
         from .runners.subprocess_worker import SubprocessWorker
         from .runners.parallel_subprocess_worker import (
             ParallelSubprocessWorker,
             _TWO_PHASE_SCRIPTS,
         )
+        from .runners.dispatcher_subprocess_worker import (
+            DispatcherSubprocessWorker,
+        )
+
+        if num_files <= 1 or script_name in _TWO_PHASE_SCRIPTS:
+            return SubprocessWorker
+        if script_name in TaskTab._DISPATCHER_SCRIPTS:
+            return DispatcherSubprocessWorker
+        return ParallelSubprocessWorker
+
+    def _start_run(self, settings_dict: dict) -> None:
+        from .runners.subprocess_worker import SubprocessWorker
+        from .runners.parallel_subprocess_worker import ParallelSubprocessWorker
+        from .runners.dispatcher_subprocess_worker import (
+            DispatcherSubprocessWorker,
+        )
 
         self._awaiting_session_path = None
         self.status_page.on_status(f"Starting {self._spec.title}…")
 
-        # Use parallel runner when we have >1 file AND the agent isn't two-phase
-        # (two-phase = AWAITING_INPUT/Phase-2 flow; only summarize_deposition today).
-        use_parallel = (
-            len(self._files) > 1
-            and self._spec.script_name not in _TWO_PHASE_SCRIPTS
+        worker_cls = self._pick_worker_cls(
+            self._spec.script_name, len(self._files)
         )
 
-        if use_parallel:
+        if worker_cls is ParallelSubprocessWorker:
             self._worker = ParallelSubprocessWorker(
                 script_name=self._spec.script_name,
                 case_path=self._case_path,
@@ -194,6 +224,15 @@ class TaskTab(QStackedWidget):
                 files=self._files,
                 settings=settings_dict,
                 max_concurrent=3,
+                parent=self,
+            )
+        elif worker_cls is DispatcherSubprocessWorker:
+            self._worker = DispatcherSubprocessWorker(
+                script_name=self._spec.script_name,
+                case_path=self._case_path,
+                file_number=self._file_number,
+                files=self._files,
+                settings=settings_dict,
                 parent=self,
             )
         else:
