@@ -612,6 +612,10 @@ class PromptsDialog(QDialog):
         self.tabs.addTab(self._create_ab_testing_tab(), "A/B Testing")
         self.tabs.addTab(self._create_history_tab(), "Version History")
         self.tabs.addTab(self._create_dashboard_tab(), "Dashboard")
+        self.model_defaults_widget = LLMSettingsWidget(self)
+        self.model_defaults_widget.settings_saved.connect(self._refresh_model_settings_from_defaults)
+        self.model_defaults_widget.settings_reset.connect(self._refresh_model_settings_from_defaults)
+        self.tabs.addTab(self.model_defaults_widget, "Model Defaults")
         layout.addWidget(self.tabs)
 
         # Bottom buttons
@@ -913,6 +917,11 @@ class PromptsDialog(QDialog):
             else:
                 # No custom models, add one default to start
                 self._add_default_model_row()
+
+    def _refresh_model_settings_from_defaults(self):
+        """Refresh selected-agent model display after default settings change."""
+        self.llm_config = LLMConfig()
+        self._load_agent_model_settings()
 
     def _save_agent_model_settings(self):
         """Save model settings for the current agent."""
