@@ -597,6 +597,12 @@ class RespondDiscoverySettingsPage(QWidget):
         self.request_text.setTextInteractionFlags(Qt.TextSelectableByMouse)
         layout.addWidget(self.request_text)
 
+        self.review_warning_label = QLabel("")
+        self.review_warning_label.setWordWrap(True)
+        self.review_warning_label.setStyleSheet("color: #8a5a00; font-weight: 600;")
+        self.review_warning_label.hide()
+        layout.addWidget(self.review_warning_label)
+
         layout.addWidget(QLabel("Objections"))
         self.objection_edit = QPlainTextEdit()
         self.objection_edit.setMinimumHeight(115)
@@ -678,6 +684,12 @@ class RespondDiscoverySettingsPage(QWidget):
         self.request_text.setText(review.request_text)
         self.objection_edit.setPlainText(review.proposed_objections)
         self.response_edit.setPlainText(review.proposed_substantive_response)
+        if review.needs_review and review.review_reason:
+            self.review_warning_label.setText(f"Needs review: {review.review_reason}")
+            self.review_warning_label.show()
+        else:
+            self.review_warning_label.setText("")
+            self.review_warning_label.hide()
         for rule_id, cb in self._quick_checks.items():
             cb.blockSignals(True)
             cb.setChecked(rule_id in review.selected_quick_objection_ids)

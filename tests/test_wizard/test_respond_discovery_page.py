@@ -420,6 +420,40 @@ class RespondDiscoverySettingsPageTests(unittest.TestCase):
         self.assertTrue(page.review_state.requests[0].approved)
         self.assertFalse(page.review_state.requests[1].approved)
 
+    def test_review_warning_label_shows_current_request_reason(self):
+        parsed = ParsedDiscovery(
+            discovery_type="SI",
+            propounding_party="Plaintiff Smith",
+            responding_party="Defendant Jones",
+            set_number=1,
+            set_word="ONE",
+            case_number="123",
+            requests=[ParsedRequest(number="1", text="Identify witnesses.")],
+        )
+        state = ReviewState(
+            [
+                RequestReview(
+                    number="1",
+                    request_text="Identify witnesses.",
+                    proposed_substantive_response="Unknown.",
+                    needs_review=True,
+                    review_reason="No specific context found.",
+                )
+            ]
+        )
+
+        page = RespondDiscoverySettingsPage(
+            case_root="",
+            file_number="1234.001",
+            discovery_file=r"C:\case\srogg.pdf",
+            detected_type="SI",
+            parsed_discovery=parsed,
+            review_state=state,
+        )
+
+        self.assertFalse(page.review_warning_label.isHidden())
+        self.assertIn("No specific context found", page.review_warning_label.text())
+
     def test_context_file_picker_starts_in_status_folder_next_to_discovery_file(self):
         with tempfile.TemporaryDirectory(dir="C:\\geminiterminal2") as tmp:
             propounded = Path(tmp) / "DISCOVERY" / "PROPOUNDED"
