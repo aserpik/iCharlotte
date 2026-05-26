@@ -284,6 +284,99 @@ class RespondDiscoverySettingsPageTests(unittest.TestCase):
         self.assertIn("John Smith saw the collision", first_prompt)
         self.assertIn("Photos and repair invoices exist", second_prompt)
 
+    @patch("icharlotte_core.llm_config.call_llm")
+    def test_structured_proposal_map_skips_fixed_fi_responses(self, mock_call):
+        parsed = ParsedDiscovery(
+            discovery_type="FI",
+            propounding_party="Plaintiff Smith",
+            responding_party="Defendant Jones",
+            set_number=1,
+            set_word="ONE",
+            case_number="123",
+            requests=[ParsedRequest(number="1.1", text="State who answered.")],
+        )
+
+        proposals = _build_structured_proposal_map(
+            parsed=parsed,
+            selected_rules=[],
+            context_text_by_path={"status.txt": "Attorney contact information."},
+            response_rules=ResponseRules(),
+            fi_mode="fixed",
+        )
+
+        self.assertEqual(proposals, {})
+        mock_call.assert_not_called()
+
+    @patch("icharlotte_core.llm_config.call_llm")
+    def test_structured_proposal_map_flags_empty_context_even_if_model_does_not(self, mock_call):
+        parsed = ParsedDiscovery(
+            discovery_type="SI",
+            propounding_party="Plaintiff Smith",
+            responding_party="Defendant Jones",
+            set_number=1,
+            set_word="ONE",
+            case_number="123",
+            requests=[ParsedRequest(number="1", text="Identify all witnesses.")],
+        )
+        mock_call.return_value = (
+            '{"request_number":"1",'
+            '"conditional_objection_rule_ids":[],' 
+            '"applied_custom_rule_ids":[],' 
+            '"applied_instruction_rule_ids":[],' 
+            '"ambiguous_term":"",'
+            '"proposed_objections":"",'
+            '"proposed_substantive_response":"Unknown.",'
+            '"needs_review":false,'
+            '"review_reason":""}'
+        )
+
+        proposals = _build_structured_proposal_map(
+            parsed=parsed,
+            selected_rules=[],
+            context_text_by_path={},
+            response_rules=ResponseRules(),
+        )
+
+        self.assertTrue(proposals["1"].needs_review)
+        self.assertIn("No specific context found", proposals["1"].review_reason)
+
+    @patch("icharlotte_core.llm_config.call_llm")
+    def test_structured_proposal_map_retries_invalid_json_once(self, mock_call):
+        parsed = ParsedDiscovery(
+            discovery_type="SI",
+            propounding_party="Plaintiff Smith",
+            responding_party="Defendant Jones",
+            set_number=1,
+            set_word="ONE",
+            case_number="123",
+            requests=[ParsedRequest(number="1", text="Identify all witnesses.")],
+        )
+        mock_call.side_effect = [
+            "not json",
+            (
+                '{"request_number":"1",'
+                '"conditional_objection_rule_ids":[],' 
+                '"applied_custom_rule_ids":[],' 
+                '"applied_instruction_rule_ids":[],' 
+                '"ambiguous_term":"",'
+                '"proposed_objections":"",'
+                '"proposed_substantive_response":"Jane Roe.",'
+                '"needs_review":false,'
+                '"review_reason":""}'
+            ),
+        ]
+
+        proposals = _build_structured_proposal_map(
+            parsed=parsed,
+            selected_rules=[],
+            context_text_by_path={"status.txt": "Witnesses\nJane Roe saw the collision."},
+            response_rules=ResponseRules(),
+        )
+
+        self.assertEqual(proposals["1"].proposed_substantive_response, "Jane Roe.")
+        self.assertEqual(mock_call.call_count, 2)
+        self.assertIn("Repair this structured discovery proposal JSON", mock_call.call_args_list[1].args[0])
+
     def test_fixed_fi_non_fixed_request_uses_proposal_substantive_callback(self):
         parsed = ParsedDiscovery(
             discovery_type="FI",

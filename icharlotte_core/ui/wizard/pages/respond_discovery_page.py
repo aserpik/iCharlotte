@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from typing import Iterable
 
 from PySide6.QtCore import Qt, QThread, Signal
@@ -552,6 +552,7 @@ class RespondDiscoverySettingsPage(QWidget):
             selected_rules=selected_rules,
             context_text_by_path=context_text_by_path,
             response_rules=response_rules,
+            fi_mode=self.fi_mode,
         )
         self.review_state = _generate_review_state_from_proposals(
             self.parsed_discovery,
@@ -891,6 +892,7 @@ class RespondDiscoveryProposalWorker(QThread):
                 selected_rules=self.selected_rules,
                 context_text_by_path=context_text_by_path,
                 response_rules=response_rules,
+                fi_mode=self.fi_mode,
             )
 
             review_state = _generate_review_state_from_proposals(
@@ -916,6 +918,7 @@ def _build_structured_proposal_map(
     selected_rules: list[ResponseRule],
     context_text_by_path: dict[str, str],
     response_rules: ResponseRules | None = None,
+    fi_mode: str = "custom",
 ) -> dict[str, StructuredProposal]:
     from icharlotte_core.llm_config import call_llm
 
@@ -923,6 +926,8 @@ def _build_structured_proposal_map(
     chunks = build_context_chunks(context_text_by_path)
     proposals: dict[str, StructuredProposal] = {}
     for req in parsed.requests:
+        if _should_skip_structured_proposal(req, parsed, response_rules, fi_mode):
+            continue
         packet_chunks = select_context_packet(req, chunks)
         context_packet = format_context_packet(packet_chunks)
         prompt = build_structured_proposal_prompt(
@@ -934,7 +939,21 @@ def _build_structured_proposal_map(
         )
         try:
             raw = call_llm(prompt, "", task_type="general", agent_id="agent_sum_disc")
-            proposals[req.number] = parse_structured_proposal_response(raw or "")
+            try:
+                proposal = parse_structured_proposal_response(raw or "")
+            except Exception:
+                repair_prompt = _build_structured_proposal_repair_prompt(
+                    raw or "",
+                    req.number,
+                )
+                repaired = call_llm(
+                    repair_prompt,
+                    "",
+                    task_type="general",
+                    agent_id="agent_sum_disc",
+                )
+                proposal = parse_structured_proposal_response(repaired or "")
+            proposals[req.number] = _ensure_context_warning(proposal, context_packet)
         except Exception:
             proposals[req.number] = build_fallback_structured_proposal(
                 req,
@@ -942,6 +961,45 @@ def _build_structured_proposal_map(
                 context_packet,
             )
     return proposals
+
+
+def _should_skip_structured_proposal(
+    request: ParsedRequest,
+    parsed: ParsedDiscovery,
+    response_rules: ResponseRules,
+    fi_mode: str,
+) -> bool:
+    if normalize_discovery_type(parsed.discovery_type) != "FI" or fi_mode != "fixed":
+        return False
+    if detect_inapplicable_fi(request.number):
+        return True
+    return get_fi_fixed_response(request.number, response_rules) is not None
+
+
+def _build_structured_proposal_repair_prompt(raw_text: str, request_number: str) -> str:
+    return (
+        "Repair this structured discovery proposal JSON. "
+        "Return ONLY one valid JSON object with the same schema. "
+        f"The request_number must be {request_number}.\n\n"
+        f"INVALID RESPONSE:\n{raw_text}"
+    )
+
+
+def _ensure_context_warning(
+    proposal: StructuredProposal,
+    context_packet: str,
+) -> StructuredProposal:
+    if (context_packet or "").strip():
+        return proposal
+    reason = (proposal.review_reason or "").strip()
+    missing_context = "No specific context found."
+    if missing_context.lower() not in reason.lower():
+        reason = f"{reason} {missing_context}".strip()
+    return replace(
+        proposal,
+        needs_review=True,
+        review_reason=reason,
+    )
 
 
 def _generate_review_state_from_proposals(
