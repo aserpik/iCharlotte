@@ -32,8 +32,9 @@ _LOW_SIGNAL_TERMS = {
 def build_context_chunks(text_by_path: Mapping[str, str]) -> list[ContextChunk]:
     chunks: list[ContextChunk] = []
     for source_path, text in text_by_path.items():
-        for sequence, chunk_text in enumerate(_split_text(text), start=1):
-            heading = _detect_heading(chunk_text)
+        for sequence, raw_chunk_text in enumerate(_split_text(text), start=1):
+            heading = _detect_heading(raw_chunk_text)
+            chunk_text = _collapse_text(raw_chunk_text)
             chunks.append(
                 ContextChunk(
                     source_path=source_path,
@@ -71,16 +72,19 @@ def format_context_packet(chunks: Iterable[ContextChunk]) -> str:
 def _split_text(text: str) -> list[str]:
     normalized = re.sub(r"\r\n?", "\n", text or "")
     raw_parts = re.split(r"\n\s*\n+", normalized)
-    chunks = [re.sub(r"\s+", " ", part).strip() for part in raw_parts]
-    return [chunk for chunk in chunks if len(chunk) >= 20]
+    chunks = [part.strip() for part in raw_parts]
+    return [chunk for chunk in chunks if len(_collapse_text(chunk)) >= 20]
+
+
+def _collapse_text(text: str) -> str:
+    return re.sub(r"\s+", " ", text or "").strip()
 
 
 def _detect_heading(text: str) -> str:
     first_line = (text or "").splitlines()[0].strip() if text else ""
     if 0 < len(first_line) <= 80 and not first_line.endswith("."):
         return first_line
-    match = re.match(r"^([A-Z][A-Za-z /-]{2,60})\s+", text or "")
-    return match.group(1).strip() if match else ""
+    return ""
 
 
 def _score_chunk(request: ParsedRequest, chunk: ContextChunk) -> int:

@@ -25,7 +25,22 @@ class ResponseContextIndexTests(unittest.TestCase):
         self.assertGreaterEqual(len(chunks), 2)
         self.assertEqual(chunks[0].source_path, r"C:\case\status.txt")
         self.assertEqual(chunks[0].sequence, 1)
+        self.assertEqual(chunks[0].heading, "Witnesses")
+        self.assertEqual(chunks[1].heading, "Damages")
         self.assertIn("John Smith", "\n".join(chunk.text for chunk in chunks))
+
+    def test_build_context_chunks_does_not_treat_sentence_start_as_heading(self):
+        chunks = build_context_chunks(
+            {
+                r"C:\case\status.txt": (
+                    "John Smith saw the impact and reported it.\n"
+                    "Plaintiff later claimed neck pain."
+                )
+            }
+        )
+
+        self.assertEqual(len(chunks), 1)
+        self.assertEqual(chunks[0].heading, "")
 
     def test_select_context_packet_prefers_request_terms(self):
         chunks = [
