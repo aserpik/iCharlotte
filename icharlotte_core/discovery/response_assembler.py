@@ -169,6 +169,93 @@ def parse_response_text(text: str, disc_type: str) -> List[Dict]:
     return pairs
 
 
+def _collect_document_text(doc) -> str:
+    """Return visible paragraph and table-cell text from a docx document."""
+    chunks: List[str] = []
+    chunks.extend(paragraph.text for paragraph in doc.paragraphs if paragraph.text)
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                if cell.text:
+                    chunks.append(cell.text)
+    return "\n".join(chunks)
+
+
+def _fill_firm_contact_placeholders(
+    text: str,
+    caption_text: str,
+    fallback_firm_name: str = "Bordin Semmer LLP",
+) -> str:
+    """Fill FI 1.1 firm placeholders from the caption page contact block."""
+    if not text or "{firm_" not in text:
+        return text
+
+    firm_name, firm_address, firm_phone = _extract_firm_contact(caption_text)
+    replacements = {
+        "{firm_name}": firm_name or fallback_firm_name,
+        "{firm_address}": firm_address or "{firm_address}",
+        "{firm_phone}": firm_phone or "{firm_phone}",
+    }
+    filled = text
+    for placeholder, value in replacements.items():
+        filled = filled.replace(placeholder, value)
+    return filled
+
+
+def _extract_firm_contact(caption_text: str) -> tuple[str, str, str]:
+    lines = [
+        line.strip()
+        for line in (caption_text or "").splitlines()
+        if line.strip()
+    ]
+    firm_name = next((line for line in lines if _looks_like_firm_name(line)), "")
+
+    phone = ""
+    phone_idx = None
+    for idx, line in enumerate(lines):
+        match = re.search(r"\b(?:phone|tel(?:ephone)?)\s*[:\-]?\s*(.+)", line, re.I)
+        if match:
+            phone = match.group(1).strip()
+            phone_idx = idx
+            break
+
+    address_lines: List[str] = []
+    if phone_idx is not None:
+        idx = phone_idx - 1
+        while idx >= 0 and len(address_lines) < 3:
+            line = lines[idx]
+            if _is_firm_contact_boundary(line, firm_name):
+                if address_lines:
+                    break
+                idx -= 1
+                continue
+            address_lines.append(line)
+            idx -= 1
+        address_lines.reverse()
+
+    return firm_name, ", ".join(address_lines), phone
+
+
+def _is_firm_contact_boundary(line: str, firm_name: str) -> bool:
+    upper = line.upper()
+    return (
+        "@" in line
+        or "STATE BAR" in upper
+        or "ATTORNEY" in upper
+        or "PHONE" in upper
+        or "FAX" in upper
+        or (firm_name and upper == firm_name.upper())
+        or "BORDIN SEMMER" in upper
+    )
+
+
+def _looks_like_firm_name(line: str) -> bool:
+    upper = line.upper()
+    if "DATED" in upper or "\t" in line or ":" in line:
+        return False
+    return bool(re.search(r"\b(?:LLP|LLC|APC|PLC|INC\.?|CORP\.?)$", upper))
+
+
 # ---------------------------------------------------------------------------
 # ResponseAssembler class
 # ---------------------------------------------------------------------------
@@ -250,6 +337,11 @@ class ResponseAssembler:
             self._insert_general_objections(doc, disc_type, rules)
 
         # (7) Request/response pairs
+        response_text = _fill_firm_contact_placeholders(
+            response_text,
+            _collect_document_text(doc),
+            fallback_firm_name=firm_name,
+        )
         pairs = parse_response_text(response_text, disc_type)
         self._insert_response_pairs(doc, pairs, disc_type, set_word, rules)
 
@@ -463,12 +555,12 @@ class ResponseAssembler:
                 resp_text, waiver, reservation
             )
 
-            # Objections + waiver on the same paragraph (waiver follows objections inline)
-            if obj_part:
+            # Objections + waiver on the same paragraph only when both exist.
+            # A response with no objections should not get waiver language.
+            if obj_part and subst_part:
                 _add_para(doc, f"{obj_part} {waiver}", STYLE_BODY_DOUBLE)
-            else:
-                # No separate objections found — insert waiver as its own paragraph
-                _add_para(doc, waiver, STYLE_BODY_DOUBLE)
+            elif obj_part:
+                _add_para(doc, obj_part, STYLE_BODY_DOUBLE)
 
             # Substantive response — new paragraph with explicit 0.5" first-line indent
             if subst_part:
@@ -482,8 +574,6 @@ class ResponseAssembler:
                     # Ensure first line indent on the first substantive paragraph
                     if i == 0:
                         p.paragraph_format.first_line_indent = Inches(0.5)
-            elif reservation:
-                _add_para(doc, reservation, STYLE_BODY_DOUBLE)
 
     def _insert_verification(
         self,

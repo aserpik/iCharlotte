@@ -56,14 +56,14 @@ def test_atomic_write_uses_tmp_then_rename(tmp_path):
     p = WizardStatePersistence(str(tmp_path))
     p.set_open_tabs([])
     p.save()
-    state_file = os.path.join(str(tmp_path), ".icharlotte", "wizard_state.json")
+    state_file = os.path.join(str(tmp_path), "NOTES", "AI OUTPUT", ".icharlotte", "wizard_state.json")
     assert os.path.exists(state_file)
     # tmp file should not be lingering.
     assert not os.path.exists(state_file + ".tmp")
 
 
 def test_corrupt_file_falls_back_to_default(tmp_path):
-    folder = os.path.join(str(tmp_path), ".icharlotte")
+    folder = os.path.join(str(tmp_path), "NOTES", "AI OUTPUT", ".icharlotte")
     os.makedirs(folder)
     with open(os.path.join(folder, "wizard_state.json"), "w") as f:
         f.write("{ not json")
@@ -77,5 +77,16 @@ def test_readme_created_on_first_save(tmp_path):
     p = WizardStatePersistence(str(tmp_path))
     p.set_open_tabs([])
     p.save()
-    readme = os.path.join(str(tmp_path), ".icharlotte", "README.txt")
+    readme = os.path.join(str(tmp_path), "NOTES", "AI OUTPUT", ".icharlotte", "README.txt")
     assert os.path.exists(readme)
+
+
+def test_folder_path_under_notes_ai_output(tmp_path):
+    """`.icharlotte` lives under NOTES/AI OUTPUT, not at the case root."""
+    p = WizardStatePersistence(str(tmp_path))
+    p.set_open_tabs([])
+    p.save()
+    # Folder must NOT be created at case root.
+    assert not os.path.exists(os.path.join(str(tmp_path), ".icharlotte"))
+    # Folder must be under NOTES/AI OUTPUT.
+    assert os.path.isdir(os.path.join(str(tmp_path), "NOTES", "AI OUTPUT", ".icharlotte"))

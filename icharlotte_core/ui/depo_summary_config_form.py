@@ -88,31 +88,60 @@ class DepoSummaryConfigForm(QWidget):
         topics_layout.addWidget(self.topics_list)
         self.form_splitter.addWidget(topics_section)
 
-        # Section 1: Bias row (non-collapsible, fixed-ish single row)
-        bias_section = QWidget()
-        bias_layout = QHBoxLayout(bias_section)
-        bias_layout.setContentsMargins(0, 0, 0, 0)
-        bias_layout.setSpacing(8)
-        bias_layout.addWidget(QLabel("Summary bias:"))
-        self.bias_combo = QComboBox()
+        # Section 1: Audience + Tone row (non-collapsible)
+        posture_section = QWidget()
+        posture_layout = QVBoxLayout(posture_section)
+        posture_layout.setContentsMargins(0, 0, 0, 0)
+        posture_layout.setSpacing(4)
+
+        # Audience sub-row
+        audience_row = QHBoxLayout()
+        audience_row.setContentsMargins(0, 0, 0, 0)
+        audience_row.setSpacing(8)
+        audience_row.addWidget(QLabel("Audience:"))
+        self.audience_combo = QComboBox()
         for label, value in (
             ("Neutral", "neutral"),
-            ("Most favorable to plaintiff", "pro_plaintiff"),
-            ("Most favorable to defense", "pro_defense"),
+            ("Plaintiff's Counsel", "pro_plaintiff"),
+            ("Defense Counsel", "pro_defense"),
             ("Custom…", "custom"),
         ):
-            self.bias_combo.addItem(label, value)
-        bias_layout.addWidget(self.bias_combo)
-        self.bias_custom_edit = QLineEdit()
-        self.bias_custom_edit.setPlaceholderText(
-            "Describe the editorial lens (e.g., 'Highlight any inconsistencies in injury testimony')"
+            self.audience_combo.addItem(label, value)
+        audience_row.addWidget(self.audience_combo)
+        self.audience_custom_edit = QLineEdit()
+        self.audience_custom_edit.setPlaceholderText(
+            "Describe the audience (e.g., 'Insurance carrier evaluating settlement value')"
         )
-        self.bias_custom_edit.setVisible(False)
-        bias_layout.addWidget(self.bias_custom_edit, 1)
-        self.form_splitter.addWidget(bias_section)
+        self.audience_custom_edit.setVisible(False)
+        audience_row.addWidget(self.audience_custom_edit, 1)
+        posture_layout.addLayout(audience_row)
+
+        # Tone sub-row
+        tone_row = QHBoxLayout()
+        tone_row.setContentsMargins(0, 0, 0, 0)
+        tone_row.setSpacing(8)
+        tone_row.addWidget(QLabel("Tone:"))
+        self.tone_combo = QComboBox()
+        for label, value in (
+            ("Recitation (no editorializing)", "recitation"),
+            ("Editorial (allow analysis)", "editorial"),
+            ("Custom…", "custom"),
+        ):
+            self.tone_combo.addItem(label, value)
+        tone_row.addWidget(self.tone_combo)
+        self.tone_custom_edit = QLineEdit()
+        self.tone_custom_edit.setPlaceholderText(
+            "Describe the desired tone (e.g., 'Use plain-English, jury-presentation style')"
+        )
+        self.tone_custom_edit.setVisible(False)
+        tone_row.addWidget(self.tone_custom_edit, 1)
+        posture_layout.addLayout(tone_row)
+
+        self.form_splitter.addWidget(posture_section)
         self.form_splitter.setCollapsible(1, False)
 
-        self.bias_combo.currentIndexChanged.connect(self._on_bias_combo_changed)
+        self.audience_combo.currentIndexChanged.connect(self._on_audience_combo_changed)
+        self.tone_combo.currentIndexChanged.connect(self._on_tone_combo_changed)
 
         # Section 2: Additional topics
         added_section = QWidget()
@@ -219,9 +248,9 @@ class DepoSummaryConfigForm(QWidget):
         if state:
             self.form_splitter.restoreState(state)
         else:
-            # First-run defaults (pixels): topics=130, bias=32, added=70,
+            # First-run defaults (pixels): topics=130, audience+tone=60, added=70,
             # settings=32, rules=80, context=80
-            self.form_splitter.setSizes([130, 32, 70, 32, 80, 80])
+            self.form_splitter.setSizes([130, 60, 70, 32, 80, 80])
 
     def _save_splitter(self):
         settings = QSettings("iCharlotte", "iCharlotte")
@@ -257,6 +286,8 @@ class DepoSummaryConfigForm(QWidget):
             )
             return None
         context_doc_paths = [str(p.resolve()) for p in self._context_doc_paths if p.exists()]
+        audience_value = self.audience_combo.currentData() or "neutral"
+        tone_value = self.tone_combo.currentData() or "recitation"
         cfg = {
             "selected_topics": selected_topics,
             "added_topics": added_topics,
@@ -265,9 +296,12 @@ class DepoSummaryConfigForm(QWidget):
             "custom_rules": self.custom_rules_edit.toPlainText().strip(),
             "cross_check_enabled": self.cross_check_checkbox.isChecked(),
             "context_doc_paths": context_doc_paths,
-            "bias": self.bias_combo.currentData() or "neutral",
-            "bias_custom": (self.bias_custom_edit.text().strip()
-                            if self.bias_combo.currentData() == "custom" else ""),
+            "audience": audience_value,
+            "audience_custom": (self.audience_custom_edit.text().strip()
+                                if audience_value == "custom" else ""),
+            "tone": tone_value,
+            "tone_custom": (self.tone_custom_edit.text().strip()
+                            if tone_value == "custom" else ""),
         }
         return cfg
 
@@ -284,11 +318,17 @@ class DepoSummaryConfigForm(QWidget):
 
     # ---- Internal helpers ----
 
-    def _on_bias_combo_changed(self, _index):
-        is_custom = self.bias_combo.currentData() == "custom"
-        self.bias_custom_edit.setVisible(is_custom)
+    def _on_audience_combo_changed(self, _index):
+        is_custom = self.audience_combo.currentData() == "custom"
+        self.audience_custom_edit.setVisible(is_custom)
         if not is_custom:
-            self.bias_custom_edit.clear()
+            self.audience_custom_edit.clear()
+
+    def _on_tone_combo_changed(self, _index):
+        is_custom = self.tone_combo.currentData() == "custom"
+        self.tone_custom_edit.setVisible(is_custom)
+        if not is_custom:
+            self.tone_custom_edit.clear()
 
     _CONTEXT_DOC_EXTS = (".pdf", ".doc", ".docx")
 

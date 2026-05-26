@@ -100,7 +100,7 @@ class TestGetFiFixedResponse(unittest.TestCase):
         for n in ["16.1", "16.2", "16.3", "16.4", "16.5", "16.6", "16.7", "16.8", "16.9", "16.10"]:
             resp = get_fi_fixed_response(n, rules)
             self.assertIsNotNone(resp, f"Expected fixed response for {n}")
-            self.assertIn("section 16.0", resp.lower())
+            self.assertEqual(resp, "")
 
     def test_17_1_is_placeholder(self):
         rules = ResponseRules()

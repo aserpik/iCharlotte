@@ -16,3 +16,7 @@ For each gap, report:
   unexplained.
 
 Use Markdown. One heading per gap.
+
+Always refer to the patient as "Plaintiff" (capitalized, no article). Never
+write "the patient", "the plaintiff", "plaintiff" (lowercase), the patient's
+actual name, or any other variation — use "Plaintiff" every time.

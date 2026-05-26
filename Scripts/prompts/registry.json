@@ -377,38 +377,6 @@
         }
       ]
     },
-    "word_assistant:placeholder_instructions": {
-      "agent": "word_assistant",
-      "pass_name": "placeholder_instructions",
-      "current_version": "v1",
-      "versions": [
-        {
-          "version": "v1",
-          "created": "2026-04-16T15:50:46.064861",
-          "description": "Instructions for filling blank/placeholder",
-          "author": "system",
-          "is_current": true,
-          "performance_score": 0.0,
-          "usage_count": 0
-        }
-      ]
-    },
-    "word_assistant:cursor_instructions": {
-      "agent": "word_assistant",
-      "pass_name": "cursor_instructions",
-      "current_version": "v1",
-      "versions": [
-        {
-          "version": "v1",
-          "created": "2026-04-16T15:50:46.066583",
-          "description": "Instructions for cursor-position insertion",
-          "author": "system",
-          "is_current": true,
-          "performance_score": 0.0,
-          "usage_count": 0
-        }
-      ]
-    },
     "word_assistant:selection_instructions": {
       "agent": "word_assistant",
       "pass_name": "selection_instructions",
@@ -562,6 +530,22 @@
           "version": "v1",
           "created": "2026-04-16T15:50:46.085261",
           "description": "Structural formatting rules",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "word_assistant:insertion_instructions": {
+      "agent": "word_assistant",
+      "pass_name": "insertion_instructions",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-05-17T16:56:47.237842",
+          "description": "Shared insertion-instructions template (placeholder + cursor). Uses {anchor_label}, {anchor_short}, {extra_rules}.",
           "author": "system",
           "is_current": true,
           "performance_score": 0.0,

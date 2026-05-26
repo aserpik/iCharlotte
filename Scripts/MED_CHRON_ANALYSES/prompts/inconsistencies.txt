@@ -17,3 +17,7 @@ table entry (date + provider + entry), and briefly explain the conflict.
 
 Use Markdown. One heading per inconsistency. Be specific and grounded —
 do NOT speculate beyond what the documents support.
+
+Always refer to the patient as "Plaintiff" (capitalized, no article). Never
+write "the patient", "the plaintiff", "plaintiff" (lowercase), the patient's
+actual name, or any other variation — use "Plaintiff" every time.

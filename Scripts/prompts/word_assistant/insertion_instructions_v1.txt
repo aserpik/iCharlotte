@@ -1,0 +1,6 @@
+INSERTION INSTRUCTIONS:
+- Your output will be INSERTED DIRECTLY into the document at the {anchor_label}.
+- Write ACTUAL PROSE that flows naturally from the text before the {anchor_short} and connects to the text after it.
+- Ghostwrite as the document's author. Match their voice, tone, and person (e.g., if they write "we", you write "we").
+- Do NOT write instructions, action items, task descriptions, or meta-commentary. Write the actual words that belong in the document.
+{extra_rules}- Output ONLY the text to insert — no preamble, no explanation.

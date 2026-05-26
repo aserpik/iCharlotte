@@ -121,18 +121,29 @@ def extract_file_number(path: str) -> str:
 class DeponentExtractor:
     """Extracts deponent information from transcript text."""
 
-    # Common deposition header patterns
+    # Name fragment: capitalized words separated by literal spaces (not \s, so the
+    # match stops at end-of-line and doesn't slurp "Taken on..." from the next line).
+    # Bridge: whitespace + U+00B7 MIDDLE DOT — PDF extractors render depo line-leader
+    # dots between "OF" and the name as "· · · · · NAME".
+    _NAME = r"[A-Z][A-Za-z]+(?:[ ]+[A-Z]\.?)?(?:[ ]+[A-Z][A-Za-z]+)+"
+    _BRIDGE = r"[\s·]+"
+
+    # NOTE: patterns are matched case-sensitively. The literal class declarations
+    # (DEPOSITION, WITNESS, [Dd]eponent, [Ee]xamination) already encode the two
+    # cases valid in legal captions. Applying re.IGNORECASE here turns the [A-Z]
+    # anchors in _NAME into any-letter classes, which causes prose like
+    # "the witness is being spotlighted or locked on" to be captured as a name.
     DEPONENT_PATTERNS = [
         # "DEPOSITION OF JOHN SMITH" or "DEPOSITION OF JOHN SMITH, M.D."
-        r"DEPOSITION\s+OF\s+([A-Z][A-Za-z]+(?:\s+[A-Z]\.?\s*)?(?:\s+[A-Z][A-Za-z]+)+(?:,?\s*(?:M\.?D\.?|D\.?O\.?|Ph\.?D\.?|D\.?C\.?))?)",
+        rf"DEPOSITION\s+OF{_BRIDGE}({_NAME})(?:,\s*(?:M\.?D\.?|D\.?O\.?|Ph\.?D\.?|D\.?C\.?))?",
         # "Deponent: John Smith"
-        r"[Dd]eponent[:\s]+([A-Z][A-Za-z]+(?:\s+[A-Z]\.?\s*)?(?:\s+[A-Z][A-Za-z]+)+)",
+        rf"[Dd]eponent[:\s]+({_NAME})",
         # "THE VIDEOTAPED DEPOSITION OF JOHN SMITH"
-        r"(?:VIDEOTAPED\s+)?DEPOSITION\s+OF\s+([A-Z][A-Za-z]+(?:\s+[A-Z]\.?\s*)?(?:\s+[A-Z][A-Za-z]+)+)",
+        rf"(?:VIDEOTAPED\s+)?DEPOSITION\s+OF{_BRIDGE}({_NAME})",
         # "Examination of John Smith"
-        r"[Ee]xamination\s+of\s+([A-Z][A-Za-z]+(?:\s+[A-Z]\.?\s*)?(?:\s+[A-Z][A-Za-z]+)+)",
+        rf"[Ee]xamination\s+of\s+({_NAME})",
         # "WITNESS: JOHN SMITH" (in caption)
-        r"WITNESS[:\s]+([A-Z][A-Za-z]+(?:\s+[A-Z]\.?\s*)?(?:\s+[A-Z][A-Za-z]+)+)",
+        rf"WITNESS[:\s]+({_NAME})",
     ]
 
     # Date patterns
@@ -168,7 +179,7 @@ class DeponentExtractor:
         search_text = text[:first_n_chars]
 
         for pattern in cls.DEPONENT_PATTERNS:
-            match = re.search(pattern, search_text, re.IGNORECASE)
+            match = re.search(pattern, search_text)
             if match:
                 name = match.group(1).strip()
                 # Clean up the name
@@ -395,7 +406,7 @@ def process_topics(input_path: str, logger) -> bool:
 
     logger.progress(40, "Calling LLM for topic discovery...")
     try:
-        response = llm_caller.call(topic_prompt, text, task_type="summary")
+        response = llm_caller.call(topic_prompt, text, task_type="summary", agent_id="agent_sum_depo")
     except Exception as e:
         logger.pass_failed("Topic Discovery", str(e), recoverable=False)
         return False
@@ -507,41 +518,116 @@ def _extract_context_documents(paths, logger) -> list:
     return results
 
 
-_BIAS_DIRECTIVES = {
+_AUDIENCE_DIRECTIVES = {
     "neutral": (
-        "Maintain a neutral, balanced tone. Include both favorable and unfavorable "
-        "testimony equally."
+        "Write a balanced, work-product summary suitable for either side of the case. "
+        "Include all testimony material to liability, causation, damages, and credibility, "
+        "regardless of which party it helps. If a bullet describes a concession, "
+        "contradiction, or admission, say what was said; do not say who it helps."
     ),
     "pro_plaintiff": (
-        "Emphasize testimony most favorable to the plaintiff's case. Include testimony "
-        "favorable to the defense only when it directly contradicts the plaintiff's claims."
+        "You are summarizing this transcript for plaintiff's trial team preparing for "
+        "mediation and trial. Prioritize testimony that supports plaintiff's claims on "
+        "liability, causation, and damages — lead each topic with the most useful "
+        "favorable testimony and quote distinctive admissions verbatim where they appear. "
+        "You must also surface testimony adverse to plaintiff — concessions plaintiff "
+        "made, impeachment material, gaps, and inconsistencies — under each topic so "
+        "counsel can prepare to address them; do not omit harmful testimony. If the "
+        "deponent is a defense witness or expert, treat their concessions to plaintiff's "
+        "theory as the highest-priority bullets."
     ),
     "pro_defense": (
-        "Emphasize testimony most favorable to the defense. Include testimony favorable "
-        "to the plaintiff only when it directly bears on the defense's case."
+        "You are summarizing this transcript for defense's trial team preparing for "
+        "mediation and trial. Prioritize testimony that supports the defense on "
+        "liability, causation, comparative fault, failure to mitigate, pre-existing "
+        "conditions, and credibility — lead each topic with the most useful favorable "
+        "testimony and quote distinctive admissions verbatim. You must also surface "
+        "testimony adverse to the defense — points plaintiff established cleanly, "
+        "sympathetic facts, and any concessions by defense witnesses — so counsel can "
+        "prepare to address them; do not omit harmful testimony. If the deponent is the "
+        "plaintiff, treat admissions against interest, inconsistencies, and prior-injury "
+        "history as the highest-priority bullets."
     ),
 }
 
 
-def _resolve_bias_directive(cfg: dict) -> str:
-    """Map cfg.bias to the directive string injected into the prompt."""
-    bias = cfg.get("bias", "neutral")
-    if bias == "custom":
-        return (cfg.get("bias_custom") or "").strip() or _BIAS_DIRECTIVES["neutral"]
-    return _BIAS_DIRECTIVES.get(bias, _BIAS_DIRECTIVES["neutral"])
+_TONE_DIRECTIVES = {
+    "recitation": (
+        "Recite the testimony without characterization. Do not label testimony as "
+        "\"strong,\" \"weak,\" \"damaging,\" \"favorable,\" \"evasive,\" \"credible,\" "
+        "or otherwise editorialize. State what was said; let the facts speak."
+    ),
+    "editorial": (
+        "Where it is useful for trial preparation, you may briefly characterize testimony "
+        "with terms like \"conceded,\" \"could not recall,\" \"contradicted prior "
+        "testimony,\" or \"was evasive,\" and you may note credibility issues. Keep "
+        "characterizations tethered to specific, citable testimony — never editorialize "
+        "beyond what the transcript supports."
+    ),
+}
+
+
+# Map legacy "bias" values to the new "audience" enum.
+# (Internal enum values are unchanged; this is just for sessions written before
+# the rename from "bias" → "audience" landed.)
+_LEGACY_BIAS_TO_AUDIENCE = {
+    "neutral": "neutral",
+    "pro_plaintiff": "pro_plaintiff",
+    "pro_defense": "pro_defense",
+    "custom": "custom",
+}
+
+
+def _resolve_audience_directive(cfg: dict) -> str:
+    """Map cfg["audience"] (or legacy cfg["bias"]) to the directive injected into the prompt."""
+    if "audience" in cfg:
+        audience = cfg.get("audience") or "neutral"
+        custom = cfg.get("audience_custom") or ""
+    else:
+        # Legacy session: read the old "bias" / "bias_custom" keys.
+        audience = _LEGACY_BIAS_TO_AUDIENCE.get(cfg.get("bias") or "neutral", "neutral")
+        custom = cfg.get("bias_custom") or ""
+    if audience == "custom":
+        return custom.strip() or _AUDIENCE_DIRECTIVES["neutral"]
+    return _AUDIENCE_DIRECTIVES.get(audience, _AUDIENCE_DIRECTIVES["neutral"])
+
+
+def _resolve_tone_directive(cfg: dict) -> str:
+    """Map cfg["tone"] to the tone directive injected into the prompt.
+
+    Defaults to "recitation" (no editorializing) when the key is missing — this
+    matches the safe default for legal work product and keeps legacy sessions
+    behaving predictably.
+    """
+    tone = cfg.get("tone") or "recitation"
+    if tone == "custom":
+        return (cfg.get("tone_custom") or "").strip() or _TONE_DIRECTIVES["recitation"]
+    return _TONE_DIRECTIVES.get(tone, _TONE_DIRECTIVES["recitation"])
+
+
+# Legacy alias preserved for bench scripts that import the old name.
+_resolve_bias_directive = _resolve_audience_directive
 
 
 def _build_topic_locked_prompt(base_prompt: str, *, topic_list: list, bullets_per_topic: int,
                                 deponent_label: str, custom_rules: str,
-                                bias_directive: str = "",
-                                context_documents: list = None) -> str:
+                                audience_directive: str = "",
+                                tone_directive: str = "",
+                                context_documents: list = None,
+                                bias_directive: str = None) -> str:
     """Render the topic-locked summary prompt with user-supplied substitutions.
 
-    User-supplied strings (deponent_label, custom_rules, bias_directive) are stripped
-    of literal `{` and `}` characters to prevent placeholder-leak across slots.
+    `bias_directive` is a deprecated alias for `audience_directive`, kept so the
+    bench scripts that import this function don't break.
+
+    User-supplied strings are stripped of literal `{` and `}` characters to
+    prevent placeholder-leak across slots.
     """
     def _strip_braces(s: str) -> str:
         return (s or "").replace("{", "").replace("}", "")
+
+    if bias_directive is not None and not audience_directive:
+        audience_directive = bias_directive
 
     rendered_topics = "\n".join(f"- {t}" for t in topic_list)
 
@@ -552,8 +638,24 @@ def _build_topic_locked_prompt(base_prompt: str, *, topic_list: list, bullets_pe
                 f"=== CONTEXT DOC: {doc['filename']} ===\n{doc['text']}"
             )
         context_section = (
-            "\n\nADDITIONAL CASE CONTEXT (read these in addition to the deposition "
-            "transcript to better inform your summary):\n\n" + "\n\n".join(ctx_blocks)
+            "\n\nADDITIONAL CASE CONTEXT — USE AS A ROADMAP FOR BULLET SELECTION:\n"
+            "The document(s) below describe the case posture, the theories and "
+            "defenses being pursued, and the issues counsel cares about (status "
+            "reports, complaints, expert reports, opposing summaries, etc.). "
+            "Read them FIRST, then summarize the deposition with this discipline:\n"
+            "  - Lead each topic with bullets that confirm, contradict, or "
+            "undermine a theory, defense, or concern named in the context.\n"
+            "  - When the context identifies a specific issue (pre-existing "
+            "condition, alternative cause, credibility concern, comparative "
+            "fault, failure to mitigate, prior inconsistent statement, etc.), "
+            "prioritize bullets that bear on that issue and quote the relevant "
+            "testimony verbatim where it appears.\n"
+            "  - Mirror the context's terminology where the testimony maps to "
+            "a named theory (e.g., if the context names 'pre-existing lumbar "
+            "injury,' surface prior-injury testimony under that framing).\n"
+            "  - The deposition transcript remains the ONLY source for direct "
+            "testimony content. Never attribute statements from the context "
+            "document(s) to the deponent.\n\n" + "\n\n".join(ctx_blocks)
         )
     else:
         context_section = ""
@@ -562,7 +664,8 @@ def _build_topic_locked_prompt(base_prompt: str, *, topic_list: list, bullets_pe
             .replace("{deponent_label}", _strip_braces(deponent_label))
             .replace("{bullets_per_topic}", str(bullets_per_topic))
             .replace("{topic_list}", rendered_topics)
-            .replace("{bias_directive}", _strip_braces(bias_directive))
+            .replace("{audience_directive}", _strip_braces(audience_directive))
+            .replace("{tone_directive}", _strip_braces(tone_directive))
             .replace("{context_section}", context_section)
             .replace("{custom_rules}", _strip_braces(custom_rules) or "(none)"))
 
@@ -615,7 +718,7 @@ def _register_outputs(input_path, summary, deponent_name, deponent_type, output_
         logger.warning(f"Could not register document: {e}")
 
 
-def process_summary(session_path: str, logger) -> bool:
+def process_summary(session_path: str, logger, output_path_override: str = None) -> bool:
     """Phase 2: read session, generate topic-locked summary, save docx, cleanup."""
     from pathlib import Path
     memory_monitor = MemoryMonitor(warn_threshold_mb=1500, abort_threshold_mb=2000, logger=logger.info)
@@ -661,21 +764,23 @@ def process_summary(session_path: str, logger) -> bool:
     with open(NARRATIVE_PROMPT_FILE, "r", encoding="utf-8") as f:
         base_prompt = f.read()
 
-    bias_directive = _resolve_bias_directive(cfg)
+    audience_directive = _resolve_audience_directive(cfg)
+    tone_directive = _resolve_tone_directive(cfg)
     prompt = _build_topic_locked_prompt(
         base_prompt,
         topic_list=final_topics,
         bullets_per_topic=cfg.get("bullets_per_topic", 5),
         deponent_label=cfg.get("deponent_label") or session.get("deponent_type", "Deponent"),
         custom_rules=cfg.get("custom_rules", ""),
-        bias_directive=bias_directive,
+        audience_directive=audience_directive,
+        tone_directive=tone_directive,
         context_documents=context_documents,
     )
 
     logger.progress(30, "Generating summary...")
     try:
         with memory_monitor.track_operation("Narrative Summary"):
-            summary = llm_caller.call(prompt, text, task_type="summary")
+            summary = llm_caller.call(prompt, text, task_type="summary", agent_id="agent_sum_depo")
         if not summary:
             raise SummaryPassError("LLM returned empty summary")
     except Exception as e:
@@ -696,9 +801,19 @@ def process_summary(session_path: str, logger) -> bool:
             logger.warning(f"Cross-check failed; using original summary: {e}")
     logger.progress(85, "Cross-check complete")
 
-    output_dir = get_output_directory(session["input_path"])
+    if output_path_override:
+        output_file = output_path_override
+        output_dir = os.path.dirname(output_file) or "."
+    else:
+        output_dir = get_output_directory(session["input_path"])
+        output_file = os.path.join(
+            output_dir,
+            _build_default_output_filename(
+                session.get("deponent_name") or "",
+                session["input_path"],
+            ),
+        )
     os.makedirs(output_dir, exist_ok=True)
-    output_file = os.path.join(output_dir, "Deposition_summaries.docx")
     logger.progress(90, f"Saving to {os.path.basename(output_file)}...")
     if not save_to_docx(summary, output_file, session["deponent_name"], session["deposition_date"], logger):
         return False
@@ -719,16 +834,32 @@ def process_summary(session_path: str, logger) -> bool:
 
 def add_markdown_to_doc(doc, content):
     """Parses basic Markdown and adds it to the docx Document with specific formatting."""
+    from icharlotte_core.docx_writer import (
+        try_consume_markdown_table,
+        add_markdown_table_to_doc,
+        render_inline_markdown,
+    )
+
     lines = content.split('\n')
 
-    for line in lines:
+    i = 0
+    while i < len(lines):
+        line = lines[i]
         stripped = line.strip()
         if not stripped:
+            i += 1
+            continue
+
+        # Markdown table block — emit a real Word table.
+        consumed, header, rows = try_consume_markdown_table(lines, i)
+        if consumed:
+            add_markdown_table_to_doc(doc, header, rows)
+            i += consumed
             continue
 
         # Headings (## or #)
         if stripped.startswith('#'):
-            text = stripped.lstrip('#').strip()
+            text = stripped.lstrip('#').strip().replace('**', '').replace('__', '')
             if not text.endswith('.'):
                 text += "."
             p = doc.add_paragraph()
@@ -738,50 +869,31 @@ def add_markdown_to_doc(doc, content):
             run.bold = True
             run.font.name = 'Times New Roman'
             run.font.size = Pt(12)
+            i += 1
             continue
 
-        # List items (handle *, -, •, and numbered bullets)
+        # List items (handle *, -, •)
         if stripped.startswith('* ') or stripped.startswith('- ') or stripped.startswith('• '):
-            # Strip bullet prefix (handle •  which is 1 char + space)
-            if stripped.startswith('• '):
-                text = stripped[2:].strip()
-            else:
-                text = stripped[2:].strip()
+            text = stripped[2:].strip()
             p = doc.add_paragraph()
             p.paragraph_format.line_spacing = 1.0
             p.paragraph_format.left_indent = Inches(0.5)
             p.paragraph_format.first_line_indent = Inches(-0.25)
 
-            run = p.add_run("\t")
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(12)
+            tab_run = p.add_run("\t")
+            tab_run.font.name = 'Times New Roman'
+            tab_run.font.size = Pt(12)
 
-            # Support bold parsing within list items
-            parts = re.split(r'(\*\*.*?\*\*)', text)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    r = p.add_run(part[2:-2])
-                    r.bold = True
-                else:
-                    r = p.add_run(part)
-                r.font.name = 'Times New Roman'
-                r.font.size = Pt(12)
+            render_inline_markdown(p, text)
+            i += 1
             continue
 
-        # Normal text (with bold support)
+        # Normal text (bold/italic/code via shared inline parser)
         p = doc.add_paragraph()
         p.paragraph_format.line_spacing = 1.0
         p.paragraph_format.first_line_indent = Inches(0.5)
-
-        parts = re.split(r'(\*\*.*?\*\*)', stripped)
-        for part in parts:
-            if part.startswith('**') and part.endswith('**'):
-                run = p.add_run(part[2:-2])
-                run.bold = True
-            else:
-                run = p.add_run(part)
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(12)
+        render_inline_markdown(p, stripped)
+        i += 1
 
 
 def save_to_docx(content: str, output_path: str, deponent_name: str,
@@ -789,19 +901,22 @@ def save_to_docx(content: str, output_path: str, deponent_name: str,
     """
     Saves the content to a DOCX file with deposition formatting and process-safe locking.
 
-    Args:
-        content: Summary content to save.
-        output_path: Path to output file (will append if exists).
-        deponent_name: Name of the deponent.
-        deposition_date: Date of the deposition.
-        logger: AgentLogger instance.
-
-    Returns:
-        True if successful.
+    Each call writes a fresh document. If `output_path` already exists on disk
+    (e.g., a prior run of the same deposition) or is locked by Word, the save
+    versions up to ``<base> v.2.docx``, ``v.3.docx``, etc., so prior summaries
+    are never overwritten or appended to.
     """
     base_name, ext = os.path.splitext(output_path)
     counter = 1
     current_output_path = output_path
+
+    # Pre-skip any existing files so we never overwrite or append.
+    while os.path.exists(current_output_path):
+        counter += 1
+        current_output_path = f"{base_name} v.{counter}{ext}"
+        if counter > 10:
+            logger.error("Failed to find a free output filename after 10 attempts.")
+            return False
 
     while True:
         try:
@@ -809,16 +924,8 @@ def save_to_docx(content: str, output_path: str, deponent_name: str,
             with get_docx_lock(current_output_path):
                 logger.info(f"Acquired write lock for: {os.path.basename(current_output_path)}")
 
-                if os.path.exists(current_output_path):
-                    try:
-                        doc = Document(current_output_path)
-                        doc.add_page_break()
-                        logger.info(f"Appending to existing file: {current_output_path}")
-                    except Exception:
-                        raise PermissionError("Cannot open existing file.")
-                else:
-                    doc = Document()
-                    logger.info(f"Creating new file: {current_output_path}")
+                doc = Document()
+                logger.info(f"Creating new file: {current_output_path}")
 
                 # Apply styles
                 style = doc.styles['Normal']
@@ -826,11 +933,8 @@ def save_to_docx(content: str, output_path: str, deponent_name: str,
                 style.font.size = Pt(12)
                 style.paragraph_format.line_spacing = 1.0
 
-                # Count existing depositions for numbering
+                # Per-deposition file → always entry 1.
                 next_num = 1
-                for para in doc.paragraphs:
-                    if re.match(r'^\d+\.\tDeposition of', para.text):
-                        next_num += 1
 
                 # Title paragraph with numbering
                 p = doc.add_paragraph()
@@ -887,6 +991,25 @@ def save_to_docx(content: str, output_path: str, deponent_name: str,
             return False
 
 
+# Windows-illegal filename characters (matches ParallelSubprocessWorker convention).
+_UNSAFE_FILENAME_CHARS = re.compile(r'[\\/*?:"<>|]')
+
+
+def _build_default_output_filename(deponent_name: str, input_path: str) -> str:
+    """Build a per-deposition output filename.
+
+    Prefers the deponent name ("Deposition of John Smith.docx"). Falls back to
+    the input file stem when the deponent name is missing or sanitizes to empty.
+    """
+    raw = (deponent_name or "").strip()
+    safe = _UNSAFE_FILENAME_CHARS.sub("", raw).strip()
+    if safe:
+        return f"Deposition of {safe}.docx"
+    stem = os.path.splitext(os.path.basename(input_path))[0]
+    stem = _UNSAFE_FILENAME_CHARS.sub("", stem).strip() or "Deposition"
+    return f"{stem} - Summary.docx"
+
+
 def get_output_directory(input_path: str) -> str:
     """Determine the output directory based on input path."""
     parts = input_path.split(os.sep)
@@ -938,14 +1061,22 @@ def main():
 
     args = sys.argv[1:]
 
-    # Parse --phase argument (default: topics)
+    # Parse --phase argument (default: topics) and optional --output_path.
     phase = "topics"
+    output_path_override = None
     positional = []
-    for a in args:
+    i = 0
+    while i < len(args):
+        a = args[i]
         if a.startswith("--phase="):
             phase = a.split("=", 1)[1].strip().lower()
+            i += 1
+        elif a == "--output_path" and i + 1 < len(args):
+            output_path_override = args[i + 1]
+            i += 2
         else:
             positional.append(a)
+            i += 1
 
     if not positional:
         print("Error: missing input path.", flush=True)
@@ -981,7 +1112,7 @@ def main():
         sys.exit(0 if ok else 1)
 
     if phase == "summary":
-        ok = process_summary(target, logger)
+        ok = process_summary(target, logger, output_path_override=output_path_override)
         sys.exit(0 if ok else 1)
 
     print(f"Error: unknown --phase value: {phase}", flush=True)

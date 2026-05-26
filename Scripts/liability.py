@@ -192,24 +192,41 @@ def call_gemini(prompt, text):
 
 def add_markdown_to_doc(doc, content):
     """Parses basic Markdown and adds it to the docx Document with specific formatting."""
+    from icharlotte_core.docx_writer import (
+        try_consume_markdown_table,
+        add_markdown_table_to_doc,
+        render_inline_markdown,
+    )
+
     lines = content.split('\n')
     active_paragraph = None
-    
+
     # Debug: Log the first few lines to see what we are parsing
     log_event("--- content preview ---")
-    for i, line in enumerate(lines[:10]):
-        log_event(f"Line {i}: {repr(line)}")
+    for preview_i, line in enumerate(lines[:10]):
+        log_event(f"Line {preview_i}: {repr(line)}")
     log_event("--- end preview ---")
 
     # Pattern for subheadings like "A. Duty", "**A. Duty**", "A. **Duty**"
     # Matches: (Non-word chars like *)(Letter.)(Any chars)(Text)
     subheading_pattern = re.compile(r'^\W*([A-Z]\.)\s*(.*)')
-    
-    for line in lines:
+
+    i = 0
+    while i < len(lines):
+        line = lines[i]
         stripped = line.strip()
         if not stripped:
+            i += 1
             continue
-        
+
+        # Markdown table block — emit a real Word table.
+        consumed, header, rows = try_consume_markdown_table(lines, i)
+        if consumed:
+            add_markdown_table_to_doc(doc, header, rows)
+            i += consumed
+            active_paragraph = None
+            continue
+
         # Headings: Convert to bold text at start of paragraph, ending with period
         if stripped.startswith('#'):
             log_event(f"Formatting as Heading: {stripped}")
@@ -225,8 +242,9 @@ def add_markdown_to_doc(doc, content):
             p = doc.add_paragraph()
             run = p.add_run(text + " ")
             run.bold = True
+            i += 1
             continue
-        
+
         # Subheadings (A. Duty)
         match = subheading_pattern.match(stripped)
         # Verify it's not just a bullet point or random text starting with a letter
@@ -258,8 +276,9 @@ def add_markdown_to_doc(doc, content):
             r = p.add_run(text_part)
             r.bold = True
             r.underline = True
+            i += 1
             continue
-        
+
         # Specific formatting for "EVALUATION OF LIABILITY"
         if "EVALUATION OF LIABILITY" in stripped.upper():
             log_event(f"Formatting Title: {stripped}")
@@ -268,6 +287,7 @@ def add_markdown_to_doc(doc, content):
             run = p.add_run(stripped.replace('**', '').strip())
             run.bold = True
             run.underline = True
+            i += 1
             continue
 
         log_event(f"Formatting as Normal Text: {stripped}")
@@ -280,26 +300,18 @@ def add_markdown_to_doc(doc, content):
             p.paragraph_format.line_spacing = 1.0
             p.paragraph_format.left_indent = Inches(0.5)
             p.paragraph_format.first_line_indent = Inches(-0.25)
-            
+
             # Use a real bullet character and tab for portability
-            run = p.add_run("•\t")
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(12)
-            
-            # Support bold parsing within list items
-            parts = re.split(r'(\*\*.*?\*\*)', text)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    r = p.add_run(part[2:-2])
-                    r.bold = True
-                else:
-                    r = p.add_run(part)
-                r.font.name = 'Times New Roman'
-                r.font.size = Pt(12)
+            bullet_run = p.add_run("•\t")
+            bullet_run.font.name = 'Times New Roman'
+            bullet_run.font.size = Pt(12)
+
+            render_inline_markdown(p, text)
+            i += 1
             continue
-        
-        # Normal text (with bold support)
-        # "Start of each new paragraph should be indented by 0.5"
+
+        # Normal text — paragraphs continue until a block-level token,
+        # so we append a separator before continuing.
         if active_paragraph:
             p = active_paragraph
             p.add_run(" ")
@@ -307,15 +319,9 @@ def add_markdown_to_doc(doc, content):
             p = doc.add_paragraph()
             p.paragraph_format.first_line_indent = Inches(0.5)
             active_paragraph = p
-        
-        # Simple bold parsing: **text**
-        parts = re.split(r'(\*\*.*\*\*)', stripped)
-        for part in parts:
-            if part.startswith('**') and part.endswith('**'):
-                run = p.add_run(part[2:-2])
-                run.bold = True
-            else:
-                p.add_run(part)
+
+        render_inline_markdown(p, stripped)
+        i += 1
 
 def save_to_docx(content, output_path, title_text):
     """Saves the content to a DOCX file. Appends if exists. Handles locking."""

@@ -182,6 +182,163 @@ def test_settings_page_swaps_to_form_on_awaiting_input(qtbot, tmp_path):
     assert page._form is not None
 
 
+# ---- File-swap behavior (bug repro: settings page edits ignored by Phase 2) ----
+
+
+def _settings_page_with_phase1_done(qtbot, tmp_path, original_filename: str = "orig.docx"):
+    """Build a MedChronSettingsPage that has already completed Phase 1 for one file."""
+    from icharlotte_core.ui.wizard.pages.med_chron_settings_page import MedChronSettingsPage
+    from icharlotte_core.ui.wizard.registry import TaskSpec
+
+    spec = TaskSpec(
+        task_id="med_chron_analysis",
+        title="Med Chron Analysis",
+        description="…",
+        icon_glyph="🩺",
+        script_name="med_chron.py",
+    )
+    original_path = str(tmp_path / original_filename)
+    page = MedChronSettingsPage(spec, files=[original_path], case_root=str(tmp_path))
+    qtbot.addWidget(page)
+
+    # Simulate the speculative-run path: TaskTab would build the worker and
+    # call attach_worker() before launching the process. attach_worker only
+    # needs .files (to record _prep_file) plus the four signals it connects.
+    from PySide6.QtCore import QObject, Signal
+
+    class _StubWorker(QObject):
+        status = Signal(str)
+        progress = Signal(int)
+        awaiting_input = Signal(str)
+        failed = Signal(str)
+
+        def __init__(self, files):
+            super().__init__()
+            self.files = list(files)
+
+    page.attach_worker(_StubWorker([original_path]))
+
+    # Simulate Phase 1 completion (form appears, _prep_file == original_path).
+    session_path = _write_session(tmp_path)
+    page._on_phase1_complete(str(session_path))
+    return page, original_path, session_path
+
+
+def test_swapping_file_emits_restart_phase1_with_new_file(qtbot, tmp_path):
+    """The bug: changing the file on the settings page must trigger a new
+    Phase 1 against the new file (not silently reuse the original session).
+    """
+    page, original_path, _ = _settings_page_with_phase1_done(qtbot, tmp_path)
+    new_path = str(tmp_path / "swapped.docx")
+
+    received = []
+    page.restart_phase1_requested.connect(lambda files: received.append(list(files)))
+
+    # Simulate Remove (the only file) + Add (a different file) by mutating
+    # the file list the way base SettingsPage does, then routing through the
+    # public hook.
+    page._files = []
+    page._refresh_files_list()
+    page._maybe_restart_phase1()           # remove half — emits []
+
+    page._files = [new_path]
+    page._refresh_files_list()
+    page._maybe_restart_phase1()           # add half — emits [new_path]
+
+    # Both events fired in order: cancel-only then restart-with-new-file.
+    assert received == [[], [new_path]]
+
+
+def test_swapping_file_resets_to_prep_state(qtbot, tmp_path):
+    """After a file swap the form must be torn down and the spinner page shown,
+    so the user can't click Proceed against the stale session_path.
+    """
+    page, _, _ = _settings_page_with_phase1_done(qtbot, tmp_path)
+    assert page._form is not None                  # precondition: form is up
+    assert page._stack.currentIndex() == 1         # form page
+    assert page.proceed_btn.isEnabled() is True
+    stale_session = page._session_path
+
+    new_path = str(tmp_path / "swapped.docx")
+    page._files = [new_path]
+    page._refresh_files_list()
+    page._maybe_restart_phase1()
+
+    assert page._form is None
+    assert page._session_path is None, "old session_path must be cleared"
+    assert page._session_path != stale_session
+    assert page._stack.currentIndex() == 0         # spinner page
+    assert page.proceed_btn.isEnabled() is False
+
+
+def test_picking_same_file_again_does_not_restart(qtbot, tmp_path):
+    """No-op when the user re-picks the file that's already selected."""
+    page, original_path, _ = _settings_page_with_phase1_done(qtbot, tmp_path)
+    received = []
+    page.restart_phase1_requested.connect(lambda files: received.append(list(files)))
+
+    # Same file currently selected → _maybe_restart_phase1 should be a no-op.
+    page._maybe_restart_phase1()
+    assert received == []
+
+
+def test_tasktab_restart_handler_swaps_files_and_starts_new_worker(qtbot, tmp_path, monkeypatch):
+    """Wiring check: TaskTab._restart_speculative_run cancels the old worker,
+    updates self._files, and launches a fresh worker that the settings page
+    re-attaches to. Without this wiring the settings page would emit the
+    restart signal into the void and Phase 2 would still use the stale cache.
+    """
+    from PySide6.QtCore import QObject, Signal
+    import icharlotte_core.ui.wizard.runners.subprocess_worker as sw_mod
+    from icharlotte_core.ui.wizard.registry import get_task
+    from icharlotte_core.ui.wizard.task_tab import TaskTab
+
+    instances = []
+
+    class _FakeWorker(QObject):
+        status = Signal(str)
+        progress = Signal(int)
+        awaiting_input = Signal(str)
+        finished = Signal(str)
+        failed = Signal(str)
+        cancelled = Signal()
+
+        def __init__(self, *args, **kwargs):
+            super().__init__()
+            self.kwargs = kwargs
+            self.files = list(kwargs.get("files") or [])
+            self.started = False
+            self.cancel_called = False
+            instances.append(self)
+
+        def start(self):
+            self.started = True
+
+        def cancel(self):
+            self.cancel_called = True
+
+    monkeypatch.setattr(sw_mod, "SubprocessWorker", _FakeWorker)
+
+    spec = get_task("med_chron_analysis")
+    tab = TaskTab(spec, files=[str(tmp_path / "orig.docx")], case_path=str(tmp_path), file_number="0000.000")
+    qtbot.addWidget(tab)
+    tab.start_speculative_run()
+
+    assert len(instances) == 1
+    assert instances[0].files == [str(tmp_path / "orig.docx")]
+
+    # Settings page asks TaskTab to swap files.
+    new_path = str(tmp_path / "swapped.docx")
+    tab.settings_page.restart_phase1_requested.emit([new_path])
+
+    # Old worker was cancelled; new worker was created with new files.
+    assert instances[0].cancel_called is True
+    assert len(instances) == 2
+    assert instances[1].files == [new_path]
+    assert instances[1].started is True
+    assert tab.files == [new_path]
+
+
 # ---- Global custom-analyses persistence ----
 
 
@@ -277,6 +434,41 @@ def test_removed_saved_row_is_dropped_from_global_store(qtbot, tmp_path):
 
     saved = custom_analyses_store.load()
     assert saved == [{"label": "Keep", "instruction": "K."}]
+
+
+def test_form_has_vertical_splitter_between_curated_and_custom(qtbot, tmp_path):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QSplitter
+    from icharlotte_core.ui.med_chron_config_form import MedChronConfigForm
+
+    session_path = _write_session(tmp_path)
+    form = MedChronConfigForm(session_path)
+    qtbot.addWidget(form)
+    assert isinstance(form._analyses_splitter, QSplitter)
+    assert form._analyses_splitter.orientation() == Qt.Orientation.Vertical
+    assert form._analyses_splitter.count() == 2
+    assert form._analyses_splitter.childrenCollapsible() is False
+
+
+def test_settings_page_has_vertical_splitter_for_files(qtbot, tmp_path):
+    from PySide6.QtCore import Qt
+    from PySide6.QtWidgets import QSplitter
+    from icharlotte_core.ui.wizard.pages.med_chron_settings_page import MedChronSettingsPage
+    from icharlotte_core.ui.wizard.registry import TaskSpec
+
+    spec = TaskSpec(
+        task_id="med_chron_analysis",
+        title="Med Chron Analysis",
+        description="…",
+        icon_glyph="🩺",
+        script_name="med_chron.py",
+    )
+    page = MedChronSettingsPage(spec, files=[str(tmp_path / "rec.docx")])
+    qtbot.addWidget(page)
+    assert isinstance(page._outer_splitter, QSplitter)
+    assert page._outer_splitter.orientation() == Qt.Orientation.Vertical
+    assert page._outer_splitter.count() == 2
+    assert page._outer_splitter.childrenCollapsible() is False
 
 
 def test_edited_saved_row_writes_back_edited_text(qtbot, tmp_path):

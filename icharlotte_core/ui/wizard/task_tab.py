@@ -55,6 +55,12 @@ class TaskTab(QStackedWidget):
         if hasattr(self.settings_page, "phase2_requested"):
             self.settings_page.phase2_requested.connect(self.advance_to_status_with_phase2)
 
+        # Wire restart_phase1_requested (currently only MedChronSettingsPage)
+        # so file swaps on the settings page can invalidate a stale Phase 1
+        # cache and re-run prep against the new file.
+        if hasattr(self.settings_page, "restart_phase1_requested"):
+            self.settings_page.restart_phase1_requested.connect(self._restart_speculative_run)
+
     # ---- Public API ----
 
     @property
@@ -123,6 +129,35 @@ class TaskTab(QStackedWidget):
 
         self._worker = worker
         worker.start()
+
+    def _restart_speculative_run(self, new_files: list) -> None:
+        """Cancel the in-flight speculative worker and restart against new_files.
+
+        Called when the settings page detects that the user swapped the input
+        file. The old Phase 1 cache is invalid (it was keyed to the prior
+        file's contents); we drop the old worker and launch a fresh Phase 1.
+
+        If ``new_files`` is empty the user removed the file without adding a
+        replacement — cancel the in-flight worker but don't restart.
+        """
+        if self._worker is not None:
+            # Suppress stale signals from the old worker so finished/failed/
+            # cancelled don't disrupt the new prep state we're about to enter.
+            try:
+                self._worker.disconnect()
+            except (RuntimeError, TypeError):
+                pass
+            try:
+                self._worker.cancel()
+            except Exception:
+                pass
+            self._worker = None
+
+        self._awaiting_session_path = None
+        self._files = list(new_files)
+        if not self._files:
+            return
+        self.start_speculative_run()
 
     def advance_to_status_with_phase2(self, session_path: str) -> None:
         """Switch to the Status page and kick off Phase 2.
@@ -262,6 +297,7 @@ class TaskTab(QStackedWidget):
         self._total_files_for_run = len(self._files)
         self._files_done_for_run = 0
         self.output_page.set_progress_hint("")
+        self.output_page.set_failure_banner("")
         self._worker.start()
 
     def _on_worker_file_completed(self, output_path: str) -> None:
@@ -341,6 +377,13 @@ class TaskTab(QStackedWidget):
         self._awaiting_session_path = None
         self._settings_owns_worker = False
         self.output_page.set_progress_hint("")
+        # If the user is already on the Output page — which happens when a
+        # parallel run streamed some file_completed signals before failing —
+        # show the failure on the output page itself. Updating only the
+        # Status page text leaves the user staring at fewer outputs than
+        # expected with no explanation.
+        if self.currentIndex() == PAGE_OUTPUT:
+            self.output_page.set_failure_banner(err)
         self.status_page.on_status(f"FAILED: {err}")
         self.status_page.cancel_btn.setText("Back to Settings")
         self.status_page.cancel_btn.setEnabled(True)

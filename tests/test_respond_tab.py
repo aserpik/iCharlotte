@@ -81,6 +81,35 @@ class TestRespondTabLoadCase(unittest.TestCase):
         tab.load_case("1234.001")
         self.assertEqual(tab.file_number, "1234.001")
 
+    @patch("icharlotte_core.ui.respond_tab.ModelFetcher")
+    @patch("Scripts.case_data_manager.CaseDataManager")
+    def test_load_case_normalizes_stale_fixed_fi_rules(self, mock_cdm_cls, mock_fetcher_cls):
+        mock_fetcher = MagicMock()
+        mock_fetcher.isRunning.return_value = False
+        mock_fetcher_cls.return_value = mock_fetcher
+        mock_cdm = MagicMock()
+        mock_cdm.get_value.return_value = {
+            "fi_15_1_response": "Old saved 15.1 response.",
+            "fi_objections_by_number": {
+                "12.1": "Old saved 12.1 objection.",
+            },
+        }
+        mock_cdm_cls.return_value = mock_cdm
+
+        tab = RespondTab()
+        tab.load_case("1234.001")
+
+        self.assertTrue(mock_cdm.get_value.called)
+        self.assertIn("equally available", tab.rules.fi_objections_by_number["12.1"])
+        self.assertEqual(
+            tab.rules.fi_responses_by_number["15.1"],
+            (
+                "A general denial is interposed as a matter of right based in part on "
+                "California Code of Civil Procedure § 431.30. As to affirmative defenses, "
+                "this interrogatory is premature at this time."
+            ),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

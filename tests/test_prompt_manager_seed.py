@@ -20,13 +20,51 @@ class TestSeedPipelinePrompts(unittest.TestCase):
         self.pm.seed_pipeline_prompts()
         expected = [
             "system_prompt", "redline_system_prompt", "email_system_prompt",
-            "redline_prefix", "placeholder_instructions",
-            "cursor_instructions", "selection_instructions",
+            "redline_prefix", "insertion_instructions",
+            "selection_instructions",
         ]
         for pass_name in expected:
             text = self.pm.get_prompt("word_assistant", pass_name)
             self.assertIsNotNone(text, f"word_assistant:{pass_name} missing")
             self.assertTrue(len(text) > 20, f"word_assistant:{pass_name} too short")
+
+    def test_seed_prunes_deprecated_placeholder_and_cursor_entries(self):
+        """
+        Migration: pre-existing placeholder_instructions / cursor_instructions
+        workbench entries get removed when seed runs, since they were
+        consolidated into the templated insertion_instructions entry.
+        """
+        # Simulate a pre-migration install: create both legacy entries first.
+        self.pm.create_version(
+            "word_assistant", "placeholder_instructions",
+            "OLD placeholder text", version="v1", set_as_current=True,
+        )
+        self.pm.create_version(
+            "word_assistant", "cursor_instructions",
+            "OLD cursor text", version="v1", set_as_current=True,
+        )
+        self.assertIsNotNone(
+            self.pm.get_prompt("word_assistant", "placeholder_instructions")
+        )
+        self.assertIsNotNone(
+            self.pm.get_prompt("word_assistant", "cursor_instructions")
+        )
+
+        # Run seed — should prune both, and create the new shared template.
+        self.pm.seed_pipeline_prompts()
+
+        self.assertIsNone(
+            self.pm.get_prompt("word_assistant", "placeholder_instructions"),
+            "deprecated placeholder_instructions should be pruned",
+        )
+        self.assertIsNone(
+            self.pm.get_prompt("word_assistant", "cursor_instructions"),
+            "deprecated cursor_instructions should be pruned",
+        )
+        self.assertIsNotNone(
+            self.pm.get_prompt("word_assistant", "insertion_instructions"),
+            "new insertion_instructions should be seeded",
+        )
 
     def test_seed_creates_legal_research_passes(self):
         self.pm.seed_pipeline_prompts()

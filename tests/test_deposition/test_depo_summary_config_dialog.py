@@ -158,64 +158,116 @@ def test_dialog_topic_drag_reorder_changes_selected_topics_order(qtbot, tmp_path
     assert cfg["selected_topics"] == ["Damages", "Pre-Accident History", "Mechanism Of Injury"]
 
 
-def test_dialog_bias_combo_defaults_to_neutral_and_writes_neutral_to_session(qtbot, tmp_path):
+def test_dialog_audience_combo_defaults_to_neutral_and_writes_neutral_to_session(qtbot, tmp_path):
     session_path = _make_session(tmp_path)
     dlg = DepoSummaryConfigDialog(session_path)
     qtbot.addWidget(dlg)
 
-    assert dlg.bias_combo.currentData() == "neutral"
-    assert dlg.bias_custom_edit.isVisible() is False
+    assert dlg.audience_combo.currentData() == "neutral"
+    assert dlg.audience_custom_edit.isVisible() is False
 
     dlg.accept()
     cfg = session_manager.read_session(session_path)["user_config"]
-    assert cfg["bias"] == "neutral"
-    assert cfg["bias_custom"] == ""
+    assert cfg["audience"] == "neutral"
+    assert cfg["audience_custom"] == ""
 
 
-def test_dialog_bias_custom_reveals_text_field_and_round_trips(qtbot, tmp_path):
+def test_dialog_audience_custom_reveals_text_field_and_round_trips(qtbot, tmp_path):
     session_path = _make_session(tmp_path)
     dlg = DepoSummaryConfigDialog(session_path)
     qtbot.addWidget(dlg)
     dlg.show()
 
     custom_idx = next(
-        i for i in range(dlg.bias_combo.count())
-        if dlg.bias_combo.itemData(i) == "custom"
+        i for i in range(dlg.audience_combo.count())
+        if dlg.audience_combo.itemData(i) == "custom"
     )
-    dlg.bias_combo.setCurrentIndex(custom_idx)
-    assert dlg.bias_custom_edit.isVisible() is True
+    dlg.audience_combo.setCurrentIndex(custom_idx)
+    assert dlg.audience_custom_edit.isVisible() is True
 
-    dlg.bias_custom_edit.setText("Highlight inconsistencies in injury testimony.")
+    dlg.audience_custom_edit.setText("Insurance carrier evaluating settlement value.")
     dlg.accept()
 
     cfg = session_manager.read_session(session_path)["user_config"]
-    assert cfg["bias"] == "custom"
-    assert cfg["bias_custom"] == "Highlight inconsistencies in injury testimony."
+    assert cfg["audience"] == "custom"
+    assert cfg["audience_custom"] == "Insurance carrier evaluating settlement value."
 
 
-def test_dialog_bias_switching_away_from_custom_clears_custom_field(qtbot, tmp_path):
+def test_dialog_audience_switching_away_from_custom_clears_custom_field(qtbot, tmp_path):
     session_path = _make_session(tmp_path)
     dlg = DepoSummaryConfigDialog(session_path)
     qtbot.addWidget(dlg)
 
     custom_idx = next(
-        i for i in range(dlg.bias_combo.count())
-        if dlg.bias_combo.itemData(i) == "custom"
+        i for i in range(dlg.audience_combo.count())
+        if dlg.audience_combo.itemData(i) == "custom"
     )
     pro_def_idx = next(
-        i for i in range(dlg.bias_combo.count())
-        if dlg.bias_combo.itemData(i) == "pro_defense"
+        i for i in range(dlg.audience_combo.count())
+        if dlg.audience_combo.itemData(i) == "pro_defense"
     )
-    dlg.bias_combo.setCurrentIndex(custom_idx)
-    dlg.bias_custom_edit.setText("Some custom directive")
-    dlg.bias_combo.setCurrentIndex(pro_def_idx)
-    assert dlg.bias_custom_edit.isVisible() is False
-    assert dlg.bias_custom_edit.text() == ""
+    dlg.audience_combo.setCurrentIndex(custom_idx)
+    dlg.audience_custom_edit.setText("Some custom directive")
+    dlg.audience_combo.setCurrentIndex(pro_def_idx)
+    assert dlg.audience_custom_edit.isVisible() is False
+    assert dlg.audience_custom_edit.text() == ""
 
     dlg.accept()
     cfg = session_manager.read_session(session_path)["user_config"]
-    assert cfg["bias"] == "pro_defense"
-    assert cfg["bias_custom"] == ""
+    assert cfg["audience"] == "pro_defense"
+    assert cfg["audience_custom"] == ""
+
+
+def test_dialog_tone_combo_defaults_to_recitation(qtbot, tmp_path):
+    session_path = _make_session(tmp_path)
+    dlg = DepoSummaryConfigDialog(session_path)
+    qtbot.addWidget(dlg)
+
+    assert dlg.tone_combo.currentData() == "recitation"
+    assert dlg.tone_custom_edit.isVisible() is False
+
+    dlg.accept()
+    cfg = session_manager.read_session(session_path)["user_config"]
+    assert cfg["tone"] == "recitation"
+    assert cfg["tone_custom"] == ""
+
+
+def test_dialog_tone_editorial_round_trips(qtbot, tmp_path):
+    session_path = _make_session(tmp_path)
+    dlg = DepoSummaryConfigDialog(session_path)
+    qtbot.addWidget(dlg)
+
+    editorial_idx = next(
+        i for i in range(dlg.tone_combo.count())
+        if dlg.tone_combo.itemData(i) == "editorial"
+    )
+    dlg.tone_combo.setCurrentIndex(editorial_idx)
+    dlg.accept()
+
+    cfg = session_manager.read_session(session_path)["user_config"]
+    assert cfg["tone"] == "editorial"
+    assert cfg["tone_custom"] == ""
+
+
+def test_dialog_tone_custom_reveals_text_field_and_round_trips(qtbot, tmp_path):
+    session_path = _make_session(tmp_path)
+    dlg = DepoSummaryConfigDialog(session_path)
+    qtbot.addWidget(dlg)
+    dlg.show()
+
+    custom_idx = next(
+        i for i in range(dlg.tone_combo.count())
+        if dlg.tone_combo.itemData(i) == "custom"
+    )
+    dlg.tone_combo.setCurrentIndex(custom_idx)
+    assert dlg.tone_custom_edit.isVisible() is True
+
+    dlg.tone_custom_edit.setText("Use plain-English, jury-presentation style.")
+    dlg.accept()
+
+    cfg = session_manager.read_session(session_path)["user_config"]
+    assert cfg["tone"] == "custom"
+    assert cfg["tone_custom"] == "Use plain-English, jury-presentation style."
 
 
 def test_dialog_context_docs_accept_via_add_button(qtbot, tmp_path):

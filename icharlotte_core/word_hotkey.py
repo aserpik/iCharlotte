@@ -180,71 +180,80 @@ DEFAULT_OUTLOOK_PROMPTS = [
 ]
 
 # Default Word system prompt (non-redline)
-DEFAULT_WORD_SYSTEM_PROMPT = (
-    "You are a helpful writing assistant for Microsoft Word documents. "
-    "Follow the user's instructions precisely. Output only the requested "
-    "text without any preamble or explanation.\n\n"
-    "VOICE & TONE RULE: When writing within an existing document, you MUST "
-    "match the voice, tone, person (first/second/third), tense, and style "
-    "of the surrounding text. If the document uses first-person plural "
-    '("we believe", "our client"), you must continue in first-person plural. '
-    "Do NOT switch to a detached, analytical, third-person voice unless the "
-    "document itself is written that way.\n\n"
+# Shared system-prompt preamble (applies in Word, Outlook, and Redline modes).
+# Mode-specific system prompts below add only their deltas on top.
+_SHARED_SYSTEM_PREAMBLE = (
+    "You are a helpful writing assistant. Follow the user's instructions "
+    "precisely. Output only the requested text without any preamble or "
+    "explanation.\n\n"
+    "VOICE & TONE RULE: Match the voice, tone, person (first/second/third), "
+    "tense, and style of the surrounding text. If the document uses "
+    'first-person plural ("we believe", "our client"), continue in '
+    "first-person plural. Do NOT switch to a detached, analytical, "
+    "third-person voice unless the document itself is written that way.\n\n"
     "ATTACHMENT RULE: Attached files are REFERENCE MATERIAL — use them for "
     "facts, details, and context to inform your writing. Do NOT summarize, "
-    "describe, or analyze the attachment. Do NOT write instructions or action "
-    "items about the attachment. Instead, draw from its content naturally as "
-    "a source while writing prose in the voice of the document you are editing.\n\n"
-    "CONTEXTUAL WRITING RULE: When asked to complete, continue, or fill in "
-    "text within an existing document, you are writing AS THE AUTHOR of that "
-    "document. Read the surrounding text carefully to understand the author's "
-    "perspective, arguments, and style, then continue seamlessly as if you "
-    "were that author.\n\n"
-    "FORMAT RULES (strict defaults — override ONLY if the user explicitly "
-    "asks for headings, bullet points, numbered lists, or other structure):\n"
-    "- Always write in plain narrative prose. No headings (#, ##, ###), "
-    "no bullet points, no numbered lists, no markdown formatting.\n"
-    "- Use **bold** sparingly and only when the user asks for emphasis.\n"
-    "- Do not use code blocks or HTML.\n\n"
-    "CONTINUATION RULE: When the user asks you to finish a sentence, "
-    "fill in a blank, or continue from a specific point, output ONLY "
-    "the new text that comes after the existing content. Do NOT repeat "
-    "any part of the preceding sentence, paragraph, or context that was "
-    "provided to you. Start your output as fresh, complete text — never "
-    "begin mid-word or mid-sentence as if continuing a truncated fragment. "
-    "The cursor context shown to you may be abbreviated with '…' — always "
-    "refer to the FULL DOCUMENT section for the complete, untruncated text.\n\n"
-    "ELABORATION RULE: The user's prompt is a DIRECTIVE describing what "
-    "to write — it is NOT the text itself. You must compose original, "
-    "substantive, detailed prose that develops the ideas the user described. "
-    "NEVER copy, parrot, or lightly rephrase the user's instruction as your "
-    "output. If the user says 'argue that X caused Y', write a full legal "
-    "argument with reasoning and supporting points — do not just restate "
-    "'X caused Y'."
+    "describe, or analyze the attachment unless the user explicitly asks. "
+    "Draw from its content naturally as a source while writing prose in the "
+    "voice of the document you are editing.\n\n"
+    "ELABORATION RULE: The user's prompt is a DIRECTIVE describing what to "
+    "write — it is NOT the text itself. Compose original, substantive, "
+    "detailed prose that develops the ideas the user described. NEVER copy, "
+    "parrot, or lightly rephrase the user's instruction as your output. If "
+    'the user says "argue that X caused Y", write a full argument with '
+    'reasoning and supporting points — do not just restate "X caused Y".\n\n'
+    "CONTINUATION RULE: When asked to finish a sentence, fill in a blank, "
+    "or continue from a specific point, output ONLY the new text that comes "
+    "after the existing content. Do NOT repeat any part of the preceding "
+    "sentence, paragraph, or context provided to you. The cursor context "
+    "shown to you may be abbreviated with '…' — always refer to the FULL "
+    "DOCUMENT section for the complete, untruncated text.\n\n"
+    "FORMAT BASELINE: Do not introduce markdown (#, ##, **, bullets, "
+    "numbered lists, code blocks, HTML) unless the surrounding text already "
+    "uses it or the user explicitly asks for structure. Use **bold** "
+    "sparingly and only when asked for emphasis."
+)
+
+# Default Word system prompt (free-form mode)
+DEFAULT_WORD_SYSTEM_PROMPT = (
+    _SHARED_SYSTEM_PREAMBLE + "\n\n"
+    "CONTEXTUAL WRITING: You are writing AS THE AUTHOR of the open Word "
+    "document. Read the surrounding text carefully to understand the "
+    "author's perspective, arguments, and style, then continue seamlessly "
+    "as if you were that author.\n\n"
+    "DEFAULT FORMAT: Write in plain narrative prose unless the user "
+    "explicitly asks for headings, bullets, numbered lists, or other "
+    "structure."
 )
 
 # Default Word system prompt (redline mode)
 DEFAULT_WORD_REDLINE_SYSTEM_PROMPT = (
-    "You are a helpful writing assistant operating in REDLINE MODE. "
-    "Your output will be diffed against the original text to produce "
-    "Track Changes in Microsoft Word. You MUST preserve unchanged text "
-    "EXACTLY as written — same words, same order, same punctuation. "
-    "Only modify the specific parts that need changing per the user's "
-    "instructions. Output only the requested text without any preamble, "
-    "explanation, or markdown formatting unless specifically asked."
+    _SHARED_SYSTEM_PREAMBLE + "\n\n"
+    "REDLINE MODE: Your output will be diffed against the original text to "
+    "produce Track Changes in Microsoft Word. You MUST preserve unchanged "
+    "text EXACTLY as written — same words, same order, same punctuation, "
+    "same paragraph breaks. Only modify the specific parts that need "
+    "changing per the user's instructions. Preserve the original formatting "
+    "(bullets, numbering, headings, indentation) rather than overriding it; "
+    "do not impose plain-prose formatting on text that was already "
+    "structured."
 )
 
 # Email-specific system prompt
 EMAIL_SYSTEM_PROMPT = (
-    "You are a helpful email writing assistant. Follow the user's instructions precisely. "
-    "Output ONLY the processed body text - never include Subject lines, To/From/CC headers, "
-    "greetings, signatures, or any email metadata. Just output the revised text content directly. "
-    "Do not add any preamble or explanation."
+    _SHARED_SYSTEM_PREAMBLE + "\n\n"
+    "EMAIL MODE: You are editing the BODY of an email. Output ONLY the "
+    "processed body text — never include Subject lines, To/From/CC headers, "
+    'greetings (e.g., "Hi John,"), signatures, or any email metadata. If a '
+    "thread is visible above your edit, match the formality, tone, and "
+    "style of the preceding messages in the thread."
 )
 
-# Redline mode prefix — prepended to prompt when Track Changes mode is active
+# Redline mode prefix — appended to prompt when Track Changes mode is active.
+# Placed AFTER the assembled context so the user's actual instruction stays
+# at the top of the user message (where the model attends most strongly).
 DEFAULT_REDLINE_PREFIX = (
-    "IMPORTANT — REDLINE MODE IS ACTIVE: Your output will be compared "
+    "\n\nIMPORTANT — REDLINE MODE IS ACTIVE: Your output will be compared "
     "word-by-word against the original text to generate Track Changes. "
     "You MUST follow these rules:\n"
     "1. Preserve any text that does not need to change EXACTLY as-is — "
@@ -255,53 +264,108 @@ DEFAULT_REDLINE_PREFIX = (
     "split paragraphs, or remove blank lines.\n"
     "3. Do NOT rephrase, reorganize, or rewrite portions that are already correct.\n"
     "4. Only modify the specific words or sentences that need to change.\n"
-    "5. If a sentence is fine as-is, copy it verbatim.\n\n"
+    "5. If a sentence is fine as-is, copy it verbatim."
 )
 
-# Instructions for filling a placeholder/blank in the document
-DEFAULT_PLACEHOLDER_INSTRUCTIONS = (
-    "CRITICAL INSTRUCTIONS:\n"
-    "- The USER DIRECTIVE above tells you WHAT to write about — it is "
-    "NOT the text to insert. You must compose original, substantive "
-    "prose that develops the ideas described. NEVER copy or rephrase "
-    "the user's instruction as your output.\n"
+# Shared insertion-instructions template used for both placeholder and cursor
+# scenarios. Format with {anchor_label}, {anchor_short}, {extra_rules}.
+# The ELABORATION RULE (directive ≠ text) lives in the system preamble — do
+# not restate it here.
+DEFAULT_INSERTION_INSTRUCTIONS = (
+    "INSERTION INSTRUCTIONS:\n"
     "- Your output will be INSERTED DIRECTLY into the document at "
-    "the position of the blank shown above.\n"
+    "the {anchor_label}.\n"
     "- Write ACTUAL PROSE that flows naturally from the text before "
-    "the blank and connects to the text after it.\n"
-    "- You are ghostwriting as the document's author. Match their "
-    "voice, tone, and person (e.g., if they write \"we\", you write \"we\").\n"
-    "- Do NOT write instructions, action items, task descriptions, "
-    "or summaries. Write the actual words that belong in the document.\n"
-    "- Output ONLY the replacement text — no preamble, no explanation."
-)
-
-# Instructions for inserting text at the cursor position (no selection)
-DEFAULT_CURSOR_INSTRUCTIONS = (
-    "CRITICAL INSTRUCTIONS:\n"
-    "- The USER DIRECTIVE above tells you WHAT to write about — it is "
-    "NOT the text to insert. You must compose original, substantive "
-    "prose that develops the ideas described. NEVER copy or rephrase "
-    "the user's instruction as your output.\n"
-    "- Your output will be INSERTED DIRECTLY into the document at "
-    "the cursor position shown above.\n"
-    "- Write ACTUAL PROSE that flows naturally from the text before "
-    "the cursor and connects to the text after it.\n"
-    "- You are ghostwriting as the document's author. Match their "
-    "voice, tone, and person (e.g., if they write \"we\", you write \"we\").\n"
+    "the {anchor_short} and connects to the text after it.\n"
+    "- Ghostwrite as the document's author. Match their voice, tone, "
+    'and person (e.g., if they write "we", you write "we").\n'
     "- Do NOT write instructions, action items, task descriptions, "
     "or meta-commentary. Write the actual words that belong in the document.\n"
-    "- Your output must start as a complete, well-formed sentence or "
-    "paragraph. NEVER begin with a partial word or sentence fragment.\n"
+    "{extra_rules}"
     "- Output ONLY the text to insert — no preamble, no explanation."
+)
+
+# Legacy aliases kept for any external import/back-compat. The shared
+# template replaces them in runtime call sites.
+DEFAULT_PLACEHOLDER_INSTRUCTIONS = DEFAULT_INSERTION_INSTRUCTIONS.format(
+    anchor_label="position of the blank shown above",
+    anchor_short="blank",
+    extra_rules="",
+)
+DEFAULT_CURSOR_INSTRUCTIONS = DEFAULT_INSERTION_INSTRUCTIONS.format(
+    anchor_label="cursor position shown above",
+    anchor_short="cursor",
+    extra_rules=(
+        "- Your output must start as a complete, well-formed sentence or "
+        "paragraph. NEVER begin with a partial word or sentence fragment.\n"
+    ),
 )
 
 # Instructions for processing a normal text selection
 DEFAULT_SELECTION_INSTRUCTIONS = (
-    "Apply the user's instructions to the SELECTED TEXT above. "
-    "Use the full document for context and to match the writing style. "
-    "Output only the processed version of the selected text."
+    "SELECTION TRANSFORM INSTRUCTIONS:\n"
+    "- Apply the user's instructions to the SELECTED TEXT above. The full "
+    "document is provided for context and style only — do NOT rewrite it.\n"
+    "- PRESERVE FACTS VERBATIM: keep all names, dates, dollar amounts, "
+    "citations, case numbers, addresses, and direct quotes exactly as they "
+    "appear in the selection. Transform only the phrasing the user asked "
+    "you to change.\n"
+    "- Match the surrounding document's voice, tone, person, and tense.\n"
+    "- Preserve the selection's structure (paragraph count, bullet/list "
+    "formatting, indentation) unless the user explicitly asks to change it.\n"
+    "- Output ONLY the processed version of the selected text — no preamble, "
+    "no explanation, no quotation marks around the output."
 )
+
+
+def _is_placeholder_selection(text: str) -> bool:
+    """
+    Detect whether a Word selection looks like a blank/placeholder to fill in
+    rather than text to transform.
+
+    A placeholder is empty, or contains ONLY filler characters
+    (underscores, hyphens, en-dashes, em-dashes, dots, spaces). Short
+    alphanumeric selections like "Mr.", "$10", or "Dr." are deliberately
+    NOT flagged — they should be treated as normal selections to transform.
+    """
+    stripped = text.strip()
+    if not stripped:
+        return True
+    return all(c in "_—–-. " for c in stripped)
+
+
+def _render_insertion_instructions(mode: str, template: str | None = None) -> str:
+    """
+    Render the insertion-instructions prompt for a given mode.
+
+    mode: "placeholder" or "cursor"
+    template: optional override (e.g., user-customized from the workbench);
+              if None, uses DEFAULT_INSERTION_INSTRUCTIONS.
+
+    Falls back to the raw template if .format() raises (i.e., user removed
+    a required placeholder while editing in the workbench).
+    """
+    tpl = template if template is not None else DEFAULT_INSERTION_INSTRUCTIONS
+    if mode == "placeholder":
+        kwargs = dict(
+            anchor_label="position of the blank shown above",
+            anchor_short="blank",
+            extra_rules="",
+        )
+    else:  # cursor
+        kwargs = dict(
+            anchor_label="cursor position shown above",
+            anchor_short="cursor",
+            extra_rules=(
+                "- Your output must start as a complete, well-formed "
+                "sentence or paragraph. NEVER begin with a partial word "
+                "or sentence fragment.\n"
+            ),
+        )
+    try:
+        return tpl.format(**kwargs)
+    except (KeyError, IndexError, ValueError):
+        return tpl
 
 
 def detect_active_app_context() -> tuple:
@@ -4090,24 +4154,20 @@ class WordLLMPopup(QDialog):
             selected_text, has_selection = self._get_word_selection_internal(word)
             QApplication.processEvents()  # Keep UI responsive
 
-            # When redline mode is active, prepend instruction to preserve unchanged text
+            # Redline mode: load the prefix now, but APPEND it to the assembled
+            # full_prompt at the end (below) rather than prepending it to the
+            # user's directive. Keeps the user's actual instruction at the top
+            # of the user message, where the model attends most strongly.
             redline_prefix = ""
             if self._redline_mode_active:
                 redline_prefix = _load_pipeline_prompt(
                     "word_assistant", "redline_prefix", DEFAULT_REDLINE_PREFIX)
-                prompt = redline_prefix + prompt
 
             if use_all_text and has_selection and selected_text:
                 # Get all document text for context
                 all_text = self._get_all_document_text()
                 if all_text:
-                    # Detect if the selection is a placeholder/blank
-                    stripped = selected_text.strip()
-                    is_placeholder = (
-                        not stripped
-                        or all(c in '_—–-. ' for c in stripped)
-                        or len(stripped) <= 3
-                    )
+                    is_placeholder = _is_placeholder_selection(selected_text)
 
                     if is_placeholder:
                         # Extract surrounding context to show what comes before/after
@@ -4120,8 +4180,9 @@ class WordLLMPopup(QDialog):
                             context_after = all_text[after_start:].strip()
 
                         # Placeholder/blank: instruct AI to write replacement prose
-                        _ph_instr = _load_pipeline_prompt(
-                            "word_assistant", "placeholder_instructions", DEFAULT_PLACEHOLDER_INSTRUCTIONS)
+                        _ph_tpl = _load_pipeline_prompt(
+                            "word_assistant", "insertion_instructions", DEFAULT_INSERTION_INSTRUCTIONS)
+                        _ph_instr = _render_insertion_instructions("placeholder", _ph_tpl)
                         full_prompt = (
                             f"=== USER DIRECTIVE (describes what to write — NOT the text itself) ===\n"
                             f"{prompt}\n\n"
@@ -4160,8 +4221,9 @@ class WordLLMPopup(QDialog):
                     if cursor_pos is not None and cursor_pos <= len(all_text):
                         context_before = all_text[:cursor_pos].strip()
                         context_after = all_text[cursor_pos:].strip()
-                        _cur_instr = _load_pipeline_prompt(
-                            "word_assistant", "cursor_instructions", DEFAULT_CURSOR_INSTRUCTIONS)
+                        _cur_tpl = _load_pipeline_prompt(
+                            "word_assistant", "insertion_instructions", DEFAULT_INSERTION_INSTRUCTIONS)
+                        _cur_instr = _render_insertion_instructions("cursor", _cur_tpl)
                         full_prompt = (
                             f"=== USER DIRECTIVE (describes what to write — NOT the text itself) ===\n"
                             f"{prompt}\n\n"
@@ -4187,6 +4249,12 @@ class WordLLMPopup(QDialog):
             attachment_context = self.attachment_area.get_attachment_context()
             if attachment_context:
                 full_prompt += attachment_context
+
+            # Redline prefix goes LAST so it sits in the recency-strong
+            # position right before the model generates. Prefix constant
+            # begins with "\n\n" — concatenation produces clean spacing.
+            if redline_prefix:
+                full_prompt += redline_prefix
 
             QApplication.processEvents()
 

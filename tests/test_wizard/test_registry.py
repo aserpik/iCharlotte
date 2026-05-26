@@ -19,6 +19,8 @@ def test_initial_tasks_registered():
         "med_chron_analysis",
         "med_record_extractor",
         "subpoena_tracker",
+        "respond_to_discovery",
+        "oppose_motion",
         "chat",
     }
 

@@ -8,7 +8,7 @@
         {
           "provider": "Gemini",
           "model": "gemini-3.1-flash-lite-preview",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -16,7 +16,7 @@
         {
           "provider": "Gemini",
           "model": "gemini-3-flash-preview",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -24,7 +24,7 @@
         {
           "provider": "Gemini",
           "model": "gemini-2.5-pro",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -32,7 +32,7 @@
         {
           "provider": "OpenAI",
           "model": "gpt-4o",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -46,8 +46,16 @@
       "model_sequence": [
         {
           "provider": "Gemini",
+          "model": "gemini-3.1-pro-preview",
+          "max_tokens": 1024,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        },
+        {
+          "provider": "Gemini",
           "model": "gemini-3-pro-preview",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -55,7 +63,7 @@
         {
           "provider": "Gemini",
           "model": "gemini-3.1-flash-lite-preview",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -63,23 +71,7 @@
         {
           "provider": "Gemini",
           "model": "gemini-3-flash-preview",
-          "max_tokens": -1,
-          "supports_thinking": false,
-          "supports_streaming": true,
-          "cost_tier": "standard"
-        },
-        {
-          "provider": "Claude",
-          "model": "claude-sonnet-4-20250514",
-          "max_tokens": -1,
-          "supports_thinking": false,
-          "supports_streaming": true,
-          "cost_tier": "standard"
-        },
-        {
-          "provider": "OpenAI",
-          "model": "gpt-4o",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -93,16 +85,16 @@
       "model_sequence": [
         {
           "provider": "Gemini",
-          "model": "gemini-3-pro-preview",
-          "max_tokens": -1,
+          "model": "gemini-3.1-pro-preview",
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
         },
         {
           "provider": "Gemini",
-          "model": "gemini-3.1-pro-preview",
-          "max_tokens": -1,
+          "model": "gemini-3-pro-preview",
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -110,7 +102,7 @@
         {
           "provider": "Gemini",
           "model": "gemini-3.1-flash-lite-preview",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -118,15 +110,7 @@
         {
           "provider": "Gemini",
           "model": "gemini-3-flash-preview",
-          "max_tokens": -1,
-          "supports_thinking": false,
-          "supports_streaming": true,
-          "cost_tier": "standard"
-        },
-        {
-          "provider": "OpenAI",
-          "model": "gpt-4o",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -141,7 +125,7 @@
         {
           "provider": "Gemini",
           "model": "gemini-3.1-flash-lite-preview",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -149,7 +133,7 @@
         {
           "provider": "Gemini",
           "model": "gemini-3-flash-preview",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -157,7 +141,7 @@
         {
           "provider": "Gemini",
           "model": "gemini-2.5-flash",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -165,7 +149,7 @@
         {
           "provider": "OpenAI",
           "model": "gpt-4o-mini",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -180,7 +164,7 @@
         {
           "provider": "Gemini",
           "model": "gemini-3.1-flash-lite-preview",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -188,7 +172,7 @@
         {
           "provider": "Gemini",
           "model": "gemini-3-flash-preview",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -196,7 +180,7 @@
         {
           "provider": "Gemini",
           "model": "gemini-2.5-flash",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -204,7 +188,7 @@
         {
           "provider": "OpenAI",
           "model": "gpt-4o-mini",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -219,7 +203,7 @@
         {
           "provider": "Gemini",
           "model": "gemini-3.1-flash-lite-preview",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -227,7 +211,7 @@
         {
           "provider": "Gemini",
           "model": "gemini-3-flash-preview",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -235,7 +219,7 @@
         {
           "provider": "Gemini",
           "model": "gemini-2.5-flash",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -243,7 +227,7 @@
         {
           "provider": "OpenAI",
           "model": "gpt-4o-mini",
-          "max_tokens": -1,
+          "max_tokens": 1024,
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
@@ -267,28 +251,55 @@
       "agent_id": "agent_summarize",
       "display_name": "Summarize",
       "description": "Document summarization with verification",
-      "model_sequence": [],
+      "model_sequence": [
+        {
+          "provider": "Gemini",
+          "model": "gemini-3.1-pro-preview",
+          "max_tokens": -1,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        }
+      ],
       "max_retries": 3,
-      "timeout_seconds": 120,
-      "use_default": true
+      "timeout_seconds": 180,
+      "use_default": false
     },
     "agent_sum_disc": {
       "agent_id": "agent_sum_disc",
       "display_name": "Summarize Discovery",
       "description": "Discovery response extraction and summarization",
-      "model_sequence": [],
+      "model_sequence": [
+        {
+          "provider": "Gemini",
+          "model": "gemini-3.1-pro-preview",
+          "max_tokens": -1,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        }
+      ],
       "max_retries": 3,
-      "timeout_seconds": 120,
-      "use_default": true
+      "timeout_seconds": 180,
+      "use_default": false
     },
     "agent_sum_depo": {
       "agent_id": "agent_sum_depo",
       "display_name": "Summarize Deposition",
       "description": "Deposition transcript analysis",
-      "model_sequence": [],
+      "model_sequence": [
+        {
+          "provider": "Gemini",
+          "model": "gemini-3.1-pro-preview",
+          "max_tokens": -1,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        }
+      ],
       "max_retries": 3,
-      "timeout_seconds": 120,
-      "use_default": true
+      "timeout_seconds": 180,
+      "use_default": false
     },
     "agent_med_rec": {
       "agent_id": "agent_med_rec",
@@ -320,14 +331,6 @@
           "supports_thinking": false,
           "supports_streaming": true,
           "cost_tier": "standard"
-        },
-        {
-          "provider": "Gemini",
-          "model": "gemini-3-flash-preview",
-          "max_tokens": -1,
-          "supports_thinking": false,
-          "supports_streaming": true,
-          "cost_tier": "standard"
         }
       ],
       "max_retries": 3,
@@ -342,14 +345,6 @@
         {
           "provider": "Gemini",
           "model": "gemini-3.1-flash-lite-preview",
-          "max_tokens": -1,
-          "supports_thinking": false,
-          "supports_streaming": true,
-          "cost_tier": "standard"
-        },
-        {
-          "provider": "Gemini",
-          "model": "gemini-3-flash-preview",
           "max_tokens": -1,
           "supports_thinking": false,
           "supports_streaming": true,

@@ -259,11 +259,19 @@ class VariablesDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save: {e}")
 
+def _is_gpt55_pro_model(model: str) -> bool:
+    return (model or "").lower().startswith("gpt-5.5-pro")
+
+
 class SettingsDialog(QDialog):
-    def __init__(self, settings, parent=None):
+    DEFAULT_THINKING_LEVELS = ["None", "Minimal", "Low", "Medium", "High"]
+    GPT55_PRO_THINKING_LEVELS = ["Medium", "High", "xhigh"]
+
+    def __init__(self, settings, parent=None, selected_model=None):
         super().__init__(parent)
         self.setWindowTitle("Model Settings")
         self.settings = settings
+        self.selected_model = selected_model
         layout = QFormLayout(self)
         
         self.temp_spin = QDoubleSpinBox()
@@ -285,14 +293,27 @@ class SettingsDialog(QDialog):
         layout.addRow("Max Tokens:", self.tokens_spin)
 
         self.thinking_combo = QComboBox()
-        self.thinking_combo.addItems(["None", "Minimal", "Low", "Medium", "High"])
+        thinking_levels = (
+            self.GPT55_PRO_THINKING_LEVELS
+            if _is_gpt55_pro_model(selected_model)
+            else self.DEFAULT_THINKING_LEVELS
+        )
+        self.thinking_combo.addItems(thinking_levels)
         
         current_level = settings.get('thinking_level', "None")
         index = self.thinking_combo.findText(current_level, Qt.MatchFlag.MatchFixedString)
+        if index < 0:
+            for i in range(self.thinking_combo.count()):
+                if self.thinking_combo.itemText(i).lower() == str(current_level).lower():
+                    index = i
+                    break
         if index >= 0:
             self.thinking_combo.setCurrentIndex(index)
             
-        self.thinking_combo.setToolTip("Gemini 3.0 Only. Pro supports High/Low. Flash supports all.")
+        if _is_gpt55_pro_model(selected_model):
+            self.thinking_combo.setToolTip("GPT-5.5 Pro supports Medium, High, and xhigh.")
+        else:
+            self.thinking_combo.setToolTip("Gemini 3.0 Only. Pro supports High/Low. Flash supports all.")
         layout.addRow("Thinking Level:", self.thinking_combo)
         
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -979,6 +1000,32 @@ class PromptsDialog(QDialog):
         toolbar.addWidget(self.mode_label)
 
         toolbar.addStretch()
+
+        # Preview Assembled Prompt button (word_assistant only).
+        # Shows the FULL system + user message the model actually receives
+        # for a given scenario (selection × mode × app), so editors can spot
+        # interactions between the 6 word_assistant fragments.
+        self.preview_assembled_btn = QPushButton("Preview Assembled Prompt")
+        self.preview_assembled_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #fff3e0;
+                border: 1px solid #ffb74d;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-weight: 500;
+                color: #e65100;
+            }
+            QPushButton:hover { background-color: #ffe0b2; }
+            QPushButton:disabled { color: #aaa; background-color: #f5f5f5; border-color: #ddd; }
+        """)
+        self.preview_assembled_btn.setToolTip(
+            "Show the assembled system + user message for the selected "
+            "word_assistant scenario. Only available for the word_assistant agent."
+        )
+        self.preview_assembled_btn.clicked.connect(self._open_assembled_preview)
+        self.preview_assembled_btn.setEnabled(False)
+        toolbar.addWidget(self.preview_assembled_btn)
+
         layout.addLayout(toolbar)
 
         # Editor with syntax highlighting
@@ -990,6 +1037,18 @@ class PromptsDialog(QDialog):
         layout.addWidget(self.editor)
 
         return tab
+
+    def _open_assembled_preview(self):
+        """Open the WordAssistantPreviewDialog scoped to the current_agent."""
+        if self.current_agent != "word_assistant":
+            QMessageBox.information(
+                self, "Preview Unavailable",
+                "Assembled-prompt preview is only available for the "
+                "word_assistant agent."
+            )
+            return
+        dlg = WordAssistantPreviewDialog(self.prompt_manager, parent=self)
+        dlg.exec()
 
     def _toggle_editor_mode(self):
         """Toggle between raw markdown and rendered markdown editing."""
@@ -1546,6 +1605,10 @@ class PromptsDialog(QDialog):
 
         # Load model settings for this agent
         self._load_agent_model_settings()
+
+        # Enable assembled-prompt preview only for word_assistant
+        if hasattr(self, "preview_assembled_btn"):
+            self.preview_assembled_btn.setEnabled(agent == "word_assistant")
 
         if self.pass_combo.count() > 0:
             self._on_pass_changed(self.pass_combo.currentText())
@@ -2892,3 +2955,236 @@ class CaseContextDialog(QDialog):
     def get_context_file_text(self) -> str:
         return self._context_file_text
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# WordAssistantPreviewDialog
+# ─────────────────────────────────────────────────────────────────────────────
+# Shows the FULL assembled prompt (system + user message) that word_assistant
+# sends to the LLM for a chosen scenario. The 6 workbench fragments interact
+# in non-obvious ways (e.g., a system-prompt edit only takes effect when no
+# custom override is set; the redline prefix is appended only when redline
+# mode is active). Previewing them in their assembled form makes those
+# interactions visible.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Sample fixtures used to fill in document context for the preview. Kept
+# short and obviously synthetic so users don't mistake them for real text.
+_PREVIEW_USER_DIRECTIVE = "Argue that the defendant's conduct caused plaintiff's injuries."
+_PREVIEW_FULL_DOCUMENT = (
+    "I. INTRODUCTION\n\n"
+    "This is a sample document used to preview the word_assistant prompt "
+    "assembly. The model would receive the full surrounding context here.\n\n"
+    "II. ARGUMENT\n\n"
+    "[The selection or cursor lives somewhere in this section.]"
+)
+_PREVIEW_SELECTION_TEXT = "The defendant's conduct was reckless."
+_PREVIEW_PLACEHOLDER_TEXT = "____________"
+_PREVIEW_CONTEXT_BEFORE = (
+    "I. INTRODUCTION\n\n"
+    "This is a sample document used to preview the word_assistant prompt "
+    "assembly. The model would receive the full surrounding context here.\n\n"
+    "II. ARGUMENT\n\n"
+)
+_PREVIEW_CONTEXT_AFTER = ""
+_PREVIEW_ATTACHMENT_CONTEXT = (
+    "\n\n=== ATTACHED REFERENCE FILE: example_exhibit.pdf ===\n"
+    "[attachment text would appear here]"
+)
+
+
+class WordAssistantPreviewDialog(QDialog):
+    """Show the assembled system + user message for a word_assistant scenario."""
+
+    SCENARIOS = [
+        ("Word — selection + full doc (free-form)", "word_selection_normal"),
+        ("Word — selection + full doc (REDLINE)", "word_selection_redline"),
+        ("Word — placeholder/blank + full doc", "word_placeholder"),
+        ("Word — cursor + full doc (no selection)", "word_cursor"),
+        ("Outlook — compose email body", "outlook_email"),
+    ]
+
+    def __init__(self, prompt_manager, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Assembled Prompt Preview — word_assistant")
+        self.resize(950, 720)
+        self.prompt_manager = prompt_manager
+
+        layout = QVBoxLayout(self)
+
+        # Scenario selector + attachment toggle
+        controls = QHBoxLayout()
+        controls.addWidget(QLabel("Scenario:"))
+        self.scenario_combo = QComboBox()
+        for label, key in self.SCENARIOS:
+            self.scenario_combo.addItem(label, key)
+        self.scenario_combo.currentIndexChanged.connect(self._refresh)
+        controls.addWidget(self.scenario_combo, stretch=1)
+
+        self.attach_checkbox = QCheckBox("Include sample attachment context")
+        self.attach_checkbox.stateChanged.connect(self._refresh)
+        controls.addWidget(self.attach_checkbox)
+
+        layout.addLayout(controls)
+
+        # Explanatory note
+        note = QLabel(
+            "<i>This preview uses synthetic sample text for the document, "
+            "selection, and user directive — the real assembly uses your "
+            "current Word document. Edits to workbench prompts are reflected "
+            "here on the next refresh.</i>"
+        )
+        note.setWordWrap(True)
+        note.setStyleSheet("color: #666; padding: 4px;")
+        layout.addWidget(note)
+
+        # System prompt panel
+        layout.addWidget(QLabel("<b>System prompt</b> (sent as the system role):"))
+        self.system_view = QPlainTextEdit()
+        self.system_view.setReadOnly(True)
+        self.system_view.setStyleSheet(
+            "font-family: Consolas, monospace; font-size: 11px; "
+            "background-color: #f0f4f8;"
+        )
+        layout.addWidget(self.system_view, stretch=2)
+
+        # User message panel
+        layout.addWidget(QLabel("<b>User message</b> (full assembled prompt):"))
+        self.user_view = QPlainTextEdit()
+        self.user_view.setReadOnly(True)
+        self.user_view.setStyleSheet(
+            "font-family: Consolas, monospace; font-size: 11px; "
+            "background-color: #fffaf0;"
+        )
+        layout.addWidget(self.user_view, stretch=3)
+
+        # Footer with refresh + close
+        btn_row = QHBoxLayout()
+        self.refresh_btn = QPushButton("Refresh")
+        self.refresh_btn.clicked.connect(self._refresh)
+        btn_row.addWidget(self.refresh_btn)
+
+        self.copy_btn = QPushButton("Copy User Message")
+        self.copy_btn.clicked.connect(self._copy_user_message)
+        btn_row.addWidget(self.copy_btn)
+
+        btn_row.addStretch()
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.accept)
+        btn_row.addWidget(close_btn)
+        layout.addLayout(btn_row)
+
+        self._refresh()
+
+    # ── prompt loading ────────────────────────────────────────────────────
+    def _load(self, pass_name: str, default: str) -> str:
+        """Load a workbench prompt with fallback to default."""
+        try:
+            text = self.prompt_manager.get_prompt("word_assistant", pass_name)
+            if text:
+                return text
+        except Exception:
+            pass
+        return default
+
+    # ── assembly (mirrors logic in word_hotkey.py) ────────────────────────
+    def _assemble(self, scenario: str) -> tuple[str, str]:
+        """
+        Build (system_prompt, user_message) for a given scenario.
+
+        This duplicates the assembly logic in word_hotkey.py:_call_llm_for_word
+        and the Outlook path — kept in sync via the test that exercises the
+        same constants/helpers.
+        """
+        from icharlotte_core.word_hotkey import (
+            DEFAULT_WORD_SYSTEM_PROMPT,
+            DEFAULT_WORD_REDLINE_SYSTEM_PROMPT,
+            EMAIL_SYSTEM_PROMPT,
+            DEFAULT_REDLINE_PREFIX,
+            DEFAULT_INSERTION_INSTRUCTIONS,
+            DEFAULT_SELECTION_INSTRUCTIONS,
+            _render_insertion_instructions,
+        )
+
+        directive = _PREVIEW_USER_DIRECTIVE
+        attach = _PREVIEW_ATTACHMENT_CONTEXT if self.attach_checkbox.isChecked() else ""
+
+        if scenario == "outlook_email":
+            system = self._load("email_system_prompt", EMAIL_SYSTEM_PROMPT)
+            user = (
+                f"{directive}\n\n"
+                f"Text to process:\n{_PREVIEW_SELECTION_TEXT}"
+                f"{attach}"
+            )
+            return system, user
+
+        # All Word scenarios
+        redline = scenario == "word_selection_redline"
+        if redline:
+            system = self._load(
+                "redline_system_prompt", DEFAULT_WORD_REDLINE_SYSTEM_PROMPT
+            )
+        else:
+            system = self._load("system_prompt", DEFAULT_WORD_SYSTEM_PROMPT)
+
+        if scenario == "word_placeholder":
+            tpl = self._load("insertion_instructions", DEFAULT_INSERTION_INSTRUCTIONS)
+            instr = _render_insertion_instructions("placeholder", tpl)
+            user = (
+                "=== USER DIRECTIVE (describes what to write — NOT the text itself) ===\n"
+                f"{directive}\n\n"
+                f"=== FULL DOCUMENT ===\n{_PREVIEW_FULL_DOCUMENT}\n\n"
+                "=== IMMEDIATE CONTEXT ===\n"
+                f'Text BEFORE the blank: "{_PREVIEW_CONTEXT_BEFORE.strip()}"\n'
+                "[___BLANK TO FILL___]\n"
+                f'Text AFTER the blank: "{_PREVIEW_CONTEXT_AFTER.strip()}"\n\n'
+                f"{instr}"
+            )
+        elif scenario == "word_cursor":
+            tpl = self._load("insertion_instructions", DEFAULT_INSERTION_INSTRUCTIONS)
+            instr = _render_insertion_instructions("cursor", tpl)
+            user = (
+                "=== USER DIRECTIVE (describes what to write — NOT the text itself) ===\n"
+                f"{directive}\n\n"
+                f"=== FULL DOCUMENT ===\n{_PREVIEW_FULL_DOCUMENT}\n\n"
+                "=== CURSOR POSITION ===\n"
+                f'Text BEFORE cursor: "{_PREVIEW_CONTEXT_BEFORE.strip()}"\n'
+                "[___CURSOR IS HERE___]\n"
+                f'Text AFTER cursor: "{_PREVIEW_CONTEXT_AFTER.strip()}"\n\n'
+                f"{instr}"
+            )
+        else:
+            # word_selection_normal or word_selection_redline
+            instr = self._load(
+                "selection_instructions", DEFAULT_SELECTION_INSTRUCTIONS
+            )
+            user = (
+                f"{directive}\n\n"
+                f"=== FULL DOCUMENT (for context) ===\n{_PREVIEW_FULL_DOCUMENT}\n\n"
+                f"=== SELECTED TEXT TO PROCESS ===\n{_PREVIEW_SELECTION_TEXT}\n\n"
+                f"{instr}"
+            )
+
+        if attach:
+            user += attach
+
+        if redline:
+            prefix = self._load("redline_prefix", DEFAULT_REDLINE_PREFIX)
+            user += prefix
+
+        return system, user
+
+    # ── UI handlers ───────────────────────────────────────────────────────
+    def _refresh(self):
+        scenario = self.scenario_combo.currentData()
+        try:
+            system, user = self._assemble(scenario)
+        except Exception as e:
+            self.system_view.setPlainText(f"[Error assembling preview: {e}]")
+            self.user_view.setPlainText("")
+            return
+        self.system_view.setPlainText(system)
+        self.user_view.setPlainText(user)
+
+    def _copy_user_message(self):
+        from PySide6.QtWidgets import QApplication
+        QApplication.clipboard().setText(self.user_view.toPlainText())

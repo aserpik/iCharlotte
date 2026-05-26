@@ -104,6 +104,51 @@ def is_fi_series(number_str: str, series_list: List[int]) -> bool:
     return prefix in series_list
 
 
+def _normalize_fi_number(number_str: str) -> str:
+    return "".join(str(number_str or "").split())
+
+
+def _lookup_fi_numbered_value(number_str: str, values_by_number: Dict[str, str]):
+    n = _normalize_fi_number(number_str)
+    if n in values_by_number:
+        return values_by_number[n]
+    if "." in n:
+        series_key = f"{n.split('.', 1)[0]}.*"
+        if series_key in values_by_number:
+            return values_by_number[series_key]
+    return None
+
+
+def get_fi_fixed_objections(number_str: str, rules: ResponseRules) -> str:
+    """Return FI-number-specific fixed objections, if configured."""
+    objections_by_number = getattr(rules, "fi_objections_by_number", {}) or {}
+    value = _lookup_fi_numbered_value(number_str, objections_by_number)
+    if value is not None:
+        return value
+    return ""
+
+
+def strip_fi_objections_from_fixed_response(
+    number_str: str,
+    response_text: str,
+    rules: ResponseRules,
+) -> str:
+    """Remove leading objection/waiver text already shown in the objections box."""
+    if not response_text or not get_fi_fixed_objections(number_str, rules):
+        return response_text or ""
+    marker_pattern = (
+        "Subject to and without waiving "
+        r"(?:the )?(?:foregoing|stated) objections?,?\s*"
+        r"(?:Responding Party responds as follows:)?"
+    )
+    import re
+
+    match = re.search(marker_pattern, response_text, re.IGNORECASE)
+    if not match:
+        return response_text
+    return response_text[match.end():].strip()
+
+
 def get_fi_fixed_response(number_str: str, rules: ResponseRules) -> Optional[str]:
     """
     Return the fixed (pre-written) response text for certain FI numbers,
@@ -115,7 +160,11 @@ def get_fi_fixed_response(number_str: str, rules: ResponseRules) -> Optional[str
       - 16.x → fi_16_response (section 16.0 series)
       - 17.1 → placeholder "[PENDING …]"
     """
-    n = number_str.strip()
+    n = _normalize_fi_number(number_str)
+    responses_by_number = getattr(rules, "fi_responses_by_number", {}) or {}
+    mapped = _lookup_fi_numbered_value(n, responses_by_number)
+    if mapped is not None:
+        return mapped
 
     if n == "1.1":
         return rules.fi_1_1_response

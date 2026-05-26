@@ -1184,3 +1184,131 @@ def validate_report(doc_path: str, profile: Dict = None) -> ValidationResult:
             ))
 
     return result
+
+
+def validate_discovery_response_docx(doc_path: str) -> ValidationResult:
+    """Lightweight offline validation for generated discovery-response .docx files.
+
+    This intentionally does not run litigation-report formatting checks. It
+    verifies that the file exists, can be opened by python-docx, and contains
+    non-empty response text.
+    """
+    from docx import Document
+
+    result = ValidationResult(
+        context=f"Discovery response: {os.path.basename(doc_path)}"
+    )
+
+    if not os.path.exists(doc_path):
+        result.findings.append(Finding("ERROR", "file", f"File not found: {doc_path}"))
+        return result
+
+    try:
+        doc = Document(doc_path)
+    except Exception as exc:
+        result.findings.append(
+            Finding("ERROR", "open_docx", f"Could not open generated docx: {exc}")
+        )
+        return result
+
+    text = _docx_all_story_text(doc)
+    if not text.strip():
+        result.findings.append(
+            Finding("ERROR", "content", "Generated document contains no paragraph text")
+        )
+    else:
+        result.findings.append(
+            Finding("PASS", "content", "Generated document contains paragraph text")
+        )
+
+    if "RESPONSE" in text.upper():
+        result.findings.append(
+            Finding("PASS", "response_markers", "Response headings detected")
+        )
+    else:
+        result.findings.append(
+            Finding("WARN", "response_markers", "No response headings detected")
+        )
+
+    return result
+
+
+def validate_opposition_docx(doc_path: str) -> ValidationResult:
+    """Lightweight offline validation for generated opposition .docx files."""
+    from docx import Document
+
+    result = ValidationResult(
+        context=f"Opposition memorandum: {os.path.basename(doc_path)}"
+    )
+
+    if not os.path.exists(doc_path):
+        result.findings.append(Finding("ERROR", "file", f"File not found: {doc_path}"))
+        return result
+
+    try:
+        doc = Document(doc_path)
+    except Exception as exc:
+        result.findings.append(
+            Finding("ERROR", "open_docx", f"Could not open generated docx: {exc}")
+        )
+        return result
+
+    text = _docx_all_story_text(doc)
+    if not text.strip():
+        result.findings.append(
+            Finding("ERROR", "content", "Generated document contains no paragraph text")
+        )
+    else:
+        result.findings.append(
+            Finding("PASS", "content", "Generated document contains paragraph text")
+        )
+
+    if "OPPOSITION" in text.upper():
+        result.findings.append(
+            Finding("PASS", "opposition_marker", "Opposition title detected")
+        )
+    else:
+        result.findings.append(
+            Finding("WARN", "opposition_marker", "No opposition title detected")
+        )
+
+    if "CAPTION PAGE" in text.upper():
+        result.findings.append(
+            Finding("ERROR", "caption_marker", "Unreplaced CAPTION PAGE marker detected")
+        )
+    else:
+        result.findings.append(
+            Finding("PASS", "caption_marker", "No unreplaced caption marker detected")
+        )
+
+    return result
+
+
+def _docx_all_story_text(doc) -> str:
+    w_t = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"
+    w_p = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"
+    roots = [doc.element.body]
+    for section in doc.sections:
+        roots.extend(
+            [
+                section.header._element,
+                section.first_page_header._element,
+                section.even_page_header._element,
+                section.footer._element,
+                section.first_page_footer._element,
+                section.even_page_footer._element,
+            ]
+        )
+
+    seen: set[int] = set()
+    parts: list[str] = []
+    for root in roots:
+        root_id = id(root)
+        if root_id in seen:
+            continue
+        seen.add(root_id)
+        for paragraph in root.iter(w_p):
+            paragraph_text = "".join(text.text or "" for text in paragraph.iter(w_t))
+            if paragraph_text:
+                parts.append(paragraph_text)
+    return "\n".join(parts)

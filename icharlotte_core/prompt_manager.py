@@ -432,8 +432,7 @@ class PromptManager:
             DEFAULT_WORD_REDLINE_SYSTEM_PROMPT,
             EMAIL_SYSTEM_PROMPT,
             DEFAULT_REDLINE_PREFIX,
-            DEFAULT_PLACEHOLDER_INSTRUCTIONS,
-            DEFAULT_CURSOR_INSTRUCTIONS,
+            DEFAULT_INSERTION_INSTRUCTIONS,
             DEFAULT_SELECTION_INSTRUCTIONS,
         )
         from icharlotte_core.legal_research.prompts import (
@@ -447,14 +446,51 @@ class PromptManager:
         )
         from icharlotte_core.mediation_brief import MediationBriefGenerator
 
+        # ── Migration: prune deprecated word_assistant entries ──────────────
+        # placeholder_instructions and cursor_instructions were consolidated
+        # into the templated insertion_instructions entry. Remove the
+        # orphaned registry entries + files so the workbench UI stops
+        # showing them. Safe to run multiple times (no-op if already pruned).
+        deprecated = [
+            ("word_assistant", "placeholder_instructions"),
+            ("word_assistant", "cursor_instructions"),
+        ]
+        pruned = 0
+        for agent, pass_name in deprecated:
+            key = self._get_prompt_key(agent, pass_name)
+            if key not in self._registry.get("prompts", {}):
+                continue
+            # Delete all version files + the current pointer for this prompt
+            entry = self._registry["prompts"][key]
+            for v_meta in entry.get("versions", []):
+                version_id = v_meta.get("version") if isinstance(v_meta, dict) else None
+                if not version_id:
+                    continue
+                vpath = self._get_prompt_path(agent, pass_name, version_id)
+                if os.path.exists(vpath):
+                    try:
+                        os.remove(vpath)
+                    except OSError as e:
+                        print(f"[PromptManager] Could not remove {vpath}: {e}")
+            current_path = self._get_current_path(agent, pass_name)
+            if os.path.exists(current_path):
+                try:
+                    os.remove(current_path)
+                except OSError as e:
+                    print(f"[PromptManager] Could not remove {current_path}: {e}")
+            del self._registry["prompts"][key]
+            pruned += 1
+        if pruned:
+            self._save_registry()
+            print(f"[PromptManager] Pruned {pruned} deprecated word_assistant prompts")
+
         seeds = [
-            ("word_assistant", "system_prompt", DEFAULT_WORD_SYSTEM_PROMPT, "Default Word system prompt"),
-            ("word_assistant", "redline_system_prompt", DEFAULT_WORD_REDLINE_SYSTEM_PROMPT, "Default redline system prompt"),
-            ("word_assistant", "email_system_prompt", EMAIL_SYSTEM_PROMPT, "Default Outlook email system prompt"),
-            ("word_assistant", "redline_prefix", DEFAULT_REDLINE_PREFIX, "Prefix prepended in redline mode"),
-            ("word_assistant", "placeholder_instructions", DEFAULT_PLACEHOLDER_INSTRUCTIONS, "Instructions for filling blank/placeholder"),
-            ("word_assistant", "cursor_instructions", DEFAULT_CURSOR_INSTRUCTIONS, "Instructions for cursor-position insertion"),
-            ("word_assistant", "selection_instructions", DEFAULT_SELECTION_INSTRUCTIONS, "Instructions for selected text with full doc"),
+            ("word_assistant", "system_prompt", DEFAULT_WORD_SYSTEM_PROMPT, "Word free-form system prompt (preamble + Word delta)"),
+            ("word_assistant", "redline_system_prompt", DEFAULT_WORD_REDLINE_SYSTEM_PROMPT, "Redline system prompt (preamble + redline delta)"),
+            ("word_assistant", "email_system_prompt", EMAIL_SYSTEM_PROMPT, "Outlook email system prompt (preamble + email delta)"),
+            ("word_assistant", "redline_prefix", DEFAULT_REDLINE_PREFIX, "Prefix appended at end of user message in redline mode"),
+            ("word_assistant", "insertion_instructions", DEFAULT_INSERTION_INSTRUCTIONS, "Shared insertion-instructions template (placeholder + cursor). Uses {anchor_label}, {anchor_short}, {extra_rules}."),
+            ("word_assistant", "selection_instructions", DEFAULT_SELECTION_INSTRUCTIONS, "Instructions for transforming a selection with full-doc context"),
             ("legal_research", "query_planning", QUERY_PLANNING_PROMPT, "Structured JSON query generation"),
             ("legal_research", "query_extraction", QUERY_EXTRACTION_PROMPT, "Extract queries from litigation prompt"),
             ("legal_research", "synthesis", SYNTHESIS_PROMPT, "Synthesize authorities into memo"),

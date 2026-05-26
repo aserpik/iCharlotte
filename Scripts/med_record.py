@@ -525,94 +525,91 @@ def call_gemini(prompt, text):
 
 def add_markdown_to_doc(doc, content):
     """Parses basic Markdown and applies formatting."""
+    from icharlotte_core.docx_writer import (
+        try_consume_markdown_table,
+        add_markdown_table_to_doc,
+        render_inline_markdown,
+    )
+
     lines = content.split('\n')
     active_paragraph = None
-    
+
     # Regex to identify dates at the beginning of a paragraph/sentence
     # Matches: (Optional "On ") (Date String)
     # Date String: Month DD, YYYY
     date_pattern = re.compile(r"^(On )?((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? \d{4})")
 
-    for line in lines:
+    i = 0
+    while i < len(lines):
+        line = lines[i]
         stripped = line.strip()
         if not stripped:
+            i += 1
             continue
-        
+
+        # Markdown table block — emit a real Word table.
+        consumed, header, rows = try_consume_markdown_table(lines, i)
+        if consumed:
+            add_markdown_table_to_doc(doc, header, rows)
+            i += consumed
+            active_paragraph = None
+            continue
+
         if stripped.startswith('#'):
-            text = stripped.lstrip('#').strip()
+            text = stripped.lstrip('#').strip().replace('**', '').replace('__', '')
             if not text.endswith('.'):
                 text += "."
             active_paragraph = doc.add_paragraph()
             run = active_paragraph.add_run(text + " ")
             run.bold = True
+            i += 1
             continue
-        
+
         if stripped.startswith('* ') or stripped.startswith('- '):
             text = stripped[2:].strip()
             p = doc.add_paragraph()
             p.paragraph_format.line_spacing = 1.0
             p.paragraph_format.left_indent = Inches(0.5)
             p.paragraph_format.first_line_indent = Inches(-0.25)
-            
+
             # Use a real bullet character and tab for portability
-            run = p.add_run("•\t")
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(12)
-            
-            # Support bold parsing within list items
-            parts = re.split(r'(\*\*.*?\*\*)', text)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    r = p.add_run(part[2:-2])
-                    r.bold = True
-                else:
-                    r = p.add_run(part)
-                r.font.name = 'Times New Roman'
-                r.font.size = Pt(12)
+            bullet_run = p.add_run("•\t")
+            bullet_run.font.name = 'Times New Roman'
+            bullet_run.font.size = Pt(12)
+
+            render_inline_markdown(p, text)
             active_paragraph = None
+            i += 1
             continue
-        
+
         # Regular paragraph
         if active_paragraph:
             p = active_paragraph
         else:
             p = doc.add_paragraph()
             p.paragraph_format.first_line_indent = Inches(0.5)
-        
-        # Check for date at start of line
+
+        # Check for date at start of line — underline it, then render the rest.
         match = date_pattern.match(stripped)
         if match:
             on_prefix = match.group(1) # "On " or None
             date_str = match.group(2)  # "January 1, 2024"
-            
+
             total_match_len = len(match.group(0))
             remaining_text = stripped[total_match_len:]
-            
+
             if on_prefix:
                 p.add_run(on_prefix)
-            
+
             run = p.add_run(date_str)
             run.underline = True
-            
-            # Process remaining text for bold markers
-            parts = re.split(r'(\**.*?\**)', remaining_text)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    run = p.add_run(part[2:-2])
-                    run.bold = True
-                else:
-                    p.add_run(part)
+
+            render_inline_markdown(p, remaining_text)
         else:
-            # Standard markdown parsing
-            parts = re.split(r'(\**.*?\**)', stripped)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    run = p.add_run(part[2:-2])
-                    run.bold = True
-                else:
-                    p.add_run(part)
-        
+            render_inline_markdown(p, stripped)
+
         active_paragraph = None
+        i += 1
 
 def extract_provider_from_filename(filename):
     """Extracts provider name from filename based on patterns."""
@@ -640,17 +637,29 @@ def sanitize_filename(name):
     name = name.strip()
     return name
 
-def save_to_docx(content, output_dir, provider_name, original_filename):
-    """Saves to DOCX with dynamic filename and process-safe locking."""
+def save_to_docx(content, output_dir, provider_name, original_filename,
+                 output_path_override=None):
+    """Saves to DOCX with dynamic filename and process-safe locking.
+
+    If output_path_override is supplied, the dynamic Med_Record_<provider>.docx
+    naming is skipped and the file is written to that exact path.
+    """
     checkpoint("Starting DOCX save")
 
-    safe_provider = sanitize_filename(provider_name)
-    if not safe_provider:
-        safe_provider = "Unknown_Provider"
+    if output_path_override:
+        output_path = output_path_override
+        filename = os.path.basename(output_path)
+        output_dir = os.path.dirname(output_path) or "."
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+    else:
+        safe_provider = sanitize_filename(provider_name)
+        if not safe_provider:
+            safe_provider = "Unknown_Provider"
 
-    # Filename format: Med_Record_[name of treatment provider].docx
-    filename = f"Med_Record_{safe_provider}.docx"
-    output_path = os.path.join(output_dir, filename)
+        # Filename format: Med_Record_[name of treatment provider].docx
+        filename = f"Med_Record_{safe_provider}.docx"
+        output_path = os.path.join(output_dir, filename)
 
     log_event(f"Saving to: {output_path}", progress=85)
 
@@ -738,6 +747,19 @@ def main():
         print("ERROR:No file path provided")
         sys.exit(1)
 
+    # Extract --output_path <path> if present (used by Wizard parallel runs).
+    output_path_override = None
+    filtered = []
+    i = 0
+    while i < len(raw_args):
+        if raw_args[i] == "--output_path" and i + 1 < len(raw_args):
+            output_path_override = raw_args[i + 1]
+            i += 2
+        else:
+            filtered.append(raw_args[i])
+            i += 1
+    raw_args = filtered
+
     # Heuristic: Check if arguments form a single split path
     combined_arg = " ".join(raw_args)
     clean_combined = combined_arg.strip().strip('"').strip("'")
@@ -760,7 +782,9 @@ def main():
     checkpoint("Agent initialized")
 
     # --- Dispatcher Mode ---
-    if len(file_paths) > 1:
+    # NOTE: skipped when an output_path_override is supplied — the caller
+    # (Wizard parallel worker) is managing per-file fan-out itself.
+    if len(file_paths) > 1 and not output_path_override:
         log_event(f"Detected multiple file paths: {len(file_paths)} items. Launching separate agents...")
         spawned = 0
         failed = 0
@@ -937,7 +961,13 @@ def main():
             # Fall back to input file directory
             output_dir = os.path.dirname(input_path)
 
-    success = save_to_docx(final_content, output_dir, provider_name, filename)
+    success = save_to_docx(
+        final_content,
+        output_dir,
+        provider_name,
+        filename,
+        output_path_override=output_path_override,
+    )
     write_duration = time.time() - write_start
 
     if success:

@@ -92,7 +92,9 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Run selectable analyses on a medical chronology.",
         icon_glyph="\U0001FA7A",  # 🩺
         script_name="med_chron.py",
-        default_folders=["NOTES/AI OUTPUT", "RECORDS"],
+        # Picker prefers RECORDS/<medical summary subfolder> via find_medical_summary_folder()
+        # in iCharlotte._open_task_tab; this list is the fallback if no such subfolder exists.
+        default_folders=["RECORDS"],
         phase1_args=["--phase=prep"],
         phase2_flag="--phase=run",
         _settings_page_cls_factory=_med_chron_settings_page_cls,
@@ -112,6 +114,22 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         icon_glyph="\U0001F4DC",  # 📜
         script_name="",  # in-process QThread worker
         default_folders=[],
+    ),
+    "respond_to_discovery": TaskSpec(
+        task_id="respond_to_discovery",
+        title="Respond to Discovery",
+        description="Draft objections and responses to incoming written discovery.",
+        icon_glyph="\U0001F4DD",  # 📝
+        script_name="",  # in-process QThread worker
+        default_folders=["DISCOVERY/PROPOUNDED", "DISCOVERY"],
+    ),
+    "oppose_motion": TaskSpec(
+        task_id="oppose_motion",
+        title="Oppose a Motion",
+        description="Draft and verify an opposition memorandum for a California civil motion.",
+        icon_glyph="\U0001F4DD",  # 📝
+        script_name="",
+        default_folders=["MOTIONS", "PLEADINGS", "DISCOVERY"],
     ),
     "chat": TaskSpec(
         task_id="chat",

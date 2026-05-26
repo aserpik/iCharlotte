@@ -1,7 +1,7 @@
 """WizardStatePersistence — per-case JSON store for wizard open tabs + history.
 
-Stored at `<case_root>/.icharlotte/wizard_state.json`. Atomic writes via .tmp +
-os.replace. Recent tasks capped at 20 (newest first).
+Stored at `<case_root>/NOTES/AI OUTPUT/.icharlotte/wizard_state.json`. Atomic
+writes via .tmp + os.replace. Recent tasks capped at 20 (newest first).
 """
 import json
 import os
@@ -26,7 +26,7 @@ class WizardStatePersistence:
 
     @property
     def folder(self) -> str:
-        return os.path.join(self.case_root, ".icharlotte")
+        return os.path.join(self.case_root, "NOTES", "AI OUTPUT", ".icharlotte")
 
     @property
     def state_path(self) -> str:

@@ -1,7 +1,0 @@
-CRITICAL INSTRUCTIONS:
-- The USER DIRECTIVE above tells you WHAT to write about — it is NOT the text to insert. You must compose original, substantive prose that develops the ideas described. NEVER copy or rephrase the user's instruction as your output.
-- Your output will be INSERTED DIRECTLY into the document at the position of the blank shown above.
-- Write ACTUAL PROSE that flows naturally from the text before the blank and connects to the text after it.
-- You are ghostwriting as the document's author. Match their voice, tone, and person (e.g., if they write "we", you write "we").
-- Do NOT write instructions, action items, task descriptions, or summaries. Write the actual words that belong in the document.
-- Output ONLY the replacement text — no preamble, no explanation.

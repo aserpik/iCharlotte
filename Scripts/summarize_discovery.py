@@ -45,13 +45,6 @@ from icharlotte_core.exceptions import (
 )
 from icharlotte_core.docx_writer import get_docx_lock, LockTimeoutError
 
-# Import Case Data Manager
-try:
-    from case_data_manager import CaseDataManager
-except ImportError:
-    sys.path.append(os.path.join(os.getcwd(), 'Scripts'))
-    from case_data_manager import CaseDataManager
-
 # Import Document Registry for classification
 try:
     from document_registry import classify_and_register, DocumentRegistry
@@ -111,16 +104,32 @@ def add_section_divider(doc, section_title):
 
 def add_markdown_to_doc(doc, content):
     """Parses basic Markdown and adds it to the docx Document."""
+    from icharlotte_core.docx_writer import (
+        try_consume_markdown_table,
+        add_markdown_table_to_doc,
+        render_inline_markdown,
+    )
+
     lines = content.split('\n')
 
-    for line in lines:
+    i = 0
+    while i < len(lines):
+        line = lines[i]
         stripped = line.strip()
         if not stripped:
+            i += 1
+            continue
+
+        # Markdown table block — emit a real Word table.
+        consumed, header, rows = try_consume_markdown_table(lines, i)
+        if consumed:
+            add_markdown_table_to_doc(doc, header, rows)
+            i += consumed
             continue
 
         # Headings
         if stripped.startswith('#'):
-            text = stripped.lstrip('#').strip()
+            text = stripped.lstrip('#').strip().replace('**', '').replace('__', '')
             if not text.endswith('.'):
                 text += "."
 
@@ -131,6 +140,7 @@ def add_markdown_to_doc(doc, content):
             run.bold = True
             run.font.name = 'Times New Roman'
             run.font.size = Pt(12)
+            i += 1
             continue
 
         # List items
@@ -141,33 +151,20 @@ def add_markdown_to_doc(doc, content):
             p.paragraph_format.left_indent = Inches(0.5)
             p.paragraph_format.first_line_indent = Inches(-0.25)
 
-            run = p.add_run("\t")
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(12)
+            tab_run = p.add_run("\t")
+            tab_run.font.name = 'Times New Roman'
+            tab_run.font.size = Pt(12)
 
-            parts = re.split(r'(\*\*.*?\*\*)', text)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    r = p.add_run(part[2:-2])
-                    r.bold = True
-                else:
-                    r = p.add_run(part)
-                r.font.name = 'Times New Roman'
-                r.font.size = Pt(12)
+            render_inline_markdown(p, text)
+            i += 1
             continue
 
-        # Normal text
+        # Normal text (bold/italic/code via shared inline parser)
         p = doc.add_paragraph()
         p.paragraph_format.line_spacing = 1.0
         p.paragraph_format.first_line_indent = Inches(0.5)
-
-        parts = stripped.split('**')
-        for i, part in enumerate(parts):
-            run = p.add_run(part)
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(12)
-            if i % 2 == 1:
-                run.bold = True
+        render_inline_markdown(p, stripped)
+        i += 1
 
 
 def save_to_docx(extraction_content: str, summary_content: str, output_path: str,
@@ -369,10 +366,17 @@ def consolidate_file(file_path: str, logger: AgentLogger, show_diff: bool = Fals
         logger.error(f"Error reading consolidation prompt: {e}")
         return False
 
-    # Call LLM
+    # Call LLM — Flash-Lite is ~7x faster than Pro and substantively equivalent for
+    # consolidation; fall back to gemini-3.1-pro-preview if Flash-Lite is unavailable.
     logger.progress(99, "Running consolidation LLM pass...")
     llm_caller = LLMCaller(logger=logger)
-    consolidated = llm_caller.call(prompt, result.text, task_type="summary")
+    consolidated = llm_caller.call(prompt, result.text, task_type="summary",
+                                   model_override="gemini-3.1-flash-lite-preview")
+
+    if not consolidated:
+        logger.warning("Flash-Lite consolidation failed; retrying with gemini-3.1-pro-preview.")
+        consolidated = llm_caller.call(prompt, result.text, task_type="summary",
+                                       model_override="gemini-3.1-pro-preview")
 
     if not consolidated:
         logger.error("LLM failed to generate consolidated summary.")
@@ -410,7 +414,12 @@ def consolidate_file(file_path: str, logger: AgentLogger, show_diff: bool = Fals
 # Main Processing Functions
 # =============================================================================
 
-def process_document(input_path: str, logger: AgentLogger, report_dir: str = None) -> bool:
+def process_document(
+    input_path: str,
+    logger: AgentLogger,
+    report_dir: str = None,
+    output_path_override: str = None,
+) -> bool:
     """
     Process a single discovery document through the three-pass pipeline.
 
@@ -695,56 +704,34 @@ def process_document(input_path: str, logger: AgentLogger, report_dir: str = Non
 
     logger.progress(90, f"Metadata parsed: {responding_party}")
 
-    # ==========================================================================
-    # Save to Case Data (90% - 92%)
-    # ==========================================================================
-    logger.progress(91, "Saving to case database...")
-    try:
-        data_manager = CaseDataManager()
-        file_num = extract_file_number(input_path)
-
-        if file_num:
-            base_name = os.path.splitext(os.path.basename(input_path))[0]
-            clean_var_name = re.sub(r"[^a-zA-Z0-9_]", "_", base_name.lower())
-            var_key = f"discovery_summary_{clean_var_name}"
-
-            # Add document type as tag
-            tags = ["Discovery"]
-            if discovery_type:
-                tags.append(discovery_type.replace(" ", "_"))
-
-            logger.info(f"Saving to case data: {var_key} for {file_num}")
-            data_manager.save_variable(file_num, var_key, summary_content,
-                                       source="discovery_agent", extra_tags=tags)
-    except Exception as e:
-        logger.warning(f"Could not save to case data: {e}")
-
-    logger.progress(92, "Case data saved")
+    file_num = extract_file_number(input_path)
 
     # ==========================================================================
     # Save Output (92% - 96%)
     # ==========================================================================
     logger.progress(93, "Preparing output file...")
-    output_dir = get_output_directory(input_path)
+    if output_path_override:
+        output_file = output_path_override
+        output_dir = os.path.dirname(output_file) or "."
+        output_filename = os.path.basename(output_file)
+    else:
+        output_dir = get_output_directory(input_path)
+        # Check for existing party file
+        existing_file = find_existing_party_file(output_dir, responding_party, logger)
+        if existing_file:
+            output_filename = existing_file
+        else:
+            safe_party_name = re.sub(r'[\\/*?:"<>|]', "", responding_party).replace(" ", "_")
+            output_filename = f"Discovery_Responses_{safe_party_name}.docx"
+        output_file = os.path.join(output_dir, output_filename)
 
     if not os.path.exists(output_dir):
         try:
-            os.makedirs(output_dir)
+            os.makedirs(output_dir, exist_ok=True)
             logger.info(f"Created directory: {output_dir}")
         except Exception as e:
             logger.error(f"Error creating directory: {e}")
             return False
-
-    # Check for existing party file
-    existing_file = find_existing_party_file(output_dir, responding_party, logger)
-
-    if existing_file:
-        output_filename = existing_file
-    else:
-        safe_party_name = re.sub(r'[\\/*?:"<>|]', "", responding_party).replace(" ", "_")
-        output_filename = f"Discovery_Responses_{safe_party_name}.docx"
-
-    output_file = os.path.join(output_dir, output_filename)
 
     logger.progress(94, f"Saving to {output_filename}...")
     save_success = save_to_docx(extraction_content, summary_content, output_file,
@@ -964,6 +951,7 @@ def main():
     # Parse arguments
     args = sys.argv[1:]
     report_dir = None
+    output_path_override = None
     clean_args = []
 
     i = 0
@@ -972,6 +960,12 @@ def main():
         if arg == "--report-dir":
             if i + 1 < len(args):
                 report_dir = args[i+1]
+                i += 2
+            else:
+                i += 1
+        elif arg == "--output_path":
+            if i + 1 < len(args):
+                output_path_override = args[i+1]
                 i += 2
             else:
                 i += 1
@@ -1000,7 +994,9 @@ def main():
     logger = AgentLogger("Discovery", file_number=file_number)
 
     # Dispatcher mode: multiple files
-    if len(file_paths) > 1:
+    # NOTE: skipped when an output_path_override is supplied — the caller
+    # (Wizard parallel worker) is managing per-file fan-out itself.
+    if len(file_paths) > 1 and not output_path_override:
         logger.info(f"Dispatcher mode: {len(file_paths)} files")
 
         use_temp_dir = False
@@ -1113,13 +1109,23 @@ def main():
         logger.info("Directory processing complete.")
         sys.exit(0)
 
-    # Single file processing
-    input_filename_lower = os.path.basename(input_path).lower()
-    if any(kw in input_filename_lower for kw in SKIP_KEYWORDS):
-        logger.info(f"Skipping filtered file: {input_path}")
-        sys.exit(0)
+    # Single file processing.
+    # When --output_path is supplied the caller (e.g. the Wizard parallel
+    # worker) has explicitly chosen this file; honor that choice and skip the
+    # filename-keyword filter. The filter still runs in directory-walk mode
+    # above, where the agent has to decide what's discovery-worthy.
+    if not output_path_override:
+        input_filename_lower = os.path.basename(input_path).lower()
+        if any(kw in input_filename_lower for kw in SKIP_KEYWORDS):
+            logger.info(f"Skipping filtered file: {input_path}")
+            sys.exit(0)
 
-    success = process_document(input_path, logger, report_dir)
+    success = process_document(
+        input_path,
+        logger,
+        report_dir=report_dir,
+        output_path_override=output_path_override,
+    )
 
     if success:
         logger.info("Agent finished successfully.")

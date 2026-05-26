@@ -1120,6 +1120,7 @@ class MainWindow(QMainWindow):
     def _on_reopen_recent_task(self, entry: dict) -> None:
         from icharlotte_core.ui.wizard.registry import get_task, TASK_REGISTRY
         from icharlotte_core.ui.wizard.task_tab import TaskTab, PAGE_OUTPUT, PAGE_SETTINGS
+        from icharlotte_core.ui.wizard.task_routing import get_in_process_task_builder_name
         from icharlotte_core.ui.wizard.instance_naming import next_instance_suffix
 
         task_id = entry.get("task_id")
@@ -1139,32 +1140,58 @@ class MainWindow(QMainWindow):
         suffix = next_instance_suffix(spec.title, existing_titles)
         title = f"{spec.title} {suffix}".strip()
 
-        task_tab = TaskTab(
-            spec=spec,
-            files=files,
-            case_path=self.case_path,
-            file_number=self.file_number,
-            parent=self,
-        )
+        if get_in_process_task_builder_name(task_id) == "build_oppose_motion_tab":
+            from icharlotte_core.ui.wizard.pages.oppose_motion_page import (
+                OpposeMotionTaskTab,
+                TASK_PAGE_OUTPUT,
+                TASK_PAGE_SETTINGS,
+            )
+
+            settings = dict(entry.get("settings") or {})
+            motion_file = settings.get("motion_file") or (files[0] if files else "")
+            context_files = settings.get("context_files") or files[1:]
+            task_tab = OpposeMotionTaskTab(
+                spec=spec,
+                case_path=self.case_path,
+                file_number=self.file_number,
+                motion_file=motion_file,
+                context_files=context_files,
+                parent=self,
+            )
+            task_tab.settings_page.from_dict(settings)
+            output_page = TASK_PAGE_OUTPUT
+            settings_page = TASK_PAGE_SETTINGS
+        else:
+            task_tab = TaskTab(
+                spec=spec,
+                files=files,
+                case_path=self.case_path,
+                file_number=self.file_number,
+                parent=self,
+            )
+            output_page = PAGE_OUTPUT
+            settings_page = PAGE_SETTINGS
         task_tab.setProperty("wizard_task_id", spec.task_id)
         task_tab.setProperty("wizard_instance_suffix", suffix)
         try:
-            task_tab.settings_page.from_dict(entry.get("settings") or {})
+            if get_in_process_task_builder_name(task_id) != "build_oppose_motion_tab":
+                task_tab.settings_page.from_dict(entry.get("settings") or {})
         except Exception:
             pass
         new_index = self.tabs.addTab(task_tab, title)
         task_tab.task_completed.connect(self._on_task_completed)
 
         if out_abs and os.path.exists(out_abs):
-            task_tab.output_page.load_output(out_abs)
-            task_tab.setCurrentIndex(PAGE_OUTPUT)
+            if hasattr(task_tab.output_page, "load_output"):
+                task_tab.output_page.load_output(out_abs)
+            task_tab.setCurrentIndex(output_page)
         else:
             QMessageBox.information(
                 self,
                 "Output missing",
                 f"The saved output file no longer exists.\nYou can re-run with the saved settings.",
             )
-            task_tab.setCurrentIndex(PAGE_SETTINGS)
+            task_tab.setCurrentIndex(settings_page)
 
         self.tabs.setCurrentIndex(new_index)
         self._hide_fixed_close_buttons()
@@ -1175,6 +1202,7 @@ class MainWindow(QMainWindow):
         from icharlotte_core.ui.wizard.persistence import WizardStatePersistence
         from icharlotte_core.ui.wizard.registry import get_task, TASK_REGISTRY
         from icharlotte_core.ui.wizard.task_tab import TaskTab, PAGE_OUTPUT, PAGE_SETTINGS
+        from icharlotte_core.ui.wizard.task_routing import get_in_process_task_builder_name
 
         p = WizardStatePersistence(self.case_path)
         for entry in p.get_open_tabs():
@@ -1186,13 +1214,38 @@ class MainWindow(QMainWindow):
                 f if os.path.isabs(f) else os.path.join(self.case_path, f)
                 for f in entry.get("files", [])
             ]
-            tab = TaskTab(
-                spec=spec,
-                files=files_abs,
-                case_path=self.case_path,
-                file_number=self.file_number,
-                parent=self,
-            )
+            settings_dict = entry.get("settings") or {}
+            if get_in_process_task_builder_name(task_id) == "build_oppose_motion_tab":
+                from icharlotte_core.ui.wizard.pages.oppose_motion_page import (
+                    OpposeMotionTaskTab,
+                    TASK_PAGE_OUTPUT,
+                    TASK_PAGE_SETTINGS,
+                )
+
+                motion_file = settings_dict.get("motion_file") or (
+                    files_abs[0] if files_abs else ""
+                )
+                context_files = settings_dict.get("context_files") or files_abs[1:]
+                tab = OpposeMotionTaskTab(
+                    spec=spec,
+                    case_path=self.case_path,
+                    file_number=self.file_number,
+                    motion_file=motion_file,
+                    context_files=context_files,
+                    parent=self,
+                )
+                output_page = TASK_PAGE_OUTPUT
+                settings_page = TASK_PAGE_SETTINGS
+            else:
+                tab = TaskTab(
+                    spec=spec,
+                    files=files_abs,
+                    case_path=self.case_path,
+                    file_number=self.file_number,
+                    parent=self,
+                )
+                output_page = PAGE_OUTPUT
+                settings_page = PAGE_SETTINGS
             suffix = entry.get("instance_suffix", "") or ""
             tab.setProperty("wizard_task_id", spec.task_id)
             tab.setProperty("wizard_instance_suffix", suffix)
@@ -1200,7 +1253,6 @@ class MainWindow(QMainWindow):
             title = f"{spec.title} {suffix}".strip()
 
             # Restore settings dict if present.
-            settings_dict = entry.get("settings") or {}
             try:
                 tab.settings_page.from_dict(settings_dict)
             except Exception:
@@ -1214,12 +1266,13 @@ class MainWindow(QMainWindow):
                 out_rel = entry.get("output_path")
                 out_abs = os.path.join(self.case_path, out_rel) if out_rel else None
                 if out_abs and os.path.exists(out_abs):
-                    tab.output_page.load_output(out_abs)
-                    tab.setCurrentIndex(PAGE_OUTPUT)
+                    if hasattr(tab.output_page, "load_output"):
+                        tab.output_page.load_output(out_abs)
+                    tab.setCurrentIndex(output_page)
                 else:
-                    tab.setCurrentIndex(PAGE_SETTINGS)
+                    tab.setCurrentIndex(settings_page)
             else:
-                tab.setCurrentIndex(PAGE_SETTINGS)
+                tab.setCurrentIndex(settings_page)
 
             # Mirror the open path: per-file tasks run Phase 1 speculatively on
             # the settings page. Without this, a restored tab on PAGE_SETTINGS
@@ -1384,7 +1437,14 @@ class MainWindow(QMainWindow):
 
     def _open_task_tab(self, task_id: str) -> None:
         from icharlotte_core.ui.wizard.registry import get_task
-        from icharlotte_core.ui.wizard.file_picker import resolve_default_folder
+        from icharlotte_core.ui.wizard.file_picker import (
+            find_medical_summary_folder,
+            resolve_default_folder,
+        )
+        from icharlotte_core.ui.wizard.task_routing import (
+            get_in_process_task_builder_name,
+            requires_initial_file_picker,
+        )
         from icharlotte_core.ui.wizard.task_tab import TaskTab
         from icharlotte_core.ui.wizard.instance_naming import next_instance_suffix
         from PySide6.QtWidgets import QFileDialog
@@ -1393,8 +1453,48 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "No case loaded", "Open a case from the Master List first.")
             return
 
+        if task_id == "chat":
+            chat_idx = self._index_of_tab("Chat")
+            if chat_idx >= 0:
+                self.tabs.setCurrentIndex(chat_idx)
+                log_event("[wizard] switched to Chat tab")
+            return
+
         spec = get_task(task_id)
-        start_dir = resolve_default_folder(self.case_path, spec.default_folders)
+        in_process_builder_name = get_in_process_task_builder_name(task_id)
+        if in_process_builder_name:
+            from icharlotte_core.ui.wizard import in_process_task_tab
+
+            existing_titles = [self.tabs.tabText(i) for i in range(self.tabs.count())]
+            suffix = next_instance_suffix(spec.title, existing_titles)
+            title = f"{spec.title} {suffix}".strip()
+            builder = getattr(in_process_task_tab, in_process_builder_name)
+            task_tab = builder(
+                spec=spec,
+                case_path=self.case_path,
+                file_number=self.file_number,
+                parent=self,
+            )
+            if task_tab is None:
+                return
+            task_tab.setProperty("wizard_task_id", spec.task_id)
+            task_tab.setProperty("wizard_instance_suffix", suffix)
+            task_tab.task_completed.connect(self._on_task_completed)
+            new_index = self.tabs.addTab(task_tab, title)
+            self.tabs.setCurrentIndex(new_index)
+            log_event(f"[wizard] opened in-process task tab '{title}'")
+            self._hide_fixed_close_buttons()
+            return
+
+        if not requires_initial_file_picker(task_id):
+            log_event(f"[wizard] task '{task_id}' has no file-picker route")
+            return
+
+        start_dir = None
+        if task_id == "med_chron_analysis":
+            start_dir = find_medical_summary_folder(self.case_path)
+        if start_dir is None:
+            start_dir = resolve_default_folder(self.case_path, spec.default_folders)
         files, _ = QFileDialog.getOpenFileNames(
             self,
             f"Select files for {spec.title}",
@@ -1461,6 +1561,13 @@ class MainWindow(QMainWindow):
         # Cancel any running worker before removing the tab.
         worker = getattr(widget, "_worker", None)
         if worker is not None:
+            if widget.__class__.__name__ == "OpposeMotionTaskTab" and worker.isRunning():
+                QMessageBox.information(
+                    self,
+                    "Task running",
+                    "The opposition draft is still running. Wait for it to finish before closing this tab.",
+                )
+                return
             try:
                 worker.cancel()
             except Exception:
