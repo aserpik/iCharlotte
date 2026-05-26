@@ -16,6 +16,8 @@ logs/depo_sessions/
 __pycache__/
 *.py[cod]
 *$py.class
+.pytest_cache/
+.pytest_cache_codex/
 .venv/
 env/
 venv/
