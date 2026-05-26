@@ -238,6 +238,47 @@ class ResponseGenerationEngineTests(unittest.TestCase):
         self.assertTrue(review.needs_review)
         self.assertIn("Unknown rule ID", review.review_reason)
 
+    def test_structured_proposal_rejects_ungrounded_ambiguous_term(self):
+        from icharlotte_core.discovery.response_generation_engine import (
+            StructuredProposal,
+            apply_structured_proposal,
+        )
+
+        parsed = _parsed()
+        rules = built_in_rules_for("SI")
+        proposal = StructuredProposal(
+            request_number="2",
+            conditional_objection_rule_ids=["ambiguous_term_when_unclear"],
+            ambiguous_term="BAD TERM WITH EXTRA OBJECTION",
+            proposed_substantive_response="No additional facts known.",
+        )
+
+        review = apply_structured_proposal(parsed.requests[1], parsed, rules, proposal)
+
+        self.assertNotIn("BAD TERM WITH EXTRA OBJECTION", review.proposed_objections)
+        self.assertIn('"INCIDENT"', review.proposed_objections)
+
+    def test_structured_proposal_request_number_mismatch_needs_review(self):
+        from icharlotte_core.discovery.response_generation_engine import (
+            StructuredProposal,
+            apply_structured_proposal,
+        )
+
+        parsed = _parsed()
+        rules = built_in_rules_for("SI")
+        proposal = StructuredProposal(
+            request_number="2",
+            conditional_objection_rule_ids=[],
+            applied_instruction_rule_ids=["minimal_direct_answer"],
+            proposed_substantive_response="No additional facts known.",
+        )
+
+        review = apply_structured_proposal(parsed.requests[0], parsed, rules, proposal)
+
+        self.assertTrue(review.needs_review)
+        self.assertIn("request number mismatch", review.review_reason.lower())
+        self.assertEqual(review.proposed_substantive_response, "No additional facts known.")
+
     def test_parse_structured_proposal_json_extracts_schema(self):
         from icharlotte_core.discovery.response_generation_engine import (
             parse_structured_proposal_response,

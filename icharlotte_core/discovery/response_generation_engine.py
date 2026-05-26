@@ -162,6 +162,7 @@ def apply_structured_proposal(
     proposal: StructuredProposal,
 ) -> RequestReview:
     rules_by_id = {rule.id: rule for rule in selected_rules}
+    ambiguous_term = _grounded_ambiguous_term(request, proposal.ambiguous_term)
     proposal_rule_ids = (
         list(proposal.conditional_objection_rule_ids or [])
         + list(proposal.applied_custom_rule_ids or [])
@@ -184,7 +185,7 @@ def apply_structured_proposal(
     )
 
     objections = [
-        _format_rule_text(rules_by_id[rid], request, proposal.ambiguous_term)
+        _format_rule_text(rules_by_id[rid], request, ambiguous_term)
         for rid in requested_ids
         if rid in rules_by_id and rules_by_id[rid].category == RuleCategory.OBJECTION
     ]
@@ -204,13 +205,23 @@ def apply_structured_proposal(
     selected_rule_ids = list(
         dict.fromkeys([rid for rid in requested_ids + instruction_ids if rid in rules_by_id])
     )
-    needs_review = proposal.needs_review or bool(unknown_ids)
+    proposal_request_number = (proposal.request_number or "").strip()
+    request_number_mismatch = (
+        bool(proposal_request_number) and proposal_request_number != request.number
+    )
+    needs_review = proposal.needs_review or bool(unknown_ids) or request_number_mismatch
     review_reason = proposal.review_reason.strip()
     if unknown_ids:
         unknown_message = "Unknown rule ID returned by model: " + ", ".join(
             sorted(set(unknown_ids))
         )
         review_reason = f"{review_reason} {unknown_message}".strip()
+    if request_number_mismatch:
+        mismatch_message = (
+            "Proposal request number mismatch: "
+            f"expected {request.number}, got {proposal_request_number}."
+        )
+        review_reason = f"{review_reason} {mismatch_message}".strip()
 
     return RequestReview(
         number=request.number,
@@ -222,6 +233,18 @@ def apply_structured_proposal(
         needs_review=needs_review,
         review_reason=review_reason,
     )
+
+
+def _grounded_ambiguous_term(request: ParsedRequest, proposed_term: str) -> str:
+    term = (proposed_term or "").strip()
+    if not term:
+        return ""
+    for defined_term in request.defined_terms_used or []:
+        if term.lower() == defined_term.lower():
+            return defined_term
+    if term.lower() in (request.text or "").lower():
+        return term
+    return ""
 
 
 def build_structured_proposal_prompt(
