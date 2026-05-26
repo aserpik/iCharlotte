@@ -82,7 +82,13 @@ def _collapse_text(text: str) -> str:
 
 def _detect_heading(text: str) -> str:
     first_line = (text or "").splitlines()[0].strip() if text else ""
-    if 0 < len(first_line) <= 80 and not first_line.endswith("."):
+    word_count = len(re.findall(r"[A-Za-z0-9][A-Za-z0-9'-]*", first_line))
+    has_terminal_sentence_punctuation = bool(re.search(r"[.!?]$", first_line))
+    if (
+        0 < len(first_line) <= 80
+        and 1 <= word_count <= 4
+        and not has_terminal_sentence_punctuation
+    ):
         return first_line
     return ""
 
