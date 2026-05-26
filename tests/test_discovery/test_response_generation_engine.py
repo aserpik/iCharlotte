@@ -214,7 +214,7 @@ class ResponseGenerationEngineTests(unittest.TestCase):
         self.assertTrue(review.needs_review)
         self.assertEqual(review.review_reason, "No specific context found.")
 
-    def test_structured_proposal_ignores_unknown_rule_ids(self):
+    def test_structured_proposal_unknown_rule_ids_preserve_mandatory_rules(self):
         from icharlotte_core.discovery.response_generation_engine import (
             StructuredProposal,
             apply_structured_proposal,
@@ -232,7 +232,9 @@ class ResponseGenerationEngineTests(unittest.TestCase):
 
         review = apply_structured_proposal(parsed.requests[0], parsed, rules, proposal)
 
-        self.assertEqual(review.proposed_objections, "")
+        self.assertIn("vague, ambiguous", review.proposed_objections)
+        self.assertIn("always_vague_ambiguous_overbroad", review.selected_rule_ids)
+        self.assertNotIn("missing_rule", review.selected_rule_ids)
         self.assertTrue(review.needs_review)
         self.assertIn("Unknown rule ID", review.review_reason)
 

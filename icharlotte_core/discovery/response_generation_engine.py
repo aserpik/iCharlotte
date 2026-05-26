@@ -171,9 +171,7 @@ def apply_structured_proposal(
     mandatory_ids = [
         rule.id
         for rule in selected_rules
-        if not unknown_ids
-        and rule.category == RuleCategory.OBJECTION
-        and rule.mode == RuleMode.MANDATORY
+        if rule.category == RuleCategory.OBJECTION and rule.mode == RuleMode.MANDATORY
     ]
     requested_ids = (
         mandatory_ids
