@@ -684,8 +684,12 @@ class RespondDiscoverySettingsPage(QWidget):
         self.request_text.setText(review.request_text)
         self.objection_edit.setPlainText(review.proposed_objections)
         self.response_edit.setPlainText(review.proposed_substantive_response)
-        if review.needs_review and review.review_reason:
-            self.review_warning_label.setText(f"Needs review: {review.review_reason}")
+        review_reason = (review.review_reason or "").strip()
+        if review.needs_review:
+            warning_text = (
+                f"Needs review: {review_reason}" if review_reason else "Needs review."
+            )
+            self.review_warning_label.setText(warning_text)
             self.review_warning_label.show()
         else:
             self.review_warning_label.setText("")

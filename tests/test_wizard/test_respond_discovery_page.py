@@ -454,6 +454,100 @@ class RespondDiscoverySettingsPageTests(unittest.TestCase):
         self.assertFalse(page.review_warning_label.isHidden())
         self.assertIn("No specific context found", page.review_warning_label.text())
 
+    def test_review_warning_label_shows_generic_message_without_reason(self):
+        parsed = ParsedDiscovery(
+            discovery_type="SI",
+            propounding_party="Plaintiff Smith",
+            responding_party="Defendant Jones",
+            set_number=1,
+            set_word="ONE",
+            case_number="123",
+            requests=[ParsedRequest(number="1", text="Identify witnesses.")],
+        )
+        state = ReviewState(
+            [
+                RequestReview(
+                    number="1",
+                    request_text="Identify witnesses.",
+                    proposed_substantive_response="Unknown.",
+                    needs_review=True,
+                    review_reason="",
+                )
+            ]
+        )
+
+        page = RespondDiscoverySettingsPage(
+            case_root="",
+            file_number="1234.001",
+            discovery_file=r"C:\case\srogg.pdf",
+            detected_type="SI",
+            parsed_discovery=parsed,
+            review_state=state,
+        )
+
+        self.assertFalse(page.review_warning_label.isHidden())
+        self.assertEqual(page.review_warning_label.text(), "Needs review.")
+
+    def test_review_warning_label_updates_when_moving_between_requests(self):
+        parsed = ParsedDiscovery(
+            discovery_type="SI",
+            propounding_party="Plaintiff Smith",
+            responding_party="Defendant Jones",
+            set_number=1,
+            set_word="ONE",
+            case_number="123",
+            requests=[
+                ParsedRequest(number="1", text="Identify witnesses."),
+                ParsedRequest(number="2", text="Identify documents."),
+            ],
+        )
+        state = ReviewState(
+            [
+                RequestReview(
+                    number="1",
+                    request_text="Identify witnesses.",
+                    proposed_substantive_response="Unknown.",
+                    needs_review=True,
+                    review_reason="No specific context found.",
+                ),
+                RequestReview(
+                    number="2",
+                    request_text="Identify documents.",
+                    proposed_substantive_response="Documents will be produced.",
+                    needs_review=False,
+                    review_reason="",
+                ),
+            ]
+        )
+
+        page = RespondDiscoverySettingsPage(
+            case_root="",
+            file_number="1234.001",
+            discovery_file=r"C:\case\srogg.pdf",
+            detected_type="SI",
+            parsed_discovery=parsed,
+            review_state=state,
+        )
+
+        self.assertFalse(page.review_warning_label.isHidden())
+        self.assertEqual(
+            page.review_warning_label.text(),
+            "Needs review: No specific context found.",
+        )
+
+        page.next_review_btn.click()
+
+        self.assertTrue(page.review_warning_label.isHidden())
+        self.assertEqual(page.review_warning_label.text(), "")
+
+        page.prev_btn.click()
+
+        self.assertFalse(page.review_warning_label.isHidden())
+        self.assertEqual(
+            page.review_warning_label.text(),
+            "Needs review: No specific context found.",
+        )
+
     def test_context_file_picker_starts_in_status_folder_next_to_discovery_file(self):
         with tempfile.TemporaryDirectory(dir="C:\\geminiterminal2") as tmp:
             propounded = Path(tmp) / "DISCOVERY" / "PROPOUNDED"
