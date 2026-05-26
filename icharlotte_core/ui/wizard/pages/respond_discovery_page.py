@@ -553,12 +553,11 @@ class RespondDiscoverySettingsPage(QWidget):
             context_text_by_path=context_text_by_path,
             response_rules=response_rules,
         )
-        self.review_state = generate_review_state(
+        self.review_state = _generate_review_state_from_proposals(
             self.parsed_discovery,
-            selected_rules,
-            context_text="",
+            selected_rules=selected_rules,
             response_rules=response_rules,
-            callbacks=_callbacks_from_proposal_map(proposal_map),
+            proposal_map=proposal_map,
             fi_mode=self.fi_mode,
         )
         self._show_review()
@@ -878,12 +877,11 @@ class RespondDiscoveryProposalWorker(QThread):
                 response_rules=response_rules,
             )
 
-            review_state = generate_review_state(
+            review_state = _generate_review_state_from_proposals(
                 parsed,
-                self.selected_rules,
-                context_text="",
+                selected_rules=self.selected_rules,
                 response_rules=response_rules,
-                callbacks=_callbacks_from_proposal_map(proposal_map),
+                proposal_map=proposal_map,
                 fi_mode=self.fi_mode,
             )
             self.finished_result.emit(
@@ -928,6 +926,57 @@ def _build_structured_proposal_map(
                 context_packet,
             )
     return proposals
+
+
+def _generate_review_state_from_proposals(
+    parsed: ParsedDiscovery,
+    selected_rules: list[ResponseRule],
+    response_rules: ResponseRules,
+    proposal_map: dict[str, StructuredProposal],
+    fi_mode: str,
+) -> ReviewState:
+    review_state = generate_review_state(
+        parsed,
+        selected_rules,
+        context_text="",
+        response_rules=response_rules,
+        callbacks=_callbacks_from_proposal_map(proposal_map),
+        fi_mode=fi_mode,
+    )
+    _apply_fixed_fi_proposal_warnings(
+        review_state=review_state,
+        parsed=parsed,
+        proposal_map=proposal_map,
+        response_rules=response_rules,
+        fi_mode=fi_mode,
+    )
+    return review_state
+
+
+def _apply_fixed_fi_proposal_warnings(
+    review_state: ReviewState,
+    parsed: ParsedDiscovery,
+    proposal_map: dict[str, StructuredProposal],
+    response_rules: ResponseRules,
+    fi_mode: str,
+) -> None:
+    if normalize_discovery_type(parsed.discovery_type) != "FI" or fi_mode != "fixed":
+        return
+
+    requests_by_number = {req.number: req for req in parsed.requests}
+    for review in review_state.requests:
+        req = requests_by_number.get(review.number)
+        proposal = proposal_map.get(review.number)
+        if not req or not proposal:
+            continue
+        if detect_inapplicable_fi(req.number):
+            continue
+        if get_fi_fixed_response(req.number, response_rules) is not None:
+            continue
+        if proposal.needs_review:
+            review.needs_review = True
+        if proposal.review_reason.strip():
+            review.review_reason = proposal.review_reason.strip()
 
 
 def _callbacks_from_proposal_map(

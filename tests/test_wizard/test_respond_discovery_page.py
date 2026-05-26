@@ -9,10 +9,7 @@ import pytest
 pytest.importorskip("pytestqt")
 from PySide6.QtWidgets import QApplication
 
-from icharlotte_core.discovery.response_generation_engine import (
-    StructuredProposal,
-    generate_review_state,
-)
+from icharlotte_core.discovery.response_generation_engine import StructuredProposal
 from icharlotte_core.discovery.response_parser import ParsedDiscovery, ParsedRequest
 from icharlotte_core.discovery.response_review_state import RequestReview, ReviewState
 from icharlotte_core.discovery.response_rules import ResponseRules
@@ -305,21 +302,26 @@ class RespondDiscoverySettingsPageTests(unittest.TestCase):
         proposal = StructuredProposal(
             request_number="2.1",
             proposed_substantive_response="Defendant Jones resides at 100 Main Street.",
+            needs_review=True,
+            review_reason="No specific context found.",
         )
 
-        review_state = generate_review_state(
+        review_state = respond_discovery_page._generate_review_state_from_proposals(
             parsed,
             selected_rules=[],
             response_rules=ResponseRules(),
-            callbacks=respond_discovery_page._callbacks_from_proposal_map(
-                {"2.1": proposal}
-            ),
+            proposal_map={"2.1": proposal},
             fi_mode="fixed",
         )
 
         self.assertEqual(
             review_state.requests[0].proposed_substantive_response,
             "Defendant Jones resides at 100 Main Street.",
+        )
+        self.assertTrue(review_state.requests[0].needs_review)
+        self.assertEqual(
+            review_state.requests[0].review_reason,
+            "No specific context found.",
         )
 
     @patch("icharlotte_core.llm_config.call_llm")
