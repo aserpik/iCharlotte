@@ -79,7 +79,7 @@ from icharlotte_core.ui.case_view_enhanced import (
     AdvancedFilterWidget, FilePreviewWidget, OutputBrowserWidget,
     ProcessingLogWidget, ProcessingLogDB, FileTagsDB, EnhancedFileTreeWidget
 )
-from icharlotte_core.ui.dialogs import FileNumberDialog, VariablesDialog, PromptsDialog, LLMSettingsDialog
+from icharlotte_core.ui.dialogs import FileNumberDialog, VariablesDialog, PromptsDialog
 from icharlotte_core.ui.report_generator_dialog import ReportGeneratorDialog, ReportPipelineWorker
 from icharlotte_core.subpoena_tracker import SubpoenaTrackerWorker
 from icharlotte_core.ui.tabs import ChatTab, IndexTab
@@ -971,8 +971,6 @@ class MainWindow(QMainWindow):
             QToolButton::menu-indicator { image: none; }
         """)
         self.settings_menu = QMenu(self)
-        self.settings_menu.addAction("LLM Settings", self.open_settings_dialog)
-        self.settings_menu.addSeparator()
         self.email_monitor_action = self.settings_menu.addAction("Email Monitor")
         self.email_monitor_action.setCheckable(True)
         self.docket_refresh_action = self.settings_menu.addAction("Auto Docket Refresh")
@@ -1383,11 +1381,6 @@ class MainWindow(QMainWindow):
                 json.dump(settings, f)
         except Exception as e:
             log_event(f"Error saving view settings: {e}", "error")
-
-    def open_settings_dialog(self):
-        """Open the LLM settings dialog."""
-        dialog = LLMSettingsDialog(self)
-        dialog.exec()
 
     def restart_app(self):
         log_event("User requested manual restart. Spawning new process...")

@@ -633,6 +633,10 @@ class PromptsDialog(QDialog):
         self.tabs.addTab(self._create_ab_testing_tab(), "A/B Testing")
         self.tabs.addTab(self._create_history_tab(), "Version History")
         self.tabs.addTab(self._create_dashboard_tab(), "Dashboard")
+        self.model_defaults_widget = LLMSettingsWidget(self)
+        self.model_defaults_widget.settings_saved.connect(self._refresh_model_settings_from_defaults)
+        self.model_defaults_widget.settings_reset.connect(self._refresh_model_settings_from_defaults)
+        self.tabs.addTab(self.model_defaults_widget, "Model Defaults")
         layout.addWidget(self.tabs)
 
         # Bottom buttons
@@ -934,6 +938,11 @@ class PromptsDialog(QDialog):
             else:
                 # No custom models, add one default to start
                 self._add_default_model_row()
+
+    def _refresh_model_settings_from_defaults(self):
+        """Refresh selected-agent model display after default settings change."""
+        self.llm_config = LLMConfig()
+        self._load_agent_model_settings()
 
     def _save_agent_model_settings(self):
         """Save model settings for the current agent."""
@@ -2387,13 +2396,14 @@ AGENT_CATEGORIES = [
 ]
 
 
-class LLMSettingsDialog(QDialog):
-    """Dialog for configuring LLM model preferences per agent/function."""
+class LLMSettingsWidget(QWidget):
+    """Reusable widget for configuring LLM model preferences per agent/function."""
+
+    settings_saved = Signal()
+    settings_reset = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("LLM Settings")
-        self.resize(800, 650)
         self.config = LLMConfig()
 
         # Track widgets for agents and task types
@@ -2450,13 +2460,10 @@ class LLMSettingsDialog(QDialog):
         btn_layout.addStretch()
 
         save_btn = QPushButton("Save")
+        save_btn.setObjectName("save_llm_settings")
         save_btn.setStyleSheet("font-weight: bold;")
         save_btn.clicked.connect(self._save_settings)
         btn_layout.addWidget(save_btn)
-
-        cancel_btn = QPushButton("Cancel")
-        cancel_btn.clicked.connect(self.reject)
-        btn_layout.addWidget(cancel_btn)
 
         layout.addLayout(btn_layout)
 
@@ -2629,16 +2636,19 @@ class LLMSettingsDialog(QDialog):
             row_layout.addWidget(priority_label)
 
             provider_combo = QComboBox()
+            provider_combo.setObjectName(f"task_provider_{task_type}_{i}")
             provider_combo.addItem("(None)", None)
             provider_combo.addItems(["Gemini", "Claude", "OpenAI"])
             provider_combo.setFixedWidth(100)
             row_layout.addWidget(provider_combo)
 
             model_combo = QComboBox()
+            model_combo.setObjectName(f"task_model_{task_type}_{i}")
             model_combo.setFixedWidth(200)
             row_layout.addWidget(model_combo)
 
             max_tokens_spin = QSpinBox()
+            max_tokens_spin.setObjectName(f"task_tokens_{task_type}_{i}")
             max_tokens_spin.setRange(1024, 1000000)
             max_tokens_spin.setSingleStep(1024)
             max_tokens_spin.setValue(65536)
@@ -2668,6 +2678,7 @@ class LLMSettingsDialog(QDialog):
 
         retries_label = QLabel("Max Retries:")
         retries_spin = QSpinBox()
+        retries_spin.setObjectName(f"task_retries_{task_type}")
         retries_spin.setRange(1, 10)
         retries_spin.setValue(3)
         self.task_widgets[task_type]["max_retries"] = retries_spin
@@ -2678,6 +2689,7 @@ class LLMSettingsDialog(QDialog):
 
         timeout_label = QLabel("Timeout (seconds):")
         timeout_spin = QSpinBox()
+        timeout_spin.setObjectName(f"task_timeout_{task_type}")
         timeout_spin.setRange(30, 600)
         timeout_spin.setValue(120)
         self.task_widgets[task_type]["timeout"] = timeout_spin
@@ -2822,7 +2834,7 @@ class LLMSettingsDialog(QDialog):
                     )
 
             QMessageBox.information(self, "Success", "LLM settings saved successfully.")
-            self.accept()
+            self.settings_saved.emit()
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save settings: {e}")
@@ -2850,7 +2862,41 @@ class LLMSettingsDialog(QDialog):
 
             # Reload UI
             self._load_current_settings()
+            self.settings_reset.emit()
             QMessageBox.information(self, "Reset", "Settings reset to defaults.")
+
+
+class LLMSettingsDialog(QDialog):
+    """Compatibility wrapper for the reusable LLM settings widget."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("LLM Settings")
+        self.resize(800, 650)
+
+        layout = QVBoxLayout(self)
+        self.settings_widget = LLMSettingsWidget(self)
+        self.settings_widget.settings_saved.connect(self.accept)
+        layout.addWidget(self.settings_widget)
+
+        close_row = QHBoxLayout()
+        close_row.addStretch()
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.accept)
+        close_row.addWidget(close_btn)
+        layout.addLayout(close_row)
+
+    @property
+    def config(self):
+        return self.settings_widget.config
+
+    @property
+    def agent_widgets(self):
+        return self.settings_widget.agent_widgets
+
+    @property
+    def task_widgets(self):
+        return self.settings_widget.task_widgets
 
 
 class CaseContextDialog(QDialog):
