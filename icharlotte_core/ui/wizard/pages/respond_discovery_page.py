@@ -535,17 +535,30 @@ class RespondDiscoverySettingsPage(QWidget):
         self._proposal_worker.start()
 
     def _generate_review_from_parsed(self) -> None:
-        context_text = "\n\n---\n\n".join(read_document_text(p) for p in self.context_files)
         self.parsed_discovery = _normalize_and_filter_parsed_discovery(
             self.parsed_discovery,
             self.detected_type,
             self.discovery_file,
         )
+        response_rules = load_respond_response_rules(self.file_number)
+        selected_rules = self.selected_rules()
+        context_text_by_path = {
+            path: read_document_text(path)
+            for path in self.context_files
+            if os.path.isfile(path)
+        }
+        proposal_map = _build_structured_proposal_map(
+            parsed=self.parsed_discovery,
+            selected_rules=selected_rules,
+            context_text_by_path=context_text_by_path,
+            response_rules=response_rules,
+        )
         self.review_state = generate_review_state(
             self.parsed_discovery,
-            self.selected_rules(),
-            context_text=context_text,
-            response_rules=load_respond_response_rules(self.file_number),
+            selected_rules,
+            context_text="",
+            response_rules=response_rules,
+            callbacks=_callbacks_from_proposal_map(proposal_map),
             fi_mode=self.fi_mode,
         )
         self._show_review()
@@ -865,18 +878,12 @@ class RespondDiscoveryProposalWorker(QThread):
                 response_rules=response_rules,
             )
 
-            def propose(req, _parsed, _context, _rules, _response_rules):
-                return proposal_map.get(
-                    req.number,
-                    build_fallback_structured_proposal(req, _parsed, ""),
-                )
-
             review_state = generate_review_state(
                 parsed,
                 self.selected_rules,
                 context_text="",
                 response_rules=response_rules,
-                callbacks=DraftCallbacks(structured_proposal=propose),
+                callbacks=_callbacks_from_proposal_map(proposal_map),
                 fi_mode=self.fi_mode,
             )
             self.finished_result.emit(
@@ -921,6 +928,48 @@ def _build_structured_proposal_map(
                 context_packet,
             )
     return proposals
+
+
+def _callbacks_from_proposal_map(
+    proposal_map: dict[str, StructuredProposal],
+) -> DraftCallbacks:
+    proposals = dict(proposal_map or {})
+
+    def fallback_response(req: ParsedRequest, parsed: ParsedDiscovery) -> str:
+        return build_fallback_structured_proposal(
+            req,
+            parsed,
+            "",
+        ).proposed_substantive_response
+
+    def propose(
+        req: ParsedRequest,
+        parsed: ParsedDiscovery,
+        _context: str,
+        _rules: list[ResponseRule],
+        _response_rules: ResponseRules,
+    ) -> StructuredProposal:
+        return proposals.get(req.number) or build_fallback_structured_proposal(
+            req,
+            parsed,
+            "",
+        )
+
+    def draft_substantive(
+        req: ParsedRequest,
+        parsed: ParsedDiscovery,
+        _context: str,
+        _rules: list[ResponseRule],
+    ) -> str:
+        proposal = proposals.get(req.number)
+        if proposal and proposal.proposed_substantive_response.strip():
+            return proposal.proposed_substantive_response
+        return fallback_response(req, parsed)
+
+    return DraftCallbacks(
+        structured_proposal=propose,
+        draft_substantive=draft_substantive,
+    )
 
 
 def _draft_substantive_response_map(

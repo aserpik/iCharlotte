@@ -9,9 +9,14 @@ import pytest
 pytest.importorskip("pytestqt")
 from PySide6.QtWidgets import QApplication
 
+from icharlotte_core.discovery.response_generation_engine import (
+    StructuredProposal,
+    generate_review_state,
+)
 from icharlotte_core.discovery.response_parser import ParsedDiscovery, ParsedRequest
 from icharlotte_core.discovery.response_review_state import RequestReview, ReviewState
 from icharlotte_core.discovery.response_rules import ResponseRules
+import icharlotte_core.ui.wizard.pages.respond_discovery_page as respond_discovery_page
 from icharlotte_core.ui.wizard.pages.respond_discovery_page import (
     RespondDiscoverySettingsPage,
     RespondDiscoveryWorker,
@@ -281,6 +286,87 @@ class RespondDiscoverySettingsPageTests(unittest.TestCase):
         second_prompt = mock_call.call_args_list[1].args[0]
         self.assertIn("John Smith saw the collision", first_prompt)
         self.assertIn("Photos and repair invoices exist", second_prompt)
+
+    def test_fixed_fi_non_fixed_request_uses_proposal_substantive_callback(self):
+        parsed = ParsedDiscovery(
+            discovery_type="FI",
+            propounding_party="Plaintiff Smith",
+            responding_party="Defendant Jones",
+            set_number=1,
+            set_word="ONE",
+            case_number="123",
+            requests=[
+                ParsedRequest(
+                    number="2.1",
+                    text="State your name and contact information.",
+                )
+            ],
+        )
+        proposal = StructuredProposal(
+            request_number="2.1",
+            proposed_substantive_response="Defendant Jones resides at 100 Main Street.",
+        )
+
+        review_state = generate_review_state(
+            parsed,
+            selected_rules=[],
+            response_rules=ResponseRules(),
+            callbacks=respond_discovery_page._callbacks_from_proposal_map(
+                {"2.1": proposal}
+            ),
+            fi_mode="fixed",
+        )
+
+        self.assertEqual(
+            review_state.requests[0].proposed_substantive_response,
+            "Defendant Jones resides at 100 Main Street.",
+        )
+
+    @patch("icharlotte_core.llm_config.call_llm")
+    def test_generate_review_from_parsed_uses_structured_proposals(self, mock_call):
+        mock_call.return_value = (
+            '{"request_number":"1",'
+            '"conditional_objection_rule_ids":[],'
+            '"applied_custom_rule_ids":[],'
+            '"applied_instruction_rule_ids":[],'
+            '"ambiguous_term":"",'
+            '"proposed_objections":"",'
+            '"proposed_substantive_response":"Jane Roe witnessed the collision.",'
+            '"needs_review":false,'
+            '"review_reason":""}'
+        )
+        parsed = ParsedDiscovery(
+            discovery_type="SI",
+            propounding_party="Plaintiff Smith",
+            responding_party="Defendant Jones",
+            set_number=1,
+            set_word="ONE",
+            case_number="123",
+            requests=[ParsedRequest(number="1", text="Identify all witnesses.")],
+        )
+
+        with tempfile.TemporaryDirectory(dir="C:\\geminiterminal2") as tmp:
+            context_file = Path(tmp) / "status.txt"
+            context_file.write_text(
+                "Witnesses section: Jane Roe saw the collision.",
+                encoding="utf-8",
+            )
+            page = RespondDiscoverySettingsPage(
+                case_root=tmp,
+                file_number="",
+                discovery_file=str(Path(tmp) / "srogg.txt"),
+                detected_type="SI",
+                parsed_discovery=parsed,
+            )
+            page.context_files = [str(context_file)]
+
+            page._generate_review_from_parsed()
+
+        self.assertEqual(
+            page.review_state.requests[0].proposed_substantive_response,
+            "Jane Roe witnessed the collision.",
+        )
+        self.assertIn("Jane Roe saw the collision", mock_call.call_args.args[0])
 
     @patch("Scripts.case_data_manager.CaseDataManager")
     def test_loads_advanced_mode_response_rules(self, mock_manager_cls):
