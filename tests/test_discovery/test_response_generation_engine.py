@@ -301,6 +301,71 @@ class ResponseGenerationEngineTests(unittest.TestCase):
         self.assertTrue(state.requests[1].needs_review)
         self.assertEqual(state.requests[1].review_reason, "No specific context found.")
 
+    def test_build_structured_proposal_prompt_contains_schema_and_packet(self):
+        from icharlotte_core.discovery.response_generation_engine import (
+            build_structured_proposal_prompt,
+        )
+
+        parsed = _parsed("RFA")
+        prompt = build_structured_proposal_prompt(
+            parsed.requests[0],
+            parsed,
+            context_packet="[status.txt #1]\nNo witnesses identified.",
+            selected_rules=built_in_rules_for("RFA"),
+            response_rules=ResponseRules(),
+        )
+
+        self.assertIn("Return ONLY a JSON object", prompt)
+        self.assertIn("conditional_objection_rule_ids", prompt)
+        self.assertIn("[status.txt #1]", prompt)
+        self.assertIn("admit only when", prompt.lower())
+
+    def test_fallback_proposal_marks_empty_context_for_review(self):
+        from icharlotte_core.discovery.response_generation_engine import (
+            build_fallback_structured_proposal,
+        )
+
+        parsed = _parsed("SI")
+        proposal = build_fallback_structured_proposal(
+            parsed.requests[0],
+            parsed,
+            context_packet="",
+        )
+
+        self.assertEqual(proposal.request_number, "1")
+        self.assertTrue(proposal.needs_review)
+        self.assertIn("No specific context found", proposal.review_reason)
+
+    def test_rfa_fallback_uses_insufficient_information(self):
+        from icharlotte_core.discovery.response_generation_engine import (
+            build_fallback_structured_proposal,
+        )
+
+        parsed = _parsed("RFA")
+        proposal = build_fallback_structured_proposal(
+            parsed.requests[0],
+            parsed,
+            context_packet="",
+        )
+
+        self.assertIn("insufficient to enable Responding Party to admit", proposal.proposed_substantive_response)
+        self.assertTrue(proposal.needs_review)
+
+    def test_rpd_fallback_uses_unable_to_comply_when_context_empty(self):
+        from icharlotte_core.discovery.response_generation_engine import (
+            build_fallback_structured_proposal,
+        )
+
+        parsed = _parsed("RPD")
+        proposal = build_fallback_structured_proposal(
+            parsed.requests[0],
+            parsed,
+            context_packet="",
+        )
+
+        self.assertIn("unable to comply", proposal.proposed_substantive_response.lower())
+        self.assertTrue(proposal.needs_review)
+
 
 if __name__ == "__main__":
     unittest.main()

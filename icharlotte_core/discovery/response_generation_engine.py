@@ -224,6 +224,133 @@ def apply_structured_proposal(
     )
 
 
+def build_structured_proposal_prompt(
+    request: ParsedRequest,
+    parsed: ParsedDiscovery,
+    context_packet: str,
+    selected_rules: list[ResponseRule],
+    response_rules: ResponseRules,
+) -> str:
+    conditional_rules = [
+        rule for rule in selected_rules
+        if rule.category == RuleCategory.OBJECTION and rule.mode == RuleMode.CONDITIONAL
+    ]
+    custom_rules = [rule for rule in selected_rules if rule.id.startswith("custom_")]
+    instruction_rules = [
+        rule for rule in selected_rules
+        if rule.category == RuleCategory.SUBSTANTIVE
+    ]
+    return "\n".join(
+        [
+            "You are a California civil litigation attorney drafting proposed discovery responses.",
+            "Return ONLY a JSON object matching the requested schema.",
+            "",
+            f"DISCOVERY TYPE: {(parsed.discovery_type or '').upper()}",
+            f"REQUEST NUMBER: {request.number}",
+            f"REQUEST TEXT:\n{request.text}",
+            "",
+            f"RESPONSE POSTURE:\n{_response_posture(parsed, response_rules)}",
+            "",
+            "CONDITIONAL OBJECTION RULES:",
+            _format_rules_for_prompt(conditional_rules),
+            "",
+            "CUSTOM RULES:",
+            _format_rules_for_prompt(custom_rules),
+            "",
+            "SUBSTANTIVE INSTRUCTION RULES:",
+            _format_rules_for_prompt(instruction_rules),
+            "",
+            f"REQUEST-SPECIFIC CONTEXT PACKET:\n{context_packet or '[NO SPECIFIC CONTEXT FOUND]'}",
+            "",
+            "Hard requirements:",
+            "- Do not include objections in proposed_substantive_response.",
+            "- Do not include waiver or reservation language.",
+            "- Do not invent facts not supported by the context packet.",
+            "- If context is weak, use cautious default language and set needs_review true.",
+            "- Select only objection rule IDs that apply.",
+            "- Do not draft new objection text.",
+            "",
+            "JSON schema:",
+            "{",
+            '  "request_number": "string",',
+            '  "conditional_objection_rule_ids": ["rule_id"],',
+            '  "applied_custom_rule_ids": ["rule_id"],',
+            '  "applied_instruction_rule_ids": ["rule_id"],',
+            '  "ambiguous_term": "string",',
+            '  "proposed_objections": "ignored by application",',
+            '  "proposed_substantive_response": "string",',
+            '  "needs_review": false,',
+            '  "review_reason": "string"',
+            "}",
+        ]
+    )
+
+
+def build_fallback_structured_proposal(
+    request: ParsedRequest,
+    parsed: ParsedDiscovery,
+    context_packet: str,
+) -> StructuredProposal:
+    dtype = (parsed.discovery_type or "").upper()
+    weak_context = not bool((context_packet or "").strip())
+    review_reason = "No specific context found." if weak_context else "Model response could not be parsed."
+    if dtype == "RFA":
+        substantive = (
+            "After a reasonable inquiry concerning the matter in this request, "
+            "the information known or readily obtainable to Responding Party is "
+            "insufficient to enable Responding Party to admit the matter."
+        )
+    elif dtype == "RPD":
+        substantive = (
+            "Upon a diligent search and reasonable inquiry, Responding Party is "
+            "unable to comply with this request at this time because responsive "
+            "documents, if they exist, have not been identified in the available context."
+        )
+    elif dtype in {"FI", "SI"}:
+        substantive = "Responding Party lacks sufficient information to provide a further substantive response at this time."
+    else:
+        substantive = ""
+    return StructuredProposal(
+        request_number=request.number,
+        conditional_objection_rule_ids=[],
+        applied_custom_rule_ids=[],
+        applied_instruction_rule_ids=[],
+        proposed_substantive_response=substantive,
+        needs_review=True,
+        review_reason=review_reason,
+    )
+
+
+def _format_rules_for_prompt(rules: list[ResponseRule]) -> str:
+    if not rules:
+        return "[none]"
+    return "\n".join(
+        f"- {rule.id}: {rule.name}\n  Description: {rule.description}\n  Text: {rule.output_text}"
+        for rule in rules
+    )
+
+
+def _response_posture(parsed: ParsedDiscovery, response_rules: ResponseRules) -> str:
+    dtype = (parsed.discovery_type or "").upper()
+    if dtype == "RFA":
+        return (
+            "Use Admit, Deny, or the insufficient-information response. "
+            "Admit only when the context clearly supports admission."
+        )
+    if dtype == "RPD":
+        return (
+            "Say will comply only when context indicates responsive non-privileged "
+            "documents exist or will be produced. Otherwise use unable-to-comply "
+            "or cautious default language."
+        )
+    if dtype == "FI":
+        return "Draft only the substantive factual response. Answer narrowly."
+    return (
+        "Answer only the question being asked using as few words as possible. "
+        "Do not volunteer extra facts."
+    )
+
+
 def _string_list(value) -> list[str]:
     if not isinstance(value, list):
         return []
