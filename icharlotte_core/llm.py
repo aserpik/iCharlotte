@@ -486,6 +486,7 @@ class LLMHandler:
                         proc = subprocess.Popen(
                             cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE, env=env, text=True,
+                            encoding="utf-8", errors="replace",
                             creationflags=creationflags
                         )
                         proc.stdin.write(combined_prompt)
@@ -538,7 +539,8 @@ class LLMHandler:
                     creationflags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
                     result = subprocess.run(
                         cmd, input=combined_prompt, capture_output=True,
-                        text=True, env=env, timeout=300,
+                        text=True, encoding="utf-8", errors="replace",
+                        env=env, timeout=300,
                         creationflags=creationflags
                     )
                     if result.returncode == 0:
