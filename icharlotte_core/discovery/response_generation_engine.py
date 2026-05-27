@@ -6,12 +6,6 @@ import re
 from dataclasses import dataclass
 from typing import Callable, Iterable
 
-from icharlotte_core.discovery.response_drafter import (
-    detect_inapplicable_fi,
-    get_fi_fixed_objections,
-    get_fi_fixed_response,
-    strip_fi_objections_from_fixed_response,
-)
 from icharlotte_core.discovery.response_parser import ParsedDiscovery, ParsedRequest
 from icharlotte_core.discovery.response_review_state import RequestReview, ReviewState
 from icharlotte_core.discovery.response_rule_library import (
@@ -385,6 +379,12 @@ def _generate_fixed_fi_state(
     callbacks: DraftCallbacks,
     context_text: str,
 ) -> ReviewState:
+    from icharlotte_core.discovery.response_drafter import (
+        detect_inapplicable_fi,
+        get_fi_fixed_objections,
+        get_fi_fixed_response,
+        strip_fi_objections_from_fixed_response,
+    )
     reviews: list[RequestReview] = []
     for req in parsed.requests:
         objections = get_fi_fixed_objections(req.number, response_rules)
@@ -535,5 +535,141 @@ def _draft_substantive(
 
     dtype = (parsed.discovery_type or "").upper()
     if dtype == "FI":
+        from icharlotte_core.discovery.response_drafter import get_fi_fixed_response
         return get_fi_fixed_response(request.number, response_rules) or ""
     return ""
+
+
+def _build_pending_review_state(
+    parsed: ParsedDiscovery,
+    response_rules: ResponseRules,
+    fi_mode: str,
+) -> ReviewState:
+    """Build a ReviewState where every non-skipped request is pending.
+
+    Skipped requests (FI fixed responses, FI inapplicable) get their fixed
+    text immediately and ``is_pending=False``. All other requests get empty
+    draft text, ``is_pending=True``, and ``review_reason='Generating...'``.
+    """
+    from icharlotte_core.discovery.response_drafter import (
+        detect_inapplicable_fi,
+        get_fi_fixed_objections,
+        get_fi_fixed_response,
+        strip_fi_objections_from_fixed_response,
+    )
+    from icharlotte_core.discovery.response_type_detector import normalize_discovery_type
+
+    dtype = normalize_discovery_type(parsed.discovery_type)
+    is_fi_fixed = dtype == "FI" and fi_mode == "fixed"
+
+    reviews: list[RequestReview] = []
+    for req in parsed.requests:
+        if is_fi_fixed and detect_inapplicable_fi(req.number):
+            reviews.append(
+                RequestReview(
+                    number=req.number,
+                    request_text=req.text,
+                    proposed_objections=get_fi_fixed_objections(
+                        req.number, response_rules,
+                    ),
+                    proposed_substantive_response=(
+                        "This interrogatory is not applicable to the present action."
+                    ),
+                    selected_rule_ids=["fi_fixed_objections_responses"],
+                    is_pending=False,
+                )
+            )
+            continue
+        if is_fi_fixed:
+            fixed = get_fi_fixed_response(req.number, response_rules)
+            if fixed is not None:
+                cleaned = strip_fi_objections_from_fixed_response(
+                    req.number, fixed, response_rules,
+                )
+                reviews.append(
+                    RequestReview(
+                        number=req.number,
+                        request_text=req.text,
+                        proposed_objections=get_fi_fixed_objections(
+                            req.number, response_rules,
+                        ),
+                        proposed_substantive_response=cleaned,
+                        selected_rule_ids=["fi_fixed_objections_responses"],
+                        is_pending=False,
+                    )
+                )
+                continue
+        reviews.append(
+            RequestReview(
+                number=req.number,
+                request_text=req.text,
+                proposed_objections="",
+                proposed_substantive_response="",
+                selected_rule_ids=[],
+                is_pending=True,
+                needs_review=False,
+                review_reason="Generating...",
+            )
+        )
+    return ReviewState(reviews)
+
+
+def _apply_proposal_to_review_state(
+    review_state: ReviewState,
+    req_number: str,
+    proposal: StructuredProposal,
+    parsed: ParsedDiscovery,
+    selected_rules: list[ResponseRule],
+    response_rules: ResponseRules,
+    fi_mode: str,
+) -> RequestReview | None:
+    """Merge ``proposal`` into the matching row of ``review_state``.
+
+    Returns the updated RequestReview, or None if no row with that number
+    exists. The row's ``is_pending`` is cleared.
+    """
+    from icharlotte_core.discovery.response_type_detector import normalize_discovery_type
+
+    target_index = next(
+        (i for i, r in enumerate(review_state.requests) if r.number == req_number),
+        -1,
+    )
+    if target_index < 0:
+        return None
+    parsed_request = next(
+        (req for req in parsed.requests if req.number == req_number), None,
+    )
+    if parsed_request is None:
+        return None
+
+    new_review = apply_structured_proposal(
+        request=parsed_request,
+        parsed=parsed,
+        selected_rules=selected_rules,
+        proposal=proposal,
+    )
+    # Preserve user-driven selections (quick-objection IDs).
+    previous = review_state.requests[target_index]
+    new_review.approved = False
+    new_review.selected_quick_objection_ids = list(previous.selected_quick_objection_ids)
+    new_review.is_pending = False
+    review_state.requests[target_index] = new_review
+
+    # Run the fixed-FI proposal-warning pass for this single row if needed.
+    if (
+        normalize_discovery_type(parsed.discovery_type) == "FI"
+        and fi_mode == "fixed"
+    ):
+        from icharlotte_core.discovery.response_drafter import (
+            detect_inapplicable_fi,
+            get_fi_fixed_response,
+        )
+        if not detect_inapplicable_fi(parsed_request.number) and (
+            get_fi_fixed_response(parsed_request.number, response_rules) is None
+        ):
+            if proposal.needs_review:
+                new_review.needs_review = True
+            if proposal.review_reason.strip():
+                new_review.review_reason = proposal.review_reason.strip()
+
+    return new_review
