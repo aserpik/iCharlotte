@@ -3,7 +3,9 @@ import unittest
 from icharlotte_core.discovery.response_generation_engine import (
     ConditionalRuleDecision,
     DraftCallbacks,
+    build_structured_proposal_prompt,
     generate_review_state,
+    parse_structured_proposal_response,
 )
 from icharlotte_core.discovery.response_parser import ParsedDiscovery, ParsedRequest
 from icharlotte_core.discovery.response_rule_library import (
@@ -406,6 +408,184 @@ class ResponseGenerationEngineTests(unittest.TestCase):
 
         self.assertIn("unable to comply", proposal.proposed_substantive_response.lower())
         self.assertTrue(proposal.needs_review)
+
+
+class StructuredProposalPromptTests(unittest.TestCase):
+    def _build_prompt(self):
+        parsed = _parsed()
+        request = parsed.requests[0]
+        rules = built_in_rules_for("SI")
+        return build_structured_proposal_prompt(
+            request=request,
+            parsed=parsed,
+            context_packet="",
+            selected_rules=rules,
+            response_rules=ResponseRules(),
+        )
+
+    def test_prompt_omits_proposed_objections_from_schema(self):
+        prompt = self._build_prompt()
+        # The dead "proposed_objections" field used to live inside the JSON
+        # schema block. We still mention objection RULES in the schema,
+        # but the OBJECTIONS-TEXT field is gone.
+        self.assertNotIn('"proposed_objections"', prompt)
+
+    def test_prompt_explicitly_forbids_drafting_objection_text(self):
+        prompt = self._build_prompt()
+        self.assertIn("Do not draft objection text.", prompt)
+
+    def test_parse_handles_payload_without_proposed_objections(self):
+        # Old clients won't send the field. The parser must tolerate that.
+        proposal = parse_structured_proposal_response(
+            '{"request_number": "1", "proposed_substantive_response": "ok"}'
+        )
+        self.assertEqual(proposal.request_number, "1")
+        self.assertEqual(proposal.proposed_substantive_response, "ok")
+        self.assertEqual(proposal.proposed_objections, "")
+
+    def test_parse_still_tolerates_legacy_proposed_objections_field(self):
+        # Old persisted JSON may still carry it; we just ignore the value.
+        proposal = parse_structured_proposal_response(
+            '{"request_number": "1", "proposed_objections": "legacy", '
+            '"proposed_substantive_response": "ok"}'
+        )
+        self.assertEqual(proposal.proposed_objections, "legacy")
+
+
+class PendingReviewStateTests(unittest.TestCase):
+    def _fi_parsed(self):
+        return ParsedDiscovery(
+            discovery_type="FI",
+            propounding_party="P",
+            responding_party="D",
+            set_number=1,
+            set_word="ONE",
+            case_number="1",
+            requests=[
+                ParsedRequest(number="A", text="Applicable, no fixed response."),
+                ParsedRequest(number="F", text="Has a fixed response."),
+                ParsedRequest(number="N", text="Inapplicable form interrogatory."),
+            ],
+        )
+
+    def test_pending_state_marks_non_skipped_requests_as_pending(self):
+        from icharlotte_core.discovery.response_generation_engine import (
+            _build_pending_review_state,
+        )
+        from icharlotte_core.discovery.response_rules import ResponseRules
+
+        parsed = _parsed()  # SI, two requests
+        state = _build_pending_review_state(parsed, ResponseRules(), "custom")
+        self.assertEqual(len(state.requests), 2)
+        for review in state.requests:
+            self.assertTrue(review.is_pending)
+            self.assertEqual(review.proposed_substantive_response, "")
+            self.assertEqual(review.proposed_objections, "")
+            self.assertEqual(review.review_reason, "Generating...")
+
+    def test_pending_state_fills_fixed_fi_responses_immediately(self):
+        from icharlotte_core.discovery import response_generation_engine as eng
+        from icharlotte_core.discovery.response_rules import ResponseRules
+
+        # Mock both authoritative lookups so the test fully controls the
+        # branches without depending on which numbers happen to be in
+        # response_drafter's default _INAPPLICABLE_ or fi_responses_by_number.
+        rules = ResponseRules()
+        # Avoid the FI rules dict from steering the lookup -- leave default.
+
+        original_detect = eng.detect_inapplicable_fi if hasattr(
+            eng, "detect_inapplicable_fi"
+        ) else None
+        original_fixed = eng.get_fi_fixed_response if hasattr(
+            eng, "get_fi_fixed_response"
+        ) else None
+
+        # These helpers are imported function-locally inside
+        # _build_pending_review_state, so we patch the module they come
+        # from rather than this engine module.
+        from icharlotte_core.discovery import response_drafter as rd
+        original_rd_detect = rd.detect_inapplicable_fi
+        original_rd_fixed = rd.get_fi_fixed_response
+        original_rd_objections = rd.get_fi_fixed_objections
+        original_rd_strip = rd.strip_fi_objections_from_fixed_response
+
+        rd.detect_inapplicable_fi = lambda number: number == "N"
+        rd.get_fi_fixed_response = lambda number, _rules: (
+            "Fixed answer body." if number == "F" else None
+        )
+        rd.get_fi_fixed_objections = lambda number, _rules: ""
+        rd.strip_fi_objections_from_fixed_response = lambda _num, text, _rules: text
+
+        try:
+            parsed = self._fi_parsed()
+            state = eng._build_pending_review_state(parsed, rules, "fixed")
+        finally:
+            rd.detect_inapplicable_fi = original_rd_detect
+            rd.get_fi_fixed_response = original_rd_fixed
+            rd.get_fi_fixed_objections = original_rd_objections
+            rd.strip_fi_objections_from_fixed_response = original_rd_strip
+
+        rows = {r.number: r for r in state.requests}
+        # F has a fixed response -- not pending, body filled.
+        self.assertFalse(rows["F"].is_pending)
+        self.assertEqual(rows["F"].proposed_substantive_response, "Fixed answer body.")
+        # N is inapplicable -- not pending, gets the inapplicable response.
+        self.assertFalse(rows["N"].is_pending)
+        self.assertIn("not applicable", rows["N"].proposed_substantive_response.lower())
+        # A is applicable with no fixed response -- pending.
+        self.assertTrue(rows["A"].is_pending)
+        self.assertEqual(rows["A"].review_reason, "Generating...")
+    def test_apply_proposal_overwrites_pending_row(self):
+        from icharlotte_core.discovery.response_generation_engine import (
+            _apply_proposal_to_review_state,
+            _build_pending_review_state,
+            StructuredProposal,
+        )
+        from icharlotte_core.discovery.response_rules import ResponseRules
+
+        parsed = _parsed()
+        state = _build_pending_review_state(parsed, ResponseRules(), "custom")
+        proposal = StructuredProposal(
+            request_number="1",
+            proposed_substantive_response="Drafted answer.",
+        )
+
+        review = _apply_proposal_to_review_state(
+            review_state=state,
+            req_number="1",
+            proposal=proposal,
+            parsed=parsed,
+            selected_rules=[],
+            response_rules=ResponseRules(),
+            fi_mode="custom",
+        )
+
+        self.assertIsNotNone(review)
+        self.assertFalse(review.is_pending)
+        self.assertEqual(review.proposed_substantive_response, "Drafted answer.")
+        # The state object itself reflects the change.
+        self.assertFalse(state.requests[0].is_pending)
+
+    def test_apply_proposal_returns_none_for_unknown_request_number(self):
+        from icharlotte_core.discovery.response_generation_engine import (
+            _apply_proposal_to_review_state,
+            _build_pending_review_state,
+            StructuredProposal,
+        )
+        from icharlotte_core.discovery.response_rules import ResponseRules
+
+        parsed = _parsed()
+        state = _build_pending_review_state(parsed, ResponseRules(), "custom")
+        result = _apply_proposal_to_review_state(
+            review_state=state,
+            req_number="999",
+            proposal=StructuredProposal(request_number="999"),
+            parsed=parsed,
+            selected_rules=[],
+            response_rules=ResponseRules(),
+            fi_mode="custom",
+        )
+        self.assertIsNone(result)
 
 
 if __name__ == "__main__":

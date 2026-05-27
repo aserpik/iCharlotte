@@ -439,6 +439,25 @@ class LLMConfig:
             "pass_defaults": {},
         }
 
+    def discovery_response_max_concurrent(self) -> int:
+        """Return the max concurrent proposal tasks for the discovery wizard.
+
+        Reads ``discovery_response.max_concurrent_proposals`` from the loaded
+        config, defaulting to 8. Clamps non-positive values to 1.
+        """
+        section = self._config.get("discovery_response") if isinstance(
+            self._config, dict
+        ) else None
+        default = 8
+        if not isinstance(section, dict):
+            return default
+        raw = section.get("max_concurrent_proposals", default)
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            return default
+        return max(1, value)
+
     def _save_config(self):
         """Save current configuration to file."""
         try:

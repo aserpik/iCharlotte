@@ -2,9 +2,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Iterable
+from typing import TYPE_CHECKING, Iterable
 
 from icharlotte_core.discovery.response_rule_library import ResponseRule
+
+if TYPE_CHECKING:
+    from icharlotte_core.discovery.response_generation_engine import (
+        StructuredProposal,
+    )
 
 
 @dataclass
@@ -18,6 +23,12 @@ class RequestReview:
     approved: bool = False
     needs_review: bool = False
     review_reason: str = ""
+    is_pending: bool = False
+    # Session-only: holds a freshly-generated proposal when the user has
+    # already edited this request. Never serialized.
+    pending_replacement: "StructuredProposal | None" = field(
+        default=None, repr=False, compare=False,
+    )
 
     def to_dict(self) -> dict:
         return {
@@ -30,6 +41,7 @@ class RequestReview:
             "approved": bool(self.approved),
             "needs_review": bool(self.needs_review),
             "review_reason": self.review_reason,
+            "is_pending": bool(self.is_pending),
         }
 
     @classmethod
@@ -48,6 +60,7 @@ class RequestReview:
             approved=bool(data.get("approved", False)),
             needs_review=bool(data.get("needs_review", False)),
             review_reason=str(data.get("review_reason", "")),
+            is_pending=bool(data.get("is_pending", False)),
         )
 
 
@@ -56,7 +69,10 @@ class ReviewState:
     requests: list[RequestReview] = field(default_factory=list)
 
     def all_approved(self) -> bool:
-        return all(item.approved for item in self.requests)
+        return all(
+            item.approved and not item.is_pending
+            for item in self.requests
+        )
 
     def to_dict(self) -> dict:
         return {"requests": [item.to_dict() for item in self.requests]}

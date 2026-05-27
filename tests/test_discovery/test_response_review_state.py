@@ -128,5 +128,63 @@ class ResponseReviewStateTests(unittest.TestCase):
         self.assertIn("No witnesses known.", text)
 
 
+class RequestReviewPendingFieldsTests(unittest.TestCase):
+    def test_default_request_review_is_not_pending(self):
+        from icharlotte_core.discovery.response_review_state import RequestReview
+        review = RequestReview(number="1", request_text="x")
+        self.assertFalse(review.is_pending)
+        self.assertIsNone(review.pending_replacement)
+
+    def test_is_pending_round_trips_through_to_from_dict(self):
+        from icharlotte_core.discovery.response_review_state import RequestReview
+        review = RequestReview(number="1", request_text="x", is_pending=True)
+        round_tripped = RequestReview.from_dict(review.to_dict())
+        self.assertTrue(round_tripped.is_pending)
+
+    def test_pending_replacement_is_not_serialized(self):
+        # pending_replacement is session-only — it MUST NOT round-trip.
+        from icharlotte_core.discovery.response_generation_engine import (
+            StructuredProposal,
+        )
+        from icharlotte_core.discovery.response_review_state import RequestReview
+        proposal = StructuredProposal(request_number="1")
+        review = RequestReview(
+            number="1", request_text="x", pending_replacement=proposal,
+        )
+        data = review.to_dict()
+        self.assertNotIn("pending_replacement", data)
+        round_tripped = RequestReview.from_dict(data)
+        self.assertIsNone(round_tripped.pending_replacement)
+
+    def test_legacy_dict_without_is_pending_loads_as_false(self):
+        from icharlotte_core.discovery.response_review_state import RequestReview
+        legacy = {
+            "number": "1",
+            "request_text": "x",
+            "proposed_objections": "",
+            "proposed_substantive_response": "",
+            "selected_rule_ids": [],
+            "selected_quick_objection_ids": [],
+            "approved": False,
+            "needs_review": False,
+            "review_reason": "",
+        }
+        review = RequestReview.from_dict(legacy)
+        self.assertFalse(review.is_pending)
+        self.assertIsNone(review.pending_replacement)
+
+    def test_all_approved_false_when_any_request_is_pending(self):
+        from icharlotte_core.discovery.response_review_state import (
+            RequestReview, ReviewState,
+        )
+        state = ReviewState(requests=[
+            RequestReview(number="1", request_text="x", approved=True),
+            RequestReview(
+                number="2", request_text="y", approved=True, is_pending=True,
+            ),
+        ])
+        self.assertFalse(state.all_approved())
+
+
 if __name__ == "__main__":
     unittest.main()
