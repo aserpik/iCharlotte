@@ -68,12 +68,10 @@ from icharlotte_core.discovery.response_rule_library import (
 )
 from icharlotte_core.discovery.response_rules import ResponseRules
 from icharlotte_core.discovery.response_type_detector import normalize_discovery_type
-
-
-try:
-    import fitz
-except ImportError:  # pragma: no cover - depends on local install
-    fitz = None
+from icharlotte_core.discovery._io import (
+    read_document_text,
+    read_first_page_text,
+)
 
 
 def parsed_discovery_to_dict(parsed: ParsedDiscovery | None) -> dict | None:
@@ -90,45 +88,6 @@ def parsed_discovery_from_dict(data: dict | None) -> ParsedDiscovery | None:
         if isinstance(item, dict)
     ]
     return ParsedDiscovery(**raw, requests=requests)
-
-
-def read_document_text(path: str) -> str:
-    """Extract text from a supported context or discovery file."""
-    if not path or not os.path.isfile(path):
-        return ""
-    lower = path.lower()
-    if lower.endswith(".pdf"):
-        if not fitz:
-            return ""
-        doc = fitz.open(path)
-        try:
-            return "\n".join(page.get_text() for page in doc)
-        finally:
-            doc.close()
-    if lower.endswith(".docx"):
-        from docx import Document
-
-        doc = Document(path)
-        return "\n".join(p.text for p in doc.paragraphs)
-    if lower.endswith(".txt"):
-        with open(path, "r", encoding="utf-8", errors="replace") as fh:
-            return fh.read()
-    return ""
-
-
-def read_first_page_text(path: str) -> str:
-    """Read first-page text for type detection without parsing the whole PDF."""
-    if not path or not path.lower().endswith(".pdf") or not fitz:
-        return ""
-    if not os.path.isfile(path):
-        return ""
-    doc = fitz.open(path)
-    try:
-        if len(doc) == 0:
-            return ""
-        return doc[0].get_text()
-    finally:
-        doc.close()
 
 
 def context_file_start_dir(discovery_file: str, case_root: str = "") -> str:
@@ -1297,3 +1256,5 @@ def _normalize_and_filter_parsed_discovery(
         discovery_file,
         selected_numbers,
     )
+
+

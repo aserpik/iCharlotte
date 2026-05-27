@@ -8,11 +8,11 @@ from icharlotte_core.discovery.response_parser import (
     build_parse_prompt,
     parse_llm_response,
 )
-from icharlotte_core.llm_config import call_llm
-from icharlotte_core.ui.wizard.pages.respond_discovery_page import (
-    _normalize_and_filter_parsed_discovery,
+from icharlotte_core.discovery._io import (
+    normalize_and_filter_parsed_discovery,
     read_document_text,
 )
+from icharlotte_core.llm_config import call_llm
 
 
 class DiscoveryParseWorker(QThread):
@@ -49,7 +49,7 @@ class DiscoveryParseWorker(QThread):
                 return
 
             parsed = parse_llm_response(raw)
-            parsed = _normalize_and_filter_parsed_discovery(
+            parsed = normalize_and_filter_parsed_discovery(
                 parsed, self.detected_type, self.discovery_file,
             )
             self.parse_finished.emit(True, parsed)
