@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import os
 import re
-from dataclasses import asdict, replace
-from typing import Iterable
+from dataclasses import asdict
 
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
@@ -24,18 +23,15 @@ from PySide6.QtWidgets import (
 )
 
 from icharlotte_core.discovery.response_generation_engine import (
-    DraftCallbacks,
-    StructuredProposal,
-    build_fallback_structured_proposal,
-    build_structured_proposal_prompt,
-    generate_review_state,
-    parse_structured_proposal_response,
+    _apply_proposal_to_review_state,
+    _build_pending_review_state,
 )
 from icharlotte_core.discovery.response_context_index import (
     build_context_chunks,
-    format_context_packet,
-    select_context_packet,
 )
+from icharlotte_core.discovery.discovery_parse_worker import DiscoveryParseWorker
+from icharlotte_core.discovery.proposal_coordinator import ProposalCoordinator
+from icharlotte_core.llm_config import LLMConfig
 from icharlotte_core.discovery.form_interrogatory_selection import (
     complete_selected_form_interrogatories,
     extract_selected_form_interrogatory_numbers,
@@ -46,10 +42,6 @@ from icharlotte_core.discovery.response_parser import (
     ParsedRequest,
     build_parse_prompt,
     parse_llm_response,
-)
-from icharlotte_core.discovery.response_drafter import (
-    detect_inapplicable_fi,
-    get_fi_fixed_response,
 )
 from icharlotte_core.discovery.response_review_state import (
     RequestReview,
@@ -225,7 +217,10 @@ class RespondDiscoverySettingsPage(QWidget):
         self._rule_checks: dict[str, QCheckBox] = {}
         self._quick_checks: dict[str, QCheckBox] = {}
         self._quick_response_buttons: dict[str, QPushButton] = {}
-        self._proposal_worker: RespondDiscoveryProposalWorker | None = None
+        self._parse_worker: DiscoveryParseWorker | None = None
+        self._coordinator: ProposalCoordinator | None = None
+        self._context_chunks: list = []
+        self._loaded_response_rules = None
         self._current_review_index = 0
 
         self._build_ui()
@@ -477,61 +472,123 @@ class RespondDiscoverySettingsPage(QWidget):
         self.next_btn.setEnabled(False)
         self.status_label.setText("Parsing discovery and drafting proposed responses...")
         if self.parsed_discovery is not None:
-            self._generate_review_from_parsed()
+            self._kick_off_drafting(self.parsed_discovery)
             return
 
-        self._proposal_worker = RespondDiscoveryProposalWorker(
+        self._parse_worker = DiscoveryParseWorker(
             discovery_file=self.discovery_file,
             detected_type=self.detected_type,
-            fi_mode=self.fi_mode,
-            selected_rules=self.selected_rules(),
-            context_files=self.context_files,
-            file_number=self.file_number,
             parent=self,
         )
-        self._proposal_worker.progress.connect(self.status_label.setText)
-        self._proposal_worker.finished_result.connect(self._on_proposals_finished)
-        self._proposal_worker.start()
+        self._parse_worker.parse_finished.connect(self._on_parse_finished)
+        self._parse_worker.start()
 
-    def _generate_review_from_parsed(self) -> None:
-        self.parsed_discovery = _normalize_and_filter_parsed_discovery(
-            self.parsed_discovery,
-            self.detected_type,
-            self.discovery_file,
-        )
+    def _on_parse_finished(self, success: bool, payload: object) -> None:
+        self._parse_worker = None
+        if not success:
+            self.next_btn.setEnabled(True)
+            self.status_label.setText(str(payload))
+            return
+        self.parsed_discovery = payload  # ParsedDiscovery
+        self._kick_off_drafting(self.parsed_discovery)
+
+    def _kick_off_drafting(self, parsed) -> None:
+        self.next_btn.setEnabled(True)
         response_rules = load_respond_response_rules(self.file_number)
-        selected_rules = self.selected_rules()
+        self._loaded_response_rules = response_rules
         context_text_by_path = {
             path: read_document_text(path)
             for path in self.context_files
             if os.path.isfile(path)
         }
-        proposal_map = _build_structured_proposal_map(
-            parsed=self.parsed_discovery,
-            selected_rules=selected_rules,
-            context_text_by_path=context_text_by_path,
+        self._context_chunks = build_context_chunks(context_text_by_path)
+        self.review_state = _build_pending_review_state(
+            parsed, response_rules, self.fi_mode,
+        )
+        self._open_review_screen_with_pending(parsed)
+
+        if self._coordinator is not None:
+            self._coordinator.cancel()
+        max_concurrent = LLMConfig().discovery_response_max_concurrent()
+        self._coordinator = ProposalCoordinator(
+            max_concurrent=max_concurrent, parent=self,
+        )
+        self._coordinator.proposal_ready.connect(self._on_proposal_ready)
+        self._coordinator.progress.connect(self._on_coordinator_progress)
+        self._coordinator.all_done.connect(self._on_coordinator_all_done)
+        self._coordinator.start(
+            parsed=parsed,
+            selected_rules=self.selected_rules(),
+            context_chunks=self._context_chunks,
             response_rules=response_rules,
             fi_mode=self.fi_mode,
         )
-        self.review_state = _generate_review_state_from_proposals(
-            self.parsed_discovery,
-            selected_rules=selected_rules,
-            response_rules=response_rules,
-            proposal_map=proposal_map,
-            fi_mode=self.fi_mode,
-        )
+
+    def _open_review_screen_with_pending(self, parsed) -> None:
+        if self.review_state is None:
+            response_rules = self._loaded_response_rules or load_respond_response_rules(
+                self.file_number,
+            )
+            self.review_state = _build_pending_review_state(
+                parsed, response_rules, self.fi_mode,
+            )
         self._show_review()
 
-    def _on_proposals_finished(self, success: bool, payload: object) -> None:
-        self.next_btn.setEnabled(True)
-        self._proposal_worker = None
-        if not success:
-            self.status_label.setText(str(payload))
+    def _on_proposal_ready(self, req_number: str, proposal) -> None:
+        if not self.review_state or not self.parsed_discovery:
             return
-        data = payload if isinstance(payload, dict) else {}
-        self.parsed_discovery = parsed_discovery_from_dict(data.get("parsed_discovery"))
-        self.review_state = ReviewState.from_dict(data.get("review_state") or {})
-        self._show_review()
+        target_index = next(
+            (i for i, r in enumerate(self.review_state.requests)
+             if r.number == req_number),
+            -1,
+        )
+        if target_index < 0:
+            return
+        previous = self.review_state.requests[target_index]
+        user_edited = (
+            (previous.proposed_substantive_response or "").strip() != ""
+            or (previous.proposed_objections or "").strip() != ""
+        )
+        if user_edited:
+            # Stash for the conflict banner; do not overwrite.
+            previous.pending_replacement = proposal
+            previous.is_pending = False
+            self._refresh_review_row(target_index)
+            return
+
+        response_rules = self._loaded_response_rules or load_respond_response_rules(
+            self.file_number,
+        )
+        _apply_proposal_to_review_state(
+            review_state=self.review_state,
+            req_number=req_number,
+            proposal=proposal,
+            parsed=self.parsed_discovery,
+            selected_rules=self.selected_rules(),
+            response_rules=response_rules,
+            fi_mode=self.fi_mode,
+        )
+        self._refresh_review_row(target_index)
+
+    def _on_coordinator_progress(self, completed: int, total: int) -> None:
+        if hasattr(self, "review_status_label") and self.review_status_label:
+            self.review_status_label.setText(f"Generated {completed} / {total}")
+
+    def _on_coordinator_all_done(self) -> None:
+        self._refresh_finalize_button()
+
+    def _refresh_review_row(self, target_index: int) -> None:
+        if target_index == self._current_review_index:
+            self._load_current_review()
+        self._refresh_finalize_button()
+
+    def _refresh_finalize_button(self) -> None:
+        if not hasattr(self, "finalize_btn"):
+            return
+        any_pending = self.review_state and any(
+            r.is_pending for r in self.review_state.requests
+        )
+        self.finalize_btn.setEnabled(not any_pending)
 
     # ------------------------------------------------------------------
     # Review screen
@@ -618,6 +675,7 @@ class RespondDiscoverySettingsPage(QWidget):
         self.review_widget.show()
         self._current_review_index = 0
         self._load_current_review()
+        self._refresh_finalize_button()
 
     def _current_review(self) -> RequestReview | None:
         if not self.review_state or not self.review_state.requests:
@@ -786,362 +844,6 @@ class RespondDiscoverySettingsPage(QWidget):
             )
             return
         self.run_requested.emit(self.to_dict())
-
-
-class RespondDiscoveryProposalWorker(QThread):
-    progress = Signal(str)
-    finished_result = Signal(bool, object)
-
-    def __init__(
-        self,
-        discovery_file: str,
-        detected_type: str,
-        fi_mode: str,
-        selected_rules: list[ResponseRule],
-        context_files: list[str],
-        file_number: str = "",
-        parent=None,
-    ):
-        super().__init__(parent)
-        self.discovery_file = discovery_file
-        self.detected_type = detected_type
-        self.fi_mode = fi_mode
-        self.selected_rules = list(selected_rules)
-        self.context_files = list(context_files)
-        self.file_number = file_number
-
-    def run(self) -> None:
-        try:
-            from icharlotte_core.llm_config import call_llm
-
-            self.progress.emit("Reading discovery file...")
-            discovery_text = read_document_text(self.discovery_file)
-            if not discovery_text.strip():
-                self.finished_result.emit(False, "Could not read text from the discovery file.")
-                return
-
-            self.progress.emit("Parsing discovery requests...")
-            parse_response = call_llm(
-                build_parse_prompt(discovery_text),
-                "",
-                task_type="extraction",
-                agent_id="agent_sum_disc",
-            )
-            if not parse_response:
-                self.finished_result.emit(False, "The parser did not return a response.")
-                return
-            parsed = parse_llm_response(parse_response)
-            parsed = _normalize_and_filter_parsed_discovery(
-                parsed,
-                self.detected_type,
-                self.discovery_file,
-            )
-
-            self.progress.emit("Reading context files...")
-            context_text_by_path = {
-                path: read_document_text(path)
-                for path in self.context_files
-                if os.path.isfile(path)
-            }
-
-            self.progress.emit("Drafting proposed responses...")
-            response_rules = load_respond_response_rules(self.file_number)
-            proposal_map = _build_structured_proposal_map(
-                parsed=parsed,
-                selected_rules=self.selected_rules,
-                context_text_by_path=context_text_by_path,
-                response_rules=response_rules,
-                fi_mode=self.fi_mode,
-            )
-
-            review_state = _generate_review_state_from_proposals(
-                parsed,
-                selected_rules=self.selected_rules,
-                response_rules=response_rules,
-                proposal_map=proposal_map,
-                fi_mode=self.fi_mode,
-            )
-            self.finished_result.emit(
-                True,
-                {
-                    "parsed_discovery": parsed_discovery_to_dict(parsed),
-                    "review_state": review_state.to_dict(),
-                },
-            )
-        except Exception as exc:
-            self.finished_result.emit(False, str(exc))
-
-
-def _build_structured_proposal_map(
-    parsed: ParsedDiscovery,
-    selected_rules: list[ResponseRule],
-    context_text_by_path: dict[str, str],
-    response_rules: ResponseRules | None = None,
-    fi_mode: str = "custom",
-) -> dict[str, StructuredProposal]:
-    from icharlotte_core.llm_config import call_llm
-
-    response_rules = response_rules or ResponseRules()
-    chunks = build_context_chunks(context_text_by_path)
-    proposals: dict[str, StructuredProposal] = {}
-    for req in parsed.requests:
-        if _should_skip_structured_proposal(req, parsed, response_rules, fi_mode):
-            continue
-        packet_chunks = select_context_packet(req, chunks)
-        context_packet = format_context_packet(packet_chunks)
-        prompt = build_structured_proposal_prompt(
-            req,
-            parsed,
-            context_packet,
-            selected_rules,
-            response_rules,
-        )
-        try:
-            raw = call_llm(prompt, "", task_type="general", agent_id="agent_sum_disc")
-            try:
-                proposal = parse_structured_proposal_response(raw or "")
-            except Exception:
-                repair_prompt = _build_structured_proposal_repair_prompt(
-                    raw or "",
-                    req.number,
-                )
-                repaired = call_llm(
-                    repair_prompt,
-                    "",
-                    task_type="general",
-                    agent_id="agent_sum_disc",
-                )
-                proposal = parse_structured_proposal_response(repaired or "")
-            proposals[req.number] = _ensure_context_warning(proposal, context_packet)
-        except Exception:
-            proposals[req.number] = build_fallback_structured_proposal(
-                req,
-                parsed,
-                context_packet,
-            )
-    return proposals
-
-
-def _should_skip_structured_proposal(
-    request: ParsedRequest,
-    parsed: ParsedDiscovery,
-    response_rules: ResponseRules,
-    fi_mode: str,
-) -> bool:
-    if normalize_discovery_type(parsed.discovery_type) != "FI" or fi_mode != "fixed":
-        return False
-    if detect_inapplicable_fi(request.number):
-        return True
-    return get_fi_fixed_response(request.number, response_rules) is not None
-
-
-def _build_structured_proposal_repair_prompt(raw_text: str, request_number: str) -> str:
-    return (
-        "Repair this structured discovery proposal JSON. "
-        "Return ONLY one valid JSON object with the same schema. "
-        f"The request_number must be {request_number}.\n\n"
-        f"INVALID RESPONSE:\n{raw_text}"
-    )
-
-
-def _ensure_context_warning(
-    proposal: StructuredProposal,
-    context_packet: str,
-) -> StructuredProposal:
-    if (context_packet or "").strip():
-        return proposal
-    reason = (proposal.review_reason or "").strip()
-    missing_context = "No specific context found."
-    if missing_context.lower() not in reason.lower():
-        reason = f"{reason} {missing_context}".strip()
-    return replace(
-        proposal,
-        needs_review=True,
-        review_reason=reason,
-    )
-
-
-def _generate_review_state_from_proposals(
-    parsed: ParsedDiscovery,
-    selected_rules: list[ResponseRule],
-    response_rules: ResponseRules,
-    proposal_map: dict[str, StructuredProposal],
-    fi_mode: str,
-) -> ReviewState:
-    review_state = generate_review_state(
-        parsed,
-        selected_rules,
-        context_text="",
-        response_rules=response_rules,
-        callbacks=_callbacks_from_proposal_map(proposal_map),
-        fi_mode=fi_mode,
-    )
-    _apply_fixed_fi_proposal_warnings(
-        review_state=review_state,
-        parsed=parsed,
-        proposal_map=proposal_map,
-        response_rules=response_rules,
-        fi_mode=fi_mode,
-    )
-    return review_state
-
-
-def _apply_fixed_fi_proposal_warnings(
-    review_state: ReviewState,
-    parsed: ParsedDiscovery,
-    proposal_map: dict[str, StructuredProposal],
-    response_rules: ResponseRules,
-    fi_mode: str,
-) -> None:
-    if normalize_discovery_type(parsed.discovery_type) != "FI" or fi_mode != "fixed":
-        return
-
-    requests_by_number = {req.number: req for req in parsed.requests}
-    for review in review_state.requests:
-        req = requests_by_number.get(review.number)
-        proposal = proposal_map.get(review.number)
-        if not req or not proposal:
-            continue
-        if detect_inapplicable_fi(req.number):
-            continue
-        if get_fi_fixed_response(req.number, response_rules) is not None:
-            continue
-        if proposal.needs_review:
-            review.needs_review = True
-        if proposal.review_reason.strip():
-            review.review_reason = proposal.review_reason.strip()
-
-
-def _callbacks_from_proposal_map(
-    proposal_map: dict[str, StructuredProposal],
-) -> DraftCallbacks:
-    proposals = dict(proposal_map or {})
-
-    def fallback_response(req: ParsedRequest, parsed: ParsedDiscovery) -> str:
-        return build_fallback_structured_proposal(
-            req,
-            parsed,
-            "",
-        ).proposed_substantive_response
-
-    def propose(
-        req: ParsedRequest,
-        parsed: ParsedDiscovery,
-        _context: str,
-        _rules: list[ResponseRule],
-        _response_rules: ResponseRules,
-    ) -> StructuredProposal:
-        return proposals.get(req.number) or build_fallback_structured_proposal(
-            req,
-            parsed,
-            "",
-        )
-
-    def draft_substantive(
-        req: ParsedRequest,
-        parsed: ParsedDiscovery,
-        _context: str,
-        _rules: list[ResponseRule],
-    ) -> str:
-        proposal = proposals.get(req.number)
-        if proposal and proposal.proposed_substantive_response.strip():
-            return proposal.proposed_substantive_response
-        return fallback_response(req, parsed)
-
-    return DraftCallbacks(
-        structured_proposal=propose,
-        draft_substantive=draft_substantive,
-    )
-
-
-def _draft_substantive_response_map(
-    parsed: ParsedDiscovery,
-    context_text: str,
-    fi_mode: str = "custom",
-    response_rules: ResponseRules | None = None,
-) -> dict[str, str]:
-    from icharlotte_core.llm_config import call_llm
-
-    response_rules = response_rules or ResponseRules()
-    requests = list(parsed.requests)
-    if normalize_discovery_type(parsed.discovery_type) == "FI" and fi_mode == "fixed":
-        requests = [
-            req for req in requests
-            if not detect_inapplicable_fi(req.number)
-            and get_fi_fixed_response(req.number, response_rules) is None
-        ]
-    if not requests:
-        return {}
-
-    requests_listing = "\n\n".join(
-        f"REQUEST NO. {req.number}:\n{req.text}"
-        for req in requests
-    )
-    prompt = _build_combined_substantive_prompt(parsed, context_text, requests_listing)
-    response = call_llm(prompt, "", task_type="general", agent_id="agent_sum_disc")
-    return _parse_combined_response_map(response or "", requests)
-
-
-def _build_combined_substantive_prompt(
-    parsed: ParsedDiscovery,
-    context_text: str,
-    requests_listing: str,
-) -> str:
-    dtype = (parsed.discovery_type or "").upper()
-    if dtype == "RFA":
-        instruction = (
-            "For each Request for Admission, use exactly one of these forms: "
-            "Admit; Deny; or After a reasonable inquiry concerning the matter "
-            "in this request, the information known or readily obtainable is "
-            "insufficient to enable this party to admit the matter. Lean toward "
-            "Deny or insufficient information unless the fact is clearly undisputed."
-        )
-    elif dtype == "RPD":
-        instruction = (
-            "For each Request for Production, draft a concise substantive "
-            "response stating whether Responding Party will comply or is unable "
-            "to comply based on the context."
-        )
-    elif dtype == "FI":
-        instruction = (
-            "For each Form Interrogatory, draft only the substantive factual "
-            "response. Do not include objections. If a fixed response is already "
-            "available, it may be replaced later by the application."
-        )
-    else:
-        instruction = (
-            "Answer only the question being asked using as few words as possible. "
-            "Do not include objections."
-        )
-
-    return (
-        "You are a California civil litigation attorney drafting proposed "
-        "substantive discovery responses.\n\n"
-        f"{instruction}\n\n"
-        "Format each response exactly as:\n"
-        "RESPONSE {number}: [response]\n\n"
-        f"CASE CONTEXT:\n{context_text[:2_000_000]}\n\n"
-        f"REQUESTS:\n{requests_listing}"
-    )
-
-
-def _parse_combined_response_map(
-    response_text: str,
-    requests: Iterable[ParsedRequest],
-) -> dict[str, str]:
-    pattern = re.compile(r"RESPONSE\s+([\d.]+)\s*[:\-]\s*", re.IGNORECASE)
-    parts = pattern.split(response_text or "")
-    responses: dict[str, str] = {}
-    if len(parts) >= 3:
-        for i in range(1, len(parts) - 1, 2):
-            responses[parts[i].strip()] = parts[i + 1].strip()
-    elif response_text.strip():
-        request_list = list(requests)
-        if request_list:
-            responses[request_list[0].number] = response_text.strip()
-    return responses
-
-
 class RespondDiscoveryWorker(QThread):
     progress = Signal(str)
     warning = Signal(str)
