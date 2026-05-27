@@ -401,6 +401,19 @@ _MD_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 _MD_ITALIC_RE = re.compile(r"\*([^\*\n]+?)\*")
 
 
+_VERDICT_COLORS = {
+    "SUPPORTED": "#1e8e3e",       # green
+    "PARTIAL": "#f9ab00",          # yellow
+    "NOT_SUPPORTED": "#c5221f",    # red
+    "NOT_FOUND": "#c5221f",        # red (same as NOT_SUPPORTED)
+    "UNVERIFIED": "#80868b",       # gray
+}
+
+
+def _color_for_verdict(verdict: str) -> str:
+    return _VERDICT_COLORS.get((verdict or "").upper(), "#1a5dbf")  # default blue
+
+
 def _render_draft_html(draft: DraftDocument) -> str:
     """Render the draft body into HTML with clickable citation anchors."""
     citation_spans = _build_citation_index(draft)
@@ -430,39 +443,48 @@ def _render_draft_html(draft: DraftDocument) -> str:
     )
 
 
-def _build_citation_index(draft: DraftDocument) -> list[tuple[str, int]]:
-    """Return [(citation_text, draft_citation_index), ...] sorted by length desc.
+def _build_citation_index(draft: DraftDocument) -> list[tuple[str, int, str]]:
+    """Return [(citation_text, draft_citation_index, verdict), ...] sorted by length desc.
 
     Sorting by length avoids partial-match collisions (e.g. "62 Cal. 4th 1081"
     must be wrapped before a shorter substring matches inside it).
     """
-    spans: list[tuple[str, int]] = []
+    spans: list[tuple[str, int, str]] = []
     for index, citation in enumerate(draft.citations or []):
         text = (citation.citation_text or "").strip()
         if text:
-            spans.append((text, index))
-    spans.sort(key=lambda pair: len(pair[0]), reverse=True)
+            spans.append((text, index, citation.verdict or ""))
+    spans.sort(key=lambda triple: len(triple[0]), reverse=True)
     return spans
 
 
-def _format_inline_html(line: str, citation_spans: list[tuple[str, int]]) -> str:
+def _format_inline_html(line: str, citation_spans: list[tuple[str, int, str]]) -> str:
     """Escape, italicize *case names*, and wrap citation texts as clickable anchors."""
     italicized = _MD_ITALIC_RE.sub(
         lambda match: f"\x00ITA{html.escape(match.group(1))}\x00ITAEND",
         line,
     )
     escaped = html.escape(italicized)
-    escaped = escaped.replace("\x00ITA", "<i>").replace("\x00ITAEND", "</i>")
-    for citation_text, index in citation_spans:
+    # Replace closing placeholder before opening — otherwise "\x00ITA" matches
+    # the prefix of "\x00ITAEND" and leaves "END" stranded in the output.
+    escaped = escaped.replace("\x00ITAEND", "</i>").replace("\x00ITA", "<i>")
+    for citation_text, index, verdict in citation_spans:
         if not citation_text:
             continue
-        pattern = re.escape(html.escape(citation_text))
+        # Build a regex that tolerates intervening <i> or </i> tags inserted
+        # by the italics pass above (case names are typically wrapped in
+        # *...* in the body but the citation_text comes without asterisks).
+        escaped_cite = html.escape(citation_text)
+        tolerant_pattern = r"(?:<i>|</i>)*".join(
+            re.escape(ch) for ch in escaped_cite
+        )
+        color = _color_for_verdict(verdict)
         anchor = (
             f"<a href=\"citation:{index}\" "
-            f"style=\"color:#1a5dbf; text-decoration:underline;\">"
-            f"{html.escape(citation_text)}</a>"
+            f"style=\"color:{color}; text-decoration:underline;\">"
+            f"{escaped_cite}</a>"
         )
-        escaped = re.sub(pattern, anchor, escaped, count=0)
+        escaped = re.sub(tolerant_pattern, anchor, escaped, count=0)
     return escaped
 
 
