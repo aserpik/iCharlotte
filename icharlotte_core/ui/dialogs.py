@@ -640,6 +640,9 @@ class PromptsDialog(QDialog):
         self.tabs.addTab(self.model_defaults_widget, "Model Defaults")
         layout.addWidget(self.tabs)
 
+        # Style Examples tab (only shown when oppose_motion is selected agent).
+        self._style_examples_tab = None
+
         # Bottom buttons
         btn_layout = QHBoxLayout()
 
@@ -1869,6 +1872,34 @@ class PromptsDialog(QDialog):
         else:
             self.current_pass = None
             self._load_pass_model_defaults()
+
+        # Show/hide the Style Examples tab based on the selected agent.
+        self._refresh_style_examples_tab()
+
+    def _refresh_style_examples_tab(self) -> None:
+        """Show the Style Examples tab only when oppose_motion is selected."""
+        from icharlotte_core.ui.dialogs_style_examples import StyleExamplesTab
+
+        tabs = getattr(self, "tabs", None)
+        if tabs is None:
+            return
+
+        existing_index = -1
+        for i in range(tabs.count()):
+            if tabs.tabText(i) == "Style Examples":
+                existing_index = i
+                break
+
+        if self.current_agent == "oppose_motion":
+            if existing_index < 0:
+                # Resolve the registry path next to the seeded prompt files.
+                registry_path = os.path.join(PROMPTS_DIR, "oppose_motion", "style_examples.json")
+                self._style_examples_tab = StyleExamplesTab(registry_path=registry_path)
+                tabs.addTab(self._style_examples_tab, "Style Examples")
+        else:
+            if existing_index >= 0:
+                tabs.removeTab(existing_index)
+                self._style_examples_tab = None
 
     def _on_pass_changed(self, pass_name: str):
         """Handle pass selection change."""
