@@ -3,17 +3,22 @@ import json
 import datetime
 import subprocess
 import os
+import re
 import threading
 from .config import API_KEYS
 from .utils import log_event
+from . import model_catalog
 
-OPENAI_RESPONSES_MODEL_PREFIXES = ("gpt-5", "o1", "o3", "o4")
+OPENAI_REASONING_MODEL_RE = re.compile(r"^o\d(?:[-.]|$)", re.IGNORECASE)
 OPENAI_REASONING_EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh"}
+GEMINI_MODELS_ENDPOINT = model_catalog.GEMINI_MODELS_ENDPOINT
+CURATED_GEMINI_MODELS = model_catalog.CURATED_GEMINI_MODELS
 
 
 def _openai_uses_responses_api(model):
     """Return True for OpenAI reasoning models that should use Responses."""
-    return (model or "").lower().startswith(OPENAI_RESPONSES_MODEL_PREFIXES)
+    model_id = (model or "").lower()
+    return model_id.startswith("gpt-5") or bool(OPENAI_REASONING_MODEL_RE.match(model_id))
 
 
 def _openai_model_supports_streaming(model):
@@ -27,6 +32,42 @@ def _openai_reasoning_effort(model, thinking_level):
     if level in OPENAI_REASONING_EFFORTS:
         return level
     return None
+
+
+def _curated_gemini_models():
+    return list(model_catalog.CURATED_GEMINI_MODELS)
+
+
+def _normalize_gemini_model_name(name):
+    return model_catalog._normalize_gemini_model_name(name)
+
+
+def _gemini_model_methods(model):
+    return model_catalog._gemini_model_methods(model)
+
+
+def _gemini_supports_generate_content(model):
+    return model_catalog._gemini_supports_generate_content(model)
+
+
+def _gemini_model_name(model):
+    return model_catalog._gemini_model_id(model)
+
+
+def _gemini_models_from_entries(entries):
+    models = [entry.model_id for entry in model_catalog.gemini_entries_from_models(entries)]
+    return sorted(set(models), reverse=True)
+
+
+def _fetch_gemini_models_over_rest(api_key):
+    return [
+        entry.model_id
+        for entry in model_catalog.fetch_provider_models(
+            "Gemini",
+            api_key=api_key,
+            request_get=requests.get,
+        )
+    ]
 
 
 def _openai_user_content(user_prompt, file_contents):
@@ -567,41 +608,16 @@ if PYSIDE6_AVAILABLE:
 
         def run(self):
             try:
-                models = []
-                if self.provider == "OpenAI":
-                    url = "https://api.openai.com/v1/models"
-                    headers = {"Authorization": f"Bearer {self.api_key}"}
-                    resp = requests.get(url, headers=headers)
-                    if resp.status_code == 200:
-                        all_models = resp.json()['data']
-                        models = [m['id'] for m in all_models if m['id'].startswith(('gpt', 'o1', 'o3'))]
-                        models.sort(reverse=True)
-                    else:
-                        raise Exception(f"OpenAI Error: {resp.status_code} {resp.text}")
+                entries = model_catalog.list_provider_models(
+                    self.provider,
+                    api_key=self.api_key,
+                    request_get=requests.get,
+                    allow_fallback=True,
+                )
+                models = [entry.model_id for entry in entries]
 
-                elif self.provider == "Gemini":
-                    if genai:
-                        client = genai.Client(api_key=self.api_key)
-                        # Try iterating; if fails, catch exception
-                        found_models = list(client.models.list())
-                        for m in found_models:
-                            name = m.name if hasattr(m, 'name') else str(m)
-                            if name.startswith('models/'):
-                                name = name[7:]
-                            if 'gemini' in name.lower():
-                                models.append(name)
-                    else:
-                        raise ImportError("google.genai not installed")
-
+                if self.provider == "Gemini":
                     models.sort(reverse=True)
-
-                elif self.provider == "Claude":
-                    # Return well-known models — CLI uses Max subscription, no API key needed
-                    models = [
-                        "claude-opus-4-6",
-                        "claude-sonnet-4-6",
-                        "claude-haiku-4-5-20251001",
-                    ]
 
                 self.finished.emit(self.provider, models)
 

@@ -175,6 +175,29 @@ class TaskConfig:
         )
 
 
+@dataclass
+class PassModelConfig:
+    """Model defaults for a specific Workbench agent/pass combination."""
+    agent_id: str
+    pass_name: str
+    model_sequence: List[ModelSpec] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "agent_id": self.agent_id,
+            "pass_name": self.pass_name,
+            "model_sequence": [m.to_dict() for m in self.model_sequence],
+        }
+
+    @classmethod
+    def from_dict(cls, agent_id: str, pass_name: str, data: dict) -> 'PassModelConfig':
+        return cls(
+            agent_id=data.get("agent_id", agent_id),
+            pass_name=data.get("pass_name", pass_name),
+            model_sequence=[ModelSpec.from_dict(m) for m in data.get("model_sequence", [])],
+        )
+
+
 # =============================================================================
 # Default Model Configurations
 # =============================================================================
@@ -183,14 +206,14 @@ class TaskConfig:
 DEFAULT_MODEL_SEQUENCE = [
     ModelSpec(
         provider="Gemini",
-        model="gemini-2.5-pro",
+        model="gemini-3.1-pro-preview",
         max_tokens=-1,
         supports_thinking=True,
         cost_tier="high"
     ),
     ModelSpec(
         provider="Gemini",
-        model="gemini-2.5-flash",
+        model="gemini-3.5-flash",
         max_tokens=-1,
         supports_thinking=True,
         cost_tier="standard"
@@ -215,7 +238,7 @@ DEFAULT_MODEL_SEQUENCE = [
 FAST_MODEL_SEQUENCE = [
     ModelSpec(
         provider="Gemini",
-        model="gemini-2.5-flash",
+        model="gemini-3.5-flash",
         max_tokens=-1,
         supports_thinking=False,
         cost_tier="low"
@@ -240,21 +263,21 @@ FAST_MODEL_SEQUENCE = [
 GEMINI3_MODEL_SEQUENCE = [
     ModelSpec(
         provider="Gemini",
-        model="gemini-3-pro-preview",
+        model="gemini-3.1-pro-preview",
         max_tokens=-1,
         supports_thinking=True,
         cost_tier="high"
     ),
     ModelSpec(
         provider="Gemini",
-        model="gemini-3.1-flash-lite-preview",
+        model="gemini-3.1-flash-lite",
         max_tokens=-1,
         supports_thinking=True,
         cost_tier="standard"
     ),
     ModelSpec(
         provider="Gemini",
-        model="gemini-3-flash-preview",
+        model="gemini-3.5-flash",
         max_tokens=-1,
         supports_thinking=True,
         cost_tier="standard"
@@ -347,6 +370,7 @@ class LLMConfig:
         self._config: Dict[str, Any] = {}
         self._task_configs: Dict[str, TaskConfig] = {}
         self._agent_configs: Dict[str, AgentConfig] = {}
+        self._pass_model_configs: Dict[tuple, PassModelConfig] = {}
 
         # Load configuration
         self._load_config()
@@ -367,6 +391,14 @@ class LLMConfig:
                 # Parse agent configurations
                 for agent_id, agent_data in data.get("agents", {}).items():
                     self._agent_configs[agent_id] = AgentConfig.from_dict(agent_data)
+
+                # Parse Workbench agent/pass defaults
+                self._pass_model_configs = {}
+                for agent_id, pass_configs in data.get("pass_defaults", {}).items():
+                    for pass_name, pass_data in pass_configs.items():
+                        config = PassModelConfig.from_dict(agent_id, pass_name, pass_data)
+                        if config.model_sequence:
+                            self._pass_model_configs[(config.agent_id, config.pass_name)] = config
 
             except (json.JSONDecodeError, KeyError) as e:
                 print(f"Warning: Failed to load LLM config: {e}. Using defaults.")
@@ -396,11 +428,14 @@ class LLMConfig:
                 use_default=True
             )
 
+        self._pass_model_configs = {}
+
         self._config = {
-            "version": "2.0",
+            "version": "2.2",
             "default_provider": "Gemini",
             "tasks": {name: config.to_dict() for name, config in self._task_configs.items()},
-            "agents": {agent_id: config.to_dict() for agent_id, config in self._agent_configs.items()}
+            "agents": {agent_id: config.to_dict() for agent_id, config in self._agent_configs.items()},
+            "pass_defaults": {},
         }
 
     def _save_config(self):
@@ -415,6 +450,10 @@ class LLMConfig:
             self._config["agents"] = {
                 agent_id: config.to_dict() for agent_id, config in self._agent_configs.items()
             }
+            pass_defaults = {}
+            for (agent_id, pass_name), config in sorted(self._pass_model_configs.items()):
+                pass_defaults.setdefault(agent_id, {})[pass_name] = config.to_dict()
+            self._config["pass_defaults"] = pass_defaults
 
             with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
                 json.dump(self._config, f, indent=2)
@@ -452,17 +491,28 @@ class LLMConfig:
             use_default=True
         )
 
-    def get_model_sequence_for_agent(self, agent_id: str, fallback_task: str = None) -> List[ModelSpec]:
+    def get_model_sequence_for_agent(
+        self,
+        agent_id: str,
+        fallback_task: str = None,
+        pass_name: str = None,
+    ) -> List[ModelSpec]:
         """
         Get the model sequence for a specific agent.
 
         Args:
             agent_id: Agent identifier (e.g., "agent_summarize", "func_chat")
             fallback_task: Optional task type to use if agent uses default
+            pass_name: Optional Workbench pass name to prefer before agent/task defaults
 
         Returns:
             List of ModelSpec objects in order of preference.
         """
+        if pass_name:
+            pass_config = self._pass_model_configs.get((agent_id, pass_name))
+            if pass_config and pass_config.model_sequence:
+                return pass_config.model_sequence
+
         agent_config = self._agent_configs.get(agent_id)
 
         if agent_config and not agent_config.use_default and agent_config.model_sequence:
@@ -516,6 +566,30 @@ class LLMConfig:
         if timeout_seconds is not None:
             config.timeout_seconds = timeout_seconds
 
+        self._save_config()
+
+    def get_pass_model_sequence(self, agent_id: str, pass_name: str) -> List[ModelSpec]:
+        """Get an explicit Workbench agent/pass model sequence, if one exists."""
+        config = self._pass_model_configs.get((agent_id, pass_name))
+        if config:
+            return config.model_sequence
+        return []
+
+    def update_pass_model_config(self, agent_id: str, pass_name: str,
+                                 model_sequence: List[ModelSpec]):
+        """Save model defaults for a specific Workbench agent/pass combination."""
+        if not agent_id:
+            raise ValueError("agent_id is required")
+        if not pass_name:
+            raise ValueError("pass_name is required")
+        if not model_sequence:
+            self._pass_model_configs.pop((agent_id, pass_name), None)
+        else:
+            self._pass_model_configs[(agent_id, pass_name)] = PassModelConfig(
+                agent_id=agent_id,
+                pass_name=pass_name,
+                model_sequence=model_sequence,
+            )
         self._save_config()
 
     # =========================================================================
@@ -785,7 +859,8 @@ class LLMCaller:
         return None
 
     def call(self, prompt: str, text: str, task_type: str = "general",
-             agent_id: str = None, model_override: str = None) -> Optional[str]:
+             agent_id: str = None, model_override: str = None,
+             pass_name: str = None, pass_agent_id: str = None) -> Optional[str]:
         """
         Call LLM with automatic fallback through configured models.
 
@@ -794,14 +869,24 @@ class LLMCaller:
             text: The document content.
             task_type: Type of task for model selection (fallback).
             agent_id: Specific agent ID for model selection (priority).
-            model_override: Specific model to use (e.g., "gemini-2.5-pro").
+            pass_name: Specific Workbench pass name for agent/pass defaults.
+            pass_agent_id: Agent ID used only for explicit pass-default lookup.
+            model_override: Specific model to use (e.g., "gemini-3.1-pro-preview").
                            Bypasses model sequence and uses only this model.
 
         Returns:
             LLM response text or None if all models fail.
         """
+        pass_default_sequence = []
+        if pass_agent_id and pass_name:
+            pass_default_sequence = self.config.get_pass_model_sequence(pass_agent_id, pass_name)
+
+        if pass_default_sequence:
+            model_sequence = pass_default_sequence
+            agent_config = self.config.get_agent_config(pass_agent_id)
+            max_retries = agent_config.max_retries if not agent_config.use_default else 3
         # Handle model override - create a single-model sequence
-        if model_override:
+        elif model_override:
             provider = self._detect_provider(model_override)
             if provider:
                 model_sequence = [ModelSpec(provider=provider, model=model_override)]
@@ -812,9 +897,22 @@ class LLMCaller:
                 model_override = None
 
         # Get model sequence - prefer agent-specific, fallback to task type
-        if not model_override:
-            if agent_id:
-                model_sequence = self.config.get_model_sequence_for_agent(agent_id, task_type)
+        if not model_override and not pass_default_sequence:
+            if pass_agent_id and pass_name:
+                if agent_id:
+                    model_sequence = self.config.get_model_sequence_for_agent(agent_id, task_type)
+                    agent_config = self.config.get_agent_config(agent_id)
+                    max_retries = agent_config.max_retries if not agent_config.use_default else 3
+                else:
+                    model_sequence = self.config.get_model_sequence(task_type)
+                    task_config = self.config.get_task_config(task_type)
+                    max_retries = task_config.max_retries
+            elif agent_id:
+                model_sequence = self.config.get_model_sequence_for_agent(
+                    agent_id,
+                    task_type,
+                    pass_name=pass_name,
+                )
                 agent_config = self.config.get_agent_config(agent_id)
                 max_retries = agent_config.max_retries if not agent_config.use_default else 3
             else:
@@ -867,9 +965,9 @@ def get_model_sequence(task_type: str = "general") -> List[ModelSpec]:
     return LLMConfig().get_model_sequence(task_type)
 
 
-def get_model_sequence_for_agent(agent_id: str) -> List[ModelSpec]:
+def get_model_sequence_for_agent(agent_id: str, pass_name: str = None) -> List[ModelSpec]:
     """Get model sequence for an agent (convenience function)."""
-    return LLMConfig().get_model_sequence_for_agent(agent_id)
+    return LLMConfig().get_model_sequence_for_agent(agent_id, pass_name=pass_name)
 
 
 def get_api_key(provider: str) -> Optional[str]:
@@ -878,7 +976,8 @@ def get_api_key(provider: str) -> Optional[str]:
 
 
 def call_llm(prompt: str, text: str, task_type: str = "general",
-             agent_id: str = None, logger=None) -> Optional[str]:
+             agent_id: str = None, logger=None, pass_name: str = None,
+             pass_agent_id: str = None) -> Optional[str]:
     """
     Call LLM with automatic fallback (convenience function).
 
@@ -888,9 +987,18 @@ def call_llm(prompt: str, text: str, task_type: str = "general",
         task_type: Type of task (fallback).
         agent_id: Specific agent ID (priority).
         logger: Optional logger.
+        pass_name: Optional Workbench pass name.
+        pass_agent_id: Agent ID used only for explicit pass-default lookup.
 
     Returns:
         LLM response or None.
     """
     caller = LLMCaller(logger=logger)
-    return caller.call(prompt, text, task_type, agent_id)
+    return caller.call(
+        prompt,
+        text,
+        task_type,
+        agent_id,
+        pass_name=pass_name,
+        pass_agent_id=pass_agent_id,
+    )

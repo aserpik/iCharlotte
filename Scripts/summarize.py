@@ -395,7 +395,13 @@ def process_document(
     try:
         with memory_monitor.track_operation("Summary Generation"):
             logger.progress(35, "Sending document to LLM for summarization...")
-            summary = llm_caller.call(summary_prompt, text, task_type="summary")
+            summary = llm_caller.call(
+                summary_prompt,
+                text,
+                task_type="summary",
+                agent_id="agent_summarize",
+                pass_name="summary",
+            )
 
             if not summary:
                 raise SummaryPassError("LLM returned empty response")
@@ -423,7 +429,13 @@ def process_document(
                 formatted_prompt = cross_check_prompt.replace("{summary}", summary).replace("{original}", text[:50000])
 
                 logger.progress(72, "Sending to LLM for cross-check verification...")
-                verified_summary = llm_caller.call(formatted_prompt, "", task_type="cross_check")
+                verified_summary = llm_caller.call(
+                    formatted_prompt,
+                    "",
+                    task_type="cross_check",
+                    pass_name="cross_check",
+                    pass_agent_id="agent_summarize",
+                )
 
                 if verified_summary:
                     # Check if cross-check made meaningful changes

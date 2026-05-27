@@ -8,18 +8,9 @@ import re
 # Context window limits for various models
 MODEL_CONTEXT_LIMITS = {
     # Gemini models
-    'gemini-3.1-flash-lite-preview': 1048576,
     'gemini-3.1-pro-preview': 1048576,
-    'gemini-3-flash': 1048576,
-    'gemini-3-flash-preview': 1048576,
-    'gemini-3-pro': 1048576,
-    'gemini-3-pro-preview': 1048576,
-    'gemini-2.5-flash': 1048576,
-    'gemini-2.5-pro': 1048576,
-    'gemini-2.0-flash': 1048576,
-    'gemini-1.5-flash': 1048576,
-    'gemini-1.5-pro': 2097152,
-    'gemini-1.0-pro': 32000,
+    'gemini-3.5-flash': 1048576,
+    'gemini-3.1-flash-lite': 1048576,
 
     # OpenAI models
     'gpt-4o': 128000,
@@ -139,7 +130,7 @@ class TokenCounter:
         Get the context window limit for a model.
 
         Args:
-            model: Model name (e.g., 'gemini-3-flash-preview', 'gpt-4o')
+            model: Model name (e.g., 'gemini-3.5-flash', 'gpt-4o')
             provider: Optional provider name for fallback
 
         Returns:

@@ -370,8 +370,14 @@ def consolidate_file(file_path: str, logger: AgentLogger, show_diff: bool = Fals
     # consolidation; fall back to gemini-3.1-pro-preview if Flash-Lite is unavailable.
     logger.progress(99, "Running consolidation LLM pass...")
     llm_caller = LLMCaller(logger=logger)
-    consolidated = llm_caller.call(prompt, result.text, task_type="summary",
-                                   model_override="gemini-3.1-flash-lite-preview")
+    consolidated = llm_caller.call(
+        prompt,
+        result.text,
+        task_type="summary",
+        model_override="gemini-3.1-flash-lite",
+        pass_name="consolidate",
+        pass_agent_id="agent_sum_disc",
+    )
 
     if not consolidated:
         logger.warning("Flash-Lite consolidation failed; retrying with gemini-3.1-pro-preview.")
@@ -528,7 +534,13 @@ def process_document(
     def run_extraction():
         """Run extraction pass."""
         with memory_monitor.track_operation("Extraction Pass"):
-            result = llm_caller.call(prompts["extraction"], text, task_type="extraction")
+            result = llm_caller.call(
+                prompts["extraction"],
+                text,
+                task_type="extraction",
+                agent_id="agent_sum_disc",
+                pass_name="extraction",
+            )
             if not result:
                 raise ExtractionPassError("LLM returned empty response")
             return result
@@ -536,7 +548,13 @@ def process_document(
     def run_summary():
         """Run summary pass."""
         with memory_monitor.track_operation("Summary Pass"):
-            result = llm_caller.call(prompts["summary"], text, task_type="summary")
+            result = llm_caller.call(
+                prompts["summary"],
+                text,
+                task_type="summary",
+                agent_id="agent_sum_disc",
+                pass_name="summary",
+            )
             if not result:
                 raise SummaryPassError("LLM returned empty response")
             # Strip extraction layer if present
@@ -616,7 +634,13 @@ def process_document(
 {summary_result}
 """
                 logger.progress(75, "Sending cross-check to LLM...")
-                cross_check_result = llm_caller.call(cross_prompt, "", task_type="cross_check")
+                cross_check_result = llm_caller.call(
+                    cross_prompt,
+                    "",
+                    task_type="cross_check",
+                    pass_name="cross_check",
+                    pass_agent_id="agent_sum_disc",
+                )
 
                 if cross_check_result:
                     final_summary = cross_check_result

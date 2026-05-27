@@ -406,7 +406,13 @@ def process_topics(input_path: str, logger) -> bool:
 
     logger.progress(40, "Calling LLM for topic discovery...")
     try:
-        response = llm_caller.call(topic_prompt, text, task_type="summary", agent_id="agent_sum_depo")
+        response = llm_caller.call(
+            topic_prompt,
+            text,
+            task_type="summary",
+            agent_id="agent_sum_depo",
+            pass_name="topic_discovery",
+        )
     except Exception as e:
         logger.pass_failed("Topic Discovery", str(e), recoverable=False)
         return False
@@ -780,7 +786,13 @@ def process_summary(session_path: str, logger, output_path_override: str = None)
     logger.progress(30, "Generating summary...")
     try:
         with memory_monitor.track_operation("Narrative Summary"):
-            summary = llm_caller.call(prompt, text, task_type="summary", agent_id="agent_sum_depo")
+            summary = llm_caller.call(
+                prompt,
+                text,
+                task_type="summary",
+                agent_id="agent_sum_depo",
+                pass_name="summary",
+            )
         if not summary:
             raise SummaryPassError("LLM returned empty summary")
     except Exception as e:
@@ -794,7 +806,13 @@ def process_summary(session_path: str, logger, output_path_override: str = None)
                 cross_prompt = f.read()
             cross_prompt = cross_prompt.replace("{summary}", summary).replace("{original}", text[:75000])
             logger.progress(75, "Running cross-check...")
-            verified = llm_caller.call(cross_prompt, "", task_type="cross_check")
+            verified = llm_caller.call(
+                cross_prompt,
+                "",
+                task_type="cross_check",
+                pass_name="cross_check",
+                pass_agent_id="agent_sum_depo",
+            )
             if verified and len(verified) > len(summary) * 0.8:
                 summary = verified
         except Exception as e:

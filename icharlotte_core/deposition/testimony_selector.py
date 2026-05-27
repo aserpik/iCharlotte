@@ -180,6 +180,7 @@ class TestimonySelector:
             text=formatted,
             agent_id="agent_depo_extract",
             task_type="extraction",
+            pass_name="extraction",
         )
 
         if not response:

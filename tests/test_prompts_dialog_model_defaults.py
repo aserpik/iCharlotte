@@ -1,4 +1,4 @@
-"""Tests for moving LLM model defaults into the Prompt Engineering Workbench."""
+"""Tests for pass-scoped model defaults in the Prompt Engineering Workbench."""
 
 import ast
 import os
@@ -9,13 +9,13 @@ from unittest.mock import patch
 
 os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
-from PySide6.QtWidgets import QApplication, QComboBox, QPushButton, QSpinBox
+from PySide6.QtWidgets import QApplication, QComboBox, QLabel, QPushButton
 
 app = QApplication.instance() or QApplication(sys.argv)
 
 from icharlotte_core.llm_config import AgentConfig, ModelSpec, TaskConfig
 from icharlotte_core.ui import dialogs as dialogs_module
-from icharlotte_core.ui.dialogs import LLMSettingsWidget, PromptsDialog
+from icharlotte_core.ui.dialogs import PromptsDialog
 
 
 def _child(widget, cls, name):
@@ -42,12 +42,19 @@ class FakeLLMConfig:
     def __init__(self):
         FakeLLMConfig.latest_instance = self
         self.updated_agents = []
+        self.updated_passes = []
         self.updated_tasks = []
+        self.pass_configs = {
+            ("agent_sum_depo", "summary"): [
+                ModelSpec(provider="OpenAI", model="gpt-4o-mini", max_tokens=-1),
+                ModelSpec(provider="Gemini", model="gemini-3.1-pro-preview", max_tokens=-1),
+            ]
+        }
         self.task_configs = {
             "general": TaskConfig(
                 name="general",
                 model_sequence=[
-                    ModelSpec(provider="Gemini", model="gemini-2.5-flash", max_tokens=4096)
+                    ModelSpec(provider="Gemini", model="gemini-3.5-flash", max_tokens=4096)
                 ],
                 max_retries=2,
                 timeout_seconds=90,
@@ -87,11 +94,21 @@ class FakeLLMConfig:
             use_default=True,
         )
 
+    def get_model_sequence_for_agent(self, agent_id, fallback_task=None, pass_name=None):
+        sequence = self.pass_configs.get((agent_id, pass_name))
+        if sequence:
+            return sequence
+        return self.get_model_sequence(fallback_task or "general")
+
+    def update_pass_model_config(self, agent_id, pass_name, model_sequence):
+        self.updated_passes.append((agent_id, pass_name, model_sequence))
+        self.pass_configs[(agent_id, pass_name)] = model_sequence
+
     def update_agent_config(self, agent_id, model_sequence=None, use_default=None, max_retries=None, timeout_seconds=None):
         self.updated_agents.append((agent_id, model_sequence, use_default, max_retries, timeout_seconds))
 
     def get_model_sequence(self, task_type="general"):
-        return self.task_configs[task_type].model_sequence
+        return self.task_configs.get(task_type, self.task_configs["general"]).model_sequence
 
 
 class TestWorkbenchModelDefaults(unittest.TestCase):
@@ -107,65 +124,67 @@ class TestWorkbenchModelDefaults(unittest.TestCase):
         dlg = PromptsDialog()
         try:
             self.assertIn("Model Defaults", _tab_names(dlg.tabs))
-            self.assertIsInstance(dlg.model_defaults_widget, LLMSettingsWidget)
+            self.assertIsNotNone(dlg.model_defaults_widget)
+            self.assertFalse(hasattr(dlg, "model_settings_panel"))
         finally:
             dlg.deleteLater()
 
-    def test_model_defaults_widget_loads_task_profile_rows(self):
-        widget = LLMSettingsWidget()
+    def test_model_defaults_tab_tracks_selected_agent_and_pass(self):
+        dlg = PromptsDialog()
         try:
-            provider = _child(widget, QComboBox, "task_provider_general_0")
-            model = _child(widget, QComboBox, "task_model_general_0")
-            tokens = _child(widget, QSpinBox, "task_tokens_general_0")
-            retries = _child(widget, QSpinBox, "task_retries_general")
-            timeout = _child(widget, QSpinBox, "task_timeout_general")
+            dlg.agent_combo.setCurrentText("deposition")
+            dlg.pass_combo.setCurrentText("summary")
 
-            self.assertEqual(provider.currentText(), "Gemini")
-            self.assertEqual(model.currentData(), "gemini-2.5-flash")
-            self.assertEqual(tokens.value(), 4096)
-            self.assertEqual(retries.value(), 2)
-            self.assertEqual(timeout.value(), 90)
+            target = _child(dlg, QLabel, "pass_model_defaults_target")
+            primary = _child(dlg, QComboBox, "primary_default_model")
+            first_backup = _child(dlg, QComboBox, "first_backup_model")
+            second_backup = _child(dlg, QComboBox, "second_backup_model")
+
+            self.assertIn("deposition / summary", target.text())
+            self.assertEqual(primary.currentData(), "OpenAI|gpt-4o-mini")
+            self.assertEqual(first_backup.currentData(), "Gemini|gemini-3.1-pro-preview")
+            self.assertIsNone(second_backup.currentData())
         finally:
-            widget.deleteLater()
+            dlg.deleteLater()
 
-    def test_model_defaults_save_updates_config_and_emits_signal(self):
-        widget = LLMSettingsWidget()
-        emitted = []
-        widget.settings_saved.connect(lambda: emitted.append(True))
+    def test_model_defaults_save_updates_selected_agent_pass(self):
+        dlg = PromptsDialog()
         try:
-            provider = _child(widget, QComboBox, "task_provider_general_0")
-            model = _child(widget, QComboBox, "task_model_general_0")
-            tokens = _child(widget, QSpinBox, "task_tokens_general_0")
-            save_button = _child(widget, QPushButton, "save_llm_settings")
+            dlg.agent_combo.setCurrentText("deposition")
+            dlg.pass_combo.setCurrentText("summary")
 
-            provider.setCurrentText("OpenAI")
-            model_index = model.findData("gpt-4o-mini")
-            self.assertGreaterEqual(model_index, 0)
-            model.setCurrentIndex(model_index)
-            tokens.setValue(2048)
+            primary = _child(dlg, QComboBox, "primary_default_model")
+            first_backup = _child(dlg, QComboBox, "first_backup_model")
+            second_backup = _child(dlg, QComboBox, "second_backup_model")
+            save_button = _child(dlg, QPushButton, "save_pass_model_defaults")
+
+            primary.setCurrentIndex(primary.findData("Gemini|gemini-3.5-flash"))
+            first_backup.setCurrentIndex(first_backup.findData("OpenAI|gpt-4o-mini"))
+            second_backup.setCurrentIndex(second_backup.findData(None))
 
             with patch.object(dialogs_module.QMessageBox, "information"):
                 save_button.click()
 
-            self.assertEqual(emitted, [True])
-            saved = widget.config.updated_tasks[-1]
-            self.assertEqual(saved[0], "general")
-            self.assertEqual(saved[1][0].provider, "OpenAI")
-            self.assertEqual(saved[1][0].model, "gpt-4o-mini")
-            self.assertEqual(saved[1][0].max_tokens, 2048)
+            saved = dlg.llm_config.updated_passes[-1]
+            self.assertEqual(saved[0], "agent_sum_depo")
+            self.assertEqual(saved[1], "summary")
+            self.assertEqual([(m.provider, m.model) for m in saved[2]], [
+                ("Gemini", "gemini-3.5-flash"),
+                ("OpenAI", "gpt-4o-mini"),
+            ])
         finally:
-            widget.deleteLater()
+            dlg.deleteLater()
 
-    def test_model_defaults_signals_refresh_selected_agent_panel(self):
+    def test_pass_change_refreshes_model_defaults_tab(self):
         dlg = PromptsDialog()
         try:
-            with patch.object(dlg, "_load_agent_model_settings") as reload_settings:
-                dlg.model_defaults_widget.settings_saved.emit()
-            reload_settings.assert_called_once()
+            dlg.agent_combo.setCurrentText("deposition")
+            dlg.pass_combo.setCurrentText("summary")
+            primary = _child(dlg, QComboBox, "primary_default_model")
+            self.assertEqual(primary.currentData(), "OpenAI|gpt-4o-mini")
 
-            with patch.object(dlg, "_load_agent_model_settings") as reload_settings:
-                dlg.model_defaults_widget.settings_reset.emit()
-            reload_settings.assert_called_once()
+            dlg.pass_combo.setCurrentText("cross_check")
+            self.assertEqual(primary.currentData(), "Gemini|gemini-3.5-flash")
         finally:
             dlg.deleteLater()
 
