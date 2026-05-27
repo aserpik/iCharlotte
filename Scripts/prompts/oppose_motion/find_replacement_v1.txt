@@ -1,0 +1,20 @@
+You are searching for California authority to replace a failed citation in an opposition brief.
+
+The brief asserted a PROPOSITION and cited an AUTHORITY that did not support it.
+Propose up to 3 candidate California cases or statutes that DO support the proposition.
+
+Return strict JSON only with key "candidates" mapping to an array. Each candidate has:
+- citation_text: full citation in standard California form
+- kind: "case" or "statute"
+- reason: 1 sentence why this authority supports the proposition
+
+Do not invent citations. If you are not confident a real authority directly supports the proposition, return fewer candidates (or an empty array).
+
+PROPOSITION:
+{proposition}
+
+FAILED CITATION:
+{failed_citation}
+
+VERIFIER NOTE (why the original failed):
+{verifier_note}

@@ -101,7 +101,8 @@ class PromptManager:
 
         # Create agent subdirectories
         for agent in ['summarize', 'discovery', 'deposition', 'timeline', 'contradiction',
-                      'word_assistant', 'legal_research', 'mediation_brief']:
+                      'word_assistant', 'legal_research', 'mediation_brief',
+                      'oppose_motion']:
             agent_dir = os.path.join(self.prompts_dir, agent)
             if not os.path.exists(agent_dir):
                 os.makedirs(agent_dir)
@@ -445,6 +446,7 @@ class PromptManager:
             CITATION_INSTRUCTION,
         )
         from icharlotte_core.mediation_brief import MediationBriefGenerator
+        from icharlotte_core.opposition import prompts as oppose_prompts
 
         # ── Migration: prune deprecated word_assistant entries ──────────────
         # placeholder_instructions and cursor_instructions were consolidated
@@ -500,6 +502,11 @@ class PromptManager:
             ("legal_research", "citation_instruction", CITATION_INSTRUCTION, "Strict citation rules"),
             ("mediation_brief", "style_guide", MediationBriefGenerator.STYLE_GUIDE, "Defense writing style/tone guide"),
             ("mediation_brief", "formatting_rules", MediationBriefGenerator.FORMATTING_RULES, "Structural formatting rules"),
+            ("oppose_motion", "analyze_motion", oppose_prompts.ANALYZE_MOTION_PROMPT, "Motion analysis: extract metadata + principal arguments"),
+            ("oppose_motion", "generate_outline", oppose_prompts.GENERATE_OUTLINE_PROMPT, "Outline generation from analyzed metadata"),
+            ("oppose_motion", "draft_memorandum", oppose_prompts.DRAFT_MEMORANDUM_PROMPT, "Drafter prompt (no pre-draft research; uses style exemplars)"),
+            ("oppose_motion", "verify_citation", oppose_prompts.VERIFY_CITATION_PROMPT, "Per-citation verifier: case + statute"),
+            ("oppose_motion", "find_replacement", oppose_prompts.FIND_REPLACEMENT_PROMPT, "Optional replacement-case search on red verdicts"),
         ]
 
         seeded = 0

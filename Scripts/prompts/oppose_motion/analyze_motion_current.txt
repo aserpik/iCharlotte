@@ -1,0 +1,20 @@
+You are analyzing a California civil motion to prepare an opposition.
+
+Extract these fields from the motion text and return strict JSON only:
+
+- motion_type: short label, e.g. "Motion to Compel Form Interrogatories"
+- moving_party: the party who filed the motion
+- opposing_party: the party who will oppose (our client)
+- relief_requested: 1-2 sentences describing what the moving party asks the court to do
+- hearing_date: ISO-8601 if extractable, else ""
+- opposition_due_date: ISO-8601 if computable from CCP defaults, else ""
+- procedural_posture: 1-2 sentences on the case status
+- principal_arguments: a JSON array of 3-7 short strings, each capturing one of the moving party's principal arguments
+
+Return JSON only. Do not include commentary.
+
+MOTION TEXT:
+{motion_text}
+
+CONTEXT DOCUMENTS:
+{context_text}
