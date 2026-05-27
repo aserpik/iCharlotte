@@ -3,7 +3,7 @@ Data models for chat conversations and messages.
 """
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 
 
@@ -96,7 +96,7 @@ class Conversation:
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
     provider: str = 'Gemini'
-    model: str = 'gemini-3-flash-preview'
+    model: str = 'gemini-3.5-flash'
     system_prompt: str = ''
     settings: Dict[str, Any] = field(default_factory=dict)
     messages: List[Message] = field(default_factory=list)
@@ -131,7 +131,7 @@ class Conversation:
             created_at=data.get('created_at', datetime.now().isoformat()),
             updated_at=data.get('updated_at', datetime.now().isoformat()),
             provider=data.get('provider', 'Gemini'),
-            model=data.get('model', 'gemini-3-flash-preview'),
+            model=data.get('model', 'gemini-3.5-flash'),
             system_prompt=data.get('system_prompt', ''),
             settings=data.get('settings', {}),
             messages=messages,
@@ -144,7 +144,14 @@ class Conversation:
     def add_message(self, message: Message):
         """Add a message and update timestamps."""
         self.messages.append(message)
-        self.updated_at = datetime.now().isoformat()
+        updated_at = datetime.now()
+        try:
+            previous_updated_at = datetime.fromisoformat(self.updated_at)
+            if updated_at <= previous_updated_at:
+                updated_at = previous_updated_at + timedelta(microseconds=1)
+        except ValueError:
+            pass
+        self.updated_at = updated_at.isoformat()
         self.total_tokens_used += message.token_count
 
     def get_history_for_llm(self) -> List[Dict[str, str]]:

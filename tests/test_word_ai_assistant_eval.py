@@ -34,7 +34,7 @@ from icharlotte_core.word_hotkey import apply_flat_diff_redline
 DOC_PATH = r'C:\geminiterminal2\tests\AI Assistant\[OLD} SS iso MTC Further Rsps RPD.docx'
 SECTION_HEADING = "REASON WHY FURTHER RESPONSE IS NOT WARRANTED AS TO REQUESTS FOR PRODUCTION NO. 6"
 PROMPT = "convert this to a persuasive argument in narrative format"
-MODEL = "gemini-3-flash-preview"
+MODEL = "gemini-3.5-flash"
 PROVIDER = "Gemini"
 
 LLM_SETTINGS = {

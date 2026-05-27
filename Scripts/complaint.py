@@ -657,7 +657,7 @@ def main():
         }
         Return ONLY the JSON.
         """
-        json_str = gemini_utils.call_gemini_api(prompt_complaint, complaint_text, ["gemini-3-flash-preview", "gemini-2.5-flash"])
+        json_str = gemini_utils.call_gemini_api(prompt_complaint, complaint_text, ["gemini-3.5-flash", "gemini-3.1-flash-lite"])
         if json_str:
             try:
                 data = json.loads(gemini_utils.clean_json_string(json_str))
@@ -678,7 +678,7 @@ def main():
         }
         Return ONLY the JSON.
         """
-        json_str = gemini_utils.call_gemini_api(prompt_ins, insurance_text, ["gemini-3-flash-preview", "gemini-2.5-flash"])
+        json_str = gemini_utils.call_gemini_api(prompt_ins, insurance_text, ["gemini-3.5-flash", "gemini-3.1-flash-lite"])
         if json_str:
             try:
                 data = json.loads(gemini_utils.clean_json_string(json_str))
@@ -729,7 +729,7 @@ def main():
                 "case_name": "generated_case_name"
             }
             """
-            json_str = gemini_utils.call_gemini_api(verify_prompt, caption_text, ["gemini-2.5-flash"])
+            json_str = gemini_utils.call_gemini_api(verify_prompt, caption_text, ["gemini-3.5-flash"])
             if json_str:
                 log_event(f"Caption Verification RAW JSON: {json_str}")
                 try:
@@ -784,7 +784,7 @@ def main():
         Here is text from Page 1 of the complaint (OCR'd).
         Find the Case Number. Return JSON: {"case_number": "found_number"}
         """
-        json_str = gemini_utils.call_gemini_api(recon_prompt, page1_text, ["gemini-2.5-flash"]) 
+        json_str = gemini_utils.call_gemini_api(recon_prompt, page1_text, ["gemini-3.5-flash"])
         if json_str:
              try:
                 data = json.loads(gemini_utils.clean_json_string(json_str))
@@ -813,7 +813,7 @@ def main():
                     fb_prompt = f.read()
                 
                 log_event("Calling AI for Factual Background...")
-                fb_result = gemini_utils.call_gemini_api(fb_prompt, complaint_text, ["gemini-3-flash-preview", "gemini-2.5-flash"])
+                fb_result = gemini_utils.call_gemini_api(fb_prompt, complaint_text, ["gemini-3.5-flash", "gemini-3.1-flash-lite"])
                 
                 if fb_result:
                     data_manager.save_variable(file_num, "factual_background", fb_result, extra_tags=["Meta Data"])

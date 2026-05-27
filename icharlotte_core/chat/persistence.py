@@ -48,7 +48,7 @@ class ChatPersistence:
             'settings': {
                 'theme': 'light',
                 'default_provider': 'Gemini',
-                'default_model': 'gemini-3-flash-preview'
+                'default_model': 'gemini-3.5-flash'
             },
             'attached_files': []  # Persisted context files for the case
         }
@@ -140,7 +140,7 @@ class ChatPersistence:
         return None
 
     def create_conversation(self, name: str = None, provider: str = 'Gemini',
-                          model: str = 'gemini-3-flash-preview',
+                          model: str = 'gemini-3.5-flash',
                           system_prompt: str = '') -> str:
         """
         Create a new conversation.

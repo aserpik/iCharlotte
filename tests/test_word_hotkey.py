@@ -210,7 +210,7 @@ def test_llm_handler():
         print("1. Testing LLMHandler.generate...")
         result = LLMHandler.generate(
             provider="Gemini",
-            model="models/gemini-2.0-flash",
+            model="gemini-3.5-flash",
             system_prompt="You are a test assistant. Respond with exactly: TEST_SUCCESS",
             user_prompt="Say the test response.",
             file_contents="",

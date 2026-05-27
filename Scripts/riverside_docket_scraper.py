@@ -51,7 +51,7 @@ async def solve_image_captcha(page):
             return False
             
         client = genai.Client(api_key=api_key)
-        # Switch to gemini-2.0-flash for potentially better OCR on distorted images
+        # Switch to gemini-3.5-flash for potentially better OCR on distorted images
         
         sample_file = None
         try:
@@ -87,8 +87,8 @@ Output the characters now:"""
         else:
             prompt = "Solve this math problem (e.g., '1 + 5 ='). Return ONLY the result number."
         
-        # Use gemini-3-pro-preview for best OCR accuracy on distorted text
-        response = client.models.generate_content(model="gemini-3-pro-preview", contents=[sample_file, prompt])
+        # Use gemini-3.1-pro-preview for best OCR accuracy on distorted text
+        response = client.models.generate_content(model="gemini-3.1-pro-preview", contents=[sample_file, prompt])
         captcha_text = response.text.strip()
 
         # Handle verbose responses - extract just the alphanumeric characters

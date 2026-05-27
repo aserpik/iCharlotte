@@ -759,10 +759,6 @@ class PropoundTab(QWidget):
             return
 
         api_key = API_KEYS.get(provider)
-        if not api_key:
-            self.model_combo.addItem(f"No API Key for {provider}")
-            return
-
         self.model_combo.addItem("Fetching models...")
         self.model_combo.setEnabled(False)
 
@@ -796,9 +792,9 @@ class PropoundTab(QWidget):
 
         # Default selection
         if provider == "Gemini":
-            idx = self.model_combo.findText("gemini-3.1-flash-lite-preview")
+            idx = self.model_combo.findText("gemini-3.1-flash-lite")
             if idx == -1:
-                idx = self.model_combo.findText("gemini-3-flash-preview")
+                idx = self.model_combo.findText("gemini-3.5-flash")
             if idx != -1:
                 self.model_combo.setCurrentIndex(idx)
             else:

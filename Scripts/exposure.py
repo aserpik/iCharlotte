@@ -169,8 +169,8 @@ def call_gemini(prompt, text):
     
     # Updated model sequence for liability agent
     model_sequence = [
-        "gemini-3-pro-preview", 
-        "gemini-2.5-flash"
+        "gemini-3.1-pro-preview",
+        "gemini-3.5-flash"
     ]
 
     for model_name in model_sequence:

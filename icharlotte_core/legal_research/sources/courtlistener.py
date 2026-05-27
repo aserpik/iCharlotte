@@ -32,6 +32,16 @@ def opinion_url_for_cluster(cluster: dict) -> str:
     return urljoin("https://www.courtlistener.com/", absolute_url)
 
 
+def preferred_california_citation(citations: list[str]) -> str:
+    """Prefer a California official/appellate reporter citation when present."""
+    if not citations:
+        return ""
+    for citation in citations:
+        if re.search(r"\bCal\.\s*(?:App\.\s*)?(?:2d|3d|4th|5th|6th)?\s+\d+", citation):
+            return citation
+    return citations[0]
+
+
 class CourtListenerClient:
     """Stateless client for the CourtListener REST API v4.
 
@@ -61,9 +71,9 @@ class CourtListenerClient:
 
     def _parse_result(self, r: dict) -> CaseResult:
         """Convert a single CourtListener search result dict to a CaseResult."""
-        # Citation: use the first entry if available
+        # Citation: prefer a California reporter entry when available.
         citations = r.get("citation") or []
-        citation_str = citations[0] if citations else ""
+        citation_str = preferred_california_citation(citations)
 
         # Strip HTML tags from snippet
         snippet_raw = r.get("snippet") or ""

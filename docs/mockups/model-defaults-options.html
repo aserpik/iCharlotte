@@ -1,0 +1,869 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Prompt Engineering Workbench - Model Defaults Options</title>
+  <style>
+    :root {
+      --bg: #f4f5f4;
+      --panel: #ffffff;
+      --panel-soft: #f8f9f7;
+      --line: #cfd4d0;
+      --line-strong: #aeb7b1;
+      --text: #202522;
+      --muted: #65706a;
+      --green: #1e8a52;
+      --green-soft: #e4f4eb;
+      --blue: #286fb2;
+      --blue-soft: #e6f0fb;
+      --amber: #a76116;
+      --amber-soft: #fff2dd;
+      --danger: #a53c30;
+      --shadow: 0 16px 40px rgba(24, 31, 28, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(244, 245, 244, 0.86)),
+        repeating-linear-gradient(90deg, rgba(43, 56, 50, 0.03) 0 1px, transparent 1px 40px);
+      color: var(--text);
+      font-family: "Segoe UI", "Aptos", sans-serif;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .page {
+      max-width: 1420px;
+      margin: 0 auto;
+      padding: 28px 26px 40px;
+    }
+
+    .intro {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 22px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 24px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .intro p {
+      max-width: 780px;
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .legend {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: 5px;
+      padding: 5px 8px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .chip.strong {
+      color: var(--green);
+      border-color: #add5bf;
+      background: var(--green-soft);
+      font-weight: 600;
+    }
+
+    .mockup-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .option {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      gap: 10px;
+    }
+
+    .option-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 38px;
+    }
+
+    .option-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 15px;
+      font-weight: 650;
+    }
+
+    .rank {
+      width: 24px;
+      height: 24px;
+      display: inline-grid;
+      place-items: center;
+      border: 1px solid var(--line-strong);
+      border-radius: 5px;
+      color: #25312a;
+      background: #fff;
+      font-weight: 700;
+    }
+
+    .tag {
+      padding: 4px 7px;
+      border-radius: 5px;
+      background: var(--blue-soft);
+      color: var(--blue);
+      border: 1px solid #bdd7f2;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .tag.orange {
+      background: var(--amber-soft);
+      color: var(--amber);
+      border-color: #e6ca9b;
+    }
+
+    .window {
+      overflow: hidden;
+      min-height: 620px;
+      border: 1px solid var(--line-strong);
+      border-radius: 6px;
+      background: var(--panel);
+      box-shadow: var(--shadow);
+    }
+
+    .titlebar {
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 9px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(#fcfdfb, #edf0ed);
+      color: #4e5a53;
+      font-size: 12px;
+    }
+
+    .appmark {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .appicon {
+      width: 16px;
+      height: 16px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 4px;
+      background: #2b6fb0;
+      color: white;
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .close {
+      font-size: 18px;
+      color: #8a928d;
+      line-height: 1;
+    }
+
+    .workbench {
+      padding: 10px;
+    }
+
+    .toolbar {
+      display: grid;
+      grid-template-columns: auto minmax(84px, 1fr) auto minmax(84px, 1fr) auto minmax(84px, 1fr);
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .toolbar.slim {
+      grid-template-columns: auto 1fr auto 1fr;
+    }
+
+    .field-label {
+      color: #24302a;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .select,
+    .input-like {
+      height: 25px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: #fff;
+      padding: 0 8px;
+      color: #2f3933;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .caret {
+      color: #606d65;
+      padding-left: 8px;
+    }
+
+    .model-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 8px;
+      margin: 8px 0 10px;
+      border: 1px solid #b8d3c2;
+      border-radius: 5px;
+      background: #f2faf5;
+    }
+
+    .model-status .label {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .model-status .value {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #2f4738;
+    }
+
+    .model-status .spacer {
+      flex: 1;
+    }
+
+    .link-button,
+    .button {
+      height: 26px;
+      border: 1px solid var(--line-strong);
+      border-radius: 4px;
+      background: #fff;
+      padding: 0 10px;
+      color: #223129;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .button.primary {
+      border-color: #177449;
+      background: var(--green);
+      color: #fff;
+    }
+
+    .button.soft {
+      border-color: #b7d2ed;
+      background: var(--blue-soft);
+      color: var(--blue);
+    }
+
+    .tabs {
+      display: flex;
+      align-items: flex-end;
+      border-bottom: 1px solid var(--line);
+      gap: 2px;
+      margin-top: 5px;
+    }
+
+    .tab {
+      padding: 6px 10px;
+      border: 1px solid transparent;
+      border-bottom: 0;
+      border-radius: 4px 4px 0 0;
+      color: #3b463f;
+      background: #f6f7f5;
+      white-space: nowrap;
+    }
+
+    .tab.active {
+      background: #fff;
+      border-color: var(--line);
+      color: #111;
+      font-weight: 600;
+      margin-bottom: -1px;
+      padding-bottom: 7px;
+    }
+
+    .content {
+      min-height: 440px;
+      padding: 10px;
+      background: #fff;
+    }
+
+    .content.gray {
+      background: #f2f3f1;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: 130px minmax(0, 1fr);
+      gap: 10px;
+      min-height: 420px;
+    }
+
+    .side-nav {
+      border-right: 1px solid var(--line);
+      padding-right: 8px;
+    }
+
+    .nav-item {
+      padding: 8px;
+      border-radius: 5px;
+      color: #35413a;
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .nav-item.active {
+      background: var(--blue-soft);
+      color: var(--blue);
+      border: 1px solid #c3daf0;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid var(--line);
+      background: #fff;
+      font-size: 12px;
+    }
+
+    .table th,
+    .table td {
+      padding: 7px 8px;
+      border-bottom: 1px solid #e3e6e3;
+      text-align: left;
+      vertical-align: middle;
+    }
+
+    .table th {
+      background: #f6f8f5;
+      color: #4e5b54;
+      font-weight: 650;
+    }
+
+    .table tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 22px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid #cfe1d5;
+      background: #f0f8f3;
+      color: #23633d;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .pill.custom {
+      border-color: #e8cf9b;
+      background: #fff6df;
+      color: #7a4d0a;
+    }
+
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .model-row {
+      display: grid;
+      grid-template-columns: 20px minmax(0, 1fr);
+      gap: 6px;
+      align-items: center;
+      padding: 5px 7px;
+      border: 1px solid #dfe4df;
+      border-radius: 4px;
+      background: #fbfcfa;
+    }
+
+    .num {
+      display: inline-grid;
+      place-items: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 999px;
+      background: #e9efeb;
+      color: #536158;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .editor-surface {
+      min-height: 380px;
+      border: 1px solid #e0e4e0;
+      border-radius: 4px;
+      background:
+        linear-gradient(#fff 29px, #f3f5f3 30px),
+        repeating-linear-gradient(#fff, #fff 29px, #f2f4f2 30px);
+    }
+
+    .drawer-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 230px;
+      gap: 10px;
+    }
+
+    .drawer {
+      border-left: 1px solid var(--line);
+      padding-left: 10px;
+    }
+
+    .drawer h2 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      font-weight: 650;
+    }
+
+    .choice {
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 8px;
+      background: #fff;
+      margin-bottom: 8px;
+    }
+
+    .choice.active {
+      border-color: #90c7aa;
+      background: #f2faf5;
+    }
+
+    .radio-line {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 650;
+    }
+
+    .radio {
+      width: 14px;
+      height: 14px;
+      border: 1px solid #8d9891;
+      border-radius: 999px;
+      background: #fff;
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    .radio.on::after {
+      content: "";
+      position: absolute;
+      inset: 3px;
+      border-radius: 999px;
+      background: var(--green);
+    }
+
+    .mini-stack {
+      margin-top: 8px;
+      padding-left: 22px;
+      color: #46534c;
+      font-size: 12px;
+    }
+
+    .mini-stack div {
+      margin-bottom: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .old-layout-panel {
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      background: #f9faf8;
+      padding: 9px;
+      margin: 8px 0 10px;
+    }
+
+    .route-grid {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .fallback-line {
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #e0e5e0;
+      color: #4e5d54;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 8px;
+    }
+
+    .save-row {
+      display: flex;
+      justify-content: flex-end;
+      padding: 9px 10px 0;
+      gap: 8px;
+    }
+
+    .note {
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 9px;
+    }
+
+    @media (max-width: 1180px) {
+      .mockup-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .window {
+        min-height: 560px;
+      }
+    }
+
+    body[data-solo] .intro {
+      display: none;
+    }
+
+    body[data-solo] .page {
+      max-width: 900px;
+      padding-top: 18px;
+    }
+
+    body[data-solo] .mockup-grid {
+      grid-template-columns: 1fr;
+    }
+
+    body[data-solo="a"] .option:not([data-option="a"]),
+    body[data-solo="b"] .option:not([data-option="b"]),
+    body[data-solo="c"] .option:not([data-option="c"]) {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="intro">
+      <div>
+        <h1>Model Default Selection: Three UX Directions</h1>
+        <p>All three retain the same underlying configuration model: shared task profiles plus optional agent-specific overrides. The difference is where the user edits that routing and how inheritance is described.</p>
+      </div>
+      <div class="legend">
+        <span class="chip strong">Recommended: A</span>
+        <span class="chip">No disabled controls</span>
+        <span class="chip">Explicit profile language</span>
+      </div>
+    </header>
+
+    <section class="mockup-grid" aria-label="Mockup comparison">
+      <article class="option" data-option="a">
+        <div class="option-label">
+          <div class="option-title"><span class="rank">A</span> One Models Tab</div>
+          <span class="tag">Recommended</span>
+        </div>
+        <div class="window">
+          <div class="titlebar">
+            <span class="appmark"><span class="appicon">iC</span> Prompt Engineering Workbench</span>
+            <span class="close">x</span>
+          </div>
+          <div class="workbench">
+            <div class="toolbar">
+              <span class="field-label">Agent:</span>
+              <div class="select">chat <span class="caret">v</span></div>
+              <span class="field-label">Pass:</span>
+              <div class="select">main <span class="caret">v</span></div>
+              <span class="field-label">Version:</span>
+              <div class="select">current <span class="caret">v</span></div>
+            </div>
+            <div class="model-status">
+              <span class="label">Model</span>
+              <span class="value">General profile -> Gemini 3.5 Flash (+3 fallbacks)</span>
+              <span class="spacer"></span>
+              <button class="link-button">Edit</button>
+            </div>
+            <div class="tabs">
+              <span class="tab">Editor</span>
+              <span class="tab">LLM Assistant</span>
+              <span class="tab">A/B Testing</span>
+              <span class="tab">Version History</span>
+              <span class="tab">Dashboard</span>
+              <span class="tab active">Models</span>
+            </div>
+            <div class="content">
+              <div class="split">
+                <nav class="side-nav" aria-label="Models nav">
+                  <div class="nav-item active">Profiles</div>
+                  <div class="nav-item">Agent Assignments</div>
+                  <div class="nav-item">API Keys</div>
+                </nav>
+                <div>
+                  <div class="section-head">
+                    <div>
+                      <h2>Shared Model Profiles</h2>
+                      <div class="hint">Profiles define fallback stacks used by agents.</div>
+                    </div>
+                    <button class="button primary">Save Models</button>
+                  </div>
+                  <table class="table">
+                    <thead>
+                      <tr>
+                        <th>Profile</th>
+                        <th>Primary model</th>
+                        <th>Fallbacks</th>
+                        <th>Used by</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>General</strong></td>
+                        <td>Gemini 3.5 Flash</td>
+                        <td>Flash-Lite, Pro Preview, GPT-4o</td>
+                        <td><span class="pill">Chat Tab + 4</span></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Extraction</strong></td>
+                        <td>Gemini 3.1 Pro Preview</td>
+                        <td>Gemini 3.5 Flash, Flash-Lite</td>
+                        <td><span class="pill">7 agents</span></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Quick</strong></td>
+                        <td>Gemini 3.5 Flash</td>
+                        <td>GPT-4o Mini</td>
+                        <td><span class="pill">Sent Monitor</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <div class="note">Click a profile row to edit its fallback order. Agent-specific overrides live under Agent Assignments.</div>
+                </div>
+              </div>
+            </div>
+            <div class="save-row">
+              <button class="button">Close</button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="option" data-option="b">
+        <div class="option-label">
+          <div class="option-title"><span class="rank">B</span> Context Drawer</div>
+          <span class="tag orange">Most focused</span>
+        </div>
+        <div class="window">
+          <div class="titlebar">
+            <span class="appmark"><span class="appicon">iC</span> Prompt Engineering Workbench</span>
+            <span class="close">x</span>
+          </div>
+          <div class="workbench">
+            <div class="toolbar">
+              <span class="field-label">Agent:</span>
+              <div class="select">chat <span class="caret">v</span></div>
+              <span class="field-label">Pass:</span>
+              <div class="select">main <span class="caret">v</span></div>
+              <span class="field-label">Version:</span>
+              <div class="select">current <span class="caret">v</span></div>
+            </div>
+            <div class="model-status">
+              <span class="label">Model</span>
+              <span class="value">General profile -> Gemini 3.5 Flash (+3 fallbacks)</span>
+              <span class="spacer"></span>
+              <button class="link-button">Edit Agent Model</button>
+            </div>
+            <div class="tabs">
+              <span class="tab active">Editor</span>
+              <span class="tab">LLM Assistant</span>
+              <span class="tab">A/B Testing</span>
+              <span class="tab">Version History</span>
+              <span class="tab">Dashboard</span>
+            </div>
+            <div class="content">
+              <div class="drawer-layout">
+                <div>
+                  <div class="section-head">
+                    <h2>Raw Markdown</h2>
+                    <button class="button">Preview Assembled Prompt</button>
+                  </div>
+                  <div class="editor-surface"></div>
+                </div>
+                <aside class="drawer">
+                  <h2>Model for Chat</h2>
+                  <div class="choice active">
+                    <div class="radio-line"><span class="radio on"></span>Follow General profile</div>
+                    <div class="mini-stack">
+                      <div>1. Gemini 3.5 Flash</div>
+                      <div>2. Gemini 3.1 Flash-Lite</div>
+                      <div>3. Gemini 3.1 Pro Preview</div>
+                      <div>4. GPT-4o</div>
+                    </div>
+                  </div>
+                  <div class="choice">
+                    <div class="radio-line"><span class="radio"></span>Use custom override</div>
+                    <div class="mini-stack">
+                      <div>Choose a model stack only for Chat.</div>
+                    </div>
+                  </div>
+                  <button class="button soft">Open All Model Settings</button>
+                  <div class="note">Good when most edits are per current agent, but batch defaults are one level deeper.</div>
+                </aside>
+              </div>
+            </div>
+            <div class="save-row">
+              <button class="button primary">Save Prompt</button>
+              <button class="button">Close</button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="option" data-option="c">
+        <div class="option-label">
+          <div class="option-title"><span class="rank">C</span> Minimal Cleanup</div>
+          <span class="tag orange">Lowest effort</span>
+        </div>
+        <div class="window">
+          <div class="titlebar">
+            <span class="appmark"><span class="appicon">iC</span> Prompt Engineering Workbench</span>
+            <span class="close">x</span>
+          </div>
+          <div class="workbench">
+            <div class="toolbar">
+              <span class="field-label">Agent:</span>
+              <div class="select">chat <span class="caret">v</span></div>
+              <span class="field-label">Pass:</span>
+              <div class="select">main <span class="caret">v</span></div>
+              <span class="field-label">Version:</span>
+              <div class="select">current <span class="caret">v</span></div>
+            </div>
+            <div class="old-layout-panel">
+              <div class="route-grid">
+                <span class="field-label">Model routing:</span>
+                <span><strong>Chat follows General profile</strong> -> Gemini 3.5 Flash</span>
+                <button class="button">Use Custom Override</button>
+              </div>
+              <div class="fallback-line">
+                <span class="hint">Fallback order</span>
+                <span>Gemini 3.5 Flash, Gemini 3.1 Flash-Lite, Gemini 3.1 Pro Preview, GPT-4o</span>
+              </div>
+            </div>
+            <div class="tabs">
+              <span class="tab">Editor</span>
+              <span class="tab">LLM Assistant</span>
+              <span class="tab">A/B Testing</span>
+              <span class="tab">Version History</span>
+              <span class="tab">Dashboard</span>
+              <span class="tab active">Model Defaults</span>
+            </div>
+            <div class="content gray">
+              <div class="section-head">
+                <div>
+                  <h2>Agent Model Assignments</h2>
+                  <div class="hint">Same structure as today, but no disabled model dropdowns.</div>
+                </div>
+                <button class="button primary">Save</button>
+              </div>
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>Agent</th>
+                    <th>Routing</th>
+                    <th>Effective primary</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Separate</strong></td>
+                    <td><span class="pill">Extraction profile</span></td>
+                    <td>Gemini 3.1 Pro Preview</td>
+                    <td><button class="button">Override</button></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Summarize</strong></td>
+                    <td><span class="pill custom">Custom override</span></td>
+                    <td>Gemini 3.1 Pro Preview</td>
+                    <td><button class="button">Edit</button></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Chat Tab</strong></td>
+                    <td><span class="pill">General profile</span></td>
+                    <td>Gemini 3.5 Flash</td>
+                    <td><button class="button">Override</button></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Docket</strong></td>
+                    <td><span class="pill custom">Custom override</span></td>
+                    <td>Gemini 3.1 Flash-Lite</td>
+                    <td><button class="button">Edit</button></td>
+                  </tr>
+                </tbody>
+              </table>
+              <div class="note">This preserves the old mental model, but still leaves two visible places for model controls.</div>
+            </div>
+            <div class="save-row">
+              <button class="button">Close</button>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+  <script>
+    const solo = new URLSearchParams(window.location.search).get("solo");
+    if (["a", "b", "c"].includes(solo)) {
+      document.body.dataset.solo = solo;
+    }
+  </script>
+</body>
+</html>

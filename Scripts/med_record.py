@@ -429,8 +429,8 @@ def call_gemini(prompt, text):
     total_chunks = len(chunks)
 
     model_sequence = [
-        "gemini-3-flash-preview",
-        "gemini-2.5-flash"
+        "gemini-3.5-flash",
+        "gemini-3.1-flash-lite"
     ]
 
     failed_chunks = 0

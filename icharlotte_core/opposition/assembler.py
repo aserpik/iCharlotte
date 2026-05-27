@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 
 from docx import Document
 from docx.oxml import OxmlElement
@@ -53,18 +54,67 @@ def _add_title(doc, title: str) -> None:
     _format_run(run)
 
 
+_HORIZONTAL_RULE_RE = re.compile(r"^[\*\-_]{3,}\s*$")
+_MD_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
+_MD_ITALIC_RE = re.compile(r"\*([^\*\n]+?)\*")
+
+
 def _add_paragraphs(doc, body_text: str) -> None:
     for raw_line in (body_text or "").splitlines():
-        line = raw_line.strip()
-        if not line:
+        line = raw_line.rstrip()
+        stripped = line.strip()
+        if not stripped:
             doc.add_paragraph("")
             continue
 
+        # Skip markdown horizontal rules ("***", "---", "___") — they don't translate.
+        if _HORIZONTAL_RULE_RE.match(stripped):
+            continue
+
+        # Markdown heading → bolded line. Higher levels (## / ###) are also bolded
+        # but use a slightly smaller bold via paragraph formatting.
+        heading_match = _MD_HEADING_RE.match(stripped)
+        if heading_match:
+            _add_heading_paragraph(
+                doc,
+                level=len(heading_match.group(1)),
+                text=heading_match.group(2),
+            )
+            continue
+
         paragraph = doc.add_paragraph()
-        run = paragraph.add_run(line)
+        _emit_inline(paragraph, stripped, base_bold=False)
+        if _looks_like_legacy_heading(stripped):
+            for run in paragraph.runs:
+                run.bold = True
+
+
+def _emit_inline(paragraph, text: str, *, base_bold: bool) -> None:
+    """Emit text into a paragraph, converting *italic* segments to italic runs."""
+    index = 0
+    for match in _MD_ITALIC_RE.finditer(text):
+        start, end = match.span()
+        if start > index:
+            run = paragraph.add_run(text[index:start])
+            _format_run(run)
+            run.bold = base_bold
+        italic_run = paragraph.add_run(match.group(1))
+        _format_run(italic_run)
+        italic_run.italic = True
+        italic_run.bold = base_bold
+        index = end
+    if index < len(text):
+        run = paragraph.add_run(text[index:])
         _format_run(run)
-        if _looks_like_heading(line):
-            run.bold = True
+        run.bold = base_bold
+
+
+def _add_heading_paragraph(doc, *, level: int, text: str) -> None:
+    paragraph = doc.add_paragraph()
+    _emit_inline(paragraph, text, base_bold=True)
+    if level >= 3:
+        for run in paragraph.runs:
+            run.italic = True
 
 
 def _format_run(run) -> None:
@@ -72,8 +122,10 @@ def _format_run(run) -> None:
     run.font.size = Pt(12)
 
 
-def _looks_like_heading(line: str) -> bool:
-    return line.isupper() or line.startswith(("I.", "II.", "III.", "IV.", "V."))
+def _looks_like_legacy_heading(line: str) -> bool:
+    return line.isupper() or line.startswith(
+        ("I.", "II.", "III.", "IV.", "V.", "VI.", "VII.", "VIII.", "IX.", "X.")
+    )
 
 
 def _same_path(first: str, second: str) -> bool:

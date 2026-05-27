@@ -77,7 +77,7 @@ class TestChatPersistence(unittest.TestCase):
         conv_id = self.persistence.create_conversation(
             name="Test Conversation",
             provider="Gemini",
-            model="gemini-3-flash-preview",
+            model="gemini-3.5-flash",
             system_prompt="Test prompt"
         )
 

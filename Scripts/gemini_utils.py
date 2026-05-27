@@ -16,8 +16,8 @@ except ImportError as e:
     pass
 
 # Default configuration
-DEFAULT_MODEL = "gemini-2.0-flash"
-FALLBACK_MODELS = ["gemini-1.5-flash", "gemini-1.5-pro"]
+DEFAULT_MODEL = "gemini-3.5-flash"
+FALLBACK_MODELS = ["gemini-3.1-flash-lite", "gemini-3.1-pro-preview"]
 
 def log_event(message, level="info"):
     """

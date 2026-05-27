@@ -65,7 +65,7 @@ class TaggingEngine:
             Return ONLY the extracted string (e.g. "City of Hesperia"). {instruction_suffix}
             If no specific value can be found, return "Unknown".
             """
-            extracted = call_gemini_api(prompt, models=["gemini-3-flash-preview"])
+            extracted = call_gemini_api(prompt, models=["gemini-3.5-flash"])
             if extracted and "UNKNOWN" not in extracted.upper():
                 val = extracted.strip().replace('"', '').replace("'", "")
                 # Apply tag name as prefix if requested (e.g. "Propounding Party: City of Hesperia")
@@ -100,7 +100,7 @@ class TaggingEngine:
                 
                 Return ONLY the tag name or "NONE".
                 """
-                selection = call_gemini_api(prompt, models=["gemini-3-flash-preview"])
+                selection = call_gemini_api(prompt, models=["gemini-3.5-flash"])
                 if selection:
                     selected_tag_str = selection.strip().replace('"', '').replace("'", "")
                     selected_node = next((s for s in subtags if s["tag"] == selected_tag_str), None)
@@ -136,7 +136,7 @@ class TaggingEngine:
         Return ONLY the tag name (e.g. "Pleading") or "NONE".
         """
         
-        response = call_gemini_api(prompt, models=["gemini-3-flash-preview"])
+        response = call_gemini_api(prompt, models=["gemini-3.5-flash"])
         if response:
             top_tag = response.strip().replace('"', '').replace("'", "")
             root_node = next((r for r in self.rules_tree if r["tag"] == top_tag), None)

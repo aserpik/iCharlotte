@@ -535,7 +535,7 @@ class EmailUpdateTab(QWidget):
         self.set_buttons_enabled(False)
         
         settings = {'temperature': 1.0, 'max_tokens': -1, 'stream': False}
-        self.worker = LLMWorker("Gemini", "gemini-3-flash-preview", system_prompt, user_prompt, "", settings)
+        self.worker = LLMWorker("Gemini", "gemini-3.5-flash", system_prompt, user_prompt, "", settings)
         self.worker.finished.connect(self.on_gen_finished)
         self.worker.error.connect(self.on_gen_error)
         self.worker.start()
@@ -645,7 +645,7 @@ class EmailUpdateTab(QWidget):
                 )
                 settings = {'temperature': 1.0, 'max_tokens': -1, 'stream': False}
                 
-                self.proc_worker = LLMWorker("Gemini", "gemini-3-flash-preview", system_prompt, user_prompt, "", settings)
+                self.proc_worker = LLMWorker("Gemini", "gemini-3.5-flash", system_prompt, user_prompt, "", settings)
                 self.proc_worker.finished.connect(self.finalize_status_update)
                 self.proc_worker.error.connect(lambda e: self.finalize_status_update(f"Error parsing history: {e}"))
                 self.proc_worker.start()

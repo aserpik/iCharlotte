@@ -526,7 +526,7 @@ Return ONLY the short event title, nothing else. If no clear action is mentioned
             # Use Gemini for quick extraction
             response = LLMHandler.generate(
                 provider="Gemini",
-                model="gemini-3-flash-preview",
+                model="gemini-3.5-flash",
                 system_prompt="You extract short calendar event titles from emails.",
                 user_prompt=prompt,
                 file_contents="",

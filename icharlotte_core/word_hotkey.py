@@ -685,7 +685,9 @@ def kill_zombie_word_processes():
     except Exception as e:
         print(f"Error killing zombie processes: {e}")
 
-from icharlotte_core.config import GEMINI_DATA_DIR
+from icharlotte_core.config import API_KEYS, GEMINI_DATA_DIR
+from icharlotte_core import model_catalog
+from icharlotte_core.llm import ModelFetcher
 from icharlotte_core.redline_config import load_redline_settings, save_redline_settings
 
 
@@ -704,21 +706,11 @@ MB_ADD_QUOTES_SENTINEL = "__MB_ADD_QUOTES__"
 
 # Available LLM models for selection
 # Format: (display_name, provider, model_id)
-AVAILABLE_MODELS = [
-    ("Gemini 2.5 Flash (Fast)", "Gemini", "gemini-2.5-flash"),
-    ("Gemini 2.5 Pro", "Gemini", "gemini-2.5-pro"),
-    ("Gemini 2.0 Flash", "Gemini", "models/gemini-2.0-flash"),
-    ("Gemini 3.1 Pro Preview", "Gemini", "gemini-3.1-pro-preview"),
-    ("Gemini 3.1 Flash Lite Preview", "Gemini", "gemini-3.1-flash-lite-preview"),
-    ("Gemini 3 Pro Preview", "Gemini", "gemini-3-pro-preview"),
-    ("Gemini 3 Flash Preview", "Gemini", "gemini-3-flash-preview"),
-    ("Claude Sonnet 4", "Claude", "claude-sonnet-4-20250514"),
-    ("Claude Haiku 4 (Fast)", "Claude", "claude-haiku-4-20250514"),
-    ("GPT-4o", "OpenAI", "gpt-4o"),
-    ("GPT-4o Mini (Fast)", "OpenAI", "gpt-4o-mini"),
-]
+AVAILABLE_MODELS = model_catalog.flatten_word_models()
 
-DEFAULT_MODEL_INDEX = 0  # Gemini 2.5 Flash
+DEFAULT_MODEL_INDEX = 1  # Gemini 3.5 Flash
+DEFAULT_MODEL_PROVIDER = "Gemini"
+DEFAULT_MODEL_ID = "gemini-3.5-flash"
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -2485,6 +2477,10 @@ class WordLLMPopup(QDialog):
         self.outlook_prompts = []  # Outlook/email prompts
         self.custom_format_settings = {}  # Custom format settings
         self.selected_model_index = DEFAULT_MODEL_INDEX  # Selected model index
+        self.selected_model_provider = DEFAULT_MODEL_PROVIDER
+        self.selected_model_id = DEFAULT_MODEL_ID
+        self.available_models = list(AVAILABLE_MODELS)
+        self.model_fetchers = {}
         self._word_app = None  # Stored Word COM reference during execution
         self._captured_format = None  # Captured format from selection
 
@@ -2608,6 +2604,7 @@ class WordLLMPopup(QDialog):
         self.load_prompts()
         self._load_format_settings()
         self._load_model_settings()
+        self._refresh_available_models_async()
         self._update_format_preview()
         self._update_redline_checkbox_visibility()  # Set initial visibility based on context
 
@@ -2839,8 +2836,7 @@ class WordLLMPopup(QDialog):
         ai_layout.addWidget(model_label)
 
         self.model_combo = QComboBox()
-        for display_name, provider, model_id in AVAILABLE_MODELS:
-            self.model_combo.addItem(f"{display_name}", (provider, model_id))
+        self._populate_model_combo()
         self.model_combo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.model_combo.currentIndexChanged.connect(self._on_model_changed)
         ai_layout.addWidget(self.model_combo)
@@ -3668,49 +3664,138 @@ class WordLLMPopup(QDialog):
         except Exception as e:
             print(f"Error saving format settings: {e}")
 
+    def _populate_model_combo(self):
+        """Populate the Word popup model selector from the current catalog."""
+        if not hasattr(self, 'model_combo'):
+            return
+
+        current = self.model_combo.currentData()
+        self.model_combo.blockSignals(True)
+        self.model_combo.clear()
+        for display_name, provider, model_id in self.available_models:
+            self.model_combo.addItem(display_name, (provider, model_id))
+        self.model_combo.blockSignals(False)
+
+        if current:
+            self._select_model_by_id(current[0], current[1])
+
+    def _refresh_available_models_async(self):
+        """Refresh provider model catalogs without blocking the popup."""
+        if ModelFetcher is None:
+            return
+
+        for provider in model_catalog.PROVIDER_ORDER:
+            if provider in self.model_fetchers:
+                continue
+            fetcher = ModelFetcher(provider, API_KEYS.get(provider))
+            fetcher.finished.connect(self._on_provider_models_fetched)
+            fetcher.error.connect(
+                lambda err, p=provider: print(f"Word model fetch failed for {p}: {err}")
+            )
+            self.model_fetchers[provider] = fetcher
+            fetcher.start()
+
+    def _on_provider_models_fetched(self, provider: str, models: list):
+        if not models or models[0].startswith("Error:"):
+            return
+
+        provider_models = [
+            (
+                model_catalog.display_name_for_model(provider, model_id),
+                provider,
+                model_id,
+            )
+            for model_id in models
+        ]
+
+        remaining = [
+            item for item in self.available_models
+            if item[1] != provider
+        ]
+        ordered = []
+        by_provider = {p: [] for p in model_catalog.PROVIDER_ORDER}
+        for item in remaining + provider_models:
+            by_provider.setdefault(item[1], []).append(item)
+        for p in model_catalog.PROVIDER_ORDER:
+            ordered.extend(by_provider.get(p, []))
+
+        self.available_models = ordered
+        self._populate_model_combo()
+        self._select_model_by_id(self.selected_model_provider, self.selected_model_id)
+
+    def _select_model_by_id(self, provider: str, model_id: str) -> bool:
+        if not hasattr(self, 'model_combo'):
+            return False
+
+        for i in range(self.model_combo.count()):
+            data = self.model_combo.itemData(i)
+            if data == (provider, model_id):
+                self.model_combo.setCurrentIndex(i)
+                self.selected_model_index = i
+                self.selected_model_provider = provider
+                self.selected_model_id = model_id
+                return True
+        return False
+
     def _load_model_settings(self):
         """Load model selection from file."""
         if os.path.exists(self.model_settings_path):
             try:
                 with open(self.model_settings_path, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    self.selected_model_index = data.get('model_index', DEFAULT_MODEL_INDEX)
-                    # Validate index is within range
-                    if self.selected_model_index >= len(AVAILABLE_MODELS):
-                        self.selected_model_index = DEFAULT_MODEL_INDEX
+                    self.selected_model_provider = data.get('provider', DEFAULT_MODEL_PROVIDER)
+                    self.selected_model_id = data.get('model_id', DEFAULT_MODEL_ID)
+
+                    # Backwards compatibility for index-based settings.
+                    if 'provider' not in data or 'model_id' not in data:
+                        index = data.get('model_index', DEFAULT_MODEL_INDEX)
+                        if 0 <= index < len(self.available_models):
+                            _, provider, model_id = self.available_models[index]
+                            self.selected_model_provider = provider
+                            self.selected_model_id = model_id
             except:
                 pass
 
         # Set the combo box to the saved selection
         if hasattr(self, 'model_combo'):
-            self.model_combo.setCurrentIndex(self.selected_model_index)
+            if not self._select_model_by_id(self.selected_model_provider, self.selected_model_id):
+                self.model_combo.setCurrentIndex(min(DEFAULT_MODEL_INDEX, self.model_combo.count() - 1))
 
     def _save_model_settings(self):
         """Save model selection to file."""
         try:
             os.makedirs(os.path.dirname(self.model_settings_path), exist_ok=True)
             with open(self.model_settings_path, 'w', encoding='utf-8') as f:
-                json.dump({'model_index': self.selected_model_index}, f, indent=2)
+                json.dump({
+                    'provider': self.selected_model_provider,
+                    'model_id': self.selected_model_id,
+                    'model_index': self.selected_model_index,
+                }, f, indent=2)
         except Exception as e:
             print(f"Error saving model settings: {e}")
 
     def _on_model_changed(self, index: int):
         """Handle model dropdown change."""
         self.selected_model_index = index
+        data = self.model_combo.itemData(index) if index >= 0 else None
+        if data:
+            self.selected_model_provider, self.selected_model_id = data
         self._save_model_settings()
         # Get model info for display
-        if index < len(AVAILABLE_MODELS):
-            display_name, provider, model_id = AVAILABLE_MODELS[index]
+        if 0 <= index < self.model_combo.count():
+            display_name = self.model_combo.itemText(index)
+            provider, model_id = self.model_combo.itemData(index)
             print(f"Model changed to: {display_name} ({provider})")
 
     def _get_selected_model(self) -> tuple:
         """Get the currently selected model (provider, model_id)."""
-        if self.selected_model_index < len(AVAILABLE_MODELS):
-            _, provider, model_id = AVAILABLE_MODELS[self.selected_model_index]
+        if hasattr(self, 'model_combo') and self.model_combo.currentData():
+            provider, model_id = self.model_combo.currentData()
             return provider, model_id
+        if self.selected_model_provider and self.selected_model_id:
+            return self.selected_model_provider, self.selected_model_id
         # Fallback to default
-        _, provider, model_id = AVAILABLE_MODELS[DEFAULT_MODEL_INDEX]
-        return provider, model_id
+        return DEFAULT_MODEL_PROVIDER, DEFAULT_MODEL_ID
 
     def _capture_selection_format(self, word):
         """Capture the formatting of the current selection in Word.
@@ -6126,6 +6211,9 @@ class WordLLMPopup(QDialog):
             self._worker_thread.terminate()
             self._worker_thread.wait(500)
             self._worker_thread = None
+        for fetcher in getattr(self, 'model_fetchers', {}).values():
+            if fetcher and fetcher.isRunning():
+                fetcher.wait(500)
         # Safety: ensure Word UI is never left locked (use direct COM, skip zombie check)
         if getattr(self, '_word_ui_locked', False):
             try:

@@ -768,7 +768,7 @@ Output ONLY the todo text, no explanation or quotes."""
         try:
             result = LLMHandler.generate(
                 provider="Gemini",
-                model="gemini-2.0-flash",
+                model="gemini-3.5-flash",
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 file_contents="",
@@ -795,7 +795,7 @@ Use imperative form. Output ONLY the action, no explanation."""
         try:
             result = LLMHandler.generate(
                 provider="Gemini",
-                model="gemini-2.0-flash",
+                model="gemini-3.5-flash",
                 system_prompt=system_prompt,
                 user_prompt=f"Extract action: {text}",
                 file_contents="",

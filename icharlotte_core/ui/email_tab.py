@@ -142,10 +142,10 @@ class EmailChatDialog(QDialog):
 
         # Start Cache Creation
         self.cache_worker = CacheWorker(
-            "Gemini", "gemini-3-flash-preview", 
-            self.context_string, 
+            "Gemini", "gemini-3.5-flash",
+            self.context_string,
             system_instruction=self.system_prompt
-        ) 
+        )
         
         self.cache_worker.finished.connect(self.on_cache_ready)
         self.cache_worker.error.connect(self.on_cache_error)
@@ -246,7 +246,7 @@ class EmailChatDialog(QDialog):
         
         self.worker = LLMWorker(
             provider="Gemini",
-            model="gemini-3-flash-preview", 
+            model="gemini-3.5-flash",
             system=self.system_prompt,
             user=query,
             files=self.context_string,
@@ -914,9 +914,9 @@ class EmailTab(QWidget):
             'stream': False
         }
 
-        # Use gemini-3-flash-preview as default mode
+        # Use gemini-3.5-flash as default mode
         self.llm_worker = LLMWorker(
-            "Gemini", "gemini-3-flash-preview", 
+            "Gemini", "gemini-3.5-flash",
             system_prompt, user_prompt, "", settings
         )
         self.llm_worker.finished.connect(self._finalize_status_report)

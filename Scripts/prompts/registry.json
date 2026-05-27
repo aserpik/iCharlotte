@@ -552,6 +552,86 @@
           "usage_count": 0
         }
       ]
+    },
+    "oppose_motion:analyze_motion": {
+      "agent": "oppose_motion",
+      "pass_name": "analyze_motion",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-05-27T08:09:30.414972",
+          "description": "Motion analysis: extract metadata + principal arguments",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "oppose_motion:generate_outline": {
+      "agent": "oppose_motion",
+      "pass_name": "generate_outline",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-05-27T08:09:30.416977",
+          "description": "Outline generation from analyzed metadata",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "oppose_motion:draft_memorandum": {
+      "agent": "oppose_motion",
+      "pass_name": "draft_memorandum",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-05-27T08:09:30.420942",
+          "description": "Drafter prompt (no pre-draft research; uses style exemplars)",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "oppose_motion:verify_citation": {
+      "agent": "oppose_motion",
+      "pass_name": "verify_citation",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-05-27T08:09:30.422981",
+          "description": "Per-citation verifier: case + statute",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "oppose_motion:find_replacement": {
+      "agent": "oppose_motion",
+      "pass_name": "find_replacement",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-05-27T08:09:30.423981",
+          "description": "Optional replacement-case search on red verdicts",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
     }
   }
 }

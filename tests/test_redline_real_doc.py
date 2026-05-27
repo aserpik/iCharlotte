@@ -55,7 +55,7 @@ def call_gemini(prompt: str, text: str) -> str:
     from icharlotte_core.config import API_KEYS
 
     provider = "Gemini"
-    model_id = "gemini-2.5-pro"
+    model_id = "gemini-3.1-pro-preview"
 
     api_key = API_KEYS.get(provider)
     if not api_key:

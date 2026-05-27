@@ -453,10 +453,6 @@ class RespondTab(QWidget):
             return
 
         api_key = API_KEYS.get(provider)
-        if not api_key:
-            self.model_combo.addItem(f"No API Key for {provider}")
-            return
-
         self.model_combo.addItem("Fetching models...")
         self.model_combo.setEnabled(False)
 
@@ -492,7 +488,7 @@ class RespondTab(QWidget):
         if provider == "Gemini":
             idx = self.model_combo.findText("gemini-3.1-pro-preview")
             if idx == -1:
-                idx = self.model_combo.findText("gemini-3-pro-preview")
+                idx = self.model_combo.findText("gemini-3.5-flash")
             if idx != -1:
                 self.model_combo.setCurrentIndex(idx)
             else:

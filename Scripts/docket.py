@@ -371,7 +371,7 @@ def update_variables_docx(case_dir: str, data: Dict):
     doc.save(docx_path)
     log_event(f"Saved variables to {docx_path}")
 
-def call_gemini_api(prompt: str, context_text: str, models: list = ["gemini-3-flash-preview", "gemini-2.5-flash"]) -> Optional[str]:
+def call_gemini_api(prompt: str, context_text: str, models: list = ["gemini-3.5-flash", "gemini-3.1-flash-lite"]) -> Optional[str]:
     """Calls Gemini with fallback models."""
     api_key = os.environ.get("GEMINI_API_KEY")
     if not api_key:
@@ -449,7 +449,7 @@ def re_extract_case_number(file_num: str, complaint_text: str) -> Optional[str]:
     Ensure you capture the full, exact case number string. 
     Return ONLY the exact case number string. If you absolutely cannot find it, return "None".
     """
-    result = call_gemini_api(prompt, combined_context, ["gemini-3-flash-preview", "gemini-2.5-flash"])
+    result = call_gemini_api(prompt, combined_context, ["gemini-3.5-flash", "gemini-3.1-flash-lite"])
     if result:
         clean_result = result.strip().split('\n')[0].strip()
         if clean_result.lower() != "none" and len(clean_result) >= 5:
@@ -1150,7 +1150,7 @@ Return ONLY valid JSON (no markdown):
             combined_context = f"[CASE DOCKET TEXT]\n{docket_text}\n\n[COMPLAINT TEXT]\n{complaint_text}"
             
             log_event("Calling AI for Procedural History (Context provided: Docket + Complaint)...")
-            ph_result = call_gemini_api(ph_prompt, combined_context, ["gemini-3-flash-preview", "gemini-2.5-flash"])
+            ph_result = call_gemini_api(ph_prompt, combined_context, ["gemini-3.5-flash", "gemini-3.1-flash-lite"])
             
             if ph_result:
                 data_manager.save_variable(file_num, "procedural_history", ph_result)

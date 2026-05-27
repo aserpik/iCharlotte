@@ -82,8 +82,8 @@ logging.basicConfig(
 logger = logging.getLogger("Separator")
 
 # --- Constants ---
-PRIMARY_MODEL = "gemini-3-flash-preview"
-FALLBACK_MODEL = "gemini-2.5-flash"
+PRIMARY_MODEL = "gemini-3.5-flash"
+FALLBACK_MODEL = "gemini-3.1-flash-lite"
 BASE_PATH_WIN = r"Z:\\Shared\\Current Clients"
 
 # --- Functions ---

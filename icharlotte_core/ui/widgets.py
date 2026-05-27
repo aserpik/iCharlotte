@@ -329,6 +329,8 @@ class StatusWidget(QFrame):
     def update_pass_failed(self, name: str, error: str, recoverable: bool = True):
         """Handle pass failed event."""
         self.pass_progress.pass_failed(name, error, recoverable)
+        if error:
+            self.append_log(f"\n[{name}] ERROR: {error}\n")
 
     def append_log(self, text):
         self.log_output.insertPlainText(text)

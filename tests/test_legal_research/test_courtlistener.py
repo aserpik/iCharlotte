@@ -156,6 +156,31 @@ class TestSearchOpinions(unittest.TestCase):
         params = mock_get.call_args.kwargs.get("params") or mock_get.call_args[1].get("params")
         self.assertEqual(params["page_size"], 5)
 
+    @patch("icharlotte_core.legal_research.sources.courtlistener.requests.get")
+    def test_search_prefers_california_reporter_citation(self, mock_get):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = {
+            "results": [
+                {
+                    "caseName": "Example v. Party",
+                    "citation": ["471 P.3d 509", "10 Cal.5th 1"],
+                    "dateFiled": "2020-05-15",
+                    "court": "cal",
+                    "snippet": "Relevant civil issue.",
+                    "absolute_url": "/opinion/1/example/",
+                    "cluster_id": 1,
+                }
+            ]
+        }
+        resp.raise_for_status = MagicMock()
+        mock_get.return_value = resp
+
+        client = self._make_client()
+        results = client.search_opinions("civil issue")
+
+        self.assertEqual(results[0].citation, "10 Cal.5th 1")
+
 
 class TestGetCitingCases(unittest.TestCase):
     """Tests for get_citing_cases()."""
