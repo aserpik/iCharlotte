@@ -67,3 +67,22 @@ def test_tab_remove_clears_row(qtbot, tmp_path):
 
     reloaded = StyleExampleRegistry.load(registry_path)
     assert reloaded.examples == []
+
+
+def test_tab_toggling_active_persists_immediately(qtbot, tmp_path):
+    from icharlotte_core.opposition.style_examples import StyleExample, StyleExampleRegistry
+    from icharlotte_core.ui.dialogs_style_examples import StyleExamplesTab
+
+    registry_path = str(tmp_path / "style_examples.json")
+    reg = StyleExampleRegistry(path=registry_path)
+    reg.add(StyleExample(id="x", label="X", path="/x", motion_types=[], active=True))
+    reg.save()
+
+    tab = StyleExamplesTab(registry_path=registry_path)
+    qtbot.addWidget(tab)
+    # Programmatic toggle via the helper.
+    tab._on_active_toggled("x", False)
+
+    # Persisted without an explicit save().
+    reloaded = StyleExampleRegistry.load(registry_path)
+    assert reloaded.examples[0].active is False

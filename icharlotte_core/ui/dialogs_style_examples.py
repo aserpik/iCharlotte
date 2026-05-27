@@ -147,8 +147,12 @@ class StyleExamplesTab(QWidget):
             self.table.setItem(i, 2, QTableWidgetItem(", ".join(ex.motion_types)))
             checkbox = QCheckBox()
             checkbox.setChecked(ex.active)
-            checkbox.toggled.connect(lambda checked, eid=ex.id: self.registry.update(eid, active=checked))
+            checkbox.toggled.connect(lambda checked, eid=ex.id: self._on_active_toggled(eid, checked))
             self.table.setCellWidget(i, 3, checkbox)
+
+    def _on_active_toggled(self, example_id: str, checked: bool) -> None:
+        self.registry.update(example_id, active=checked)
+        self.registry.save()
 
 
 class _ExampleEditDialog(QDialog):
