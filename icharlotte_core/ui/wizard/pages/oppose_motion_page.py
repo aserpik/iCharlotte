@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import html
 import os
+import re
 import shutil
 
-from PySide6.QtCore import QThread, Qt, Signal
+from PySide6.QtCore import QThread, QUrl, Qt, Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
+    QDialog,
+    QDialogButtonBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -15,6 +20,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QStackedWidget,
+    QTextBrowser,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -24,6 +30,7 @@ from PySide6.QtWidgets import (
 from icharlotte_core.discovery.assembler import DiscoveryAssembler
 from icharlotte_core.legal_research.sources.courtlistener import CourtListenerClient
 from icharlotte_core.opposition.assembler import assemble_opposition_preview
+from icharlotte_core.opposition.authority import research_opposition_authorities
 from icharlotte_core.opposition.citation_verifier import verify_citations
 from icharlotte_core.opposition.drafter import draft_memorandum
 from icharlotte_core.opposition.extraction import (
@@ -33,6 +40,7 @@ from icharlotte_core.opposition.extraction import (
     is_supported_motion_file,
 )
 from icharlotte_core.opposition.models import DraftDocument, MotionMetadata, OutlineNode
+from icharlotte_core.opposition.motion_analyzer import analyze_motion, generate_outline
 from icharlotte_core.opposition.outline import selected_section_plan
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
 from icharlotte_core.word_validator import validate_opposition_docx
@@ -92,7 +100,7 @@ class OpposeMotionSettingsPage(QStackedWidget):
 
         row = QHBoxLayout()
         row.addStretch()
-        self.continue_btn = QPushButton("Generate Outline")
+        self.continue_btn = QPushButton("Review Outline")
         self.continue_btn.clicked.connect(self._on_continue_to_outline)
         row.addWidget(self.continue_btn)
         layout.addLayout(row)
@@ -246,8 +254,10 @@ class OpposeMotionOutputPage(QWidget):
 
         layout = QHBoxLayout()
         layout.setSpacing(12)
-        self.editor = QPlainTextEdit()
-        self.editor.setReadOnly(True)
+        self.editor = QTextBrowser()
+        self.editor.setOpenLinks(False)
+        self.editor.setOpenExternalLinks(False)
+        self.editor.anchorClicked.connect(self._on_anchor_clicked)
         layout.addWidget(self.editor, 2)
 
         self.source_drawer = QPlainTextEdit()
@@ -264,11 +274,34 @@ class OpposeMotionOutputPage(QWidget):
 
     def show_result(self, draft: DraftDocument) -> None:
         self.draft = draft
-        self.editor.setPlainText(draft.body_text)
+        self.editor.setHtml(_render_draft_html(draft))
         if draft.citations:
             self.show_citation(0)
         else:
-            self.source_drawer.clear()
+            self.source_drawer.setPlainText(
+                "No citations were detected in this opposition.\n\n"
+                "If California case-law research returned no results, the draft "
+                "was written without case citations. Review the brief for any "
+                "factual or statutory support that may need strengthening."
+            )
+
+    def _on_anchor_clicked(self, url: QUrl) -> None:
+        scheme = url.scheme()
+        if scheme == "citation":
+            try:
+                index = int(url.path().lstrip("/") or url.host() or "0")
+            except (TypeError, ValueError):
+                return
+            self.show_citation(index)
+            self.open_citation_dialog(index)
+            return
+        QDesktopServices.openUrl(url)
+
+    def open_citation_dialog(self, index: int) -> None:
+        if index < 0 or index >= len(self.draft.citations):
+            return
+        dialog = CitationDetailDialog(self.draft.citations[index], parent=self)
+        dialog.exec()
 
     @property
     def output_path(self) -> str:
@@ -360,6 +393,252 @@ class OpposeMotionOutputPage(QWidget):
         QMessageBox.information(self, "Saved", f"Saved:\n{target}")
 
 
+_HORIZONTAL_RULE_RE = re.compile(r"^[\*\-_]{3,}\s*$")
+_MD_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
+_MD_ITALIC_RE = re.compile(r"\*([^\*\n]+?)\*")
+
+
+def _render_draft_html(draft: DraftDocument) -> str:
+    """Render the draft body into HTML with clickable citation anchors."""
+    citation_spans = _build_citation_index(draft)
+    body_html_lines: list[str] = []
+
+    for raw_line in (draft.body_text or "").splitlines():
+        stripped = raw_line.strip()
+        if not stripped:
+            body_html_lines.append("<p>&nbsp;</p>")
+            continue
+        if _HORIZONTAL_RULE_RE.match(stripped):
+            continue
+        heading_match = _MD_HEADING_RE.match(stripped)
+        if heading_match:
+            level = min(max(len(heading_match.group(1)), 2), 4)
+            content = _format_inline_html(heading_match.group(2), citation_spans)
+            body_html_lines.append(f"<h{level}>{content}</h{level}>")
+            continue
+        content = _format_inline_html(stripped, citation_spans)
+        body_html_lines.append(f"<p>{content}</p>")
+
+    title = html.escape(draft.title or "Opposition Memorandum")
+    body = "\n".join(body_html_lines)
+    return (
+        "<html><body style=\"font-family:'Times New Roman',serif; font-size:13pt;\">"
+        f"<h1 style=\"text-align:center;\">{title}</h1>{body}</body></html>"
+    )
+
+
+def _build_citation_index(draft: DraftDocument) -> list[tuple[str, int]]:
+    """Return [(citation_text, draft_citation_index), ...] sorted by length desc.
+
+    Sorting by length avoids partial-match collisions (e.g. "62 Cal. 4th 1081"
+    must be wrapped before a shorter substring matches inside it).
+    """
+    spans: list[tuple[str, int]] = []
+    for index, citation in enumerate(draft.citations or []):
+        text = (citation.citation_text or "").strip()
+        if text:
+            spans.append((text, index))
+    spans.sort(key=lambda pair: len(pair[0]), reverse=True)
+    return spans
+
+
+def _format_inline_html(line: str, citation_spans: list[tuple[str, int]]) -> str:
+    """Escape, italicize *case names*, and wrap citation texts as clickable anchors."""
+    italicized = _MD_ITALIC_RE.sub(
+        lambda match: f"\x00ITA{html.escape(match.group(1))}\x00ITAEND",
+        line,
+    )
+    escaped = html.escape(italicized)
+    escaped = escaped.replace("\x00ITA", "<i>").replace("\x00ITAEND", "</i>")
+    for citation_text, index in citation_spans:
+        if not citation_text:
+            continue
+        pattern = re.escape(html.escape(citation_text))
+        anchor = (
+            f"<a href=\"citation:{index}\" "
+            f"style=\"color:#1a5dbf; text-decoration:underline;\">"
+            f"{html.escape(citation_text)}</a>"
+        )
+        escaped = re.sub(pattern, anchor, escaped, count=0)
+    return escaped
+
+
+class CitationDetailDialog(QDialog):
+    """Modal dialog showing a single citation's verification details."""
+
+    def __init__(self, citation, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.citation = citation
+        self.setWindowTitle(citation.case_name or citation.citation_text or "Citation")
+        self.resize(720, 540)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
+
+        header = QLabel(self._header_html(citation))
+        header.setTextFormat(Qt.TextFormat.RichText)
+        header.setWordWrap(True)
+        header.setOpenExternalLinks(False)
+        layout.addWidget(header)
+
+        passage_label = QLabel("Supporting passage from opinion:")
+        passage_label.setStyleSheet("font-weight: 600; margin-top: 4px;")
+        layout.addWidget(passage_label)
+
+        self.passage_view = QTextBrowser()
+        self.passage_view.setOpenLinks(False)
+        self.passage_view.setHtml(self._passage_html(citation))
+        layout.addWidget(self.passage_view, 1)
+
+        if citation.warning:
+            warning_label = QLabel(html.escape(citation.warning))
+            warning_label.setStyleSheet("color: #b85c00;")
+            warning_label.setWordWrap(True)
+            layout.addWidget(warning_label)
+
+        buttons = QDialogButtonBox()
+        self.open_btn = QPushButton("Open in CourtListener")
+        self.open_btn.setEnabled(bool(citation.opinion_url))
+        self.open_btn.clicked.connect(self._open_opinion_url)
+        buttons.addButton(self.open_btn, QDialogButtonBox.ButtonRole.ActionRole)
+        close_btn = buttons.addButton(QDialogButtonBox.StandardButton.Close)
+        close_btn.clicked.connect(self.accept)
+        layout.addWidget(buttons)
+
+    @staticmethod
+    def _header_html(citation) -> str:
+        rows: list[tuple[str, str]] = []
+        if citation.case_name:
+            rows.append(("Case", citation.case_name))
+        if citation.citation_text:
+            rows.append(("Citation", citation.citation_text))
+        if citation.court:
+            rows.append(("Court", citation.court))
+        if citation.date:
+            rows.append(("Date", citation.date))
+        if citation.status:
+            rows.append(("Status", citation.status.replace("_", " ")))
+        cells = "".join(
+            f"<tr><td style=\"padding:2px 8px; color:#555;\">{html.escape(label)}</td>"
+            f"<td style=\"padding:2px 0;\">{html.escape(value)}</td></tr>"
+            for label, value in rows
+        )
+        return f"<table style=\"font-size:11pt;\">{cells}</table>"
+
+    @staticmethod
+    def _passage_html(citation) -> str:
+        if citation.supporting_passage:
+            passage = html.escape(citation.supporting_passage)
+            return (
+                "<div style=\"font-family:'Times New Roman',serif; font-size:12pt;\">"
+                f"<p style=\"background:#fff7c2; padding:6px;\">{passage}</p></div>"
+            )
+        if citation.status in ("throttled", "exists_support_unconfirmed"):
+            note = (
+                "CourtListener did not return the supporting opinion text "
+                "(rate-limited or text unavailable). The citation exists, but "
+                "automatic support extraction did not complete. Click "
+                "<i>Open in CourtListener</i> to read the opinion."
+            )
+        elif citation.status == "not_found":
+            note = (
+                "CourtListener could not locate this citation. The case may be "
+                "unpublished, mis-cited, or absent from the database. Verify "
+                "the citation manually before relying on it."
+            )
+        elif citation.status == "invalid":
+            note = (
+                "CourtListener rejected the citation as malformed. Re-check "
+                "the citation format before relying on it."
+            )
+        else:
+            note = (
+                "No supporting passage was extracted for this citation. Open "
+                "the opinion in CourtListener to confirm the proposition."
+            )
+        return (
+            "<div style=\"font-family:'Times New Roman',serif; color:#444;\">"
+            f"<p>{note}</p></div>"
+        )
+
+    def _open_opinion_url(self) -> None:
+        if self.citation.opinion_url:
+            QDesktopServices.openUrl(QUrl(self.citation.opinion_url))
+
+
+class OpposeMotionAnalysisWorker(QThread):
+    progress = Signal(str)
+    finished_analysis = Signal(bool, object)
+
+    def __init__(self, settings: dict, parent=None):
+        super().__init__(parent)
+        self.settings = dict(settings or {})
+
+    def run(self) -> None:
+        try:
+            from icharlotte_core.llm_config import call_llm
+
+            self.progress.emit("Extracting motion text...")
+            motion_result = extract_document_text(self.settings.get("motion_file", ""))
+            if not motion_result.success:
+                message = motion_result.error or "Could not read motion."
+                self.finished_analysis.emit(False, message)
+                return
+
+            self.progress.emit("Extracting context documents...")
+            context_text, warnings = extract_context_bundle(
+                self.settings.get("context_files", [])
+            )
+            for warning in warnings:
+                self.progress.emit(f"WARNING: {warning}")
+
+            def llm(system_prompt, user_prompt):
+                return call_llm(
+                    user_prompt,
+                    system_prompt,
+                    task_type="general",
+                    agent_id="agent_chat",
+                ) or ""
+
+            self.progress.emit("Analyzing motion...")
+            metadata = analyze_motion(motion_result.text, llm_callback=llm)
+            missing = metadata.required_missing()
+            if missing:
+                self.finished_analysis.emit(
+                    False,
+                    "Could not automatically identify required motion fields: "
+                    + ", ".join(missing)
+                    + ". Confirm the motion has extractable text.",
+                )
+                return
+
+            self.progress.emit("Generating opposition outline...")
+            outline = generate_outline(
+                metadata,
+                context_text,
+                llm_callback=llm,
+            )
+            if not outline:
+                self.finished_analysis.emit(
+                    False,
+                    "Could not automatically generate an opposition outline.",
+                )
+                return
+
+            self.finished_analysis.emit(
+                True,
+                {
+                    "metadata": metadata,
+                    "outline": outline,
+                    "motion_text": motion_result.text,
+                    "context_text": context_text,
+                },
+            )
+        except Exception as exc:
+            self.finished_analysis.emit(False, str(exc))
+
+
 class OpposeMotionWorker(QThread):
     progress = Signal(str)
     finished_result = Signal(bool, object)
@@ -396,8 +675,6 @@ class OpposeMotionWorker(QThread):
             ]
             plan = selected_section_plan(outline)
 
-            self.progress.emit("Drafting memorandum...")
-
             def llm(system_prompt, user_prompt):
                 return call_llm(
                     user_prompt,
@@ -406,28 +683,69 @@ class OpposeMotionWorker(QThread):
                     agent_id="agent_chat",
                 ) or ""
 
+            token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
+            if not token:
+                self.finished_result.emit(
+                    False,
+                    (
+                        "CourtListener API token missing; cannot research and cite "
+                        "California case law for the opposition."
+                    ),
+                )
+                return
+
+            self.progress.emit("Researching California authorities...")
+            client = CourtListenerClient(token)
+            authority_packet = research_opposition_authorities(
+                metadata=metadata,
+                section_plan=plan,
+                motion_text=motion_result.text,
+                context_text=context_text,
+                courtlistener=client,
+                llm_callback=llm,
+                status_callback=self.progress.emit,
+            )
+            for warning in getattr(authority_packet, "warnings", []) or []:
+                self.progress.emit(f"WARNING: {warning}")
+            if not getattr(authority_packet, "cases", []):
+                self.progress.emit(
+                    "WARNING: No California case law was found for the selected "
+                    "opposition issues. Drafting an opposition without case-law "
+                    "citations; statutes and facts from the moving papers may "
+                    "still be cited."
+                )
+
+            self.progress.emit("Drafting memorandum with researched authorities...")
             draft = draft_memorandum(
                 metadata=metadata,
                 section_plan=plan,
                 motion_text=motion_result.text,
                 context_text=context_text,
-                authority_block="",
+                authority_block=authority_packet.authority_block,
                 llm_callback=llm,
             )
+            if not draft.body_text.strip():
+                reason = (draft.rejection_reason or "unknown reason").strip()
+                self.finished_result.emit(
+                    False,
+                    f"Drafting failed: {reason}",
+                )
+                return
 
-            token = os.environ.get("COURTLISTENER_API_TOKEN", "")
-            if token:
+            if authority_packet.cases:
                 self.progress.emit("Verifying citations...")
-                client = CourtListenerClient(token)
                 draft.citations = verify_citations(
                     draft.body_text,
-                    citation_propositions={},
+                    citation_propositions=authority_packet.citation_propositions,
                     courtlistener=client,
                 )
+                if not draft.citations:
+                    self.progress.emit(
+                        "WARNING: No citations were detected in the drafted "
+                        "opposition. Review the draft for unsupported assertions."
+                    )
             else:
-                self.progress.emit(
-                    "CourtListener token missing. Citations remain unverified."
-                )
+                draft.citations = []
 
             preview_dir = os.path.join(
                 self.case_path,
@@ -467,6 +785,7 @@ class OpposeMotionTaskTab(QStackedWidget):
         file_number: str,
         motion_file: str,
         context_files: list[str],
+        auto_analyze: bool = False,
         parent: QWidget | None = None,
     ):
         super().__init__(parent)
@@ -477,6 +796,8 @@ class OpposeMotionTaskTab(QStackedWidget):
         self._worker = None
         self._last_settings: dict = {}
         self._finishing_worker = None
+        self._analysis_worker = None
+        self._finishing_analysis_worker = None
 
         self.settings_page = OpposeMotionSettingsPage(
             case_path,
@@ -491,6 +812,8 @@ class OpposeMotionTaskTab(QStackedWidget):
         self.addWidget(self.status_page)
         self.addWidget(self.output_page)
         self.settings_page.run_requested.connect(self._on_run)
+        if auto_analyze:
+            self._start_analysis()
 
     @property
     def spec(self):
@@ -500,7 +823,67 @@ class OpposeMotionTaskTab(QStackedWidget):
     def files(self) -> list[str]:
         return list(self._files)
 
+    def _start_analysis(self) -> None:
+        if self._analysis_worker is not None or self._finishing_analysis_worker is not None:
+            return
+        self.status_page.reset()
+        self.status_page.on_status("Analyzing selected motion and context...")
+        self.status_page.progress_bar.setRange(0, 0)
+        self.setCurrentIndex(TASK_PAGE_STATUS)
+        worker = OpposeMotionAnalysisWorker(
+            settings={
+                "motion_file": self.settings_page.motion_file,
+                "context_files": list(self.settings_page.context_files),
+            },
+            parent=None,
+        )
+        worker.progress.connect(self.status_page.on_status)
+        worker.finished_analysis.connect(self._on_analysis_finished)
+        if hasattr(worker, "finished"):
+            worker.finished.connect(lambda w=worker: self._on_analysis_thread_finished(w))
+        if hasattr(worker, "deleteLater"):
+            worker.finished.connect(worker.deleteLater)
+        self._analysis_worker = worker
+        worker.start()
+
+    def _on_analysis_finished(self, success: bool, payload: object) -> None:
+        if self.sender() is not None and self.sender() is not self._analysis_worker:
+            return
+        if self.sender() is self._analysis_worker:
+            self._finishing_analysis_worker = self._analysis_worker
+            self._analysis_worker = None
+        elif self._analysis_worker is not None:
+            self._analysis_worker = None
+
+        if not success:
+            self.status_page.on_status(f"FAILED: {payload}")
+            return
+
+        data = payload if isinstance(payload, dict) else {}
+        metadata = data.get("metadata")
+        if not isinstance(metadata, MotionMetadata):
+            metadata = MotionMetadata.from_dict(metadata if isinstance(metadata, dict) else {})
+        outline = [
+            node if isinstance(node, OutlineNode) else OutlineNode.from_dict(node)
+            for node in data.get("outline", []) or []
+            if isinstance(node, (OutlineNode, dict))
+        ]
+        self.settings_page.set_metadata(metadata)
+        self.settings_page.set_outline(outline)
+        self.settings_page.setCurrentIndex(SETTINGS_PAGE_CONFIRM)
+        self.setCurrentIndex(TASK_PAGE_SETTINGS)
+
+    def _on_analysis_thread_finished(self, worker) -> None:
+        if self._analysis_worker is worker:
+            self._analysis_worker = None
+        if self._finishing_analysis_worker is worker:
+            self._finishing_analysis_worker = None
+
     def _on_run(self, settings: dict) -> None:
+        if self._analysis_worker is not None or self._finishing_analysis_worker is not None:
+            self.status_page.on_status("Motion analysis is still running.")
+            self.setCurrentIndex(TASK_PAGE_STATUS)
+            return
         if self._worker is not None or self._finishing_worker is not None:
             self.status_page.on_status("Opposition draft is already running.")
             self.setCurrentIndex(TASK_PAGE_STATUS)
@@ -560,7 +943,12 @@ class OpposeMotionTaskTab(QStackedWidget):
             self._finishing_worker = None
 
     def closeEvent(self, event) -> None:
-        for worker in (self._worker, self._finishing_worker):
+        for worker in (
+            self._analysis_worker,
+            self._finishing_analysis_worker,
+            self._worker,
+            self._finishing_worker,
+        ):
             if worker is not None and worker.isRunning():
                 QMessageBox.information(
                     self,
@@ -609,5 +997,6 @@ def build_oppose_motion_tab(
         file_number=file_number,
         motion_file=motion_file,
         context_files=list(context_files or []),
+        auto_analyze=True,
         parent=parent,
     )
