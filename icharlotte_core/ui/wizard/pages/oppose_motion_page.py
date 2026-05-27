@@ -593,6 +593,13 @@ class CitationDetailDialog(QDialog):
         close_btn = QPushButton("Close")
         close_btn.clicked.connect(self.accept)
         button_row.addWidget(close_btn)
+
+        verdict_upper = (citation.verdict or "").upper()
+        if verdict_upper in {"NOT_SUPPORTED", "NOT_FOUND"}:
+            self.find_btn = QPushButton("Find replacement case")
+            self.find_btn.clicked.connect(self._on_find_replacement)
+            button_row.insertWidget(button_row.count() - 1, self.find_btn)
+
         layout.addLayout(button_row)
 
     def _header_html(self, citation, verdict: str) -> str:
@@ -669,6 +676,50 @@ class CitationDetailDialog(QDialog):
     def _open_opinion_url(self) -> None:
         if self.citation.opinion_url:
             QDesktopServices.openUrl(QUrl(self.citation.opinion_url))
+
+    def _on_find_replacement(self) -> None:
+        from icharlotte_core.llm_config import call_llm
+        from icharlotte_core.opposition.verifier import (
+            build_opposition_verifier,
+            find_replacement_candidates,
+        )
+
+        token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
+        if not token:
+            QMessageBox.warning(
+                self,
+                "Missing API token",
+                "COURTLISTENER_API_TOKEN is not set; replacement search is unavailable.",
+            )
+            return
+
+        def llm(system_prompt, user_prompt):
+            return call_llm(
+                user_prompt,
+                system_prompt,
+                task_type="general",
+                agent_id="agent_oppose_motion",
+            ) or ""
+
+        verifier = build_opposition_verifier(courtlistener_token=token, llm_callback=llm)
+        candidates = find_replacement_candidates(
+            failed_citation=self.citation,
+            verifier=verifier,
+            llm_callback=llm,
+        )
+
+        if not candidates:
+            QMessageBox.information(
+                self,
+                "No replacements found",
+                "No supported replacement candidates were found. Try editing the proposition or searching manually.",
+            )
+            return
+
+        lines = [
+            f"{c.citation_text} — {c.verdict}\n  {c.note}" for c in candidates
+        ]
+        QMessageBox.information(self, "Replacement candidates", "\n\n".join(lines))
 
 
 class OpposeMotionAnalysisWorker(QThread):
