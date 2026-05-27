@@ -77,3 +77,59 @@ def test_unverified_uses_gray_color():
     )
     html = _render_draft_html(draft)
     assert "#80868b" in html.lower() or "unverified" in html.lower()
+
+
+def test_summary_banner_counts_per_verdict(qtbot):
+    from icharlotte_core.opposition.models import CitationVerification, DraftDocument
+    from icharlotte_core.ui.wizard.pages.oppose_motion_page import OpposeMotionOutputPage
+
+    page = OpposeMotionOutputPage()
+    qtbot.addWidget(page)
+    page.show_result(DraftDocument(
+        title="Opp",
+        body_text="Body text.",
+        citations=[
+            CitationVerification(citation_text="a", verdict="SUPPORTED"),
+            CitationVerification(citation_text="b", verdict="SUPPORTED"),
+            CitationVerification(citation_text="c", verdict="PARTIAL"),
+            CitationVerification(citation_text="d", verdict="NOT_SUPPORTED"),
+            CitationVerification(citation_text="e", verdict="UNVERIFIED"),
+        ],
+    ))
+    banner = page.summary_banner.text()
+    assert "2" in banner  # SUPPORTED count
+    assert "1" in banner  # PARTIAL count
+    assert "supported" in banner.lower()
+    assert "partial" in banner.lower()
+
+
+def test_save_warns_on_red_verdicts(qtbot, monkeypatch, tmp_path):
+    from icharlotte_core.opposition.models import CitationVerification, DraftDocument
+    from icharlotte_core.ui.wizard.pages.oppose_motion_page import OpposeMotionOutputPage
+    from PySide6.QtWidgets import QMessageBox
+
+    page = OpposeMotionOutputPage()
+    qtbot.addWidget(page)
+    preview = tmp_path / "preview.docx"
+    preview.write_bytes(b"dummy")
+    page.show_result(DraftDocument(
+        title="Opp",
+        body_text="b",
+        preview_path=str(preview),
+        citations=[CitationVerification(citation_text="x", verdict="NOT_SUPPORTED")],
+    ))
+
+    warned = {"yes": False}
+
+    def fake_question(parent, title, text, *args, **kwargs):
+        warned["yes"] = True
+        return QMessageBox.StandardButton.Cancel  # user cancels
+
+    monkeypatch.setattr(QMessageBox, "question", fake_question)
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.QFileDialog.getSaveFileName",
+        lambda *a, **k: ("", ""),
+    )
+
+    page.save_as()
+    assert warned["yes"]

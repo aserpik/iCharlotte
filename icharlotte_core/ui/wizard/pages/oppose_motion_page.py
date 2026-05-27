@@ -255,6 +255,12 @@ class OpposeMotionOutputPage(QWidget):
         outer.setContentsMargins(24, 24, 24, 24)
         outer.setSpacing(12)
 
+        self.summary_banner = QLabel("")
+        self.summary_banner.setTextFormat(Qt.TextFormat.RichText)
+        self.summary_banner.setWordWrap(True)
+        self.summary_banner.setVisible(False)
+        outer.addWidget(self.summary_banner)
+
         layout = QHBoxLayout()
         layout.setSpacing(12)
         self.editor = QTextBrowser()
@@ -278,6 +284,7 @@ class OpposeMotionOutputPage(QWidget):
     def show_result(self, draft: DraftDocument) -> None:
         self.draft = draft
         self.editor.setHtml(_render_draft_html(draft))
+        self._refresh_summary_banner()
         if draft.citations:
             self.show_citation(0)
         else:
@@ -287,6 +294,33 @@ class OpposeMotionOutputPage(QWidget):
                 "was written without case citations. Review the brief for any "
                 "factual or statutory support that may need strengthening."
             )
+
+    def _refresh_summary_banner(self) -> None:
+        if not self.draft.citations:
+            self.summary_banner.setVisible(False)
+            return
+        counts: dict[str, int] = {}
+        for cv in self.draft.citations:
+            verdict = (cv.verdict or "UNVERIFIED").upper()
+            counts[verdict] = counts.get(verdict, 0) + 1
+        total = sum(counts.values())
+        red = counts.get("NOT_SUPPORTED", 0) + counts.get("NOT_FOUND", 0)
+        parts = [
+            f"<b>Verification:</b> {total} citation(s) checked &mdash; ",
+            f"\U0001F7E2 {counts.get('SUPPORTED', 0)} supported, ",
+            f"\U0001F7E1 {counts.get('PARTIAL', 0)} partial, ",
+            f"\U0001F534 {red} flagged, ",
+            f"⚪ {counts.get('UNVERIFIED', 0)} unverified.",
+        ]
+        warning = ""
+        if red > 0:
+            warning = (
+                f"<br><span style='color:#c5221f;'>⚠ {red} citation(s) don't "
+                "support what the brief claims. Review the red-flagged cites "
+                "before filing.</span>"
+            )
+        self.summary_banner.setText("".join(parts) + warning)
+        self.summary_banner.setVisible(True)
 
     def _on_anchor_clicked(self, url: QUrl) -> None:
         scheme = url.scheme()
@@ -367,6 +401,25 @@ class OpposeMotionOutputPage(QWidget):
                 "No generated opposition preview is available.",
             )
             return
+
+        red = sum(
+            1 for cv in self.draft.citations
+            if (cv.verdict or "").upper() in {"NOT_SUPPORTED", "NOT_FOUND"}
+        )
+        if red > 0:
+            choice = QMessageBox.question(
+                self,
+                "Citations flagged",
+                (
+                    f"This opposition has {red} citation(s) flagged as "
+                    "NOT_SUPPORTED or NOT_FOUND.\n\nSave anyway?"
+                ),
+                QMessageBox.StandardButton.Save | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if choice != QMessageBox.StandardButton.Save:
+                return
+
         suggested = os.path.join(
             self.default_save_dir(self.draft.preview_path),
             f"{self.draft.title or 'Opposition Memorandum'}.docx",
