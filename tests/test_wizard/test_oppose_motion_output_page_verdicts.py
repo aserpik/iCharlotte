@@ -133,3 +133,43 @@ def test_save_warns_on_red_verdicts(qtbot, monkeypatch, tmp_path):
 
     page.save_as()
     assert warned["yes"]
+
+
+def test_dialog_shows_evidence_quote_for_supported(qtbot):
+    from icharlotte_core.opposition.models import CitationVerification
+    from icharlotte_core.ui.wizard.pages.oppose_motion_page import CitationDetailDialog
+
+    cv = CitationVerification(
+        citation_text="Smith v. Jones (2010) 50 Cal.4th 100",
+        case_name="Smith v. Jones",
+        verdict="SUPPORTED",
+        proposition="Trial courts have discretion.",
+        evidence="The court did not abuse its discretion.",
+        note="Direct support.",
+        opinion_url="https://www.courtlistener.com/opinion/123/",
+    )
+    dlg = CitationDetailDialog(cv)
+    qtbot.addWidget(dlg)
+    text = dlg.findChild(type(dlg.body_label)).text() if hasattr(dlg, "body_label") else ""
+    # Best-effort: dialog HTML must contain the evidence string somewhere.
+    all_html = " ".join(w.text() for w in dlg.findChildren(type(dlg.header)) if hasattr(w, "text"))
+    full = all_html + (text or "")
+    assert "did not abuse" in full or "did not abuse" in dlg.body_html
+
+
+def test_dialog_shows_what_case_actually_holds_for_not_supported(qtbot):
+    from icharlotte_core.opposition.models import CitationVerification
+    from icharlotte_core.ui.wizard.pages.oppose_motion_page import CitationDetailDialog
+
+    cv = CitationVerification(
+        citation_text="Sinaiko Healthcare (2007) 148 Cal.App.4th 390",
+        case_name="Sinaiko Healthcare",
+        verdict="NOT_SUPPORTED",
+        proposition="Serving discovery responses moots a motion to compel.",
+        evidence="A party who fails to serve timely responses waives objections.",
+        note="Sinaiko's holding addresses waiver, not mootness.",
+    )
+    dlg = CitationDetailDialog(cv)
+    qtbot.addWidget(dlg)
+    assert "waiver" in dlg.body_html.lower() or "waives" in dlg.body_html.lower()
+    assert "not_supported" in dlg.body_html.lower() or "does not hold" in dlg.body_html.lower() or "actually holds" in dlg.body_html.lower()

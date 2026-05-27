@@ -11,7 +11,6 @@ from PySide6.QtCore import QThread, QUrl, Qt, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QDialog,
-    QDialogButtonBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
@@ -544,101 +543,128 @@ def _format_inline_html(line: str, citation_spans: list[tuple[str, int, str]]) -
 class CitationDetailDialog(QDialog):
     """Modal dialog showing a single citation's verification details."""
 
+    _VERDICT_HEADER_COLORS = {
+        "SUPPORTED": "#1e8e3e",
+        "PARTIAL": "#f9ab00",
+        "NOT_SUPPORTED": "#c5221f",
+        "NOT_FOUND": "#c5221f",
+        "UNVERIFIED": "#80868b",
+    }
+    _VERDICT_LABELS = {
+        "SUPPORTED": "SUPPORTED",
+        "PARTIAL": "PARTIAL",
+        "NOT_SUPPORTED": "NOT SUPPORTED",
+        "NOT_FOUND": "CITATION NOT FOUND",
+        "UNVERIFIED": "UNVERIFIED",
+    }
+
     def __init__(self, citation, parent: QWidget | None = None):
         super().__init__(parent)
         self.citation = citation
         self.setWindowTitle(citation.case_name or citation.citation_text or "Citation")
         self.resize(720, 540)
 
+        verdict = (citation.verdict or "UNVERIFIED").upper()
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
 
-        header = QLabel(self._header_html(citation))
-        header.setTextFormat(Qt.TextFormat.RichText)
-        header.setWordWrap(True)
-        header.setOpenExternalLinks(False)
-        layout.addWidget(header)
+        self.header = QLabel(self._header_html(citation, verdict))
+        self.header.setTextFormat(Qt.TextFormat.RichText)
+        self.header.setWordWrap(True)
+        layout.addWidget(self.header)
 
-        passage_label = QLabel("Supporting passage from opinion:")
-        passage_label.setStyleSheet("font-weight: 600; margin-top: 4px;")
-        layout.addWidget(passage_label)
+        # Render verdict-specific body content into self.body_html for tests.
+        self.body_html = self._body_html(citation, verdict)
+        self.body_label = QLabel(self.body_html)
+        self.body_label.setTextFormat(Qt.TextFormat.RichText)
+        self.body_label.setWordWrap(True)
+        self.body_label.setOpenExternalLinks(False)
+        layout.addWidget(self.body_label, 1)
 
-        self.passage_view = QTextBrowser()
-        self.passage_view.setOpenLinks(False)
-        self.passage_view.setHtml(self._passage_html(citation))
-        layout.addWidget(self.passage_view, 1)
-
-        if citation.warning:
-            warning_label = QLabel(html.escape(citation.warning))
-            warning_label.setStyleSheet("color: #b85c00;")
-            warning_label.setWordWrap(True)
-            layout.addWidget(warning_label)
-
-        buttons = QDialogButtonBox()
-        self.open_btn = QPushButton("Open in CourtListener")
-        self.open_btn.setEnabled(bool(citation.opinion_url))
-        self.open_btn.clicked.connect(self._open_opinion_url)
-        buttons.addButton(self.open_btn, QDialogButtonBox.ButtonRole.ActionRole)
-        close_btn = buttons.addButton(QDialogButtonBox.StandardButton.Close)
+        button_row = QHBoxLayout()
+        button_row.addStretch()
+        if citation.opinion_url:
+            label = "Open in CourtListener" if citation.kind == "case" else "Open in leginfo"
+            open_btn = QPushButton(label)
+            open_btn.clicked.connect(self._open_opinion_url)
+            button_row.addWidget(open_btn)
+        close_btn = QPushButton("Close")
         close_btn.clicked.connect(self.accept)
-        layout.addWidget(buttons)
+        button_row.addWidget(close_btn)
+        layout.addLayout(button_row)
 
-    @staticmethod
-    def _header_html(citation) -> str:
-        rows: list[tuple[str, str]] = []
-        if citation.case_name:
-            rows.append(("Case", citation.case_name))
-        if citation.citation_text:
-            rows.append(("Citation", citation.citation_text))
-        if citation.court:
-            rows.append(("Court", citation.court))
-        if citation.date:
-            rows.append(("Date", citation.date))
-        if citation.status:
-            rows.append(("Status", citation.status.replace("_", " ")))
-        cells = "".join(
-            f"<tr><td style=\"padding:2px 8px; color:#555;\">{html.escape(label)}</td>"
-            f"<td style=\"padding:2px 0;\">{html.escape(value)}</td></tr>"
-            for label, value in rows
-        )
-        return f"<table style=\"font-size:11pt;\">{cells}</table>"
-
-    @staticmethod
-    def _passage_html(citation) -> str:
-        if citation.supporting_passage:
-            passage = html.escape(citation.supporting_passage)
-            return (
-                "<div style=\"font-family:'Times New Roman',serif; font-size:12pt;\">"
-                f"<p style=\"background:#fff7c2; padding:6px;\">{passage}</p></div>"
-            )
-        if citation.status in ("throttled", "exists_support_unconfirmed"):
-            note = (
-                "CourtListener did not return the supporting opinion text "
-                "(rate-limited or text unavailable). The citation exists, but "
-                "automatic support extraction did not complete. Click "
-                "<i>Open in CourtListener</i> to read the opinion."
-            )
-        elif citation.status == "not_found":
-            note = (
-                "CourtListener could not locate this citation. The case may be "
-                "unpublished, mis-cited, or absent from the database. Verify "
-                "the citation manually before relying on it."
-            )
-        elif citation.status == "invalid":
-            note = (
-                "CourtListener rejected the citation as malformed. Re-check "
-                "the citation format before relying on it."
-            )
-        else:
-            note = (
-                "No supporting passage was extracted for this citation. Open "
-                "the opinion in CourtListener to confirm the proposition."
-            )
+    def _header_html(self, citation, verdict: str) -> str:
+        color = self._VERDICT_HEADER_COLORS.get(verdict, "#80868b")
+        label = self._VERDICT_LABELS.get(verdict, verdict or "UNVERIFIED")
+        title = html.escape(citation.case_name or citation.citation_text or "Citation")
         return (
-            "<div style=\"font-family:'Times New Roman',serif; color:#444;\">"
-            f"<p>{note}</p></div>"
+            f"<div style='border-left: 6px solid {color}; padding-left: 8px;'>"
+            f"<div style='color:{color}; font-weight:bold; font-size:14pt;'>{html.escape(label)}</div>"
+            f"<div style='font-size:11pt;'>{title}</div>"
+            "</div>"
         )
+
+    def _body_html(self, citation, verdict: str) -> str:
+        parts: list[str] = []
+
+        prop = (citation.proposition or "").strip()
+        if prop:
+            parts.append(
+                f"<p><b>Brief's proposition:</b><br><i>{html.escape(prop)}</i></p>"
+            )
+
+        if verdict == "SUPPORTED":
+            if citation.evidence:
+                parts.append(
+                    f"<p><b>Verified holding:</b><br>{html.escape(citation.evidence)}</p>"
+                )
+            if citation.note:
+                parts.append(f"<p><b>Verifier note:</b> {html.escape(citation.note)}</p>")
+
+        elif verdict == "PARTIAL":
+            if citation.evidence:
+                parts.append(
+                    f"<p><b>Relevant passage:</b><br>{html.escape(citation.evidence)}</p>"
+                )
+            if citation.note:
+                parts.append(
+                    f"<p><b>Why partial:</b> {html.escape(citation.note)}</p>"
+                )
+
+        elif verdict == "NOT_SUPPORTED":
+            parts.append(
+                "<p><b>⚠ The authority does NOT hold what the brief claims.</b></p>"
+            )
+            if citation.evidence:
+                parts.append(
+                    f"<p><b>What it actually holds:</b><br>{html.escape(citation.evidence)}</p>"
+                )
+            if citation.note:
+                parts.append(f"<p><b>Verifier note:</b> {html.escape(citation.note)}</p>")
+
+        elif verdict == "NOT_FOUND":
+            parts.append(
+                "<p><b>⚠ This citation was not found in the authoritative source.</b></p>"
+                "<p>Likely causes:</p>"
+                "<ul>"
+                "<li>The case or statute was invented by the LLM</li>"
+                "<li>The citation is mis-typed</li>"
+                "<li>The case is unpublished or pre-1900</li>"
+                "</ul>"
+            )
+            if citation.note:
+                parts.append(f"<p><b>Verifier note:</b> {html.escape(citation.note)}</p>")
+
+        else:  # UNVERIFIED
+            parts.append(
+                "<p>The verifier doesn't cover this source in v1. Verify manually.</p>"
+            )
+            if citation.note:
+                parts.append(f"<p>{html.escape(citation.note)}</p>")
+
+        return "\n".join(parts)
 
     def _open_opinion_url(self) -> None:
         if self.citation.opinion_url:

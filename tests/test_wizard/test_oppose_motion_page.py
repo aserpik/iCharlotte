@@ -597,47 +597,52 @@ def test_citation_detail_dialog_shows_supporting_passage(qtbot):
         court="California Court of Appeal",
         date="2007-03-08",
         opinion_url="https://www.courtlistener.com/opinion/2271540/",
-        status="support_passage_found",
-        supporting_passage="The party fails to make a timely response, the propounding party may move.",
+        verdict="SUPPORTED",
+        evidence="The party fails to make a timely response, the propounding party may move.",
     )
     dialog = CitationDetailDialog(citation)
     qtbot.addWidget(dialog)
 
-    html_text = dialog.passage_view.toHtml()
-    assert "timely response" in html_text
-    assert dialog.open_btn.isEnabled() is True
+    assert "timely response" in dialog.body_html
 
 
-def test_citation_detail_dialog_explains_unconfirmed_status(qtbot):
+def test_citation_detail_dialog_explains_unverified_verdict(qtbot):
     from icharlotte_core.ui.wizard.pages.oppose_motion_page import CitationDetailDialog
 
     citation = CitationVerification(
         citation_text="148 Cal. App. 4th 390",
         case_name="Sinaiko Healthcare",
         opinion_url="https://example.com",
-        status="exists_support_unconfirmed",
+        verdict="UNVERIFIED",
     )
     dialog = CitationDetailDialog(citation)
     qtbot.addWidget(dialog)
 
-    html_text = dialog.passage_view.toHtml()
-    # No passage; instead the user sees an explanatory note.
-    assert "CourtListener did not return the supporting opinion text" in html_text
+    # No passage; user sees an explanatory note for the unverified verdict.
+    assert "verifier" in dialog.body_html.lower()
 
 
-def test_citation_detail_dialog_disables_open_button_without_url(qtbot):
+def test_citation_detail_dialog_omits_open_button_without_url(qtbot):
     from icharlotte_core.ui.wizard.pages.oppose_motion_page import CitationDetailDialog
 
     citation = CitationVerification(
         citation_text="148 Cal. App. 4th 390",
         case_name="Sinaiko Healthcare",
         opinion_url="",
-        status="not_found",
+        verdict="NOT_FOUND",
     )
     dialog = CitationDetailDialog(citation)
     qtbot.addWidget(dialog)
 
-    assert dialog.open_btn.isEnabled() is False
+    # The new dialog omits the "Open in CourtListener" button entirely when
+    # there is no opinion_url, so no enabled-state needs to be checked.
+    from PySide6.QtWidgets import QPushButton
+
+    open_buttons = [
+        b for b in dialog.findChildren(QPushButton)
+        if "open" in b.text().lower()
+    ]
+    assert open_buttons == []
 
 
 def test_save_as_uses_dialog_and_does_not_save_when_cancelled(qtbot, tmp_path):
