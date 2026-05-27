@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import os
-import re
 from dataclasses import asdict
 
 from PySide6.QtCore import Qt, QThread, Signal
@@ -36,13 +35,10 @@ from icharlotte_core.llm_config import LLMConfig
 from icharlotte_core.discovery.form_interrogatory_selection import (
     complete_selected_form_interrogatories,
     extract_selected_form_interrogatory_numbers,
-    filter_parsed_form_interrogatories,
 )
 from icharlotte_core.discovery.response_parser import (
     ParsedDiscovery,
     ParsedRequest,
-    build_parse_prompt,
-    parse_llm_response,
 )
 from icharlotte_core.discovery.response_review_state import (
     RequestReview,
@@ -63,7 +59,6 @@ from icharlotte_core.discovery.response_rules import ResponseRules
 from icharlotte_core.discovery.response_type_detector import normalize_discovery_type
 from icharlotte_core.discovery._io import (
     read_document_text,
-    read_first_page_text,
 )
 
 
