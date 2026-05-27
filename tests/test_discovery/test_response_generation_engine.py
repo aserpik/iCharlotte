@@ -3,7 +3,9 @@ import unittest
 from icharlotte_core.discovery.response_generation_engine import (
     ConditionalRuleDecision,
     DraftCallbacks,
+    build_structured_proposal_prompt,
     generate_review_state,
+    parse_structured_proposal_response,
 )
 from icharlotte_core.discovery.response_parser import ParsedDiscovery, ParsedRequest
 from icharlotte_core.discovery.response_rule_library import (
@@ -406,6 +408,48 @@ class ResponseGenerationEngineTests(unittest.TestCase):
 
         self.assertIn("unable to comply", proposal.proposed_substantive_response.lower())
         self.assertTrue(proposal.needs_review)
+
+
+class StructuredProposalPromptTests(unittest.TestCase):
+    def _build_prompt(self):
+        parsed = _parsed()
+        request = parsed.requests[0]
+        rules = built_in_rules_for("SI")
+        return build_structured_proposal_prompt(
+            request=request,
+            parsed=parsed,
+            context_packet="",
+            selected_rules=rules,
+            response_rules=ResponseRules(),
+        )
+
+    def test_prompt_omits_proposed_objections_from_schema(self):
+        prompt = self._build_prompt()
+        # The dead "proposed_objections" field used to live inside the JSON
+        # schema block. We still mention objection RULES in the schema,
+        # but the OBJECTIONS-TEXT field is gone.
+        self.assertNotIn('"proposed_objections"', prompt)
+
+    def test_prompt_explicitly_forbids_drafting_objection_text(self):
+        prompt = self._build_prompt()
+        self.assertIn("Do not draft objection text.", prompt)
+
+    def test_parse_handles_payload_without_proposed_objections(self):
+        # Old clients won't send the field. The parser must tolerate that.
+        proposal = parse_structured_proposal_response(
+            '{"request_number": "1", "proposed_substantive_response": "ok"}'
+        )
+        self.assertEqual(proposal.request_number, "1")
+        self.assertEqual(proposal.proposed_substantive_response, "ok")
+        self.assertEqual(proposal.proposed_objections, "")
+
+    def test_parse_still_tolerates_legacy_proposed_objections_field(self):
+        # Old persisted JSON may still carry it; we just ignore the value.
+        proposal = parse_structured_proposal_response(
+            '{"request_number": "1", "proposed_objections": "legacy", '
+            '"proposed_substantive_response": "ok"}'
+        )
+        self.assertEqual(proposal.proposed_objections, "legacy")
 
 
 if __name__ == "__main__":
