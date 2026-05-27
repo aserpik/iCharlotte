@@ -129,15 +129,43 @@ class CitationVerification:
     citation_text: str = ""
     normalized_citation: str = ""
     status: str = ""
+
+    # Verdict from the new verifier. Empty string means "not yet verified".
+    # Values: "SUPPORTED" | "PARTIAL" | "NOT_SUPPORTED" | "NOT_FOUND" | "UNVERIFIED".
+    verdict: str = ""
+
+    # Citation kind for the new pipeline: "case" | "statute" | "rule" | "unknown".
+    kind: str = ""
+
+    # The brief's surrounding proposition (1-2 sentences of context).
+    proposition: str = ""
+
+    # 1-2 verbatim sentences from the authority text cited as evidence.
+    evidence: str = ""
+
+    # Short attorney-facing explanation of the verdict.
+    note: str = ""
+
+    # Character offset of the cite in body_text (for UI underline placement).
+    body_offset: int | None = None
+
+    # Case-specific fields (existing).
     case_name: str = ""
     court: str = ""
     date: str = ""
     opinion_url: str = ""
     cluster_id: str = ""
+
+    # Statute-specific fields.
+    law_code: str = ""
+    section_num: str = ""
+
+    # Legacy fields retained for back-compat with the old verifier.
     supporting_passage: str = ""
     support_start: int | None = None
     support_end: int | None = None
     warning: str = ""
+
     replacement_candidates: list[Any] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -150,11 +178,19 @@ class CitationVerification:
             citation_text=data.get("citation_text", ""),
             normalized_citation=data.get("normalized_citation", ""),
             status=data.get("status", ""),
+            verdict=data.get("verdict", ""),
+            kind=data.get("kind", ""),
+            proposition=data.get("proposition", ""),
+            evidence=data.get("evidence", ""),
+            note=data.get("note", ""),
+            body_offset=data.get("body_offset"),
             case_name=data.get("case_name", ""),
             court=data.get("court", ""),
             date=data.get("date", ""),
             opinion_url=data.get("opinion_url", ""),
             cluster_id=data.get("cluster_id", ""),
+            law_code=data.get("law_code", ""),
+            section_num=data.get("section_num", ""),
             supporting_passage=data.get("supporting_passage", ""),
             support_start=data.get("support_start"),
             support_end=data.get("support_end"),
@@ -169,6 +205,9 @@ class DraftDocument:
     body_text: str = ""
     citations: list[CitationVerification] = field(default_factory=list)
     preview_path: str = ""
+    # Populated by the drafter when it rejects a response; lets the wizard
+    # surface a specific reason instead of a generic "no usable body" error.
+    rejection_reason: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -176,6 +215,7 @@ class DraftDocument:
             "body_text": self.body_text,
             "citations": [citation.to_dict() for citation in self.citations],
             "preview_path": self.preview_path,
+            "rejection_reason": self.rejection_reason,
         }
 
     @classmethod
@@ -191,4 +231,5 @@ class DraftDocument:
                 for citation in data.get("citations", []) or []
             ],
             preview_path=data.get("preview_path", ""),
+            rejection_reason=data.get("rejection_reason", ""),
         )

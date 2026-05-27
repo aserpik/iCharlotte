@@ -88,3 +88,51 @@ def test_public_list_fields_normalize_string_values():
     assert metadata.principal_arguments == ["No triable issue"]
     assert section.path == ["Argument"]
     assert citation.replacement_candidates == ["Better Authority"]
+
+
+def test_citation_verification_defaults_for_new_verdict_fields():
+    cv = CitationVerification()
+    assert cv.verdict == ""
+    assert cv.kind == ""
+    assert cv.proposition == ""
+    assert cv.evidence == ""
+    assert cv.note == ""
+    assert cv.law_code == ""
+    assert cv.section_num == ""
+    assert cv.body_offset is None
+
+
+def test_citation_verification_from_dict_roundtrip_with_verdict_fields():
+    data = {
+        "citation_text": "Cottini v. Enloe Medical Center (2014) 226 Cal.App.4th 401",
+        "verdict": "SUPPORTED",
+        "kind": "case",
+        "proposition": "Trial courts retain discretion to deny untimely motions.",
+        "evidence": "The trial court did not abuse its discretion.",
+        "note": "Direct support; matches the brief's framing.",
+        "body_offset": 1284,
+    }
+    cv = CitationVerification.from_dict(data)
+    assert cv.verdict == "SUPPORTED"
+    assert cv.kind == "case"
+    assert cv.body_offset == 1284
+    assert cv.proposition.startswith("Trial courts")
+
+    out = cv.to_dict()
+    for key, expected in data.items():
+        assert out[key] == expected
+
+
+def test_citation_verification_from_dict_statute_kind():
+    data = {
+        "citation_text": "Code Civ. Proc., § 2024.020",
+        "kind": "statute",
+        "law_code": "CCP",
+        "section_num": "2024.020",
+        "verdict": "PARTIAL",
+    }
+    cv = CitationVerification.from_dict(data)
+    assert cv.kind == "statute"
+    assert cv.law_code == "CCP"
+    assert cv.section_num == "2024.020"
+    assert cv.verdict == "PARTIAL"
