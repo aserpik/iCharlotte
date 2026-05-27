@@ -3,7 +3,6 @@ import re
 import sys
 import json
 import subprocess
-import markdown
 import shutil
 import datetime
 import base64
@@ -30,6 +29,7 @@ from .chat_widgets import (
     MessageWidget, SearchResultsWidget, get_theme, THEMES
 )
 from ..chat import ChatPersistence, TokenCounter, Message, Conversation, BUILTIN_PROMPTS, TRANSCRIBE_PROMPT
+from ..chat.markdown_render import render_markdown, CHAT_MARKDOWN_CSS
 from ..mediation_brief import (
     MediationBriefGenerator, MediationBriefWorker, RefinementWorker,
     RoutingWorker, SECTION_HEADINGS,
@@ -412,6 +412,10 @@ class ChatTab(QWidget):
         self.chat_history.setOpenExternalLinks(True)
         self.chat_history.setAcceptDrops(True)
         self.chat_history.setMinimumHeight(100)
+        # Style tables/code/blockquote/etc. emitted by render_markdown — Qt's
+        # QTextDocument renders bare <table> tags with no visible gridlines
+        # until a default stylesheet is attached.
+        self.chat_history.document().setDefaultStyleSheet(CHAT_MARKDOWN_CSS)
         self.chat_splitter.addWidget(self.chat_history)
 
         # Input area container (lower pane)
@@ -782,7 +786,7 @@ class ChatTab(QWidget):
         # Convert markdown to HTML for assistant messages
         if role == 'assistant':
             try:
-                html_text = markdown.markdown(content, extensions=['fenced_code', 'tables'])
+                html_text = render_markdown(content)
                 self.chat_history.insertHtml(html_text)
             except Exception as e:
                 log_event(f"Markdown conversion failed: {e}", "error")
@@ -1631,9 +1635,9 @@ class ChatTab(QWidget):
                 except Exception as e:
                     print(f"[ChatTab] Deterministic citation check failed: {e}")
 
-        # Convert markdown to HTML
+        # Convert markdown to HTML (tables, fenced code, GFM line breaks, lists)
         try:
-            html_text = markdown.markdown(text, extensions=['fenced_code', 'tables'])
+            html_text = render_markdown(text)
         except Exception as e:
             log_event(f"Markdown conversion failed: {e}", "error")
             html_text = text.replace('\n', '<br>')
@@ -2119,7 +2123,7 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
             )
 
         try:
-            html = markdown.markdown(text, extensions=['fenced_code', 'tables'])
+            html = render_markdown(text)
         except Exception:
             html = text.replace('\n', '<br>')
         self.chat_history.append(html)
