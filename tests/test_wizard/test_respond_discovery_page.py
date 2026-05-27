@@ -701,7 +701,7 @@ class StreamingReviewStateTests(unittest.TestCase):
         page.parsed_discovery = parsed
         page._show_review()
 
-        # No proposals delivered yet → Finalize is disabled.
+        # No proposals delivered yet -> Finalize is disabled.
         self.assertFalse(page.finalize_btn.isEnabled())
 
         # Deliver both proposals.
@@ -717,6 +717,85 @@ class StreamingReviewStateTests(unittest.TestCase):
         # All rows arrived; Finalize is enabled once user approves them via UI.
         # We only check the "no longer disabled by pending" half here.
         self.assertTrue(page.finalize_btn.isEnabled())
+
+
+class ReviewScreenStatusIndicatorTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls._app = QApplication.instance() or QApplication([])
+
+    def _make_page_with_pending(self, n=3):
+        from icharlotte_core.discovery.response_parser import (
+            ParsedDiscovery, ParsedRequest,
+        )
+        parsed = ParsedDiscovery(
+            discovery_type="SI",
+            propounding_party="P",
+            responding_party="D",
+            set_number=1, set_word="ONE", case_number="1",
+            requests=[
+                ParsedRequest(number=str(i + 1), text=f"Request {i + 1}.")
+                for i in range(n)
+            ],
+        )
+        page = RespondDiscoverySettingsPage(
+            case_root="", file_number="1234.001",
+            discovery_file=r"C:\case\srogg.pdf",
+            detected_type="SI",
+        )
+        page.parsed_discovery = parsed
+        page._open_review_screen_with_pending(parsed)
+        return page, parsed
+
+    def test_pending_row_shows_generating_placeholder_in_response_pane(self):
+        page, _ = self._make_page_with_pending()
+        page._current_review_index = 0
+        page._load_current_review()
+        self.assertEqual(page.response_edit.toPlainText(), "")
+        self.assertTrue(page.response_edit.isReadOnly())
+        self.assertIn("Generating", page.review_warning_label.text())
+
+    def test_completed_row_enables_edits(self):
+        from icharlotte_core.discovery.response_generation_engine import (
+            StructuredProposal,
+        )
+        page, parsed = self._make_page_with_pending()
+        page._on_proposal_ready(
+            "1",
+            StructuredProposal(
+                request_number="1", proposed_substantive_response="Done."
+            ),
+        )
+        page._current_review_index = 0
+        page._load_current_review()
+        self.assertFalse(page.response_edit.isReadOnly())
+        self.assertEqual(page.response_edit.toPlainText(), "Done.")
+
+    def test_status_bar_reflects_progress(self):
+        page, parsed = self._make_page_with_pending(n=4)
+        page._on_coordinator_progress(2, 4)
+        self.assertIn("2", page.review_status_label.text())
+        self.assertIn("4", page.review_status_label.text())
+
+    def test_request_number_header_includes_status_icon(self):
+        from icharlotte_core.discovery.response_generation_engine import (
+            StructuredProposal,
+        )
+        page, parsed = self._make_page_with_pending(n=2)
+        page._current_review_index = 0
+        page._load_current_review()
+        self.assertIn("⏳", page.request_label.text())  # hourglass U+23F3
+        page._on_proposal_ready(
+            "1",
+            StructuredProposal(
+                request_number="1",
+                proposed_substantive_response="Done.",
+                needs_review=True,
+                review_reason="weak context",
+            ),
+        )
+        page._load_current_review()
+        self.assertIn("⚠", page.request_label.text())  # warning U+26A0
 
 
 if __name__ == "__main__":

@@ -656,6 +656,10 @@ class RespondDiscoverySettingsPage(QWidget):
         quick_row.addWidget(quick_response_group, 1)
         layout.addLayout(quick_row)
 
+        self.review_status_label = QLabel("")
+        self.review_status_label.setStyleSheet("color: #666; font-style: italic;")
+        layout.addWidget(self.review_status_label)
+
         nav = QHBoxLayout()
         self.prev_btn = QPushButton("Previous")
         self.prev_btn.clicked.connect(lambda: self._move_review(-1))
@@ -695,15 +699,30 @@ class RespondDiscoverySettingsPage(QWidget):
         if not review:
             self.request_label.setText("No parsed requests.")
             return
+        icon = self._status_icon_for(review)
         self.review_title.setText(
             f"Review Discovery Responses ({self._current_review_index + 1} of {count})"
         )
-        self.request_label.setText(f"Request No. {review.number}")
+        self.request_label.setText(f"{icon} Request No. {review.number}".strip())
         self.request_text.setText(review.request_text)
-        self.objection_edit.setPlainText(review.proposed_objections)
-        self.response_edit.setPlainText(review.proposed_substantive_response)
+
+        is_pending = bool(review.is_pending)
+        self.objection_edit.setPlainText(
+            "" if is_pending else review.proposed_objections
+        )
+        self.response_edit.setPlainText(
+            "" if is_pending else review.proposed_substantive_response
+        )
+        self.objection_edit.setReadOnly(is_pending)
+        self.response_edit.setReadOnly(is_pending)
+        self.objection_edit.setPlaceholderText("Generating..." if is_pending else "")
+        self.response_edit.setPlaceholderText("Generating..." if is_pending else "")
+
         review_reason = (review.review_reason or "").strip()
-        if review.needs_review:
+        if is_pending:
+            self.review_warning_label.setText("Generating...")
+            self.review_warning_label.show()
+        elif review.needs_review:
             warning_text = (
                 f"Needs review: {review_reason}" if review_reason else "Needs review."
             )
@@ -712,12 +731,29 @@ class RespondDiscoverySettingsPage(QWidget):
         else:
             self.review_warning_label.setText("")
             self.review_warning_label.hide()
+
         for rule_id, cb in self._quick_checks.items():
             cb.blockSignals(True)
             cb.setChecked(rule_id in review.selected_quick_objection_ids)
             cb.blockSignals(False)
         self.prev_btn.setEnabled(self._current_review_index > 0)
         self.next_review_btn.setEnabled(self._current_review_index < count - 1)
+
+    def _status_icon_for(self, review) -> str:
+        if review.is_pending:
+            return "⏳"  # hourglass U+23F3
+        if review.approved:
+            return "✓"  # check U+2713
+        if review.needs_review:
+            return "⚠"  # warning U+26A0
+        # "Edited" = non-default content but not yet approved.
+        has_content = bool(
+            (review.proposed_objections or "").strip()
+            or (review.proposed_substantive_response or "").strip()
+        )
+        if has_content:
+            return "✏"  # pencil U+270F
+        return ""
 
     def _move_review(self, delta: int) -> None:
         if not self.review_state:
