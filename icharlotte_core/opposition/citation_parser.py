@@ -43,15 +43,17 @@ _REPORTER_PATTERN = (
 
 # Case name: Two capitalized phrases separated by " v. ". May be wrapped in
 # *...* or _..._ italic markers. We capture the inner name without markers.
-# Allows hyphens, apostrophes, ampersands inside the names.
+# Allows hyphens, apostrophes, ampersands inside the names, plus optional
+# commas between word tokens (so "X Co., Inc. v. Y, LLC" matches as one
+# case name rather than stopping at the comma).
 _CASE_NAME_FRAGMENT = (
     r"(?:[\*_])?"                                # optional italic open
     r"([A-Z][A-Za-z0-9&'.\-]*"                   # first word
     r"(?:\s+(?:de|del|la|of|the|von|van))?"      # optional connector
-    r"(?:\s+[A-Z][A-Za-z0-9&'.\-]*){0,4}"        # 0-4 more capitalized words
+    r"(?:,?\s+[A-Z][A-Za-z0-9&'.\-]*){0,6}"      # 0-6 more capitalized words (comma OK)
     r"\s+v\.\s+"                                 # required " v. "
     r"[A-Z][A-Za-z0-9&'.\-]*"
-    r"(?:\s+[A-Z][A-Za-z0-9&'.\-]*){0,4}"
+    r"(?:,?\s+[A-Z][A-Za-z0-9&'.\-]*){0,6}"      # 0-6 more capitalized words (comma OK)
     r")"
     r"(?:[\*_])?"                                # optional italic close
 )

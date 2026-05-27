@@ -40,6 +40,35 @@ def test_case_cite_raw_text_strips_italic_markers():
     assert cites[0].raw_text.startswith("Cottini")
 
 
+def test_case_name_with_comma_inc_suffix_captures_full_name():
+    # Real-world case names often include a comma before a company
+    # suffix like ", Inc." / ", LLC" / ", L.P." — the parser must keep
+    # the full name on the left side of "v." rather than starting the
+    # match at "Inc. v. ...".
+    body = (
+        "As the court held in *Sinaiko Healthcare-Consulting, Inc. v. "
+        "Pacific Healthcare Consultants* (2007) 148 Cal.App.4th 390, 402, "
+        "the trial court has discretion."
+    )
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    c = cites[0]
+    assert c.case_name == (
+        "Sinaiko Healthcare-Consulting, Inc. v. Pacific Healthcare Consultants"
+    )
+    assert c.year == "2007"
+    assert c.reporter_citation == "148 Cal.App.4th 390"
+    assert c.raw_text.startswith("Sinaiko Healthcare-Consulting,")
+
+
+def test_case_name_with_comma_on_right_side():
+    # Symmetric coverage: comma+suffix on the right side too.
+    body = "See *Smith v. Jones, Inc.* (2010) 50 Cal.4th 100 for support."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    assert cites[0].case_name == "Smith v. Jones, Inc."
+
+
 def test_case_name_without_italic_markers():
     body = "The court held this in Cottini v. Enloe Medical Center (2014) 226 Cal.App.4th 401."
     cites = extract_citations(body)
