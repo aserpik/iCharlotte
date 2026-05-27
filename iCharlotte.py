@@ -849,6 +849,8 @@ class MainWindow(QMainWindow):
             self.index_tab.load_data(self.file_number)
 
         # --- Tab 4: Chat ---
+        # Persistent chat tab (visible in Advanced mode; hidden in Wizard mode).
+        # Wizard mode spawns additional ChatTab instances via _open_task_tab.
         checkpoint("Creating ChatTab")
         self.chat_tab = ChatTab()
         self.tabs.addTab(self.chat_tab, "Chat")
@@ -1056,6 +1058,10 @@ class MainWindow(QMainWindow):
             return []
         snapshots = []
         for _, tab in self._iter_task_tabs():
+            if isinstance(tab, ChatTab):
+                # Chat tabs are case-scoped but not snapshot/restored — each
+                # session starts fresh; conversations live in chat persistence.
+                continue
             # Determine page label.
             page_idx = tab.currentIndex()
             if page_idx == 1:  # PAGE_STATUS — cancel and store as settings
@@ -1087,6 +1093,11 @@ class MainWindow(QMainWindow):
     def _remove_all_task_tabs(self) -> None:
         # Iterate in reverse so indices stay stable.
         for idx, widget in reversed(self._iter_task_tabs()):
+            if isinstance(widget, ChatTab):
+                try:
+                    widget.save_current_state()
+                except Exception as e:
+                    log_event(f"[wizard] chat save_current_state failed: {e}")
             self.tabs.removeTab(idx)
             widget.deleteLater()
 
@@ -1447,10 +1458,19 @@ class MainWindow(QMainWindow):
             return
 
         if task_id == "chat":
-            chat_idx = self._index_of_tab("Chat")
-            if chat_idx >= 0:
-                self.tabs.setCurrentIndex(chat_idx)
-                log_event("[wizard] switched to Chat tab")
+            spec = get_task(task_id)
+            existing_titles = [self.tabs.tabText(i) for i in range(self.tabs.count())]
+            suffix = next_instance_suffix(spec.title, existing_titles)
+            title = f"{spec.title} {suffix}".strip()
+            chat_tab = ChatTab(parent=self)
+            chat_tab.setProperty("wizard_task_id", spec.task_id)
+            chat_tab.setProperty("wizard_instance_suffix", suffix)
+            if self.file_number:
+                chat_tab.load_case(self.file_number)
+            new_index = self.tabs.addTab(chat_tab, title)
+            self.tabs.setCurrentIndex(new_index)
+            log_event(f"[wizard] opened new Chat tab '{title}'")
+            self._hide_fixed_close_buttons()
             return
 
         spec = get_task(task_id)
@@ -1767,9 +1787,16 @@ class MainWindow(QMainWindow):
 
             if new_path:
                 self.save_status_history()
-                # Save chat conversation before switching cases
+                # Save the persistent chat tab + any wizard-spawned chat tabs
+                # against the OLD case before file_number changes.
                 if hasattr(self, 'chat_tab') and self.chat_tab:
                     self.chat_tab.save_current_state()
+                for _, tab in self._iter_task_tabs():
+                    if isinstance(tab, ChatTab):
+                        try:
+                            tab.save_current_state()
+                        except Exception as e:
+                            log_event(f"[wizard] chat save_current_state failed: {e}")
                 self.file_number = new_file_num
                 self.case_path = new_path
                 self.setWindowTitle(f"iCharlotte - {self.file_number} - {os.path.basename(self.case_path)}")
@@ -1785,11 +1812,20 @@ class MainWindow(QMainWindow):
                     if case_num == new_file_num and script in self.agent_buttons:
                         self.agent_buttons[script].set_running(True)
 
+                # Rebind the persistent chat tab + any open wizard chat tabs
+                # to the NEW case.
+                if hasattr(self, 'chat_tab'):
+                    self.chat_tab.load_case(self.file_number)
+                for _, tab in self._iter_task_tabs():
+                    if isinstance(tab, ChatTab):
+                        try:
+                            tab.load_case(self.file_number)
+                        except Exception as e:
+                            log_event(f"[wizard] chat load_case failed: {e}")
+
                 # Reset Tabs for new case isolation
                 if hasattr(self, 'index_tab'):
                     self.index_tab.load_data(self.file_number)
-                if hasattr(self, 'chat_tab'):
-                    self.chat_tab.load_case(self.file_number)
                 if hasattr(self, 'liability_tab'):
                     self.liability_tab.reset_state()
                 if hasattr(self, 'email_tab'):
@@ -1831,6 +1867,8 @@ class MainWindow(QMainWindow):
         self._remove_all_task_tabs()
 
         self.save_status_history()
+        # Wizard-spawned chat tabs were already saved + removed by
+        # _remove_all_task_tabs above. Save the persistent singleton too.
         if hasattr(self, 'chat_tab') and self.chat_tab:
             self.chat_tab.save_current_state()
         self.file_number = file_number
@@ -2776,9 +2814,15 @@ class MainWindow(QMainWindow):
         except Exception as e:
             log_event(f"[wizard] close-save failed: {e}")
         self.save_status_history()
-        # Save chat conversation before closing
+        # Save persistent chat conversation + any wizard-spawned chat tabs
         if hasattr(self, 'chat_tab') and self.chat_tab:
             self.chat_tab.save_current_state()
+        for _, tab in self._iter_task_tabs():
+            if isinstance(tab, ChatTab):
+                try:
+                    tab.save_current_state()
+                except Exception as e:
+                    log_event(f"[wizard] chat save_current_state failed on close: {e}")
         # Save email update tab state before closing
         if hasattr(self, 'email_update_tab') and self.email_update_tab:
             self.email_update_tab.save_state()
