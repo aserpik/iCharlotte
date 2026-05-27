@@ -27,6 +27,19 @@ def test_pincite_preserved_in_raw_text_but_stripped_from_normalized():
     assert ", 415" not in c.normalized
 
 
+def test_case_cite_raw_text_strips_italic_markers():
+    # The UI converts *Name* into <i>Name</i> in the rendered HTML before
+    # wrapping the citation as a clickable anchor. If raw_text kept the
+    # asterisks, the regex match against the rendered HTML would fail and
+    # the cite would render unclickable. So raw_text must NOT contain *.
+    body = "See *Cottini v. Enloe Medical Center* (2014) 226 Cal.App.4th 401."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    assert "*" not in cites[0].raw_text
+    assert "_" not in cites[0].raw_text
+    assert cites[0].raw_text.startswith("Cottini")
+
+
 def test_case_name_without_italic_markers():
     body = "The court held this in Cottini v. Enloe Medical Center (2014) 226 Cal.App.4th 401."
     cites = extract_citations(body)

@@ -195,7 +195,12 @@ def extract_citations(body_text: str) -> list[Citation]:
     # Case cites
     for m in _CASE_CITE_RE.finditer(body_text):
         case_name_raw, year, vol, reporter, page = m.group(1, 2, 3, 4, 5)
-        raw_text = m.group(0)
+        # Strip italic markers (* or _) from the raw match. The UI renderer
+        # converts source-level *Name* into <i>Name</i> before trying to
+        # wrap the citation as a clickable anchor; if raw_text still
+        # contained the asterisks, the regex match against the rendered
+        # HTML would fail and the case cite would render unclickable.
+        raw_text = m.group(0).replace("*", "").replace("_", "")
         case_name = _strip_italic_markers(case_name_raw)
         citations.append(
             Citation(
