@@ -1040,7 +1040,10 @@ class OpposeMotionTaskTab(QStackedWidget):
         ]
         self.settings_page.set_metadata(metadata)
         self.settings_page.set_outline(outline)
-        self.settings_page.setCurrentIndex(SETTINGS_PAGE_CONFIRM)
+        # Skip the metadata-confirmation screen and go straight to the outline.
+        # Metadata is still set on the page (line above) so it flows through to
+        # the drafter via current_metadata() when the user clicks Generate Draft.
+        self.settings_page.setCurrentIndex(SETTINGS_PAGE_OUTLINE)
         self.setCurrentIndex(TASK_PAGE_SETTINGS)
 
     def _on_analysis_thread_finished(self, worker) -> None:

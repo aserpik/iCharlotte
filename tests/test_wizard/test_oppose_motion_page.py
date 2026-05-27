@@ -16,6 +16,7 @@ from icharlotte_core.ui.wizard.pages.oppose_motion_page import (
     OpposeMotionTaskTab,
     OpposeMotionWorker,
     SETTINGS_PAGE_CONFIRM,
+    SETTINGS_PAGE_OUTLINE,
     TASK_PAGE_SETTINGS,
     TASK_PAGE_OUTPUT,
     build_oppose_motion_tab,
@@ -152,7 +153,11 @@ def test_task_tab_auto_analysis_populates_confirmation_and_outline(qtbot, monkey
     assert started[0]["motion_file"] == "/tmp/motion.pdf"
     assert started[0]["context_files"] == ["/tmp/facts.pdf"]
     assert tab.currentIndex() == TASK_PAGE_SETTINGS
-    assert tab.settings_page.currentIndex() == SETTINGS_PAGE_CONFIRM
+    # After analysis, jump straight to the outline screen — the user no longer
+    # needs to click through a confirmation step that just shows extracted metadata.
+    assert tab.settings_page.currentIndex() == SETTINGS_PAGE_OUTLINE
+    # Metadata is still populated on the (hidden) confirmation widgets so it
+    # flows through to the drafter when the user clicks Generate Draft.
     assert tab.settings_page.motion_type_edit.text() == "Motion for Summary Judgment"
     assert tab.settings_page.relief_edit.text() == "summary judgment"
     assert "no triable issue" in tab.settings_page.arguments_edit.toPlainText()
