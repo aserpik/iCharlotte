@@ -138,6 +138,54 @@ _RULE_CITE_RE = re.compile(
 )
 
 
+# ---------------------------------------------------------------------------
+# Proposition extraction (sentence window)
+# ---------------------------------------------------------------------------
+
+# Sentence boundary: period/question/exclamation followed by whitespace or end.
+# Tries to avoid splitting on "Inc." / "v." / "§" abbreviations by requiring a
+# trailing space and an uppercase or end-of-string after.  Negative lookbehinds
+# guard against splitting after legal abbreviations like " v.", " Inc.", " App.".
+_SENTENCE_END_RE = re.compile(
+    r"(?<![\s][A-Za-z]\.)(?<=[.!?])(?=\s+[A-Z*_(])"
+    r"|(?<![\s][A-Za-z]\.)(?<=[.!?])\s*$"
+)
+
+
+def _sentence_spans(text: str) -> list[tuple[int, int]]:
+    """Return [(start, end), ...] of sentence-like spans in text."""
+    if not text:
+        return []
+    spans: list[tuple[int, int]] = []
+    start = 0
+    for m in _SENTENCE_END_RE.finditer(text):
+        end = m.start()
+        if end > start:
+            spans.append((start, end + 1))
+        start = m.end()
+    if start < len(text):
+        spans.append((start, len(text)))
+    return spans
+
+
+def _proposition_for_offset(body_text: str, offset: int) -> str:
+    """Return the containing sentence + up to 2 sentences of prior context."""
+    spans = _sentence_spans(body_text)
+    if not spans:
+        return ""
+    containing_idx = None
+    for i, (start, end) in enumerate(spans):
+        if start <= offset < end:
+            containing_idx = i
+            break
+    if containing_idx is None:
+        return ""
+    prior_idx = max(0, containing_idx - 2)
+    start = spans[prior_idx][0]
+    end = spans[containing_idx][1]
+    return body_text[start:end].strip()
+
+
 def extract_citations(body_text: str) -> list[Citation]:
     """Extract case + statute + rule citations from a draft body."""
     citations: list[Citation] = []
@@ -154,7 +202,7 @@ def extract_citations(body_text: str) -> list[Citation]:
                 kind="case",
                 raw_text=raw_text,
                 normalized=_normalize_case(case_name, vol, reporter, page),
-                proposition="",
+                proposition=_proposition_for_offset(body_text, m.start()),
                 body_offset=m.start(),
                 case_name=case_name,
                 year=year,
@@ -173,7 +221,7 @@ def extract_citations(body_text: str) -> list[Citation]:
                 kind="statute",
                 raw_text=m.group(0),
                 normalized=f"{law_code} {section_num}",
-                proposition="",
+                proposition=_proposition_for_offset(body_text, m.start()),
                 body_offset=m.start(),
                 law_code=law_code,
                 section_num=section_num,
@@ -188,7 +236,7 @@ def extract_citations(body_text: str) -> list[Citation]:
                 kind="rule",
                 raw_text=m.group(0),
                 normalized=f"CRC rule {rule_num}",
-                proposition="",
+                proposition=_proposition_for_offset(body_text, m.start()),
                 body_offset=m.start(),
             )
         )

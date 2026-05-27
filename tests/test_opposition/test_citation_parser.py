@@ -95,3 +95,40 @@ def test_mixed_case_statute_rule_in_one_body():
     cites = extract_citations(body)
     kinds = sorted(c.kind for c in cites)
     assert kinds == ["case", "rule", "statute"]
+
+
+def test_proposition_is_containing_sentence_plus_prior():
+    body = (
+        "Discovery cutoffs must be respected. "
+        "Trial courts retain discretion to deny untimely motions. "
+        "*Cottini v. Enloe Medical Center* (2014) 226 Cal.App.4th 401. "
+        "This is the next sentence."
+    )
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    p = cites[0].proposition
+    # Should include the containing sentence + the prior one, but not the next.
+    assert "untimely motions" in p
+    assert "Discovery cutoffs" in p
+    assert "next sentence" not in p
+
+
+def test_proposition_for_first_sentence_has_no_prior():
+    body = "*Cottini v. Enloe* (2014) 226 Cal.App.4th 401 controls. Other stuff follows."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    p = cites[0].proposition
+    assert "controls" in p
+    assert "Other stuff" not in p
+
+
+def test_multiple_cites_share_sentence_share_proposition():
+    body = (
+        "Two cases agree. *Smith v. Jones* (2010) 50 Cal.4th 100 and "
+        "*Brown v. Davis* (2015) 60 Cal.App.4th 200 both so hold."
+    )
+    cites = extract_citations(body)
+    assert len(cites) == 2
+    # Both share the same sentence — propositions identical.
+    assert cites[0].proposition == cites[1].proposition
+    assert "Two cases agree" in cites[0].proposition
