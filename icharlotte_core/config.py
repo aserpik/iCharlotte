@@ -1,5 +1,48 @@
 import os
 
+API_KEY_ENV_NAMES = {
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+}
+
+
+def _looks_like_placeholder_secret(value):
+    normalized = (value or "").strip().strip('"').strip("'").lower()
+    if not normalized:
+        return True
+    return (
+        normalized.startswith("your_")
+        or normalized.endswith("_here")
+        or "placeholder" in normalized
+        or "change_me" in normalized
+        or "changeme" in normalized
+        or "replace_me" in normalized
+    )
+
+
+def _load_project_api_keys():
+    try:
+        from dotenv import dotenv_values, find_dotenv
+    except ImportError:
+        return
+
+    env_path = find_dotenv(usecwd=True)
+    if not env_path:
+        return
+
+    for name, value in dotenv_values(env_path).items():
+        if name not in API_KEY_ENV_NAMES or value is None:
+            continue
+        value = str(value).strip().strip('"').strip("'")
+        if _looks_like_placeholder_secret(value):
+            continue
+        os.environ[name] = value
+
+
+_load_project_api_keys()
+
 # --- Configuration ---
 BASE_PATH_WIN = r"Z:\\Shared\\Current Clients"
 SCRIPTS_DIR = os.path.join(os.getcwd(), "Scripts")
@@ -28,4 +71,3 @@ API_KEYS = {
     "OpenAI": os.environ.get("OPENAI_API_KEY"),
     "Claude": os.environ.get("ANTHROPIC_API_KEY")
 }
-

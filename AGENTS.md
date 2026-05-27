@@ -8,7 +8,6 @@ iCharlotte is a legal document management and automation suite for law firm case
 
 **Technologies:**
 - **Backend/Main UI:** Python 3.x, PyQt6/PySide6, SQLite
-- **NoteTaker App:** Electron, React, TypeScript, TipTap, react-pdf-highlighter
 - **Document Processing:** pypdf, python-docx, Tesseract OCR, PyMuPDF
 - **LLM Providers:** Google Gemini, Anthropic Codex, OpenAI (with automatic fallback)
 - **Communication:** QWebChannel bridge for JS/Python interoperability
@@ -55,7 +54,6 @@ iCharlotte/
 │       ├── dialogs.py         # Settings dialogs
 │       └── widgets.py         # Common widgets (status, file tree, agent runner)
 ├── Scripts/                   # 44 Python analysis agents
-├── NoteTaker/                 # Electron/React PDF viewer app
 ├── tests/                     # Test suite
 └── config/                    # Configuration files
     └── llm_preferences.json   # LLM model preferences
@@ -226,12 +224,6 @@ result.print_summary()
 ```bash
 # Python App
 python iCharlotte.py
-
-# NoteTaker (Development)
-cd NoteTaker && npm run dev
-
-# NoteTaker (Build)
-cd NoteTaker && npm run build
 
 # Run Tests
 python -m pytest tests/

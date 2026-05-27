@@ -39,6 +39,13 @@ class TestSelectFiObjections(unittest.TestCase):
         self.assertIn("compound", objections.lower())
         self.assertIn("vague", objections.lower())
 
+    def test_number_specific_fi_objections(self):
+        rules = ResponseRules(fi_objections="Legacy blanket objection.")
+
+        self.assertEqual(select_fi_objections(rules, "1.1"), "")
+        self.assertIn("vague and ambiguous", select_fi_objections(rules, "15.1"))
+        self.assertIn("calls for an expert opinion", select_fi_objections(rules, "16.9"))
+
 
 class TestRuleBasedPreselect(unittest.TestCase):
     def test_compound_flag(self):

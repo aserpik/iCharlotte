@@ -219,32 +219,167 @@ _DEFAULT_FI_OBJECTIONS = (
     "request to the extent this interrogatory violates the attorney-client or work-product privilege."
 )
 
+_DEFAULT_FI_7_1_OBJECTIONS = (
+    "Responding Party objects on the basis that this request is meant for Plaintiff and not a "
+    "defendant as Responding Party is not asserting any claims. Responding Party further objects "
+    "on the grounds that this request is not relevant or reasonably calculated to lead to "
+    "discoverable evidence. Responding Party also objects on the basis that this request is vague, "
+    "ambiguous, and overbroad."
+)
+
+_DEFAULT_FI_12_1_OBJECTIONS = (
+    "Responding Party objects to this Interrogatory on the grounds that it calls for speculation, "
+    "and is compound, vague, ambiguous, uncertain and overbroad. Responding Party specifically "
+    "objects to this Interrogatory on the grounds that the terms \"witnessed,\" \"knowledge,\" "
+    "and \"statement\" are vague and ambiguous. Responding Party further objects to this "
+    "Interrogatory to the extent that it improperly violates the attorney-client privilege and/or "
+    "attorney work product doctrines. Responding Party further objects to this Interrogatory on "
+    "the grounds that the information sought is equally available to Propounding Party."
+)
+
+_DEFAULT_FI_12_2_OBJECTIONS = (
+    "Responding Party objects to this Interrogatory on the grounds that it is compound, calls for "
+    "speculation, and is vague, ambiguous, uncertain and overbroad. Responding Party specifically "
+    "objects to this Interrogatory on the grounds that the term \"interviewed\" is vague and "
+    "ambiguous. Responding Party objects to this request to the extent this interrogatory violates "
+    "the attorney-client or work-product privilege."
+)
+
+_DEFAULT_FI_12_3_OBJECTIONS = (
+    "Responding Party objects to this Interrogatory on the grounds that it is compound, calls for "
+    "speculation, and is vague, ambiguous, uncertain and overbroad. Responding Party specifically "
+    "objects to this Interrogatory on the grounds that the term \"statement\" is vague and ambiguous. "
+    "Responding Party objects to this request to the extent this interrogatory violates the "
+    "attorney-client or work-product privilege."
+)
+
+_DEFAULT_FI_12_6_OBJECTIONS = (
+    "Responding Party objects to this Interrogatory on the grounds that it is compound, calls for "
+    "speculation, and is vague, ambiguous, uncertain and overbroad. Responding Party objects to "
+    "this request to the extent this interrogatory violates the attorney-client or work-product "
+    "privilege."
+)
+
+_DEFAULT_FI_14_OBJECTIONS = (
+    "Responding Party objects to this Interrogatory on the grounds that it is compound, calls for "
+    "speculation, and is vague, ambiguous, uncertain and overbroad. Responding Party objects to "
+    "this request to the extent this interrogatory violates the attorney-client or work-product "
+    "privilege. Responding Party objects to this request to the extent this interrogatory calls "
+    "for a legal conclusion and/or expert opinion."
+)
+
+_DEFAULT_FI_15_1_OBJECTIONS = (
+    "Responding Party objects to this Interrogatory on the grounds that it is vague and ambiguous "
+    "as to the term \"material.\" Responding Party further objects to the extent this "
+    "Interrogatory invades the attorney-client privilege and work product doctrine. Responding "
+    "Party further objects to this Interrogatory on the grounds that it calls for an expert "
+    "opinion and a legal conclusion, and seeks the legal reasoning and theories of Responding "
+    "Party's contentions. Responding Party is not required to prepare the Propounding Party's "
+    "case. Discovery is continuing and Responding Party reserves the right to amend this response "
+    "upon discovery of additional facts and information."
+)
+
+_DEFAULT_FI_16_OBJECTIONS = (
+    "Responding Party objects to this Interrogatory on the grounds that it calls for speculation "
+    "and is vague, ambiguous, uncertain, and overbroad. Responding Party further objects to this "
+    "Interrogatory on the grounds that it calls for an expert opinion and a legal conclusion, and "
+    "seeks the legal reasoning and theories of Responding Party's contentions; Responding Party "
+    "is not required to prepare Propounding Party's case. Responding Party further objects to "
+    "this Interrogatory on the grounds that it seeks premature disclosure of expert opinion and "
+    "violates the attorney work-product privilege. Moreover, pursuant to instruction 2(d) to the "
+    "official form interrogatories, the interrogatories in section 16.0 should not be used until "
+    "the defendant has had a reasonable opportunity to conduct an investigation or discovery into "
+    "plaintiff's damages. At this time, Responding Party has not yet had an opportunity to depose "
+    "the Plaintiff, conduct an IME, or obtain all of the Plaintiff's medical records. As such, "
+    "Responding Party is not in a position to fully answer this Interrogatory at this time."
+)
+
+_DEFAULT_FI_20_OBJECTIONS = (
+    "Responding Party objects to this Interrogatory on the grounds that it is compound, calls for "
+    "speculation, and is vague, ambiguous, uncertain and overbroad."
+)
+
+_DEFAULT_FI_OBJECTIONS_BY_NUMBER = {
+    "7.1": _DEFAULT_FI_7_1_OBJECTIONS,
+    "12.1": _DEFAULT_FI_12_1_OBJECTIONS,
+    "12.2": _DEFAULT_FI_12_2_OBJECTIONS,
+    "12.3": _DEFAULT_FI_12_3_OBJECTIONS,
+    "12.5": _DEFAULT_FI_OBJECTIONS,
+    "12.6": _DEFAULT_FI_12_6_OBJECTIONS,
+    "12.7": _DEFAULT_FI_12_6_OBJECTIONS,
+    "13.1": _DEFAULT_FI_12_6_OBJECTIONS,
+    "13.2": _DEFAULT_FI_12_6_OBJECTIONS,
+    "14.1": _DEFAULT_FI_14_OBJECTIONS,
+    "14.2": _DEFAULT_FI_14_OBJECTIONS,
+    "15.1": _DEFAULT_FI_15_1_OBJECTIONS,
+    "16.*": _DEFAULT_FI_16_OBJECTIONS,
+    "20.3": _DEFAULT_FI_20_OBJECTIONS,
+    "20.4": _DEFAULT_FI_20_OBJECTIONS,
+    "20.5": _DEFAULT_FI_20_OBJECTIONS,
+    "20.6": _DEFAULT_FI_20_OBJECTIONS,
+    "20.7": _DEFAULT_FI_20_OBJECTIONS,
+    "20.8": _DEFAULT_FI_20_OBJECTIONS,
+    "20.9": _DEFAULT_FI_20_OBJECTIONS,
+    "20.10": _DEFAULT_FI_20_OBJECTIONS,
+    "20.11": _DEFAULT_FI_20_OBJECTIONS,
+}
+
+_MANDATORY_FI_OBJECTIONS_BY_NUMBER = {
+    key: _DEFAULT_FI_OBJECTIONS_BY_NUMBER[key]
+    for key in (
+        "12.1",
+        "12.2",
+        "12.3",
+        "12.6",
+        "12.7",
+        "13.1",
+        "13.2",
+        "14.1",
+        "14.2",
+        "15.1",
+        "16.*",
+    )
+}
+
 _DEFAULT_FI_1_1_RESPONSE = (
     "Responding Party and its attorneys of record, {firm_name}, {firm_address}; {firm_phone}."
 )
 
 _DEFAULT_FI_15_1_RESPONSE = (
-    "Responding Party filed a General Denial pursuant to California Code of Civil Procedure § 431.30. "
-    "At the time the Answer was filed, Responding Party had insufficient information to admit or deny "
-    "specific factual allegations and therefore filed a General Denial. The affirmative defenses set "
-    "forth in the Answer are asserted in good faith based on information available at the time of "
-    "filing. Discovery and investigation are ongoing, and Responding Party reserves the right to "
-    "amend its Answer and affirmative defenses as additional information is obtained."
+    "A general denial is interposed as a matter of right based in part on California Code of "
+    "Civil Procedure § 431.30. As to affirmative defenses, this interrogatory is premature at "
+    "this time."
 )
 
 _DEFAULT_FI_16_RESPONSE = (
-    "This interrogatory relates to the Section 16.0 series regarding physical, mental, or emotional "
-    "injuries. Responding Party objects to this interrogatory to the extent it seeks information "
-    "beyond what is required by the applicable form and to the extent it seeks information protected "
-    "by the attorney-client privilege or the work-product doctrine. Subject to and without waiving "
-    "the foregoing objections, Responding Party responds as follows: Propounding Party has had a "
-    "full and fair opportunity to conduct a deposition of Responding Party and/or its representatives "
-    "and/or agents. Responding Party has produced and/or will produce all medical records in its "
-    "possession, custody, or control. An Independent Medical Examination (IME) has been and/or may "
-    "be scheduled in this matter, and Responding Party reserves all rights with respect thereto. "
-    "Medical records responsive to this Section 16.0 interrogatory have been and/or will be produced "
-    "through discovery."
+    "Pursuant to instruction 2(d) to the official form interrogatories, the interrogatories in "
+    "section 16.0 should not be used until the defendant has had a reasonable opportunity to conduct "
+    "an investigation or discovery into plaintiff's injuries and damages. At this time, responding "
+    "party has yet to have an opportunity to depose the Plaintiffs, obtain an IME and obtain all of "
+    "the Plaintiffs' medical records. As such, Responding Party is not in a position to fully answer "
+    "this interrogatory at this time."
 )
+
+_DEFAULT_FI_3_7_RESPONSE = (
+    "No, other than the customary licenses necessary to operate a business."
+)
+
+_DEFAULT_FI_7_1_RESPONSE = (
+    "Not Applicable. Responding Party is not making a claim for damages in this action."
+)
+
+_DEFAULT_FI_7_RESPONSE = "Not Applicable."
+
+_DEFAULT_FI_RESPONSES_BY_NUMBER = {
+    "3.7": _DEFAULT_FI_3_7_RESPONSE,
+    "7.1": _DEFAULT_FI_7_1_RESPONSE,
+    "7.2": _DEFAULT_FI_7_RESPONSE,
+    "7.3": _DEFAULT_FI_7_RESPONSE,
+    "15.1": _DEFAULT_FI_15_1_RESPONSE,
+    "16.*": "",
+}
+
+_MANDATORY_FI_RESPONSES_BY_NUMBER = dict(_DEFAULT_FI_RESPONSES_BY_NUMBER)
 
 
 # ---------------------------------------------------------------------------
@@ -312,6 +447,12 @@ class ResponseRules:
     # Fixed FI responses
     # ------------------------------------------------------------------
     fi_objections: str = field(default_factory=lambda: _DEFAULT_FI_OBJECTIONS)
+    fi_objections_by_number: Dict[str, str] = field(
+        default_factory=lambda: dict(_DEFAULT_FI_OBJECTIONS_BY_NUMBER)
+    )
+    fi_responses_by_number: Dict[str, str] = field(
+        default_factory=lambda: dict(_DEFAULT_FI_RESPONSES_BY_NUMBER)
+    )
     fi_1_1_response: str = field(default_factory=lambda: _DEFAULT_FI_1_1_RESPONSE)
     fi_15_1_response: str = field(default_factory=lambda: _DEFAULT_FI_15_1_RESPONSE)
     fi_16_response: str = field(default_factory=lambda: _DEFAULT_FI_16_RESPONSE)
@@ -344,6 +485,14 @@ class ResponseRules:
         for key, value in data.items():
             if key in valid_keys:
                 merged[key] = value
+        merged["fi_objections_by_number"] = dict(
+            merged.get("fi_objections_by_number") or {}
+        )
+        merged["fi_objections_by_number"].update(_MANDATORY_FI_OBJECTIONS_BY_NUMBER)
+        merged["fi_responses_by_number"] = dict(
+            merged.get("fi_responses_by_number") or {}
+        )
+        merged["fi_responses_by_number"].update(_MANDATORY_FI_RESPONSES_BY_NUMBER)
         return cls(**merged)
 
     def save_to_json(self, path: str) -> None:

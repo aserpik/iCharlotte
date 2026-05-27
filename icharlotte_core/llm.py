@@ -3,9 +3,111 @@ import json
 import datetime
 import subprocess
 import os
+import re
 import threading
 from .config import API_KEYS
 from .utils import log_event
+from . import model_catalog
+
+OPENAI_REASONING_MODEL_RE = re.compile(r"^o\d(?:[-.]|$)", re.IGNORECASE)
+OPENAI_REASONING_EFFORTS = {"none", "minimal", "low", "medium", "high", "xhigh"}
+GEMINI_MODELS_ENDPOINT = model_catalog.GEMINI_MODELS_ENDPOINT
+CURATED_GEMINI_MODELS = model_catalog.CURATED_GEMINI_MODELS
+
+
+def _openai_uses_responses_api(model):
+    """Return True for OpenAI reasoning models that should use Responses."""
+    model_id = (model or "").lower()
+    return model_id.startswith("gpt-5") or bool(OPENAI_REASONING_MODEL_RE.match(model_id))
+
+
+def _openai_model_supports_streaming(model):
+    return not (model or "").lower().startswith("gpt-5.5-pro")
+
+
+def _openai_reasoning_effort(model, thinking_level):
+    level = (thinking_level or "").strip().lower()
+    if level == "none" and (model or "").lower().startswith("gpt-5.5-pro"):
+        return None
+    if level in OPENAI_REASONING_EFFORTS:
+        return level
+    return None
+
+
+def _curated_gemini_models():
+    return list(model_catalog.CURATED_GEMINI_MODELS)
+
+
+def _normalize_gemini_model_name(name):
+    return model_catalog._normalize_gemini_model_name(name)
+
+
+def _gemini_model_methods(model):
+    return model_catalog._gemini_model_methods(model)
+
+
+def _gemini_supports_generate_content(model):
+    return model_catalog._gemini_supports_generate_content(model)
+
+
+def _gemini_model_name(model):
+    return model_catalog._gemini_model_id(model)
+
+
+def _gemini_models_from_entries(entries):
+    models = [entry.model_id for entry in model_catalog.gemini_entries_from_models(entries)]
+    return sorted(set(models), reverse=True)
+
+
+def _fetch_gemini_models_over_rest(api_key):
+    return [
+        entry.model_id
+        for entry in model_catalog.fetch_provider_models(
+            "Gemini",
+            api_key=api_key,
+            request_get=requests.get,
+        )
+    ]
+
+
+def _openai_user_content(user_prompt, file_contents):
+    full_user_content = user_prompt
+    if file_contents:
+        full_user_content += "\n\n[ATTACHED FILES]:\n" + file_contents
+    return full_user_content
+
+
+def _openai_responses_input(history, full_user_content):
+    input_items = []
+    for msg in history or []:
+        role = msg.get("role", "user")
+        if role not in {"user", "assistant", "developer", "system"}:
+            role = "user"
+        input_items.append({"role": role, "content": msg.get("content", "")})
+    input_items.append({"role": "user", "content": full_user_content})
+    return input_items
+
+
+def _extract_openai_responses_text(data):
+    if isinstance(data.get("output_text"), str):
+        return data["output_text"]
+
+    text_parts = []
+    for item in data.get("output", []):
+        content = item.get("content", [])
+        if isinstance(content, str):
+            text_parts.append(content)
+            continue
+
+        for part in content:
+            if not isinstance(part, dict):
+                continue
+            text = part.get("text")
+            if isinstance(text, str) and part.get("type") in {"output_text", "text", None}:
+                text_parts.append(text)
+
+    return "".join(text_parts)
+
 
 # Try to import PySide6 for worker classes (optional - needed for UI integration)
 try:
@@ -228,27 +330,63 @@ class LLMHandler:
                     _cleanup_uploads(client, uploaded_files)
 
         elif provider == "OpenAI":
-            url = "https://api.openai.com/v1/chat/completions"
+            use_responses_api = _openai_uses_responses_api(model)
+            request_stream = do_stream and _openai_model_supports_streaming(model)
+            url = (
+                "https://api.openai.com/v1/responses"
+                if use_responses_api
+                else "https://api.openai.com/v1/chat/completions"
+            )
             headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 
-            messages = [{"role": "system", "content": system_prompt}]
-            if history:
-                messages.extend(history)
+            full_user_content = _openai_user_content(user_prompt, file_contents)
 
-            full_user_content = user_prompt
-            if file_contents: full_user_content += "\n\n[ATTACHED FILES]:\n" + file_contents
-            messages.append({"role": "user", "content": full_user_content})
+            if use_responses_api:
+                payload = {
+                    "model": model,
+                    "input": _openai_responses_input(history, full_user_content),
+                }
+                if system_prompt:
+                    payload["instructions"] = system_prompt
+                if max_tokens > 0:
+                    payload["max_output_tokens"] = max_tokens
+                effort = _openai_reasoning_effort(model, thinking_level)
+                if effort:
+                    payload["reasoning"] = {"effort": effort}
+            else:
+                messages = [{"role": "system", "content": system_prompt}]
+                if history:
+                    messages.extend(history)
+                messages.append({"role": "user", "content": full_user_content})
 
-            payload = {
-                "model": model, "messages": messages,
-                "temperature": temp, "top_p": top_p
-            }
-            if max_tokens > 0: payload["max_tokens"] = max_tokens
+                payload = {
+                    "model": model, "messages": messages,
+                    "temperature": temp, "top_p": top_p
+                }
+                if max_tokens > 0: payload["max_tokens"] = max_tokens
 
             if do_stream:
                 # Streaming mode
+                if not request_stream:
+                    api_name = "OpenAI Responses" if use_responses_api else "OpenAI"
+                    log_event(
+                        f"Sending non-streaming request to {api_name} "
+                        f"(Model: {model}, streaming not supported)"
+                    )
+                    resp = requests.post(url, headers=headers, json=payload)
+                    if resp.status_code != 200:
+                        raise Exception(f"OpenAI Error {resp.status_code}: {resp.text}")
+
+                    data = resp.json()
+                    if use_responses_api:
+                        text = _extract_openai_responses_text(data)
+                    else:
+                        text = data['choices'][0]['message']['content']
+                    return iter([text] if text else [])
+
                 payload["stream"] = True
-                log_event(f"Sending streaming request to OpenAI (Model: {model})")
+                api_name = "OpenAI Responses" if use_responses_api else "OpenAI"
+                log_event(f"Sending streaming request to {api_name} (Model: {model})")
                 resp = requests.post(url, headers=headers, json=payload, stream=True)
 
                 if resp.status_code != 200:
@@ -265,9 +403,19 @@ class LLMHandler:
                                         break
                                     try:
                                         data = json.loads(data_str)
-                                        delta = data.get('choices', [{}])[0].get('delta', {})
-                                        if 'content' in delta and delta['content']:
-                                            yield delta['content']
+                                        if use_responses_api:
+                                            event_type = data.get("type")
+                                            if event_type == "response.output_text.delta":
+                                                delta = data.get("delta", "")
+                                                if delta:
+                                                    yield delta
+                                            elif event_type in {"error", "response.failed"}:
+                                                err = data.get("error") or data.get("response", {}).get("error") or data
+                                                raise Exception(err)
+                                        else:
+                                            delta = data.get('choices', [{}])[0].get('delta', {})
+                                            if 'content' in delta and delta['content']:
+                                                yield delta['content']
                                     except json.JSONDecodeError:
                                         pass
                     except Exception as e:
@@ -277,10 +425,14 @@ class LLMHandler:
                 return openai_stream()
             else:
                 # Non-streaming mode
-                log_event(f"Sending request to OpenAI (Model: {model})")
+                api_name = "OpenAI Responses" if use_responses_api else "OpenAI"
+                log_event(f"Sending request to {api_name} (Model: {model})")
                 resp = requests.post(url, headers=headers, json=payload)
                 if resp.status_code == 200:
-                    return resp.json()['choices'][0]['message']['content']
+                    data = resp.json()
+                    if use_responses_api:
+                        return _extract_openai_responses_text(data)
+                    return data['choices'][0]['message']['content']
                 raise Exception(f"OpenAI Error {resp.status_code}: {resp.text}")
 
         elif provider == "Claude":
@@ -456,41 +608,16 @@ if PYSIDE6_AVAILABLE:
 
         def run(self):
             try:
-                models = []
-                if self.provider == "OpenAI":
-                    url = "https://api.openai.com/v1/models"
-                    headers = {"Authorization": f"Bearer {self.api_key}"}
-                    resp = requests.get(url, headers=headers)
-                    if resp.status_code == 200:
-                        all_models = resp.json()['data']
-                        models = [m['id'] for m in all_models if m['id'].startswith(('gpt', 'o1', 'o3'))]
-                        models.sort(reverse=True)
-                    else:
-                        raise Exception(f"OpenAI Error: {resp.status_code} {resp.text}")
+                entries = model_catalog.list_provider_models(
+                    self.provider,
+                    api_key=self.api_key,
+                    request_get=requests.get,
+                    allow_fallback=True,
+                )
+                models = [entry.model_id for entry in entries]
 
-                elif self.provider == "Gemini":
-                    if genai:
-                        client = genai.Client(api_key=self.api_key)
-                        # Try iterating; if fails, catch exception
-                        found_models = list(client.models.list())
-                        for m in found_models:
-                            name = m.name if hasattr(m, 'name') else str(m)
-                            if name.startswith('models/'):
-                                name = name[7:]
-                            if 'gemini' in name.lower():
-                                models.append(name)
-                    else:
-                        raise ImportError("google.genai not installed")
-
+                if self.provider == "Gemini":
                     models.sort(reverse=True)
-
-                elif self.provider == "Claude":
-                    # Return well-known models — CLI uses Max subscription, no API key needed
-                    models = [
-                        "claude-opus-4-6",
-                        "claude-sonnet-4-6",
-                        "claude-haiku-4-5-20251001",
-                    ]
 
                 self.finished.emit(self.provider, models)
 

@@ -132,22 +132,40 @@ def extract_file_number(path: str) -> str:
 
 def add_markdown_to_doc(doc, content):
     """Parses basic Markdown and adds it to the docx Document."""
+    from icharlotte_core.docx_writer import (
+        try_consume_markdown_table,
+        add_markdown_table_to_doc,
+        render_inline_markdown,
+    )
+
     lines = content.split('\n')
     active_paragraph = None
 
-    for line in lines:
+    i = 0
+    while i < len(lines):
+        line = lines[i]
         stripped = line.strip()
         if not stripped:
+            i += 1
+            continue
+
+        # Markdown table block — emit a real Word table.
+        consumed, header, rows = try_consume_markdown_table(lines, i)
+        if consumed:
+            add_markdown_table_to_doc(doc, header, rows)
+            i += consumed
+            active_paragraph = None
             continue
 
         # Headings: Convert to bold text at start of paragraph, ending with period
         if stripped.startswith('#'):
-            text = stripped.lstrip('#').strip()
+            text = stripped.lstrip('#').strip().replace('**', '').replace('__', '')
             if not text.endswith('.'):
                 text += "."
             active_paragraph = doc.add_paragraph()
             run = active_paragraph.add_run(text + " ")
             run.bold = True
+            i += 1
             continue
 
         # List items
@@ -158,36 +176,21 @@ def add_markdown_to_doc(doc, content):
             p.paragraph_format.left_indent = Inches(0.5)
             p.paragraph_format.first_line_indent = Inches(-0.25)
 
-            run = p.add_run("\t")
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(12)
+            tab_run = p.add_run("\t")
+            tab_run.font.name = 'Times New Roman'
+            tab_run.font.size = Pt(12)
 
-            # Support bold parsing within list items
-            parts = re.split(r'(\*\*.*?\*\*)', text)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    r = p.add_run(part[2:-2])
-                    r.bold = True
-                else:
-                    r = p.add_run(part)
-                r.font.name = 'Times New Roman'
-                r.font.size = Pt(12)
+            render_inline_markdown(p, text)
 
             active_paragraph = None
+            i += 1
             continue
 
-        # Normal text (with bold support)
+        # Normal text (bold/italic/code via shared inline parser)
         p = active_paragraph if active_paragraph else doc.add_paragraph()
-
-        parts = re.split(r'(\*\*.*?\*\*)', stripped)
-        for part in parts:
-            if part.startswith('**') and part.endswith('**'):
-                run = p.add_run(part[2:-2])
-                run.bold = True
-            else:
-                p.add_run(part)
-
+        render_inline_markdown(p, stripped)
         active_paragraph = None
+        i += 1
 
 
 def save_to_docx(content: str, output_path: str, title_text: str, logger: AgentLogger) -> bool:
@@ -296,7 +299,11 @@ def get_output_directory(input_path: str) -> str:
 # Main Processing Functions
 # =============================================================================
 
-def process_document(input_path: str, logger: AgentLogger) -> bool:
+def process_document(
+    input_path: str,
+    logger: AgentLogger,
+    output_path_override: str = None,
+) -> bool:
     """
     Process a single document through the summarization pipeline.
 
@@ -352,7 +359,14 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
                 logger=logger
             )
             logger.progress(10, "Running text extraction (OCR if needed)...")
-            result = processor.extract_with_dynamic_ocr(input_path)
+
+            def _extraction_progress(page_num: int, total_pages: int) -> None:
+                """Interpolate page progress into the 10→22 percent range."""
+                if total_pages > 0:
+                    scaled = 10 + int((page_num / total_pages) * 12)
+                    logger.progress(scaled, f"Extracting page {page_num} of {total_pages}")
+
+            result = processor.extract_with_dynamic_ocr(input_path, progress_callback=_extraction_progress)
 
             if not result.success:
                 raise ExtractionError(f"Failed to extract text: {result.error}", file_path=input_path)
@@ -381,7 +395,13 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
     try:
         with memory_monitor.track_operation("Summary Generation"):
             logger.progress(35, "Sending document to LLM for summarization...")
-            summary = llm_caller.call(summary_prompt, text, task_type="summary")
+            summary = llm_caller.call(
+                summary_prompt,
+                text,
+                task_type="summary",
+                agent_id="agent_summarize",
+                pass_name="summary",
+            )
 
             if not summary:
                 raise SummaryPassError("LLM returned empty response")
@@ -409,7 +429,13 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
                 formatted_prompt = cross_check_prompt.replace("{summary}", summary).replace("{original}", text[:50000])
 
                 logger.progress(72, "Sending to LLM for cross-check verification...")
-                verified_summary = llm_caller.call(formatted_prompt, "", task_type="cross_check")
+                verified_summary = llm_caller.call(
+                    formatted_prompt,
+                    "",
+                    task_type="cross_check",
+                    pass_name="cross_check",
+                    pass_agent_id="agent_summarize",
+                )
 
                 if verified_summary:
                     # Check if cross-check made meaningful changes
@@ -437,17 +463,20 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
     # Save Output (with process-safe locking) (88% - 95%)
     # ==========================================================================
     logger.progress(89, "Preparing to save output...")
-    output_dir = get_output_directory(input_path)
+    if output_path_override:
+        output_file = output_path_override
+        output_dir = os.path.dirname(output_file) or "."
+    else:
+        output_dir = get_output_directory(input_path)
+        output_file = os.path.join(output_dir, "AI_OUTPUT.docx")
 
     if not os.path.exists(output_dir):
         try:
-            os.makedirs(output_dir)
+            os.makedirs(output_dir, exist_ok=True)
             logger.info(f"Created directory: {output_dir}")
         except Exception as e:
             logger.error(f"Error creating directory: {e}")
             return False
-
-    output_file = os.path.join(output_dir, "AI_OUTPUT.docx")
     title = os.path.basename(input_path)
 
     logger.progress(91, f"Saving to {os.path.basename(output_file)}...")
@@ -478,7 +507,7 @@ def process_document(input_path: str, logger: AgentLogger) -> bool:
             var_key = f"summary_{clean_var_name}"
 
             logger.info(f"Saving to case data: {var_key} for {file_num}")
-            data_manager.save_variable(file_num, var_key, summary, source="summarize_agent")
+            data_manager.save_variable(file_num, var_key, summary, source="summarize_agent", auto_tag=False)
     except Exception as e:
         logger.warning(f"Could not save to case data: {e}")
 
@@ -540,6 +569,20 @@ def main():
     # Parse arguments
     raw_args = sys.argv[1:]
 
+    # Extract --output_path <path> if present (used by Wizard parallel runs to
+    # route this agent's output to a unique file).
+    output_path_override = None
+    filtered_args = []
+    i = 0
+    while i < len(raw_args):
+        if raw_args[i] == "--output_path" and i + 1 < len(raw_args):
+            output_path_override = raw_args[i + 1]
+            i += 2
+        else:
+            filtered_args.append(raw_args[i])
+            i += 1
+    raw_args = filtered_args
+
     # Handle quoted paths with spaces
     combined_arg = " ".join(raw_args)
     clean_combined = combined_arg.strip().strip('"').strip("'")
@@ -550,7 +593,9 @@ def main():
         file_paths = raw_args
 
     # Dispatcher mode: multiple files
-    if len(file_paths) > 1:
+    # NOTE: skipped when an output_path_override is supplied — the caller
+    # (Wizard parallel worker) is managing per-file fan-out itself.
+    if len(file_paths) > 1 and not output_path_override:
         safe_print(f"Detected {len(file_paths)} files. Launching separate agents...")
         for path in file_paths:
             try:
@@ -589,7 +634,7 @@ def main():
         sys.exit(0)
 
     # Single file processing
-    success = process_document(input_path, logger)
+    success = process_document(input_path, logger, output_path_override=output_path_override)
 
     if success:
         logger.info("Agent finished successfully.")

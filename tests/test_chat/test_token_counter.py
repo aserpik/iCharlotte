@@ -63,11 +63,11 @@ class TestTokenCounter(unittest.TestCase):
     def test_get_context_limit_known_model(self):
         """Test getting context limit for known models."""
         # Gemini models
-        limit = TokenCounter.get_context_limit('gemini-3-flash-preview')
+        limit = TokenCounter.get_context_limit('gemini-3.5-flash')
         self.assertEqual(limit, 1048576)
 
-        limit = TokenCounter.get_context_limit('gemini-1.5-pro')
-        self.assertEqual(limit, 2097152)
+        limit = TokenCounter.get_context_limit('gemini-3.1-pro-preview')
+        self.assertEqual(limit, 1048576)
 
         # OpenAI models
         limit = TokenCounter.get_context_limit('gpt-4o')

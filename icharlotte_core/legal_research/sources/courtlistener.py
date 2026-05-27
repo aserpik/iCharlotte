@@ -3,6 +3,7 @@
 import logging
 import re
 from typing import Dict, List, Optional
+from urllib.parse import urljoin
 
 import requests
 
@@ -19,6 +20,16 @@ CA_COURTS = (
 )
 
 REQUEST_TIMEOUT = 30  # seconds
+
+
+def opinion_url_for_cluster(cluster: dict) -> str:
+    """Return a public CourtListener opinion URL for a cluster record."""
+    absolute_url = (cluster or {}).get("absolute_url") or ""
+    if not absolute_url:
+        return ""
+    if absolute_url.startswith("http://") or absolute_url.startswith("https://"):
+        return absolute_url
+    return urljoin("https://www.courtlistener.com/", absolute_url)
 
 
 class CourtListenerClient:
@@ -44,6 +55,10 @@ class CourtListenerClient:
             "Content-Type": "application/json",
         }
 
+    def _auth_headers(self) -> Dict[str, str]:
+        """Return auth headers without forcing a JSON request content type."""
+        return {"Authorization": f"Token {self.token}"}
+
     def _parse_result(self, r: dict) -> CaseResult:
         """Convert a single CourtListener search result dict to a CaseResult."""
         # Citation: use the first entry if available
@@ -54,8 +69,7 @@ class CourtListenerClient:
         snippet_raw = r.get("snippet") or ""
         snippet_clean = re.sub(r"<[^>]+>", "", snippet_raw)
 
-        absolute_url = r.get("absolute_url") or ""
-        full_url = f"https://www.courtlistener.com{absolute_url}" if absolute_url else ""
+        full_url = opinion_url_for_cluster(r)
 
         return CaseResult(
             name=r.get("caseName") or "",
@@ -70,6 +84,53 @@ class CourtListenerClient:
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+
+    def lookup_citations(self, text: str) -> list[dict]:
+        """Look up citations found in arbitrary text.
+
+        Returns raw CourtListener citation-lookup records, or an empty list on
+        blank input or API failure.
+        """
+        if not text or not text.strip():
+            return []
+
+        try:
+            resp = requests.post(
+                f"{BASE_URL}/citation-lookup/",
+                headers=self._auth_headers(),
+                data={"text": text},
+                timeout=REQUEST_TIMEOUT,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if isinstance(data, list):
+                return data
+            if isinstance(data, dict):
+                results = data.get("results")
+                return results if isinstance(results, list) else []
+            return []
+        except Exception:
+            logger.warning("CourtListener citation lookup failed", exc_info=True)
+            return []
+
+    def get_cluster(self, cluster_id: int | str) -> dict | None:
+        """Fetch a CourtListener opinion cluster by ID."""
+        try:
+            resp = requests.get(
+                f"{BASE_URL}/clusters/{cluster_id}/",
+                headers=self._headers(),
+                timeout=REQUEST_TIMEOUT,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            return data if isinstance(data, dict) else None
+        except Exception:
+            logger.warning(
+                "CourtListener cluster fetch failed for cluster %s",
+                cluster_id,
+                exc_info=True,
+            )
+            return None
 
     def search_opinions(
         self,

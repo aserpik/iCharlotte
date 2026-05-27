@@ -1,0 +1,54 @@
+<h2>Oppose a Motion v1 workflow</h2>
+<p class="subtitle">Recommended architecture: shared opposition engine plus guided Wizard UI.</p>
+
+<div class="mockup">
+  <div class="mockup-header">End-to-end flow</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;align-items:stretch">
+      <div class="placeholder" style="height:120px;text-align:left">
+        <strong>1. Select motion</strong><br><br>
+        PDF/DOCX motion to oppose
+      </div>
+      <div class="placeholder" style="height:120px;text-align:left">
+        <strong>2. Select context</strong><br><br>
+        PDF/DOCX/TXT/MSG factual context
+      </div>
+      <div class="placeholder" style="height:120px;text-align:left">
+        <strong>3. Confirm motion type</strong><br><br>
+        Auto-detected, user-confirmed
+      </div>
+      <div class="placeholder" style="height:120px;text-align:left">
+        <strong>4. Review outline</strong><br><br>
+        3-level tree, selected by default
+      </div>
+      <div class="placeholder" style="height:120px;text-align:left">
+        <strong>5. Draft + verify</strong><br><br>
+        Memo preview with source drawer
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Service layer</div>
+    <div class="mockup-body">
+      <div class="placeholder" style="height:52px;text-align:left">Document extraction</div>
+      <div class="placeholder" style="height:52px;text-align:left">Motion analyzer</div>
+      <div class="placeholder" style="height:52px;text-align:left">Outline state</div>
+      <div class="placeholder" style="height:52px;text-align:left">Legal research + drafting</div>
+      <div class="placeholder" style="height:52px;text-align:left">Citation verification</div>
+      <div class="placeholder" style="height:52px;text-align:left">Word assembly + validation</div>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">Wizard UI</div>
+    <div class="mockup-body">
+      <div class="placeholder" style="height:80px;text-align:left">Task card: Oppose a Motion</div>
+      <div class="placeholder" style="height:80px;text-align:left">Confirmation + outline editor screens</div>
+      <div class="placeholder" style="height:80px;text-align:left">Output preview with right-side source drawer</div>
+      <div class="placeholder" style="height:80px;text-align:left">Save button asks where to save .docx</div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,66 @@
+<h2>Respond to Discovery Wizard Flow</h2>
+<p class="subtitle">Proposed guided flow while keeping the existing Discovery -> Respond subtab intact.</p>
+
+<div class="mockup">
+  <div class="mockup-header">End-to-end task flow</div>
+  <div class="mockup-body">
+    <div style="display:grid;grid-template-columns:repeat(5,minmax(120px,1fr));gap:12px;align-items:stretch">
+      <div class="placeholder" style="min-height:110px">
+        <div class="label">Step 1</div>
+        <h3>Select Task</h3>
+        <p>Wizard card: Respond to Discovery</p>
+      </div>
+      <div class="placeholder" style="min-height:110px">
+        <div class="label">Step 2</div>
+        <h3>Select File</h3>
+        <p>Pick one incoming discovery PDF</p>
+      </div>
+      <div class="placeholder" style="min-height:110px">
+        <div class="label">Step 3</div>
+        <h3>Detect Type + Parse</h3>
+        <p>Filename, then first-page text, then parser</p>
+      </div>
+      <div class="placeholder" style="min-height:110px">
+        <div class="label">Step 4</div>
+        <h3>Rules</h3>
+        <p>Selectable objection and response rules while parsing runs</p>
+      </div>
+      <div class="placeholder" style="min-height:110px">
+        <div class="label">Step 5</div>
+        <h3>Context</h3>
+        <p>Select case files for answer drafting</p>
+      </div>
+    </div>
+
+    <div style="height:16px"></div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:12px;align-items:stretch">
+      <div class="placeholder" style="min-height:120px">
+        <div class="label">Step 6</div>
+        <h3>Generate Proposals</h3>
+        <p>Selected rules + parsed requests + context produce objection and substantive text per request.</p>
+      </div>
+      <div class="placeholder" style="min-height:120px">
+        <div class="label">Step 7</div>
+        <h3>Review One by One</h3>
+        <p>User edits objections and answers, toggles standard objections, and approves each request.</p>
+      </div>
+      <div class="placeholder" style="min-height:120px">
+        <div class="label">Step 8</div>
+        <h3>Assemble Word Output</h3>
+        <p>Existing caption/template, preliminary statement, waiver, reservation, and verification logic.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Key design choices already locked</h3>
+  <ul>
+    <li>Existing Discovery -> Respond subtab remains available.</li>
+    <li>Discovery type detection uses filename first, first-page text second, and asks only if unclear or conflicting.</li>
+    <li>RFA/RPD show objection rules only; hidden substantive defaults still apply.</li>
+    <li>Custom rules go into a shared library, with wizard UI first.</li>
+    <li>Every request must be explicitly approved before final assembly.</li>
+  </ul>
+</div>

@@ -58,6 +58,103 @@ class TestLLMStreaming(unittest.TestCase):
         self.assertEqual(tokens, ['Hello', ' World'])
 
     @patch('icharlotte_core.llm.requests.post')
+    def test_openai_gpt5_streaming_uses_responses_api_without_sampling_params(self, mock_post):
+        """GPT-5 reasoning models should use Responses and omit unsupported sampling params."""
+        from icharlotte_core.llm import LLMHandler
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.iter_lines.return_value = [
+            b'data: {"type":"response.output_text.delta","delta":"Hello"}',
+            b'data: {"type":"response.output_text.delta","delta":" World"}',
+            b'data: {"type":"response.completed","response":{"status":"completed"}}'
+        ]
+        mock_post.return_value = mock_response
+
+        result = LLMHandler.generate(
+            provider='OpenAI',
+            model='gpt-5.5-2026-04-23',
+            system_prompt='You are helpful.',
+            user_prompt='Say hello',
+            file_contents='',
+            settings={
+                'stream': True,
+                'temperature': 0.7,
+                'top_p': 0.95,
+                'max_tokens': 500,
+            },
+            history=[{'role': 'user', 'content': 'Earlier question'}],
+        )
+
+        call_args = mock_post.call_args
+        self.assertEqual(call_args[0][0], 'https://api.openai.com/v1/responses')
+        request_data = call_args[1]['json']
+        self.assertNotIn('temperature', request_data)
+        self.assertNotIn('top_p', request_data)
+        self.assertEqual(request_data['max_output_tokens'], 500)
+        self.assertEqual(request_data['instructions'], 'You are helpful.')
+
+        tokens = list(result)
+        self.assertEqual(tokens, ['Hello', ' World'])
+
+    @patch('icharlotte_core.llm.requests.post')
+    def test_openai_gpt5_non_streaming_parses_responses_output_text(self, mock_post):
+        """Non-streaming GPT-5 Responses calls should return assistant text."""
+        from icharlotte_core.llm import LLMHandler
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {
+            'output': [
+                {
+                    'type': 'message',
+                    'content': [
+                        {'type': 'output_text', 'text': 'Hello World'}
+                    ],
+                }
+            ]
+        }
+        mock_post.return_value = mock_response
+
+        result = LLMHandler.generate(
+            provider='OpenAI',
+            model='gpt-5.5',
+            system_prompt='You are helpful.',
+            user_prompt='Say hello',
+            file_contents='',
+            settings={'stream': False}
+        )
+
+        self.assertEqual(mock_post.call_args[0][0], 'https://api.openai.com/v1/responses')
+        self.assertEqual(result, 'Hello World')
+
+    @patch('icharlotte_core.llm.requests.post')
+    def test_openai_gpt55_pro_chat_tab_request_omits_none_effort_and_disables_streaming(self, mock_post):
+        """GPT-5.5 Pro should not receive reasoning.effort=none or stream=True."""
+        from icharlotte_core.llm import LLMHandler
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = {'output_text': 'Pro response'}
+        mock_post.return_value = mock_response
+
+        result = LLMHandler.generate(
+            provider='OpenAI',
+            model='gpt-5.5-pro',
+            system_prompt='You are helpful.',
+            user_prompt='Say hello',
+            file_contents='',
+            settings={'stream': True, 'thinking_level': 'None'}
+        )
+
+        call_args = mock_post.call_args
+        self.assertEqual(call_args[0][0], 'https://api.openai.com/v1/responses')
+        request_data = call_args[1]['json']
+        self.assertNotIn('reasoning', request_data)
+        self.assertNotIn('stream', request_data)
+        self.assertEqual(list(result), ['Pro response'])
+
+    @patch('icharlotte_core.llm.requests.post')
     def test_claude_streaming_generator(self, mock_post):
         """Test Claude streaming returns a generator."""
         from icharlotte_core.llm import LLMHandler

@@ -158,8 +158,10 @@ def _write_ready_session(tmp_path, *, cross_check, selected, added, bullets=5, l
             "deponent_label": label,
             "custom_rules": rules,
             "cross_check_enabled": cross_check,
-            "bias": "neutral",
-            "bias_custom": "",
+            "audience": "neutral",
+            "audience_custom": "",
+            "tone": "recitation",
+            "tone_custom": "",
             "context_doc_paths": [],
         },
     })
@@ -285,20 +287,31 @@ def test_phase2_prompt_substitution_strips_user_braces(tmp_path, monkeypatch):
     assert "Avoid bullets_per_topic or deponent_label references." in prompt
 
 
-@pytest.mark.parametrize("bias_value,bias_custom,expected_substring", [
-    ("neutral", "", "neutral, balanced tone"),
-    ("pro_plaintiff", "", "most favorable to the plaintiff"),
-    ("pro_defense", "", "most favorable to the defense"),
-    ("custom", "Highlight inconsistencies in injury testimony.",
-     "Highlight inconsistencies in injury testimony."),
-])
-def test_phase2_resolves_bias_directive_for_each_preset(
-    tmp_path, monkeypatch, bias_value, bias_custom, expected_substring
-):
-    """Each bias preset routes the expected directive language into the prompt."""
+def _write_session_with_posture(tmp_path, audience, audience_custom="",
+                                  tone="recitation", tone_custom="",
+                                  legacy_bias=None, legacy_bias_custom=""):
+    """Build a ready_for_summary session with arbitrary audience/tone keys."""
     session_path = tmp_path / "session.json"
     cached_path = tmp_path / "session.txt"
     cached_path.write_text(FAKE_TRANSCRIPT, encoding="utf-8")
+    user_config = {
+        "selected_topics": ["T"],
+        "added_topics": [],
+        "bullets_per_topic": 5,
+        "deponent_label": "Plaintiff",
+        "custom_rules": "",
+        "cross_check_enabled": False,
+        "context_doc_paths": [],
+    }
+    if legacy_bias is not None:
+        # Legacy session: old "bias" keys only, no "audience" key at all.
+        user_config["bias"] = legacy_bias
+        user_config["bias_custom"] = legacy_bias_custom
+    else:
+        user_config["audience"] = audience
+        user_config["audience_custom"] = audience_custom
+        user_config["tone"] = tone
+        user_config["tone_custom"] = tone_custom
     session_manager.write_session(session_path, {
         "version": 1,
         "phase": "ready_for_summary",
@@ -309,23 +322,15 @@ def test_phase2_resolves_bias_directive_for_each_preset(
         "deponent_type": "Plaintiff",
         "file_number": "0000.000",
         "topics": [{"id": 1, "title": "T", "rank": 1, "discussion_density": "high"}],
-        "user_config": {
-            "selected_topics": ["T"],
-            "added_topics": [],
-            "bullets_per_topic": 5,
-            "deponent_label": "Plaintiff",
-            "custom_rules": "",
-            "cross_check_enabled": False,
-            "bias": bias_value,
-            "bias_custom": bias_custom,
-            "context_doc_paths": [],
-        },
+        "user_config": user_config,
     })
+    return session_path
 
+
+def _run_and_capture_prompt(session_path, monkeypatch):
     monkeypatch.setattr(summarize_deposition, "save_to_docx", lambda *a, **kw: True)
     monkeypatch.setattr(summarize_deposition, "_register_outputs", lambda *a, **kw: None,
                         raising=False)
-
     captured = {}
 
     def fake_call(self, prompt, text, task_type=None, **kw):
@@ -333,10 +338,73 @@ def test_phase2_resolves_bias_directive_for_each_preset(
         return "**T**\n- B."
 
     monkeypatch.setattr(summarize_deposition.LLMCaller, "call", fake_call)
+    summarize_deposition.process_summary(
+        str(session_path),
+        summarize_deposition.AgentLogger("PostureTest", log_to_file=False),
+    )
+    return captured["prompt"]
 
-    logger = summarize_deposition.AgentLogger("BiasTest", log_to_file=False)
-    summarize_deposition.process_summary(str(session_path), logger)
-    assert expected_substring in captured["prompt"]
+
+@pytest.mark.parametrize("audience,expected_phrase", [
+    ("neutral", "balanced, work-product summary suitable for either side"),
+    ("pro_plaintiff", "summarizing this transcript for plaintiff's trial team"),
+    ("pro_defense", "summarizing this transcript for defense's trial team"),
+])
+def test_phase2_audience_preset_inserts_expected_directive(
+    tmp_path, monkeypatch, audience, expected_phrase
+):
+    """Each audience preset routes the expected directive language into the prompt."""
+    session_path = _write_session_with_posture(tmp_path, audience)
+    prompt = _run_and_capture_prompt(session_path, monkeypatch)
+    assert expected_phrase in prompt
+
+
+def test_phase2_audience_custom_uses_user_text(tmp_path, monkeypatch):
+    session_path = _write_session_with_posture(
+        tmp_path, "custom", audience_custom="Insurance carrier evaluating settlement value.",
+    )
+    prompt = _run_and_capture_prompt(session_path, monkeypatch)
+    assert "Insurance carrier evaluating settlement value." in prompt
+
+
+def test_phase2_audience_custom_falls_back_to_neutral_when_blank(tmp_path, monkeypatch):
+    """If 'custom' is picked but the field is empty, fall back to neutral wording."""
+    session_path = _write_session_with_posture(tmp_path, "custom", audience_custom="")
+    prompt = _run_and_capture_prompt(session_path, monkeypatch)
+    assert "balanced, work-product summary suitable for either side" in prompt
+
+
+@pytest.mark.parametrize("tone,expected_phrase", [
+    ("recitation", "Recite the testimony without characterization"),
+    ("editorial", "you may briefly characterize testimony"),
+])
+def test_phase2_tone_preset_inserts_expected_directive(
+    tmp_path, monkeypatch, tone, expected_phrase
+):
+    session_path = _write_session_with_posture(tmp_path, "neutral", tone=tone)
+    prompt = _run_and_capture_prompt(session_path, monkeypatch)
+    assert expected_phrase in prompt
+
+
+def test_phase2_tone_custom_uses_user_text(tmp_path, monkeypatch):
+    session_path = _write_session_with_posture(
+        tmp_path, "neutral", tone="custom",
+        tone_custom="Use plain-English jury-presentation style.",
+    )
+    prompt = _run_and_capture_prompt(session_path, monkeypatch)
+    assert "Use plain-English jury-presentation style." in prompt
+
+
+def test_phase2_legacy_bias_key_still_maps_to_audience_directive(tmp_path, monkeypatch):
+    """Sessions written before the rename use 'bias' instead of 'audience' — they
+    must still route to the same directive without explosion."""
+    session_path = _write_session_with_posture(
+        tmp_path, audience=None, legacy_bias="pro_plaintiff",
+    )
+    prompt = _run_and_capture_prompt(session_path, monkeypatch)
+    assert "summarizing this transcript for plaintiff's trial team" in prompt
+    # Legacy sessions have no tone key — should default to recitation directive.
+    assert "Recite the testimony without characterization" in prompt
 
 
 def test_phase2_concatenates_context_documents_into_prompt(tmp_path, monkeypatch):
@@ -388,6 +456,11 @@ def test_phase2_concatenates_context_documents_into_prompt(tmp_path, monkeypatch
     assert "PDF context text" in p
     assert "=== CONTEXT DOC: med.docx ===" in p
     assert "DOCX context text" in p
+    # Context section must be a directive ("use as a roadmap"), not a soft hint,
+    # so the model is steered to use status-report theories to drive bullet
+    # selection. Otherwise the context doc has weak influence on the output.
+    assert "USE AS A ROADMAP FOR BULLET SELECTION" in p
+    assert "Lead each topic with bullets that confirm, contradict, or undermine" in p
 
 
 def test_phase2_per_doc_char_cap_truncates_long_docs(tmp_path, monkeypatch):
@@ -473,7 +546,7 @@ def test_phase2_no_context_docs_leaves_context_section_empty(tmp_path, monkeypat
     # The injected context block has a distinctive lead-in; rule 9 of the prompt
     # template mentions "ADDITIONAL CASE CONTEXT" by name, so we look for the
     # block-specific phrase instead.
-    assert "read these in addition to" not in captured["prompt"]
+    assert "USE AS A ROADMAP FOR BULLET SELECTION" not in captured["prompt"]
     assert "=== CONTEXT DOC:" not in captured["prompt"]
 
 
@@ -503,6 +576,127 @@ def test_phase2_doc_extension_unsupported_skipped(tmp_path, monkeypatch):
     )
     assert ok is True
     assert "=== CONTEXT DOC:" not in captured["prompt"]
+
+
+def test_phase2_default_output_path_uses_deponent_name(tmp_path, monkeypatch):
+    """Without --output_path, output filename is derived from the deponent name."""
+    session_path = _write_ready_session(
+        tmp_path, cross_check=False, selected=["T"], added=[],
+    )
+    captured = {}
+
+    def fake_save(content, output_path, deponent, date, logger):
+        captured["output_path"] = output_path
+        return True
+
+    monkeypatch.setattr(summarize_deposition, "save_to_docx", fake_save)
+    monkeypatch.setattr(summarize_deposition, "_register_outputs",
+                        lambda *a, **kw: None, raising=False)
+    # get_output_directory walks the input path; point it at tmp.
+    monkeypatch.setattr(summarize_deposition, "get_output_directory",
+                        lambda p: str(tmp_path / "AI OUTPUT"))
+    monkeypatch.setattr(
+        summarize_deposition.LLMCaller, "call",
+        lambda self, prompt, text, task_type=None, **kw: "**T**\n- B.",
+    )
+
+    summarize_deposition.process_summary(
+        str(session_path),
+        summarize_deposition.AgentLogger("OutNameTest", log_to_file=False),
+    )
+
+    # Session was built with deponent_name="John Smith".
+    assert os.path.basename(captured["output_path"]) == "Deposition of John Smith.docx"
+
+
+def test_phase2_default_output_falls_back_to_input_stem(tmp_path, monkeypatch):
+    """If deponent_name is empty, the filename derives from the input file stem."""
+    session_path = tmp_path / "session.json"
+    cached_path = tmp_path / "session.txt"
+    cached_path.write_text(FAKE_TRANSCRIPT, encoding="utf-8")
+    session_manager.write_session(session_path, {
+        "version": 1,
+        "phase": "ready_for_summary",
+        "input_path": str(tmp_path / "Smith Depo.pdf"),
+        "cached_text_path": str(cached_path),
+        "deponent_name": "",  # missing
+        "deposition_date": "",
+        "deponent_type": "Witness",
+        "file_number": "0000.000",
+        "topics": [{"id": 1, "title": "T", "rank": 1, "discussion_density": "high"}],
+        "user_config": {
+            "selected_topics": ["T"], "added_topics": [], "bullets_per_topic": 5,
+            "deponent_label": "Witness", "custom_rules": "",
+            "cross_check_enabled": False, "bias": "neutral", "bias_custom": "",
+            "context_doc_paths": [],
+        },
+    })
+
+    captured = {}
+    monkeypatch.setattr(summarize_deposition, "save_to_docx",
+                        lambda c, p, d, dt, lg: captured.update(output_path=p) or True)
+    monkeypatch.setattr(summarize_deposition, "_register_outputs",
+                        lambda *a, **kw: None, raising=False)
+    monkeypatch.setattr(summarize_deposition, "get_output_directory",
+                        lambda p: str(tmp_path / "AI OUTPUT"))
+    monkeypatch.setattr(
+        summarize_deposition.LLMCaller, "call",
+        lambda self, prompt, text, task_type=None, **kw: "**T**\n- B.",
+    )
+
+    summarize_deposition.process_summary(
+        str(session_path),
+        summarize_deposition.AgentLogger("FallbackNameTest", log_to_file=False),
+    )
+
+    assert os.path.basename(captured["output_path"]) == "Smith Depo - Summary.docx"
+
+
+def test_phase2_explicit_output_path_override_is_respected(tmp_path, monkeypatch):
+    """--output_path takes precedence over the per-deponent default."""
+    session_path = _write_ready_session(
+        tmp_path, cross_check=False, selected=["T"], added=[],
+    )
+    captured = {}
+    monkeypatch.setattr(summarize_deposition, "save_to_docx",
+                        lambda c, p, d, dt, lg: captured.update(output_path=p) or True)
+    monkeypatch.setattr(summarize_deposition, "_register_outputs",
+                        lambda *a, **kw: None, raising=False)
+    monkeypatch.setattr(
+        summarize_deposition.LLMCaller, "call",
+        lambda self, prompt, text, task_type=None, **kw: "**T**\n- B.",
+    )
+
+    override = str(tmp_path / "explicit_target.docx")
+    summarize_deposition.process_summary(
+        str(session_path),
+        summarize_deposition.AgentLogger("OverrideTest", log_to_file=False),
+        output_path_override=override,
+    )
+    assert captured["output_path"] == override
+
+
+def test_save_to_docx_versions_up_when_file_exists(tmp_path):
+    """Re-running for the same deponent should create v.2 rather than appending."""
+    target = tmp_path / "Deposition of John Smith.docx"
+    # Pre-existing file simulating a prior run.
+    target.write_bytes(b"placeholder")
+    pre_size = target.stat().st_size
+
+    logger = summarize_deposition.AgentLogger("VersionUpTest", log_to_file=False)
+    ok = summarize_deposition.save_to_docx(
+        "**Topic**\n- Bullet.", str(target),
+        "John Smith", "January 15, 2024", logger,
+    )
+
+    assert ok is True
+    # Original file untouched.
+    assert target.exists()
+    assert target.stat().st_size == pre_size
+    # v.2 created alongside.
+    v2 = tmp_path / "Deposition of John Smith v.2.docx"
+    assert v2.exists()
+    assert v2.stat().st_size > 0
 
 
 def test_phase2_keeps_session_alive_after_success(tmp_path, monkeypatch):

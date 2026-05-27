@@ -338,11 +338,23 @@ class SentItemsMonitorWorker(QThread):
         import gc
 
         # COM objects MUST be released on the same thread that created them.
-        # If they leak to the main thread's GC, we get 0x8001010e (RPC_E_WRONG_THREAD).
+        # If they leak to the main thread's GC, we get 0x8001010e (RPC_E_WRONG_THREAD),
+        # which corrupts the heap and crashes the next Qt event dispatch with an
+        # access violation in python313.dll. Per-email `del` + an outer gc.collect()
+        # alone aren't enough: pythoncom CDispatch proxies hold cycles, so if the
+        # main thread's generational GC fires while any of our proxies are live,
+        # it will finalize them on the wrong apartment. We protect against that by:
+        #   1. Disabling automatic GC for the duration of the COM critical section
+        #      so no other thread can collect our proxies.
+        #   2. Calling gc.collect() ON THIS thread after each email, which runs
+        #      synchronously here and releases any cycles while CoInitialize holds.
         items = None
         sent_folder = None
         mapi = None
         outlook = None
+        gc_was_enabled = gc.isenabled()
+        if gc_was_enabled:
+            gc.disable()
         try:
             outlook = win32com.client.Dispatch("Outlook.Application")
             mapi = outlook.GetNamespace("MAPI")
@@ -368,6 +380,9 @@ class SentItemsMonitorWorker(QThread):
                     pass  # Continue processing other emails
                 finally:
                     del item  # Release COM ref on this thread
+                    # Collect any cycles created while processing the email,
+                    # synchronously on this thread, before the next iteration.
+                    gc.collect()
 
         except Exception as e:
             self.error.emit(f"Outlook access error: {e}")
@@ -376,6 +391,8 @@ class SentItemsMonitorWorker(QThread):
             # cross-thread GC releasing them on the main thread (crash 0x8001010e)
             del items, sent_folder, mapi, outlook
             gc.collect()  # Force GC on this thread while COM apartment is active
+            if gc_was_enabled:
+                gc.enable()
 
     def _process_email(self, item):
         """Process a single email item."""

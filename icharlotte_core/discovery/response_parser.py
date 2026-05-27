@@ -10,6 +10,8 @@ import re
 from dataclasses import dataclass, field
 from typing import List, Optional
 
+from icharlotte_core.discovery.response_type_detector import normalize_discovery_type
+
 
 @dataclass
 class ParsedRequest:
@@ -96,6 +98,9 @@ Return a JSON object with these fields:
   - "text": the full text of the request/interrogatory
   - "definitions": array of any inline definition footnotes associated with this request
 
+For Form Interrogatories, include only interrogatories whose checkbox is visibly
+selected or marked. Do not include every preprinted interrogatory on the form.
+
 Return ONLY the JSON object, no other text. If a field cannot be determined, use null.
 
 DOCUMENT TEXT:
@@ -135,7 +140,7 @@ def parse_llm_response(llm_json: str, our_client_name: str = "") -> ParsedDiscov
         requests.append(req)
 
     return ParsedDiscovery(
-        discovery_type=data.get("discovery_type", ""),
+        discovery_type=normalize_discovery_type(data.get("discovery_type", "")),
         propounding_party=data.get("propounding_party", ""),
         responding_party=data.get("responding_party", "") or our_client_name,
         set_number=set_number,

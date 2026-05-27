@@ -1,0 +1,129 @@
+<h2>Rules + Review Screens</h2>
+<p class="subtitle">Updated to distinguish mandatory always-include rules from conditional rules.</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Rules screen</div>
+    <div class="mockup-body">
+      <div class="label">Detected type</div>
+      <h3>Special Interrogatories</h3>
+      <p class="subtitle">Parsing continues in the background while the user selects output rules.</p>
+
+      <div class="section">
+        <h3>Objection Rules</h3>
+
+        <div class="option" style="margin-bottom:8px">
+          <div class="letter"><input type="checkbox" checked></div>
+          <div class="content">
+            <h3>ALWAYS include "vague, ambiguous, overbroad" objections</h3>
+            <p><strong>Mandatory rule:</strong> if selected, this objection is included for every request, regardless of the request wording.</p>
+            <p>Inserted objection: Responding Party objects to this Request on the grounds that it calls for speculation and is vague, ambiguous, uncertain and overbroad.</p>
+          </div>
+        </div>
+
+        <div class="option" style="margin-bottom:8px">
+          <div class="letter"><input type="checkbox" checked></div>
+          <div class="content">
+            <h3>Include ambiguous term objection when the discovery request contains word(s) that are confusing or not obviously clear</h3>
+            <p><strong>Conditional rule:</strong> include only when the request contains a confusing, undefined, or not-obviously-clear term. The agent identifies the term and inserts it into the objection text.</p>
+          </div>
+        </div>
+
+        <div class="option" style="margin-bottom:8px">
+          <div class="letter"><input type="checkbox" checked></div>
+          <div class="content">
+            <h3>Include relevance and privacy objections when Discovery asks for information not related to the case</h3>
+            <p><strong>Conditional rule:</strong> include when the request seeks information that appears unrelated to the case or invades privacy.</p>
+          </div>
+        </div>
+
+        <div class="option" style="margin-bottom:8px">
+          <div class="letter"><input type="checkbox" checked></div>
+          <div class="content">
+            <h3>Include burdensome objections when the discovery asks for a lot of information</h3>
+            <p><strong>Conditional rule:</strong> include when the request asks for a large volume of information, lacks reasonable limits, or would impose undue burden or expense.</p>
+          </div>
+        </div>
+
+        <div class="option" style="margin-bottom:8px">
+          <div class="letter"><input type="checkbox" checked></div>
+          <div class="content">
+            <h3>Include privilege objections when the discovery asks for potentially privileged information</h3>
+            <p><strong>Conditional rule:</strong> include when the request could seek attorney-client communications, work product, investigation strategy, or other protected information.</p>
+          </div>
+        </div>
+
+        <div class="option" style="margin-bottom:8px">
+          <div class="letter"><input type="checkbox" checked></div>
+          <div class="content">
+            <h3>Include Expert Opinion or Legal Conclusion objections when Request calls for potential legal conclusion or expert opinion</h3>
+            <p><strong>Conditional rule:</strong> include when the request calls for expert analysis, legal opinion, or legal characterization.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Substantive Response Rules</h3>
+        <div class="option">
+          <div class="letter"><input type="checkbox" checked></div>
+          <div class="content">
+            <h3>Answer only the question being asked using as few words as possible.</h3>
+            <p><strong>Instruction rule:</strong> apply to every drafted substantive answer for Special Interrogatories and FI custom mode.</p>
+          </div>
+        </div>
+      </div>
+
+      <button class="mock-button">+ Add Custom Rule</button>
+      <button class="mock-button">Next: Context Files</button>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">Review screen</div>
+    <div class="mockup-body">
+      <div style="display:flex;gap:18px">
+        <div style="flex:1.6">
+          <div class="label">Request 3 of 28</div>
+          <h3>Special Interrogatory No. 3</h3>
+          <p>State all facts supporting your contention that defendant was negligent.</p>
+
+          <div class="section">
+            <h3>Proposed Objections</h3>
+            <textarea class="mock-input" style="height:95px;width:100%">Responding Party objects to this Request on the grounds that it calls for speculation and is vague, ambiguous, uncertain and overbroad.</textarea>
+          </div>
+
+          <div class="section">
+            <h3>Proposed Substantive Response</h3>
+            <textarea class="mock-input" style="height:95px;width:100%">Responding Party lacks sufficient information to provide a further response at this time.</textarea>
+          </div>
+
+          <button class="mock-button">Back</button>
+          <button class="mock-button">Approve + Next</button>
+        </div>
+
+        <div style="flex:1">
+          <h3>Quick Objections</h3>
+          <label><input type="checkbox" checked> Vague / Ambiguous / Overbroad</label><br>
+          <label><input type="checkbox"> Relevance / Privacy</label><br>
+          <label><input type="checkbox"> Expert Opinion / Legal Conclusion</label><br>
+          <label><input type="checkbox"> Privilege</label><br>
+          <label><input type="checkbox"> Burdensome</label><br>
+          <label><input type="checkbox"> Argumentative</label><br>
+          <label><input type="checkbox"> Compound</label><br>
+          <label><input type="checkbox"> Undefined Term</label>
+
+          <div class="section">
+            <div class="label">Progress</div>
+            <p>2 approved, 26 remaining</p>
+            <button class="mock-button">Assemble Final Responses</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Spec Rule</h3>
+  <p>Each rule will have a mode: <strong>mandatory</strong>, <strong>conditional</strong>, or <strong>instruction</strong>. Mandatory rules are never evaluated by the LLM; they are applied to every request when selected.</p>
+</div>

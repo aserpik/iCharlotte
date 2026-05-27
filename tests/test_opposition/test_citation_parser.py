@@ -1,0 +1,134 @@
+"""Tests for the citation parser."""
+
+from icharlotte_core.opposition.citation_parser import (
+    Citation,
+    extract_citations,
+)
+
+
+def test_simple_case_cite_extracted():
+    body = "The court held this in *Cottini v. Enloe Medical Center* (2014) 226 Cal.App.4th 401."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    c = cites[0]
+    assert c.kind == "case"
+    assert c.case_name == "Cottini v. Enloe Medical Center"
+    assert c.year == "2014"
+    assert c.reporter_citation == "226 Cal.App.4th 401"
+
+
+def test_pincite_preserved_in_raw_text_but_stripped_from_normalized():
+    body = "See *Cottini v. Enloe Medical Center* (2014) 226 Cal.App.4th 401, 415."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    c = cites[0]
+    assert "415" in c.raw_text
+    assert c.normalized.endswith("226 Cal.App.4th 401")
+    assert ", 415" not in c.normalized
+
+
+def test_case_name_without_italic_markers():
+    body = "The court held this in Cottini v. Enloe Medical Center (2014) 226 Cal.App.4th 401."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    assert cites[0].case_name == "Cottini v. Enloe Medical Center"
+
+
+def test_no_case_cite_returns_empty():
+    assert extract_citations("This sentence has no citation.") == []
+
+
+def test_multiple_case_cites_in_one_paragraph():
+    body = (
+        "Two cases apply. *Smith v. Jones* (2010) 50 Cal.4th 100 "
+        "and *Brown v. Davis* (2015) 60 Cal.App.4th 200 both hold this."
+    )
+    cites = extract_citations(body)
+    assert len(cites) == 2
+    assert {c.case_name for c in cites} == {"Smith v. Jones", "Brown v. Davis"}
+
+
+def test_statute_cite_with_section_symbol():
+    body = "Plaintiff failed to comply with Code Civ. Proc., § 2024.020."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    c = cites[0]
+    assert c.kind == "statute"
+    assert c.law_code == "CCP"
+    assert c.section_num == "2024.020"
+
+
+def test_statute_cite_evidence_code():
+    body = "Under Evid. Code § 352 the court may exclude this."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    c = cites[0]
+    assert c.kind == "statute"
+    assert c.law_code == "EVID"
+    assert c.section_num == "352"
+
+
+def test_statute_full_name_form():
+    body = "The Code of Civil Procedure section 2031.030 governs."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    c = cites[0]
+    assert c.kind == "statute"
+    assert c.law_code == "CCP"
+
+
+def test_rule_of_court_cite():
+    body = "Pursuant to California Rules of Court, rule 3.1345."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    c = cites[0]
+    assert c.kind == "rule"
+    assert "3.1345" in c.raw_text
+
+
+def test_mixed_case_statute_rule_in_one_body():
+    body = (
+        "*Smith v. Jones* (2010) 50 Cal.4th 100 establishes the rule. "
+        "Code Civ. Proc., § 2024.020 codifies the deadline. "
+        "California Rules of Court, rule 3.1345 controls format."
+    )
+    cites = extract_citations(body)
+    kinds = sorted(c.kind for c in cites)
+    assert kinds == ["case", "rule", "statute"]
+
+
+def test_proposition_is_containing_sentence_plus_prior():
+    body = (
+        "Discovery cutoffs must be respected. "
+        "Trial courts retain discretion to deny untimely motions. "
+        "*Cottini v. Enloe Medical Center* (2014) 226 Cal.App.4th 401. "
+        "This is the next sentence."
+    )
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    p = cites[0].proposition
+    # Should include the containing sentence + the prior one, but not the next.
+    assert "untimely motions" in p
+    assert "Discovery cutoffs" in p
+    assert "next sentence" not in p
+
+
+def test_proposition_for_first_sentence_has_no_prior():
+    body = "*Cottini v. Enloe* (2014) 226 Cal.App.4th 401 controls. Other stuff follows."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    p = cites[0].proposition
+    assert "controls" in p
+    assert "Other stuff" not in p
+
+
+def test_multiple_cites_share_sentence_share_proposition():
+    body = (
+        "Two cases agree. *Smith v. Jones* (2010) 50 Cal.4th 100 and "
+        "*Brown v. Davis* (2015) 60 Cal.App.4th 200 both so hold."
+    )
+    cites = extract_citations(body)
+    assert len(cites) == 2
+    # Both share the same sentence — propositions identical.
+    assert cites[0].proposition == cites[1].proposition
+    assert "Two cases agree" in cites[0].proposition

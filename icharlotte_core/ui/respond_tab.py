@@ -36,7 +36,7 @@ from icharlotte_core.discovery.objection_selector import (
 from icharlotte_core.discovery.response_drafter import (
     get_fi_fixed_response, build_si_prompt, build_rfa_prompt,
     build_rpd_prompt, build_fi_17_1_prompt, assemble_plain_text,
-    detect_inapplicable_fi,
+    detect_inapplicable_fi, strip_fi_objections_from_fixed_response,
 )
 from icharlotte_core.discovery.response_assembler import (
     ResponseAssembler, build_response_title, build_response_filename,
@@ -624,15 +624,18 @@ class RespondTab(QWidget):
         responses_map: Dict[str, str] = {}
 
         if disc_type == "FI":
-            # FI: fixed objections from rules for all requests
-            fi_obj_text = select_fi_objections(self.rules)
+            # FI: fixed objections are tied to the interrogatory number.
             for req in parsed.requests:
-                objections_map[req.number] = fi_obj_text
+                objections_map[req.number] = select_fi_objections(self.rules, req.number)
 
                 # Phase 3: Fixed responses for certain FI numbers
                 fixed = get_fi_fixed_response(req.number, self.rules)
                 if fixed is not None:
-                    responses_map[req.number] = fixed
+                    responses_map[req.number] = strip_fi_objections_from_fixed_response(
+                        req.number,
+                        fixed,
+                        self.rules,
+                    )
 
             # Find FIs that need LLM-drafted responses
             unfixed = [
@@ -1533,9 +1536,6 @@ class RespondTab(QWidget):
         try:
             rules_data = manager.get_value(self.file_number, "respond_rules")
             if rules_data and isinstance(rules_data, dict):
-                self.rules = ResponseRules(**{
-                    k: v for k, v in rules_data.items()
-                    if k in {f.name for f in __import__('dataclasses').fields(ResponseRules)}
-                })
+                self.rules = ResponseRules.from_dict(rules_data)
         except Exception as e:
             logger.warning("Failed to load response rules: %s", e)

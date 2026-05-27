@@ -12,7 +12,7 @@ import tempfile
 import shutil
 import uuid
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 from enum import Enum
 
 # PDF/Document libraries
@@ -177,7 +177,8 @@ class DocumentProcessor:
                 error=str(e)
             )
 
-    def extract_with_dynamic_ocr(self, file_path: str) -> ExtractResult:
+    def extract_with_dynamic_ocr(self, file_path: str,
+                                 progress_callback: Callable[[int, int], None] | None = None) -> ExtractResult:
         """
         Extract text using adaptive OCR threshold based on document characteristics.
 
@@ -220,7 +221,7 @@ class DocumentProcessor:
             self.ocr_config.base_threshold = threshold
 
             try:
-                result = self._extract_from_pdf(file_path)
+                result = self._extract_from_pdf(file_path, progress_callback=progress_callback)
             finally:
                 self.ocr_config.base_threshold = original_threshold
 
@@ -292,7 +293,8 @@ class DocumentProcessor:
         return len(word_refs) >= 10
 
     def _extract_from_pdf(self, file_path: str, ocr_enabled: bool = True,
-                          skip_word_index_pages: bool = True) -> ExtractResult:
+                          skip_word_index_pages: bool = True,
+                          progress_callback: Callable[[int, int], None] | None = None) -> ExtractResult:
         """Extract text from a PDF file with optional OCR fallback.
 
         When pypdf returns sparse text on a page, fitz/PyMuPDF is consulted
@@ -300,6 +302,11 @@ class DocumentProcessor:
         (non-standard encodings, embedded text layers). If the resulting
         text matches the deposition word-index pattern, the page is emitted
         as empty and OCR is skipped.
+
+        Args:
+            progress_callback: Optional callable(page_number, total_pages) called
+                once per page (1-indexed). Callers can use this to emit fine-grained
+                progress updates during long OCR runs.
         """
         reader = PdfReader(file_path)
         total_pages = len(reader.pages)
@@ -324,6 +331,13 @@ class DocumentProcessor:
                 # Memory management
                 if i % self.ocr_config.gc_interval == 0:
                     gc.collect()
+
+                # Per-page progress callback (1-indexed, called before processing).
+                if progress_callback is not None:
+                    try:
+                        progress_callback(i + 1, total_pages)
+                    except Exception:
+                        pass
 
                 page_text = page.extract_text() or ""
 

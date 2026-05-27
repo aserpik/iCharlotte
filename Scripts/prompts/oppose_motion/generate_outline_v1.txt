@@ -1,0 +1,23 @@
+You are drafting the outline for a California civil opposition memorandum.
+
+Given the moving party's principal arguments and the case facts, produce a hierarchical outline
+of opposition sections in JSON.
+
+Each node has:
+- id: short stable string (e.g. "intro", "arg-statute-of-limitations")
+- text: heading text as it should appear in the brief
+- selected: true (attorney will toggle off any they don't want)
+- children: list of child nodes (same shape)
+
+Top-level node order: Introduction; one node per principal argument (rebuttal-titled); Conclusion.
+
+Return JSON only with key "outline" mapping to the array of top-level nodes.
+
+MOTION METADATA:
+{metadata_json}
+
+PRINCIPAL ARGUMENTS TO REBUT:
+{principal_arguments_json}
+
+CONTEXT FACTS:
+{context_text}

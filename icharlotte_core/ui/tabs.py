@@ -858,7 +858,11 @@ class ChatTab(QWidget):
             QPlainTextEdit.keyPressEvent(self.chat_input, event)
 
     def open_settings(self):
-        dlg = SettingsDialog(self.settings, self)
+        dlg = SettingsDialog(
+            self.settings,
+            self,
+            selected_model=self.model_combo.currentText()
+        )
         if dlg.exec():
             self.settings = dlg.get_settings()
 

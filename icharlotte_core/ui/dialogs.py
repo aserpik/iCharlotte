@@ -12,45 +12,23 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QByteArray, Signal
 from PySide6.QtGui import QFont, QColor, QTextCharFormat, QSyntaxHighlighter
-from ..config import GEMINI_DATA_DIR
+from ..config import API_KEYS, GEMINI_DATA_DIR
 from ..utils import log_event
 from ..llm_config import LLMConfig, ModelSpec, TaskConfig
 from ..prompt_manager import get_prompt_manager, PromptManager, PromptVersion, PROMPTS_DIR
-from ..llm import LLMWorker
+from ..llm import LLMWorker, ModelFetcher
+from .. import model_catalog
 from ..chat.token_counter import TokenCounter
 
 # Available models per provider (must be defined before PromptsDialog class)
-AVAILABLE_MODELS = {
-    "Gemini": [
-        ("gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview"),
-        ("gemini-3.1-flash-lite-preview", "Gemini 3.1 Flash Lite Preview"),
-        ("gemini-3-pro-preview", "Gemini 3 Pro Preview"),
-        ("gemini-3-flash-preview", "Gemini 3 Flash Preview"),
-        ("gemini-2.5-pro", "Gemini 2.5 Pro"),
-        ("gemini-2.5-flash", "Gemini 2.5 Flash"),
-        ("gemini-2.0-flash", "Gemini 2.0 Flash"),
-        ("gemini-1.5-pro", "Gemini 1.5 Pro"),
-        ("gemini-1.5-flash", "Gemini 1.5 Flash"),
-    ],
-    "Claude": [
-        ("claude-opus-4-20250514", "Claude Opus 4"),
-        ("claude-sonnet-4-20250514", "Claude Sonnet 4"),
-        ("claude-haiku-4-20250514", "Claude Haiku 4"),
-        ("claude-3-5-sonnet-20241022", "Claude 3.5 Sonnet"),
-        ("claude-3-opus-20240229", "Claude 3 Opus"),
-    ],
-    "OpenAI": [
-        ("gpt-5.2-thinking", "GPT-5.2 Thinking"),
-        ("gpt-5.2-instant", "GPT-5.2 Instant"),
-        ("gpt-5.1-thinking", "GPT-5.1 Thinking"),
-        ("gpt-5.1-instant", "GPT-5.1 Instant"),
-        ("gpt-4o", "GPT-4o"),
-        ("gpt-4o-mini", "GPT-4o Mini"),
-        ("gpt-4-turbo", "GPT-4 Turbo"),
-        ("o1", "O1"),
-        ("o1-mini", "O1 Mini"),
-    ],
-}
+AVAILABLE_MODELS = model_catalog.dialog_models_by_provider()
+
+
+def _model_tuples_from_ids(provider: str, model_ids: list) -> list:
+    return [
+        (model_id, model_catalog.display_name_for_model(provider, model_id))
+        for model_id in model_ids
+    ]
 
 class FileNumberDialog(QDialog):
     def __init__(self, parent=None):
@@ -259,11 +237,19 @@ class VariablesDialog(QDialog):
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save: {e}")
 
+def _is_gpt55_pro_model(model: str) -> bool:
+    return (model or "").lower().startswith("gpt-5.5-pro")
+
+
 class SettingsDialog(QDialog):
-    def __init__(self, settings, parent=None):
+    DEFAULT_THINKING_LEVELS = ["None", "Minimal", "Low", "Medium", "High"]
+    GPT55_PRO_THINKING_LEVELS = ["Medium", "High", "xhigh"]
+
+    def __init__(self, settings, parent=None, selected_model=None):
         super().__init__(parent)
         self.setWindowTitle("Model Settings")
         self.settings = settings
+        self.selected_model = selected_model
         layout = QFormLayout(self)
         
         self.temp_spin = QDoubleSpinBox()
@@ -285,14 +271,27 @@ class SettingsDialog(QDialog):
         layout.addRow("Max Tokens:", self.tokens_spin)
 
         self.thinking_combo = QComboBox()
-        self.thinking_combo.addItems(["None", "Minimal", "Low", "Medium", "High"])
+        thinking_levels = (
+            self.GPT55_PRO_THINKING_LEVELS
+            if _is_gpt55_pro_model(selected_model)
+            else self.DEFAULT_THINKING_LEVELS
+        )
+        self.thinking_combo.addItems(thinking_levels)
         
         current_level = settings.get('thinking_level', "None")
         index = self.thinking_combo.findText(current_level, Qt.MatchFlag.MatchFixedString)
+        if index < 0:
+            for i in range(self.thinking_combo.count()):
+                if self.thinking_combo.itemText(i).lower() == str(current_level).lower():
+                    index = i
+                    break
         if index >= 0:
             self.thinking_combo.setCurrentIndex(index)
             
-        self.thinking_combo.setToolTip("Gemini 3.0 Only. Pro supports High/Low. Flash supports all.")
+        if _is_gpt55_pro_model(selected_model):
+            self.thinking_combo.setToolTip("GPT-5.5 Pro supports Medium, High, and xhigh.")
+        else:
+            self.thinking_combo.setToolTip("Gemini 3.0 Only. Pro supports High/Low. Flash supports all.")
         layout.addRow("Thinking Level:", self.thinking_combo)
         
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -398,8 +397,21 @@ WORKBENCH_TO_AGENT_ID = {
     "email_update": "func_email_compose",
     "chat": "func_chat",
     "mediation_brief": "agent_mediation_brief",
+    "oppose_motion": "agent_oppose_motion",
     "word_assistant": "func_word_assistant",
     "legal_research": "func_legal_research",
+}
+
+WORKBENCH_PASS_TO_AGENT_ID = {
+    ("deposition", "extraction"): "agent_depo_extract",
+}
+
+PASS_TO_TASK_TYPE = {
+    "summary": "summary",
+    "extraction": "extraction",
+    "cross_check": "cross_check",
+    "topic_discovery": "summary",
+    "consolidate": "summary",
 }
 
 DEFAULT_IMPROVEMENT_PROMPTS = {
@@ -576,6 +588,11 @@ class PromptsDialog(QDialog):
         self.current_version = None
         self.llm_worker = None
         self.ab_workers = []
+        self.available_models = {
+            provider: list(models)
+            for provider, models in AVAILABLE_MODELS.items()
+        }
+        self.model_fetchers = {}
 
         # Model settings state
         self.model_rows = []  # List of (provider_combo, model_combo, remove_btn) tuples
@@ -591,6 +608,17 @@ class PromptsDialog(QDialog):
 
         # Auto-select agent based on the tab that was open when dialog was launched
         self._auto_select_agent_for_tab()
+        self._refresh_available_models_async()
+
+    def closeEvent(self, event):
+        for fetcher in self.model_fetchers.values():
+            if fetcher and fetcher.isRunning():
+                fetcher.wait(500)
+        defaults_widget = getattr(self, "model_defaults_widget", None)
+        for fetcher in getattr(defaults_widget, "model_fetchers", {}).values():
+            if fetcher and fetcher.isRunning():
+                fetcher.wait(500)
+        super().closeEvent(event)
 
     def _setup_ui(self):
         """Set up the main UI."""
@@ -601,10 +629,6 @@ class PromptsDialog(QDialog):
         header = self._create_header()
         layout.addLayout(header)
 
-        # Model settings panel (collapsible)
-        self.model_settings_panel = self._create_model_settings_panel()
-        layout.addWidget(self.model_settings_panel)
-
         # Main tabs
         self.tabs = QTabWidget()
         self.tabs.addTab(self._create_editor_tab(), "Editor")
@@ -612,7 +636,12 @@ class PromptsDialog(QDialog):
         self.tabs.addTab(self._create_ab_testing_tab(), "A/B Testing")
         self.tabs.addTab(self._create_history_tab(), "Version History")
         self.tabs.addTab(self._create_dashboard_tab(), "Dashboard")
+        self.model_defaults_widget = self._create_pass_model_defaults_tab()
+        self.tabs.addTab(self.model_defaults_widget, "Model Defaults")
         layout.addWidget(self.tabs)
+
+        # Style Examples tab (only shown when oppose_motion is selected agent).
+        self._style_examples_tab = None
 
         # Bottom buttons
         btn_layout = QHBoxLayout()
@@ -667,6 +696,192 @@ class PromptsDialog(QDialog):
         header.addWidget(self.token_label)
 
         return header
+
+    def _create_pass_model_defaults_tab(self) -> QWidget:
+        """Create simple model-default controls for the selected agent/pass."""
+        tab = QWidget()
+        layout = QVBoxLayout(tab)
+        layout.setSpacing(12)
+
+        self.pass_model_defaults_target = QLabel("Select an agent and pass.")
+        self.pass_model_defaults_target.setObjectName("pass_model_defaults_target")
+        self.pass_model_defaults_target.setStyleSheet("font-weight: bold;")
+        layout.addWidget(self.pass_model_defaults_target)
+
+        info = QLabel(
+            "Set the primary and backup models for the Agent/Pass selected at the top of the Workbench."
+        )
+        info.setWordWrap(True)
+        info.setStyleSheet("color: #666;")
+        layout.addWidget(info)
+
+        form = QFormLayout()
+        form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+
+        self.primary_default_model = QComboBox()
+        self.primary_default_model.setObjectName("primary_default_model")
+        self.first_backup_model = QComboBox()
+        self.first_backup_model.setObjectName("first_backup_model")
+        self.second_backup_model = QComboBox()
+        self.second_backup_model.setObjectName("second_backup_model")
+
+        self._populate_pass_model_combo(self.primary_default_model, allow_none=False)
+        self._populate_pass_model_combo(self.first_backup_model, allow_none=True)
+        self._populate_pass_model_combo(self.second_backup_model, allow_none=True)
+
+        form.addRow("Primary default model:", self.primary_default_model)
+        form.addRow("First backup model:", self.first_backup_model)
+        form.addRow("Second backup model:", self.second_backup_model)
+        layout.addLayout(form)
+
+        save_row = QHBoxLayout()
+        save_row.addStretch()
+        self.save_pass_model_defaults_btn = QPushButton("Save Model Defaults")
+        self.save_pass_model_defaults_btn.setObjectName("save_pass_model_defaults")
+        self.save_pass_model_defaults_btn.setStyleSheet(
+            "background-color: #4CAF50; color: white; font-weight: bold; padding: 6px 14px;"
+        )
+        self.save_pass_model_defaults_btn.clicked.connect(self._save_pass_model_defaults)
+        save_row.addWidget(self.save_pass_model_defaults_btn)
+        layout.addLayout(save_row)
+
+        layout.addStretch()
+        return tab
+
+    def _current_model_agent_id(self) -> str:
+        """Resolve the LLM config agent ID for the selected Workbench agent/pass."""
+        if not self.current_agent:
+            return ""
+        pass_key = (self.current_agent, self.current_pass)
+        if pass_key in WORKBENCH_PASS_TO_AGENT_ID:
+            return WORKBENCH_PASS_TO_AGENT_ID[pass_key]
+        return WORKBENCH_TO_AGENT_ID.get(self.current_agent, f"agent_{self.current_agent}")
+
+    def _task_type_for_current_pass(self) -> str:
+        if self.current_pass in PASS_TO_TASK_TYPE:
+            return PASS_TO_TASK_TYPE[self.current_pass]
+        agent_id = self._current_model_agent_id()
+        info = self.llm_config.get_agent_info(agent_id)
+        return info.get("default_task", "general")
+
+    @staticmethod
+    def _pass_model_value(provider: str, model_id: str) -> str:
+        return f"{provider}|{model_id}"
+
+    @staticmethod
+    def _parse_pass_model_value(value):
+        if not value:
+            return None, None
+        provider, model_id = str(value).split("|", 1)
+        return provider, model_id
+
+    def _populate_pass_model_combo(self, combo: QComboBox, allow_none: bool):
+        current_data = combo.currentData()
+        combo.clear()
+        if allow_none:
+            combo.addItem("(None)", None)
+        for provider in model_catalog.PROVIDER_ORDER:
+            for model_id, display_name in self.available_models.get(provider, []):
+                combo.addItem(
+                    f"{provider}: {display_name}",
+                    self._pass_model_value(provider, model_id),
+                )
+        self._select_pass_model_data(combo, current_data)
+
+    def _select_pass_model_data(self, combo: QComboBox, data):
+        if data is None:
+            none_index = combo.findData(None)
+            if none_index >= 0:
+                combo.setCurrentIndex(none_index)
+            return
+        for i in range(combo.count()):
+            if combo.itemData(i) == data:
+                combo.setCurrentIndex(i)
+                return
+        provider, model_id = self._parse_pass_model_value(data)
+        if provider and model_id:
+            display = model_catalog.display_name_for_model(provider, model_id)
+            combo.addItem(f"{provider}: {display}", data)
+            combo.setCurrentIndex(combo.count() - 1)
+
+    def _load_pass_model_defaults(self):
+        """Load model defaults for the currently selected Workbench agent/pass."""
+        if not hasattr(self, "primary_default_model"):
+            return
+
+        has_target = bool(self.current_agent and self.current_pass)
+        for combo in (self.primary_default_model, self.first_backup_model, self.second_backup_model):
+            combo.setEnabled(has_target)
+        self.save_pass_model_defaults_btn.setEnabled(has_target)
+
+        if not has_target:
+            self.pass_model_defaults_target.setText("Select an agent and pass.")
+            self._select_pass_model_data(self.primary_default_model, None)
+            self._select_pass_model_data(self.first_backup_model, None)
+            self._select_pass_model_data(self.second_backup_model, None)
+            return
+
+        agent_id = self._current_model_agent_id()
+        task_type = self._task_type_for_current_pass()
+        sequence = self.llm_config.get_model_sequence_for_agent(
+            agent_id,
+            fallback_task=task_type,
+            pass_name=self.current_pass,
+        )
+
+        self.pass_model_defaults_target.setText(
+            f"Defaults for: {self.current_agent} / {self.current_pass}"
+        )
+
+        combos = [
+            self.primary_default_model,
+            self.first_backup_model,
+            self.second_backup_model,
+        ]
+        for index, combo in enumerate(combos):
+            if index < len(sequence):
+                spec = sequence[index]
+                self._select_pass_model_data(
+                    combo,
+                    self._pass_model_value(spec.provider, spec.model),
+                )
+            else:
+                self._select_pass_model_data(combo, None)
+
+    def _save_pass_model_defaults(self):
+        """Save selected model defaults for the current Workbench agent/pass."""
+        if not self.current_agent or not self.current_pass:
+            QMessageBox.warning(self, "Warning", "Select an agent and pass first.")
+            return
+
+        sequence = []
+        seen = set()
+        for combo in (
+            self.primary_default_model,
+            self.first_backup_model,
+            self.second_backup_model,
+        ):
+            provider, model_id = self._parse_pass_model_value(combo.currentData())
+            if not provider or not model_id:
+                continue
+            key = (provider, model_id)
+            if key in seen:
+                continue
+            seen.add(key)
+            sequence.append(ModelSpec(provider=provider, model=model_id))
+
+        if not sequence:
+            QMessageBox.warning(self, "Warning", "Select at least a primary model.")
+            return
+
+        agent_id = self._current_model_agent_id()
+        self.llm_config.update_pass_model_config(agent_id, self.current_pass, sequence)
+        QMessageBox.information(
+            self,
+            "Saved",
+            f"Model defaults saved for {self.current_agent} / {self.current_pass}.",
+        )
+        self._load_pass_model_defaults()
 
     def _create_model_settings_panel(self) -> QGroupBox:
         """Create the collapsible model settings panel."""
@@ -748,7 +963,7 @@ class PromptsDialog(QDialog):
         # Provider combo
         provider_combo = QComboBox()
         provider_combo.setMinimumWidth(80)
-        for p in AVAILABLE_MODELS.keys():
+        for p in model_catalog.PROVIDER_ORDER:
             provider_combo.addItem(p)
         if provider:
             idx = provider_combo.findText(provider)
@@ -800,7 +1015,7 @@ class PromptsDialog(QDialog):
     def _populate_model_combo_for_provider(self, combo: QComboBox, provider: str):
         """Populate model combo for a specific provider."""
         combo.clear()
-        models = AVAILABLE_MODELS.get(provider, [])
+        models = self.available_models.get(provider, [])
         for model_id, display_name in models:
             combo.addItem(display_name, model_id)
 
@@ -857,7 +1072,7 @@ class PromptsDialog(QDialog):
         if sequence:
             self._add_model_row(sequence[0].provider, sequence[0].model)
         else:
-            self._add_model_row("Gemini", "gemini-2.5-flash")
+            self._add_model_row("Gemini", "gemini-3.5-flash")
 
     def _update_effective_model_label(self):
         """Update the effective model label based on current agent."""
@@ -913,6 +1128,11 @@ class PromptsDialog(QDialog):
             else:
                 # No custom models, add one default to start
                 self._add_default_model_row()
+
+    def _refresh_model_settings_from_defaults(self):
+        """Refresh selected-agent model display after default settings change."""
+        self.llm_config = LLMConfig()
+        self._load_agent_model_settings()
 
     def _save_agent_model_settings(self):
         """Save model settings for the current agent."""
@@ -979,6 +1199,32 @@ class PromptsDialog(QDialog):
         toolbar.addWidget(self.mode_label)
 
         toolbar.addStretch()
+
+        # Preview Assembled Prompt button (word_assistant only).
+        # Shows the FULL system + user message the model actually receives
+        # for a given scenario (selection × mode × app), so editors can spot
+        # interactions between the 6 word_assistant fragments.
+        self.preview_assembled_btn = QPushButton("Preview Assembled Prompt")
+        self.preview_assembled_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #fff3e0;
+                border: 1px solid #ffb74d;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-weight: 500;
+                color: #e65100;
+            }
+            QPushButton:hover { background-color: #ffe0b2; }
+            QPushButton:disabled { color: #aaa; background-color: #f5f5f5; border-color: #ddd; }
+        """)
+        self.preview_assembled_btn.setToolTip(
+            "Show the assembled system + user message for the selected "
+            "word_assistant scenario. Only available for the word_assistant agent."
+        )
+        self.preview_assembled_btn.clicked.connect(self._open_assembled_preview)
+        self.preview_assembled_btn.setEnabled(False)
+        toolbar.addWidget(self.preview_assembled_btn)
+
         layout.addLayout(toolbar)
 
         # Editor with syntax highlighting
@@ -990,6 +1236,18 @@ class PromptsDialog(QDialog):
         layout.addWidget(self.editor)
 
         return tab
+
+    def _open_assembled_preview(self):
+        """Open the WordAssistantPreviewDialog scoped to the current_agent."""
+        if self.current_agent != "word_assistant":
+            QMessageBox.information(
+                self, "Preview Unavailable",
+                "Assembled-prompt preview is only available for the "
+                "word_assistant agent."
+            )
+            return
+        dlg = WordAssistantPreviewDialog(self.prompt_manager, parent=self)
+        dlg.exec()
 
     def _toggle_editor_mode(self):
         """Toggle between raw markdown and rendered markdown editing."""
@@ -1455,7 +1713,8 @@ class PromptsDialog(QDialog):
         for agent in ['summarize', 'discovery', 'deposition',
                       'liability', 'exposure', 'med_record', 'med_chron', 'separate',
                       'email_update', 'chat',
-                      'word_assistant', 'legal_research', 'mediation_brief']:
+                      'word_assistant', 'legal_research', 'mediation_brief',
+                      'oppose_motion']:
             agents.add(agent)
 
         for agent in sorted(agents):
@@ -1470,9 +1729,69 @@ class PromptsDialog(QDialog):
         """Populate a model selector combo box."""
         combo.clear()
 
-        for provider, models in AVAILABLE_MODELS.items():
-            for model_id, display_name in models:
+        for provider in model_catalog.PROVIDER_ORDER:
+            for model_id, display_name in self.available_models.get(provider, []):
                 combo.addItem(f"{provider}: {display_name}", (provider, model_id))
+
+    def _refresh_available_models_async(self):
+        """Refresh provider model catalogs without blocking the workbench UI."""
+        if ModelFetcher is None:
+            return
+
+        for provider in model_catalog.PROVIDER_ORDER:
+            if provider in self.model_fetchers:
+                continue
+            fetcher = ModelFetcher(provider, API_KEYS.get(provider))
+            fetcher.finished.connect(self._on_provider_models_fetched)
+            fetcher.error.connect(
+                lambda err, p=provider: log_event(
+                    f"Workbench model fetch failed for {p}: {err}",
+                    "warning",
+                )
+            )
+            self.model_fetchers[provider] = fetcher
+            fetcher.start()
+
+    def _on_provider_models_fetched(self, provider: str, models: list):
+        if not models or (models[0].startswith("Error:")):
+            return
+
+        self.available_models[provider] = _model_tuples_from_ids(provider, models)
+
+        for _, provider_combo, model_combo, _, _ in self.model_rows:
+            if provider_combo.currentText() == provider:
+                current_model = model_combo.currentData()
+                self._populate_model_combo_for_provider(model_combo, provider)
+                self._select_model_data(model_combo, current_model)
+
+        for combo_name in ("improve_model_combo", "ab_model_a", "ab_model_b"):
+            combo = getattr(self, combo_name, None)
+            if combo is None:
+                continue
+            current_data = combo.currentData()
+            self._populate_model_combo(combo)
+            self._select_model_data(combo, current_data)
+
+        for combo_name, allow_none in (
+            ("primary_default_model", False),
+            ("first_backup_model", True),
+            ("second_backup_model", True),
+        ):
+            combo = getattr(self, combo_name, None)
+            if combo is None:
+                continue
+            current_data = combo.currentData()
+            self._populate_pass_model_combo(combo, allow_none=allow_none)
+            self._select_pass_model_data(combo, current_data)
+
+    @staticmethod
+    def _select_model_data(combo: QComboBox, data):
+        if data is None:
+            return
+        for i in range(combo.count()):
+            if combo.itemData(i) == data:
+                combo.setCurrentIndex(i)
+                return
 
     def _migrate_if_needed(self):
         """Run migration if the registry doesn't exist."""
@@ -1544,16 +1863,49 @@ class PromptsDialog(QDialog):
 
         self.pass_combo.blockSignals(False)
 
-        # Load model settings for this agent
-        self._load_agent_model_settings()
+        # Enable assembled-prompt preview only for word_assistant
+        if hasattr(self, "preview_assembled_btn"):
+            self.preview_assembled_btn.setEnabled(agent == "word_assistant")
 
         if self.pass_combo.count() > 0:
             self._on_pass_changed(self.pass_combo.currentText())
+        else:
+            self.current_pass = None
+            self._load_pass_model_defaults()
+
+        # Show/hide the Style Examples tab based on the selected agent.
+        self._refresh_style_examples_tab()
+
+    def _refresh_style_examples_tab(self) -> None:
+        """Show the Style Examples tab only when oppose_motion is selected."""
+        from icharlotte_core.ui.dialogs_style_examples import StyleExamplesTab
+
+        tabs = getattr(self, "tabs", None)
+        if tabs is None:
+            return
+
+        existing_index = -1
+        for i in range(tabs.count()):
+            if tabs.tabText(i) == "Style Examples":
+                existing_index = i
+                break
+
+        if self.current_agent == "oppose_motion":
+            if existing_index < 0:
+                # Resolve the registry path next to the seeded prompt files.
+                registry_path = os.path.join(PROMPTS_DIR, "oppose_motion", "style_examples.json")
+                self._style_examples_tab = StyleExamplesTab(registry_path=registry_path)
+                tabs.addTab(self._style_examples_tab, "Style Examples")
+        else:
+            if existing_index >= 0:
+                tabs.removeTab(existing_index)
+                self._style_examples_tab = None
 
     def _on_pass_changed(self, pass_name: str):
         """Handle pass selection change."""
         self.current_pass = pass_name
         self._populate_versions()
+        self._load_pass_model_defaults()
 
     def _populate_versions(self):
         """Populate the version dropdown."""
@@ -2027,7 +2379,7 @@ Provide the improved prompt:"""
         # Determine models based on mode
         model_data_a = self.ab_model_a.currentData()
         if not model_data_a:
-            model_data_a = ("Gemini", "gemini-2.5-flash")
+            model_data_a = ("Gemini", "gemini-3.5-flash")
 
         if self.ab_mode == "prompts":
             # Same model for both
@@ -2035,7 +2387,7 @@ Provide the improved prompt:"""
         else:
             model_data_b = self.ab_model_b.currentData()
             if not model_data_b:
-                model_data_b = ("Gemini", "gemini-2.5-flash")
+                model_data_b = ("Gemini", "gemini-3.5-flash")
 
         if self.ab_mode == "models" and model_data_a == model_data_b:
             QMessageBox.warning(self, "Warning", "Please select different models.")
@@ -2324,14 +2676,20 @@ AGENT_CATEGORIES = [
 ]
 
 
-class LLMSettingsDialog(QDialog):
-    """Dialog for configuring LLM model preferences per agent/function."""
+class LLMSettingsWidget(QWidget):
+    """Reusable widget for configuring LLM model preferences per agent/function."""
+
+    settings_saved = Signal()
+    settings_reset = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("LLM Settings")
-        self.resize(800, 650)
         self.config = LLMConfig()
+        self.available_models = {
+            provider: list(models)
+            for provider, models in AVAILABLE_MODELS.items()
+        }
+        self.model_fetchers = {}
 
         # Track widgets for agents and task types
         self.agent_widgets = {}
@@ -2339,6 +2697,7 @@ class LLMSettingsDialog(QDialog):
 
         self._setup_ui()
         self._load_current_settings()
+        self._refresh_available_models_async()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
@@ -2353,7 +2712,7 @@ class LLMSettingsDialog(QDialog):
         status_label.setStyleSheet("font-weight: bold;")
         status_layout.addWidget(status_label)
 
-        for provider in ["Gemini", "Claude", "OpenAI"]:
+        for provider in model_catalog.PROVIDER_ORDER:
             available = self.config.is_provider_available(provider)
             indicator = QLabel(f"{provider}: {'OK' if available else 'Missing'}")
             indicator.setStyleSheet(
@@ -2387,13 +2746,10 @@ class LLMSettingsDialog(QDialog):
         btn_layout.addStretch()
 
         save_btn = QPushButton("Save")
+        save_btn.setObjectName("save_llm_settings")
         save_btn.setStyleSheet("font-weight: bold;")
         save_btn.clicked.connect(self._save_settings)
         btn_layout.addWidget(save_btn)
-
-        cancel_btn = QPushButton("Cancel")
-        cancel_btn.clicked.connect(self.reject)
-        btn_layout.addWidget(cancel_btn)
 
         layout.addLayout(btn_layout)
 
@@ -2460,7 +2816,7 @@ class LLMSettingsDialog(QDialog):
 
         # Provider combo
         provider_combo = QComboBox()
-        provider_combo.addItems(["Gemini", "Claude", "OpenAI"])
+        provider_combo.addItems(list(model_catalog.PROVIDER_ORDER))
         provider_combo.setFixedWidth(90)
         provider_combo.setEnabled(False)
         row.addWidget(provider_combo)
@@ -2566,16 +2922,19 @@ class LLMSettingsDialog(QDialog):
             row_layout.addWidget(priority_label)
 
             provider_combo = QComboBox()
+            provider_combo.setObjectName(f"task_provider_{task_type}_{i}")
             provider_combo.addItem("(None)", None)
-            provider_combo.addItems(["Gemini", "Claude", "OpenAI"])
+            provider_combo.addItems(list(model_catalog.PROVIDER_ORDER))
             provider_combo.setFixedWidth(100)
             row_layout.addWidget(provider_combo)
 
             model_combo = QComboBox()
+            model_combo.setObjectName(f"task_model_{task_type}_{i}")
             model_combo.setFixedWidth(200)
             row_layout.addWidget(model_combo)
 
             max_tokens_spin = QSpinBox()
+            max_tokens_spin.setObjectName(f"task_tokens_{task_type}_{i}")
             max_tokens_spin.setRange(1024, 1000000)
             max_tokens_spin.setSingleStep(1024)
             max_tokens_spin.setValue(65536)
@@ -2605,6 +2964,7 @@ class LLMSettingsDialog(QDialog):
 
         retries_label = QLabel("Max Retries:")
         retries_spin = QSpinBox()
+        retries_spin.setObjectName(f"task_retries_{task_type}")
         retries_spin.setRange(1, 10)
         retries_spin.setValue(3)
         self.task_widgets[task_type]["max_retries"] = retries_spin
@@ -2615,6 +2975,7 @@ class LLMSettingsDialog(QDialog):
 
         timeout_label = QLabel("Timeout (seconds):")
         timeout_spin = QSpinBox()
+        timeout_spin.setObjectName(f"task_timeout_{task_type}")
         timeout_spin.setRange(30, 600)
         timeout_spin.setValue(120)
         self.task_widgets[task_type]["timeout"] = timeout_spin
@@ -2632,9 +2993,56 @@ class LLMSettingsDialog(QDialog):
         """Update model combo based on selected provider."""
         model_combo.clear()
 
-        if provider in AVAILABLE_MODELS:
-            for model_id, description in AVAILABLE_MODELS[provider]:
+        if provider in self.available_models:
+            for model_id, description in self.available_models[provider]:
                 model_combo.addItem(description, model_id)
+
+    def _refresh_available_models_async(self):
+        """Refresh provider model catalogs without blocking the settings UI."""
+        if ModelFetcher is None:
+            return
+
+        for provider in model_catalog.PROVIDER_ORDER:
+            if provider in self.model_fetchers:
+                continue
+            fetcher = ModelFetcher(provider, API_KEYS.get(provider))
+            fetcher.finished.connect(self._on_provider_models_fetched)
+            fetcher.error.connect(
+                lambda err, p=provider: log_event(
+                    f"LLM settings model fetch failed for {p}: {err}",
+                    "warning",
+                )
+            )
+            self.model_fetchers[provider] = fetcher
+            fetcher.start()
+
+    def _on_provider_models_fetched(self, provider: str, models: list):
+        if not models or (models[0].startswith("Error:")):
+            return
+
+        self.available_models[provider] = _model_tuples_from_ids(provider, models)
+
+        for widgets in self.agent_widgets.values():
+            if widgets["provider"].currentText() == provider:
+                current_model = widgets["model"].currentData()
+                self._update_model_list(provider, widgets["model"])
+                self._select_model_data(widgets["model"], current_model)
+
+        for task_widgets in self.task_widgets.values():
+            for row in task_widgets["model_rows"]:
+                if row["provider"].currentText() == provider:
+                    current_model = row["model"].currentData()
+                    self._update_model_list(provider, row["model"])
+                    self._select_model_data(row["model"], current_model)
+
+    @staticmethod
+    def _select_model_data(combo: QComboBox, data):
+        if data is None:
+            return
+        for i in range(combo.count()):
+            if combo.itemData(i) == data:
+                combo.setCurrentIndex(i)
+                return
 
     def _load_current_settings(self):
         """Load current settings from LLMConfig into the UI."""
@@ -2759,7 +3167,7 @@ class LLMSettingsDialog(QDialog):
                     )
 
             QMessageBox.information(self, "Success", "LLM settings saved successfully.")
-            self.accept()
+            self.settings_saved.emit()
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save settings: {e}")
@@ -2787,7 +3195,41 @@ class LLMSettingsDialog(QDialog):
 
             # Reload UI
             self._load_current_settings()
+            self.settings_reset.emit()
             QMessageBox.information(self, "Reset", "Settings reset to defaults.")
+
+
+class LLMSettingsDialog(QDialog):
+    """Compatibility wrapper for the reusable LLM settings widget."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("LLM Settings")
+        self.resize(800, 650)
+
+        layout = QVBoxLayout(self)
+        self.settings_widget = LLMSettingsWidget(self)
+        self.settings_widget.settings_saved.connect(self.accept)
+        layout.addWidget(self.settings_widget)
+
+        close_row = QHBoxLayout()
+        close_row.addStretch()
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.accept)
+        close_row.addWidget(close_btn)
+        layout.addLayout(close_row)
+
+    @property
+    def config(self):
+        return self.settings_widget.config
+
+    @property
+    def agent_widgets(self):
+        return self.settings_widget.agent_widgets
+
+    @property
+    def task_widgets(self):
+        return self.settings_widget.task_widgets
 
 
 class CaseContextDialog(QDialog):
@@ -2892,3 +3334,236 @@ class CaseContextDialog(QDialog):
     def get_context_file_text(self) -> str:
         return self._context_file_text
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# WordAssistantPreviewDialog
+# ─────────────────────────────────────────────────────────────────────────────
+# Shows the FULL assembled prompt (system + user message) that word_assistant
+# sends to the LLM for a chosen scenario. The 6 workbench fragments interact
+# in non-obvious ways (e.g., a system-prompt edit only takes effect when no
+# custom override is set; the redline prefix is appended only when redline
+# mode is active). Previewing them in their assembled form makes those
+# interactions visible.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Sample fixtures used to fill in document context for the preview. Kept
+# short and obviously synthetic so users don't mistake them for real text.
+_PREVIEW_USER_DIRECTIVE = "Argue that the defendant's conduct caused plaintiff's injuries."
+_PREVIEW_FULL_DOCUMENT = (
+    "I. INTRODUCTION\n\n"
+    "This is a sample document used to preview the word_assistant prompt "
+    "assembly. The model would receive the full surrounding context here.\n\n"
+    "II. ARGUMENT\n\n"
+    "[The selection or cursor lives somewhere in this section.]"
+)
+_PREVIEW_SELECTION_TEXT = "The defendant's conduct was reckless."
+_PREVIEW_PLACEHOLDER_TEXT = "____________"
+_PREVIEW_CONTEXT_BEFORE = (
+    "I. INTRODUCTION\n\n"
+    "This is a sample document used to preview the word_assistant prompt "
+    "assembly. The model would receive the full surrounding context here.\n\n"
+    "II. ARGUMENT\n\n"
+)
+_PREVIEW_CONTEXT_AFTER = ""
+_PREVIEW_ATTACHMENT_CONTEXT = (
+    "\n\n=== ATTACHED REFERENCE FILE: example_exhibit.pdf ===\n"
+    "[attachment text would appear here]"
+)
+
+
+class WordAssistantPreviewDialog(QDialog):
+    """Show the assembled system + user message for a word_assistant scenario."""
+
+    SCENARIOS = [
+        ("Word — selection + full doc (free-form)", "word_selection_normal"),
+        ("Word — selection + full doc (REDLINE)", "word_selection_redline"),
+        ("Word — placeholder/blank + full doc", "word_placeholder"),
+        ("Word — cursor + full doc (no selection)", "word_cursor"),
+        ("Outlook — compose email body", "outlook_email"),
+    ]
+
+    def __init__(self, prompt_manager, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Assembled Prompt Preview — word_assistant")
+        self.resize(950, 720)
+        self.prompt_manager = prompt_manager
+
+        layout = QVBoxLayout(self)
+
+        # Scenario selector + attachment toggle
+        controls = QHBoxLayout()
+        controls.addWidget(QLabel("Scenario:"))
+        self.scenario_combo = QComboBox()
+        for label, key in self.SCENARIOS:
+            self.scenario_combo.addItem(label, key)
+        self.scenario_combo.currentIndexChanged.connect(self._refresh)
+        controls.addWidget(self.scenario_combo, stretch=1)
+
+        self.attach_checkbox = QCheckBox("Include sample attachment context")
+        self.attach_checkbox.stateChanged.connect(self._refresh)
+        controls.addWidget(self.attach_checkbox)
+
+        layout.addLayout(controls)
+
+        # Explanatory note
+        note = QLabel(
+            "<i>This preview uses synthetic sample text for the document, "
+            "selection, and user directive — the real assembly uses your "
+            "current Word document. Edits to workbench prompts are reflected "
+            "here on the next refresh.</i>"
+        )
+        note.setWordWrap(True)
+        note.setStyleSheet("color: #666; padding: 4px;")
+        layout.addWidget(note)
+
+        # System prompt panel
+        layout.addWidget(QLabel("<b>System prompt</b> (sent as the system role):"))
+        self.system_view = QPlainTextEdit()
+        self.system_view.setReadOnly(True)
+        self.system_view.setStyleSheet(
+            "font-family: Consolas, monospace; font-size: 11px; "
+            "background-color: #f0f4f8;"
+        )
+        layout.addWidget(self.system_view, stretch=2)
+
+        # User message panel
+        layout.addWidget(QLabel("<b>User message</b> (full assembled prompt):"))
+        self.user_view = QPlainTextEdit()
+        self.user_view.setReadOnly(True)
+        self.user_view.setStyleSheet(
+            "font-family: Consolas, monospace; font-size: 11px; "
+            "background-color: #fffaf0;"
+        )
+        layout.addWidget(self.user_view, stretch=3)
+
+        # Footer with refresh + close
+        btn_row = QHBoxLayout()
+        self.refresh_btn = QPushButton("Refresh")
+        self.refresh_btn.clicked.connect(self._refresh)
+        btn_row.addWidget(self.refresh_btn)
+
+        self.copy_btn = QPushButton("Copy User Message")
+        self.copy_btn.clicked.connect(self._copy_user_message)
+        btn_row.addWidget(self.copy_btn)
+
+        btn_row.addStretch()
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(self.accept)
+        btn_row.addWidget(close_btn)
+        layout.addLayout(btn_row)
+
+        self._refresh()
+
+    # ── prompt loading ────────────────────────────────────────────────────
+    def _load(self, pass_name: str, default: str) -> str:
+        """Load a workbench prompt with fallback to default."""
+        try:
+            text = self.prompt_manager.get_prompt("word_assistant", pass_name)
+            if text:
+                return text
+        except Exception:
+            pass
+        return default
+
+    # ── assembly (mirrors logic in word_hotkey.py) ────────────────────────
+    def _assemble(self, scenario: str) -> tuple[str, str]:
+        """
+        Build (system_prompt, user_message) for a given scenario.
+
+        This duplicates the assembly logic in word_hotkey.py:_call_llm_for_word
+        and the Outlook path — kept in sync via the test that exercises the
+        same constants/helpers.
+        """
+        from icharlotte_core.word_hotkey import (
+            DEFAULT_WORD_SYSTEM_PROMPT,
+            DEFAULT_WORD_REDLINE_SYSTEM_PROMPT,
+            EMAIL_SYSTEM_PROMPT,
+            DEFAULT_REDLINE_PREFIX,
+            DEFAULT_INSERTION_INSTRUCTIONS,
+            DEFAULT_SELECTION_INSTRUCTIONS,
+            _render_insertion_instructions,
+        )
+
+        directive = _PREVIEW_USER_DIRECTIVE
+        attach = _PREVIEW_ATTACHMENT_CONTEXT if self.attach_checkbox.isChecked() else ""
+
+        if scenario == "outlook_email":
+            system = self._load("email_system_prompt", EMAIL_SYSTEM_PROMPT)
+            user = (
+                f"{directive}\n\n"
+                f"Text to process:\n{_PREVIEW_SELECTION_TEXT}"
+                f"{attach}"
+            )
+            return system, user
+
+        # All Word scenarios
+        redline = scenario == "word_selection_redline"
+        if redline:
+            system = self._load(
+                "redline_system_prompt", DEFAULT_WORD_REDLINE_SYSTEM_PROMPT
+            )
+        else:
+            system = self._load("system_prompt", DEFAULT_WORD_SYSTEM_PROMPT)
+
+        if scenario == "word_placeholder":
+            tpl = self._load("insertion_instructions", DEFAULT_INSERTION_INSTRUCTIONS)
+            instr = _render_insertion_instructions("placeholder", tpl)
+            user = (
+                "=== USER DIRECTIVE (describes what to write — NOT the text itself) ===\n"
+                f"{directive}\n\n"
+                f"=== FULL DOCUMENT ===\n{_PREVIEW_FULL_DOCUMENT}\n\n"
+                "=== IMMEDIATE CONTEXT ===\n"
+                f'Text BEFORE the blank: "{_PREVIEW_CONTEXT_BEFORE.strip()}"\n'
+                "[___BLANK TO FILL___]\n"
+                f'Text AFTER the blank: "{_PREVIEW_CONTEXT_AFTER.strip()}"\n\n'
+                f"{instr}"
+            )
+        elif scenario == "word_cursor":
+            tpl = self._load("insertion_instructions", DEFAULT_INSERTION_INSTRUCTIONS)
+            instr = _render_insertion_instructions("cursor", tpl)
+            user = (
+                "=== USER DIRECTIVE (describes what to write — NOT the text itself) ===\n"
+                f"{directive}\n\n"
+                f"=== FULL DOCUMENT ===\n{_PREVIEW_FULL_DOCUMENT}\n\n"
+                "=== CURSOR POSITION ===\n"
+                f'Text BEFORE cursor: "{_PREVIEW_CONTEXT_BEFORE.strip()}"\n'
+                "[___CURSOR IS HERE___]\n"
+                f'Text AFTER cursor: "{_PREVIEW_CONTEXT_AFTER.strip()}"\n\n'
+                f"{instr}"
+            )
+        else:
+            # word_selection_normal or word_selection_redline
+            instr = self._load(
+                "selection_instructions", DEFAULT_SELECTION_INSTRUCTIONS
+            )
+            user = (
+                f"{directive}\n\n"
+                f"=== FULL DOCUMENT (for context) ===\n{_PREVIEW_FULL_DOCUMENT}\n\n"
+                f"=== SELECTED TEXT TO PROCESS ===\n{_PREVIEW_SELECTION_TEXT}\n\n"
+                f"{instr}"
+            )
+
+        if attach:
+            user += attach
+
+        if redline:
+            prefix = self._load("redline_prefix", DEFAULT_REDLINE_PREFIX)
+            user += prefix
+
+        return system, user
+
+    # ── UI handlers ───────────────────────────────────────────────────────
+    def _refresh(self):
+        scenario = self.scenario_combo.currentData()
+        try:
+            system, user = self._assemble(scenario)
+        except Exception as e:
+            self.system_view.setPlainText(f"[Error assembling preview: {e}]")
+            self.user_view.setPlainText("")
+            return
+        self.system_view.setPlainText(system)
+        self.user_view.setPlainText(user)
+
+    def _copy_user_message(self):
+        from PySide6.QtWidgets import QApplication
+        QApplication.clipboard().setText(self.user_view.toPlainText())

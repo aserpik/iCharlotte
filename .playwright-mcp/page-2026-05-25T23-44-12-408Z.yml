@@ -1,0 +1,10 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - heading "Superpowers Brainstorming" [level=1] [ref=e3]:
+      - link "Superpowers Brainstorming" [ref=e4] [cursor=pointer]:
+        - /url: https://github.com/obra/superpowers
+    - generic [ref=e5]: Connected
+  - generic [ref=e9]:
+    - heading "Visual companion is ready" [level=2] [ref=e10]
+    - paragraph [ref=e11]: Continuing in terminal for the next scope question.
+  - generic [ref=e12]: Click an option above, then return to the terminal

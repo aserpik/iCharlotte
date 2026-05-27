@@ -1,0 +1,75 @@
+<h2>Citation review popup options</h2>
+<p class="subtitle">Each option starts from the same output screen: clicking a citation opens proof for that citation.</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup" style="margin:0">
+        <div class="mockup-header">A. Focused popup</div>
+        <div class="mockup-body">
+          <div class="placeholder" style="height:74px;text-align:left">
+            Argument paragraph with <strong style="color:#1d4ed8">(Smith v. Jones)</strong>
+          </div>
+          <div class="placeholder" style="height:150px;background:#fff;text-align:left">
+            <strong>Smith v. Jones</strong><br>
+            Status: Verified<br><br>
+            Supporting passage highlighted here...
+            <br><br>
+            Buttons: Open opinion | Replace citation | Flag
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Focused Popup</h3>
+      <p>Clean modal with citation, verification status, supporting quote, and source link.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup" style="margin:0">
+        <div class="mockup-header">B. Right-side source drawer</div>
+        <div class="mockup-body" style="display:flex;gap:10px">
+          <div class="placeholder" style="flex:1;height:210px;text-align:left">
+            Draft text<br><br>
+            Citation links stay inline.
+          </div>
+          <div class="placeholder" style="width:38%;height:210px;background:#fff;text-align:left">
+            Opinion Viewer<br><br>
+            Highlighted passage<br>
+            Treatment notes
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Source Drawer</h3>
+      <p>Keeps the draft visible while the opinion and supporting passage open on the right.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mockup" style="margin:0">
+        <div class="mockup-header">C. Citation checklist + popup</div>
+        <div class="mockup-body" style="display:flex;gap:10px">
+          <div class="placeholder" style="width:35%;height:210px;text-align:left">
+            Verified citations<br>
+            ✓ Smith<br>
+            ⚠ Brown<br>
+            ✕ Davis
+          </div>
+          <div class="placeholder" style="flex:1;height:210px;background:#fff;text-align:left">
+            Click item or inline cite<br><br>
+            Opens popup with opinion passage.
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>Checklist Plus Popup</h3>
+      <p>Adds a citation audit list so every citation can be independently reviewed before export.</p>
+    </div>
+  </div>
+</div>

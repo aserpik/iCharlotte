@@ -1,0 +1,14 @@
+You will be given the BRIEF SYNOPSIS sections of a medical chronology PLUS
+the underlying tables of medical entries.
+
+{context_block}
+
+The user has asked you to perform the following analysis on this
+chronology:
+
+{user_instruction}
+
+Ground every finding in the document. Cite specific dates, providers, and
+entries where applicable. When context documents are provided above, you
+may reference them but the medical chronology is the primary source. Use
+Markdown. Be specific.

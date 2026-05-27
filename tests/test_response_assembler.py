@@ -3,11 +3,14 @@ import os
 import tempfile
 import unittest
 
+from docx import Document as DocxDocument
+
 from icharlotte_core.discovery.response_assembler import (
     ResponseAssembler,
     build_response_title,
     build_response_filename,
     parse_response_text,
+    _fill_firm_contact_placeholders,
 )
 from icharlotte_core.discovery.response_parser import ParsedDiscovery
 from icharlotte_core.discovery.response_rules import ResponseRules
@@ -132,6 +135,84 @@ class TestParseResponseText(unittest.TestCase):
     def test_empty_text(self):
         pairs = parse_response_text("", "SI")
         self.assertEqual(len(pairs), 0)
+
+
+class TestInsertResponsePairs(unittest.TestCase):
+    def test_no_objections_does_not_insert_waiver(self):
+        doc = DocxDocument()
+        assembler = ResponseAssembler.__new__(ResponseAssembler)
+        rules = ResponseRules()
+
+        assembler._insert_response_pairs(
+            doc,
+            [
+                {
+                    "number": "1.1",
+                    "request": "State who prepared the responses.",
+                    "response": "Attorney information.",
+                }
+            ],
+            "FI",
+            "ONE",
+            rules,
+        )
+
+        full_text = "\n".join(paragraph.text for paragraph in doc.paragraphs)
+        self.assertNotIn(rules.waiver_language, full_text)
+        self.assertIn("Attorney information.", full_text)
+
+    def test_objections_still_insert_waiver_inline(self):
+        doc = DocxDocument()
+        assembler = ResponseAssembler.__new__(ResponseAssembler)
+        rules = ResponseRules()
+
+        assembler._insert_response_pairs(
+            doc,
+            [
+                {
+                    "number": "15.1",
+                    "request": "Identify denials and defenses.",
+                    "response": (
+                        "Objection text. "
+                        f"{rules.waiver_language}\n"
+                        "General denial response."
+                    ),
+                }
+            ],
+            "FI",
+            "ONE",
+            rules,
+        )
+
+        full_text = "\n".join(paragraph.text for paragraph in doc.paragraphs)
+        self.assertIn(f"Objection text. {rules.waiver_language}", full_text)
+        self.assertIn("General denial response.", full_text)
+
+
+class TestFirmContactPlaceholders(unittest.TestCase):
+    def test_fills_firm_contact_placeholders_from_caption_text(self):
+        text = (
+            "Responding Party and its attorneys of record, {firm_name}, "
+            "{firm_address}; {firm_phone}."
+        )
+        caption_text = (
+            "Dated: April 20, 2026\t\t\tBORDIN SEMMER LLP\n"
+            "BORDIN SEMMER LLP\n"
+            "Joshua Bordin-Wosk, State Bar No. 241077\n"
+            "jbordinwosk@bordinsemmer.com\n"
+            "101 Continental Blvd., Suite 700\n"
+            "El Segundo, CA 90245\n"
+            "Phone:\t(323) 457-2110\n"
+            "Fax:\t(323) 457-2120\n"
+        )
+
+        filled = _fill_firm_contact_placeholders(text, caption_text)
+
+        self.assertIn("BORDIN SEMMER LLP, 101 Continental", filled)
+        self.assertNotIn("Dated:", filled)
+        self.assertIn("101 Continental Blvd., Suite 700, El Segundo, CA 90245", filled)
+        self.assertIn("(323) 457-2110", filled)
+        self.assertNotIn("{firm_", filled)
 
 
 if __name__ == "__main__":

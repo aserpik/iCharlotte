@@ -302,8 +302,6 @@ def _apply_default_styles(doc):
 
 def _add_markdown_to_doc(doc, content: str):
     """Parse basic markdown and add to document."""
-    import re
-
     if Pt is None or Inches is None:
         # Fallback: just add as plain text
         doc.add_paragraph(content)
@@ -312,19 +310,31 @@ def _add_markdown_to_doc(doc, content: str):
     lines = content.split('\n')
     active_paragraph = None
 
-    for line in lines:
+    i = 0
+    while i < len(lines):
+        line = lines[i]
         stripped = line.strip()
         if not stripped:
+            i += 1
             continue
 
-        # Headings
+        # Markdown table block — convert to a real Word table.
+        consumed, header, rows = try_consume_markdown_table(lines, i)
+        if consumed:
+            add_markdown_table_to_doc(doc, header, rows)
+            i += consumed
+            active_paragraph = None
+            continue
+
+        # Headings — strip emphasis markers; the heading itself is bolded.
         if stripped.startswith('#'):
-            text = stripped.lstrip('#').strip()
+            text = stripped.lstrip('#').strip().replace('**', '').replace('__', '')
             if not text.endswith('.'):
                 text += "."
             active_paragraph = doc.add_paragraph()
             run = active_paragraph.add_run(text + " ")
             run.bold = True
+            i += 1
             continue
 
         # List items
@@ -335,33 +345,216 @@ def _add_markdown_to_doc(doc, content: str):
             p.paragraph_format.left_indent = Inches(0.5)
             p.paragraph_format.first_line_indent = Inches(-0.25)
 
-            run = p.add_run("\t")
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(12)
+            tab_run = p.add_run("\t")
+            tab_run.font.name = 'Times New Roman'
+            tab_run.font.size = Pt(12)
 
-            # Parse bold markers
-            parts = re.split(r'(\*\*.*?\*\*)', text)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    r = p.add_run(part[2:-2])
-                    r.bold = True
-                else:
-                    r = p.add_run(part)
-                r.font.name = 'Times New Roman'
-                r.font.size = Pt(12)
+            render_inline_markdown(p, text)
 
             active_paragraph = None
+            i += 1
             continue
 
         # Normal text
         p = active_paragraph if active_paragraph else doc.add_paragraph()
-
-        parts = re.split(r'(\*\*.*?\*\*)', stripped)
-        for part in parts:
-            if part.startswith('**') and part.endswith('**'):
-                run = p.add_run(part[2:-2])
-                run.bold = True
-            else:
-                p.add_run(part)
-
+        render_inline_markdown(p, stripped)
         active_paragraph = None
+        i += 1
+
+
+# =============================================================================
+# Inline markdown helpers (shared by all Scripts/* add_markdown_to_doc impls)
+# =============================================================================
+
+import re as _re
+
+# Single source of truth for inline emphasis. Tried in order, so `**` wins over
+# `*`. Each alternation has its own capture group so we know which form matched.
+#
+#   group 1: ``**bold**``      content must not contain ``**``
+#   group 2: ``*italic*``      content must not contain ``*``; no whitespace
+#                              immediately inside the asterisks (so list
+#                              bullets like ``* item`` don't match), and the
+#                              outer ``*`` cannot be next to a word char on
+#                              the closing side (avoids ``2*3*4`` triggering)
+#   group 3: `` `code` ``      monospace
+_INLINE_TOKEN = _re.compile(
+    r"\*\*((?:(?!\*\*).)+?)\*\*"
+    r"|(?<![\w*])\*(?!\s)([^*]+?)(?<!\s)\*(?!\w)"
+    r"|`([^`]+?)`"
+)
+
+
+def _add_inline_run(para, text, *, bold=False, italic=False, code=False,
+                    font_name="Times New Roman", font_size_pt=12):
+    """Append a styled run to ``para``. Skip empty text."""
+    if not text:
+        return
+    run = para.add_run(text)
+    if bold:
+        run.bold = True
+    if italic:
+        run.italic = True
+    if code:
+        # Monospace for inline code; the size match keeps the line stable.
+        run.font.name = "Consolas"
+    elif font_name:
+        run.font.name = font_name
+    if font_size_pt and Pt is not None:
+        run.font.size = Pt(font_size_pt)
+
+
+def render_inline_markdown(para, text, *, font_name="Times New Roman",
+                           font_size_pt=12):
+    """Parse inline markdown in ``text`` and append styled runs to ``para``.
+
+    Handles ``**bold**``, ``*italic*``, and `` `code` ``. Block-level syntax
+    (headings, lists, tables) must be handled by the caller — this helper is
+    inline-only, so passing a heading line through it will not bold the whole
+    line.
+
+    Callers that previously did ``re.split(r'(\\*\\*.*?\\*\\*)', text)`` should
+    swap in a single call to this helper. It fixes three pre-existing bugs in
+    Scripts/*: the broken ``\\**`` zero-or-more regex (med_record, med_chron,
+    exposure), the greedy ``\\*\\*.*\\*\\*`` regex that swallowed multiple
+    bold spans (liability), and the total lack of italic/code support.
+    """
+    if not text:
+        return
+
+    pos = 0
+    for m in _INLINE_TOKEN.finditer(text):
+        # Plain text before the matched token.
+        if m.start() > pos:
+            _add_inline_run(para, text[pos:m.start()],
+                            font_name=font_name, font_size_pt=font_size_pt)
+        bold_grp, italic_grp, code_grp = m.group(1), m.group(2), m.group(3)
+        if bold_grp is not None:
+            _add_inline_run(para, bold_grp, bold=True,
+                            font_name=font_name, font_size_pt=font_size_pt)
+        elif italic_grp is not None:
+            _add_inline_run(para, italic_grp, italic=True,
+                            font_name=font_name, font_size_pt=font_size_pt)
+        elif code_grp is not None:
+            _add_inline_run(para, code_grp, code=True,
+                            font_size_pt=font_size_pt)
+        pos = m.end()
+    # Trailing plain text after the last token.
+    if pos < len(text):
+        _add_inline_run(para, text[pos:],
+                        font_name=font_name, font_size_pt=font_size_pt)
+
+
+# =============================================================================
+# Markdown table helpers (shared by all Scripts/* add_markdown_to_doc impls)
+# =============================================================================
+
+_TABLE_SEPARATOR_CELL = _re.compile(r"^\s*:?-{3,}:?\s*$")
+
+
+def _split_table_row(line: str) -> list[str]:
+    """Split a markdown table row into cells.
+
+    Accepts both ``| a | b | c |`` and ``a | b | c``. Trailing/leading empty
+    cells from outer pipes are stripped. Returns ``[]`` if the line has no
+    pipe character.
+    """
+    stripped = line.strip()
+    if "|" not in stripped:
+        return []
+    if stripped.startswith("|"):
+        stripped = stripped[1:]
+    if stripped.endswith("|"):
+        stripped = stripped[:-1]
+    return [cell.strip() for cell in stripped.split("|")]
+
+
+def _is_table_separator_line(line: str) -> bool:
+    """True if ``line`` looks like a markdown table separator (``| --- | --- |``)."""
+    cells = _split_table_row(line)
+    if not cells:
+        return False
+    return all(_TABLE_SEPARATOR_CELL.match(c) for c in cells)
+
+
+def try_consume_markdown_table(lines: list[str], start_idx: int):
+    """Try to recognise a markdown table starting at ``lines[start_idx]``.
+
+    A valid table is a header row followed immediately by a separator row,
+    optionally followed by data rows. Returns
+    ``(consumed_count, header_cells, list_of_row_cells)`` on success, or
+    ``(0, None, None)`` if no table is recognised at this position.
+    """
+    if start_idx + 1 >= len(lines):
+        return 0, None, None
+    header_line = lines[start_idx]
+    sep_line = lines[start_idx + 1]
+    if "|" not in header_line:
+        return 0, None, None
+    if not _is_table_separator_line(sep_line):
+        return 0, None, None
+    header = _split_table_row(header_line)
+    if not header:
+        return 0, None, None
+
+    rows: list[list[str]] = []
+    i = start_idx + 2
+    while i < len(lines):
+        row_line = lines[i]
+        if not row_line.strip():
+            break
+        if "|" not in row_line:
+            break
+        cells = _split_table_row(row_line)
+        if not cells:
+            break
+        # Pad / trim to header width so the Word table stays rectangular.
+        if len(cells) < len(header):
+            cells = cells + [""] * (len(header) - len(cells))
+        elif len(cells) > len(header):
+            cells = cells[: len(header)]
+        rows.append(cells)
+        i += 1
+
+    consumed = i - start_idx
+    return consumed, header, rows
+
+
+def add_markdown_table_to_doc(doc, header: list[str], rows: list[list[str]]):
+    """Append a real Word table to ``doc``. The header row is bolded.
+
+    Uses ``Table Grid`` style if available (gives visible borders that survive
+    a round trip through mammoth → HTML → QTextEdit). Falls back to the
+    default style if the template doesn't define ``Table Grid``.
+    """
+    if Document is None:
+        return
+    cols = len(header)
+    table = doc.add_table(rows=1 + len(rows), cols=cols)
+    try:
+        table.style = "Table Grid"
+    except KeyError:
+        pass
+
+    # NOTE: do NOT use ``cell.text = ""`` to clear — python-docx's text setter
+    # creates an empty default run, so our subsequent add_run lands at runs[1]
+    # and the bold/font formatting on it gets shadowed by an unstyled runs[0].
+    # ``add_table`` already gives each cell one empty paragraph with zero runs;
+    # we just append our styled run to it.
+    hdr_cells = table.rows[0].cells
+    for c_idx, text in enumerate(header):
+        para = hdr_cells[c_idx].paragraphs[0]
+        run = para.add_run(text)
+        run.bold = True
+        if Pt is not None:
+            run.font.size = Pt(12)
+        run.font.name = "Times New Roman"
+
+    for r_idx, row in enumerate(rows, start=1):
+        row_cells = table.rows[r_idx].cells
+        for c_idx, text in enumerate(row):
+            para = row_cells[c_idx].paragraphs[0]
+            run = para.add_run(text)
+            if Pt is not None:
+                run.font.size = Pt(12)
+            run.font.name = "Times New Roman"

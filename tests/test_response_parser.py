@@ -115,6 +115,18 @@ class TestParseLlmResponse(unittest.TestCase):
         parsed = parse_llm_response(llm_json, our_client_name="Defendant Y")
         self.assertEqual(parsed.discovery_type, "RFA")
 
+    def test_normalizes_verbose_discovery_type_label(self):
+        llm_json = '''{
+            "discovery_type": "Form Interrogatories",
+            "propounding_party": "Plaintiff X",
+            "responding_party": "Defendant Y",
+            "set_number": 1,
+            "case_number": "123",
+            "requests": []
+        }'''
+        parsed = parse_llm_response(llm_json)
+        self.assertEqual(parsed.discovery_type, "FI")
+
 
 if __name__ == "__main__":
     unittest.main()

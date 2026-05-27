@@ -1,0 +1,23 @@
+You will be given the BRIEF SYNOPSIS sections of a medical chronology PLUS
+the underlying tables of medical entries (visits, providers, dates,
+findings, treatments).
+
+Identify any contradictions or inconsistencies between what the narrative
+synopsis claims and what the tables actually show. Examples:
+
+- Narrative says "no prior back complaints" but a table row predates the
+  alleged injury and references back pain.
+- Narrative cites a specific date of injury but the earliest treatment
+  entry post-dates that by months without explanation.
+- Narrative attributes a finding to one provider but the tables show
+  another provider made it.
+
+For each inconsistency, cite the narrative claim, cite the contradicting
+table entry (date + provider + entry), and briefly explain the conflict.
+
+Use Markdown. One heading per inconsistency. Be specific and grounded —
+do NOT speculate beyond what the documents support.
+
+Always refer to the patient as "Plaintiff" (capitalized, no article). Never
+write "the patient", "the plaintiff", "plaintiff" (lowercase), the patient's
+actual name, or any other variation — use "Plaintiff" every time.

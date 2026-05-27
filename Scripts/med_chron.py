@@ -4,11 +4,22 @@ import logging
 import datetime
 import re
 import subprocess
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from google import genai
 import gc
 from docx import Document
 from docx.shared import Pt, Inches
 from pypdf import PdfReader
+from dataclasses import dataclass
+
+# Make ``icharlotte_core`` importable when this script is run directly
+# (``python Scripts/med_chron.py ...``). The wizard subprocess invocation
+# always runs Python with cwd == project root, but the IndexTab agent
+# runner and any direct CLI use need the project root explicitly added.
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from icharlotte_core.llm_config import LLMCaller
 
 # Import Case Data Manager
 try:
@@ -138,129 +149,93 @@ def extract_text(file_path):
         log_event(f"Error extracting text from {file_path}: {e}", level="error")
         return None
 
-def call_gemini(prompt, text):
-    """Calls Gemini API."""
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        log_event("Error: GEMINI_API_KEY environment variable not set.", level="error")
-        return None
-
-    client = genai.Client(api_key=api_key)
-
-    full_prompt = f"{prompt}\n\nDOCUMENT CONTENT:\n{text}"
-    
-    model_sequence = [
-        "gemini-3-flash-preview", 
-        "gemini-2.5-flash"
-    ]
-
-    for model_name in model_sequence:
-        log_event(f"Attempting to use model: {model_name}")
-        try:
-            response = client.models.generate_content(
-                model=model_name,
-                contents=full_prompt
-            )
-            if response and response.text:
-                log_event(f"Success with model: {model_name}")
-                return response.text
-        except Exception as e:
-            log_event(f"Failed with model {model_name}: {e}", level="warning")
-            continue
-    
-    log_event("Error: All model attempts failed.", level="error")
-    return None
-
 def add_markdown_to_doc(doc, content):
     """Parses basic Markdown and applies formatting."""
+    from icharlotte_core.docx_writer import (
+        try_consume_markdown_table,
+        add_markdown_table_to_doc,
+        render_inline_markdown,
+    )
+
     lines = content.split('\n')
     active_paragraph = None
-    
+
     # Regex to identify dates at the beginning of a paragraph/sentence
     # Matches: (Optional "On ") (Date String)
     # Date String: Month DD, YYYY
     date_pattern = re.compile(r"^(On )?((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{1,2},? \d{4})")
 
-    for line in lines:
+    i = 0
+    while i < len(lines):
+        line = lines[i]
         stripped = line.strip()
         if not stripped:
+            i += 1
             continue
-        
+
+        # Markdown table block — emit a real Word table.
+        consumed, header, rows = try_consume_markdown_table(lines, i)
+        if consumed:
+            add_markdown_table_to_doc(doc, header, rows)
+            i += consumed
+            active_paragraph = None
+            continue
+
         if stripped.startswith('#'):
-            text = stripped.lstrip('#').strip()
+            text = stripped.lstrip('#').strip().replace('**', '').replace('__', '')
             if not text.endswith('.'):
                 text += "."
             active_paragraph = doc.add_paragraph()
             run = active_paragraph.add_run(text + " ")
             run.bold = True
+            i += 1
             continue
-        
+
         if stripped.startswith('* ') or stripped.startswith('- '):
             text = stripped[2:].strip()
             p = doc.add_paragraph()
             p.paragraph_format.line_spacing = 1.0
             p.paragraph_format.left_indent = Inches(0.5)
             p.paragraph_format.first_line_indent = Inches(-0.25)
-            
+
             # Use a real bullet character and tab for portability
-            run = p.add_run("•\t")
-            run.font.name = 'Times New Roman'
-            run.font.size = Pt(12)
-            
-            # Support bold parsing within list items
-            parts = re.split(r'(\*\*.*?\*\*)', text)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    r = p.add_run(part[2:-2])
-                    r.bold = True
-                else:
-                    r = p.add_run(part)
-                r.font.name = 'Times New Roman'
-                r.font.size = Pt(12)
+            bullet_run = p.add_run("•\t")
+            bullet_run.font.name = 'Times New Roman'
+            bullet_run.font.size = Pt(12)
+
+            render_inline_markdown(p, text)
             active_paragraph = None
+            i += 1
             continue
-        
+
         # Regular paragraph
         if active_paragraph:
             p = active_paragraph
         else:
             p = doc.add_paragraph()
             p.paragraph_format.first_line_indent = Inches(0.5)
-        
-        # Check for date at start of line
+
+        # Check for date at start of line — underline it, then render the rest.
         match = date_pattern.match(stripped)
         if match:
             on_prefix = match.group(1) # "On " or None
             date_str = match.group(2)  # "January 1, 2024"
-            
+
             total_match_len = len(match.group(0))
             remaining_text = stripped[total_match_len:]
-            
+
             if on_prefix:
                 p.add_run(on_prefix)
-            
+
             run = p.add_run(date_str)
             run.underline = True
-            
-            # Process remaining text for bold markers
-            parts = re.split(r'(\**.*?\**)', remaining_text)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    run = p.add_run(part[2:-2])
-                    run.bold = True
-                else:
-                    p.add_run(part)
+
+            render_inline_markdown(p, remaining_text)
         else:
-            # Standard markdown parsing
-            parts = re.split(r'(\**.*?\**)', stripped)
-            for part in parts:
-                if part.startswith('**') and part.endswith('**'):
-                    run = p.add_run(part[2:-2])
-                    run.bold = True
-                else:
-                    p.add_run(part)
-        
+            render_inline_markdown(p, stripped)
+
         active_paragraph = None
+        i += 1
 
 def extract_provider_from_filename(filename):
     """Extracts provider name from filename based on patterns."""
@@ -287,65 +262,6 @@ def sanitize_filename(name):
     # Trim whitespace
     name = name.strip()
     return name
-
-def save_to_docx(content, output_dir, provider_name, original_filename):
-    """Saves to DOCX with unique filename med_chron_{filename}.docx."""
-    
-    # Use unique filename to avoid collision in parallel execution
-    safe_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", os.path.splitext(original_filename)[0])
-    filename = f"med_chron_{safe_name}.docx"
-    output_path = os.path.join(output_dir, filename)
-
-    try:
-        if os.path.exists(output_path):
-             # If exists (re-run on same file?), we overwrite or append? 
-             # Let's overwrite for a single file agent to avoid duplication on re-runs.
-             doc = Document()
-             log_event(f"Overwriting/Creating file: {output_path}")
-        else:
-             doc = Document()
-             log_event(f"Creating new file: {output_path}")
-
-        # Styles
-        style = doc.styles['Normal']
-        style.font.name = 'Times New Roman'
-        style.font.size = Pt(12)
-        style.paragraph_format.line_spacing = 1.0
-        
-        for i in range(1, 10):
-            if f'Heading {i}' in doc.styles:
-                h = doc.styles[f'Heading {i}']
-                h.font.name = 'Times New Roman'
-                h.font.size = Pt(12)
-                h.paragraph_format.line_spacing = 1.0
-
-        for s in ['List Bullet', 'List Number']:
-            if s in doc.styles:
-                l = doc.styles[s]
-                l.font.name = 'Times New Roman'
-                l.font.size = Pt(12)
-                l.paragraph_format.line_spacing = 1.0
-
-        # Title
-        p = doc.add_paragraph()
-        run = p.add_run(f"Medical Record Chronology - {provider_name}")
-        run.bold = True
-        run.underline = True
-        run.font.name = 'Times New Roman'
-        run.font.size = Pt(12)
-
-        doc.add_paragraph(f"Source: {original_filename}")
-        doc.add_paragraph(f"Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        
-        add_markdown_to_doc(doc, content)
-            
-        doc.save(output_path)
-        log_event(f"Saved to: {output_path}")
-        return True
-
-    except Exception as e:
-        log_event(f"Error saving DOCX: {e}", level="error")
-        return False
 
 def filter_content(text):
     """Filters text to only include content under specific headings."""
@@ -384,136 +300,602 @@ def filter_content(text):
         
     return "\n\n".join(filtered_chunks)
 
-def main():
-    if len(sys.argv) < 2:
-        log_event("Error: No file path provided.", level="error")
-        sys.exit(1)
+def _extract_full_text(file_path: str, prefetched_pdf_text: str | None = None) -> str:
+    """Extract narrative + table text from a chronology file.
 
-    # Attempt to handle unquoted paths with spaces by joining all arguments
-    input_path = " ".join(sys.argv[1:])
-    
-    # If the joined path doesn't exist, but the first argument does, 
-    # it might be a single file with tricky chars or we're in a directory where 
-    # sys.argv[1] was actually correct and the rest were garbage.
-    if not os.path.exists(input_path) and os.path.exists(sys.argv[1]):
-        input_path = sys.argv[1]
-    
-    # Handle absolute path conversion
-    input_path = os.path.abspath(input_path)
+    .docx -> ``icharlotte_core.document_processor.extract_docx_text``
+             (canonical extractor that includes tables as pipe-separated rows).
+    .pdf  -> ``prefetched_pdf_text`` if provided (avoids double-OCR), else
+             falls back to ``extract_text``. PDFs don't have a paragraphs-vs-
+             tables split in extraction.
+    .doc  -> Word COM read-only, never calls word.Quit().
+    """
+    ext = os.path.splitext(file_path)[1].lower()
+    if ext == ".docx":
+        from icharlotte_core.document_processor import extract_docx_text
+        return extract_docx_text(file_path)
+    if ext == ".pdf":
+        if prefetched_pdf_text is not None:
+            return prefetched_pdf_text
+        return extract_text(file_path) or ""
+    if ext == ".doc":
+        return _extract_doc_via_word_com(file_path)
+    return extract_text(file_path) or ""
 
-    if not os.path.exists(input_path):
-        log_event(f"Error: File not found: {input_path}", level="error")
-        sys.exit(1)
 
-    log_event(f"--- Starting Med Chron Agent for: {input_path} ---")
+def _extract_doc_via_word_com(file_path: str) -> str:
+    """Read a legacy .doc by attaching to the user's running Word.
 
-    if os.path.isdir(input_path):
-        log_event(f"Input is a directory. Scanning: {input_path}")
-        files_to_process = []
-        for root, _, files in os.walk(input_path):
-            for file in files:
-                if file.lower().endswith(('.pdf', '.docx')):
-                    if "med_chron" in file.lower(): continue
-                    files_to_process.append(os.path.join(root, file))
-        
-        if not files_to_process:
-            log_event("No suitable files found.")
-            sys.exit(0)
-        
-        for file_path in files_to_process:
-            try:
-                subprocess.run([sys.executable, sys.argv[0], file_path], check=True)
-            except subprocess.CalledProcessError as e:
-                log_event(f"Subprocess failed for {file_path}: {e}", level="error")
-        sys.exit(0)
-    
-    # Single File
-    text = extract_text(input_path)
-    if not text:
-        sys.exit(1)
-        
-    # Apply Filtering
-    filtered_text = filter_content(text)
-    if not filtered_text:
-        log_event("No valid content found under specified headings.")
-        sys.exit(0)
-
+    Mirrors ChatTab._extract_doc_text: never set word.Visible and never
+    call word.Quit() -- only close the Document we opened. Open ReadOnly
+    so the user's session is untouched.
+    """
     try:
-        with open(PROMPT_FILE, "r", encoding="utf-8") as f:
-            prompt_instruction = f.read()
+        import win32com.client  # type: ignore
+    except ImportError:
+        log_event("win32com not available; cannot extract .doc files", level="warning")
+        return ""
+    word = None
+    doc = None
+    try:
+        word = win32com.client.Dispatch("Word.Application")
+        doc = word.Documents.Open(
+            FileName=os.path.abspath(file_path),
+            ReadOnly=True,
+            AddToRecentFiles=False,
+            ConfirmConversions=False,
+        )
+        return doc.Content.Text or ""
     except Exception as e:
-        log_event(f"Error reading prompt file: {e}", level="error")
-        sys.exit(1)
+        log_event(f".doc extraction failed for {file_path}: {e}", level="warning")
+        return ""
+    finally:
+        if doc is not None:
+            try:
+                doc.Close(SaveChanges=False)
+            except Exception:
+                pass
 
-    # Determine Provider Name from Filename
+
+def _build_catalog_snapshot() -> list:
+    """Serialise the curated catalog into a JSON-friendly list."""
+    scripts_dir = os.path.dirname(os.path.abspath(__file__))
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    from MED_CHRON_ANALYSES.catalog import CATALOG
+    return [
+        {
+            "id": d.id,
+            "title": d.title,
+            "description": d.description,
+            "uses_tables": d.uses_tables,
+            "default_selected": d.default_selected,
+        }
+        for d in CATALOG
+    ]
+
+
+def process_prep(input_path: str, output_dir: str) -> int:
+    """Phase 1: extract text twice, write session JSON, print AWAITING_INPUT.
+
+    Returns process-style exit code (0 success, non-zero failure). Does
+    NOT call sys.exit -- leaves that to main().
+    """
+    from icharlotte_core.med_chron import session_manager
+
+    paths = session_manager.compute_session_paths(input_path, output_dir)
+
+    # Cache reuse: if session.json + both text files exist, skip extraction.
+    if (paths.session_path.exists()
+            and paths.narrative_text_path.exists()
+            and paths.full_text_path.exists()):
+        log_event(f"Reusing cached prep at {paths.cache_dir}")
+        print(f"AWAITING_INPUT:{paths.session_path}", flush=True)
+        return 0
+
+    paths.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    # --- Narrative-only text ---
+    raw_text = extract_text(input_path)
+    narrative_missing = False
+    if not raw_text:
+        # For docx files with no text content, use empty string rather than failing
+        log_event(f"Could not extract text from {input_path}", level="warning")
+        raw_text = ""
+
+    narrative = filter_content(raw_text)
+    if narrative is None:
+        narrative_missing = True
+        narrative = ""
+    paths.narrative_text_path.write_text(narrative, encoding="utf-8")
+
+    # --- Full text (narrative + tables) ---
+    full_text = _extract_full_text(input_path, prefetched_pdf_text=raw_text)
+    if not full_text:
+        log_event(f"Could not extract full text from {input_path}", level="error")
+        return 1
+    paths.full_text_path.write_text(full_text, encoding="utf-8")
+
+    # --- Session JSON ---
     filename = os.path.basename(input_path)
     provider_name = extract_provider_from_filename(filename)
-    log_event(f"Identified Provider from Filename: {provider_name}")
-
-    final_content = call_gemini(prompt_instruction, filtered_text)
-    if not final_content:
-        sys.exit(1)
-
-    # Save to Case Data
-    data_manager = CaseDataManager()
     file_num_match = re.search(r"(\d{4}\.\d{3})", input_path)
-    if file_num_match:
-        file_num = file_num_match.group(1)
-        
-        # Create a variable key based on provider name if possible
-        safe_provider = re.sub(r"[^a-zA-Z0-9_]", "_", provider_name.lower())
-        var_key = f"med_chron_{safe_provider}"
-        
-        log_event(f"Saving medical chronology to case variable: {var_key}")
-        data_manager.save_variable(file_num, var_key, final_content, source="med_chron_agent", extra_tags=["Evidence", "Medical Records", "Chronology"])
-    else:
-        log_event("Could not extract file number from path. Skipping variable save.", level="warning")
+    file_number = file_num_match.group(1) if file_num_match else None
 
-    # Determine Output Directory
+    session_data = {
+        "version": 1,
+        "phase": "awaiting_input",
+        "input_path": str(input_path),
+        "narrative_text_path": str(paths.narrative_text_path),
+        "full_text_path": str(paths.full_text_path),
+        "narrative_missing": narrative_missing,
+        "provider_name": provider_name,
+        "file_number": file_number,
+        "catalog": _build_catalog_snapshot(),
+        "user_config": None,
+    }
+    session_manager.write_session(paths.session_path, session_data)
+
+    log_event(
+        f"Phase 1 complete: cached {len(narrative)} narrative chars "
+        f"+ {len(full_text)} full chars; session at {paths.session_path}"
+    )
+    print(f"AWAITING_INPUT:{paths.session_path}", flush=True)
+    return 0
+
+
+# =============================================================================
+# Context-document rendering for custom analyses
+# =============================================================================
+
+MAX_CONTEXT_CHARS = 120_000  # per-file cap to keep prompts bounded
+
+
+def _render_context_block(context_files: list[str]) -> str:
+    """Return the ADDITIONAL CONTEXT DOCUMENTS block, or '' if no usable files.
+
+    Each file is extracted via ``_extract_full_text``. Failures (missing
+    file, exception, empty text) are logged and silently skipped. If every
+    file fails, returns ''.
+    """
+    if not context_files:
+        return ""
+
+    chunks: list[str] = []
+    for path in context_files:
+        try:
+            if not os.path.exists(path):
+                log_event(f"Context file missing, skipping: {path}", level="warning")
+                continue
+            text = _extract_full_text(path)
+            if not text or not text.strip():
+                log_event(f"Context file empty after extraction, skipping: {path}", level="warning")
+                continue
+            if len(text) > MAX_CONTEXT_CHARS:
+                text = text[:MAX_CONTEXT_CHARS] + f"\n[…context truncated at {MAX_CONTEXT_CHARS:,} characters…]"
+                log_event(f"Context file truncated to {MAX_CONTEXT_CHARS} chars: {path}", level="warning")
+            filename = os.path.basename(path)
+            chunks.append(
+                f"--- BEGIN CONTEXT DOCUMENT: {filename} ---\n{text}\n--- END CONTEXT DOCUMENT ---"
+            )
+        except Exception as e:
+            log_event(f"Failed to extract context file {path}: {e}", level="warning")
+            continue
+
+    if not chunks:
+        return ""
+
+    body = "\n\n".join(chunks)
+    return f"ADDITIONAL CONTEXT DOCUMENTS PROVIDED BY THE USER:\n\n{body}"
+
+
+# =============================================================================
+# Phase 2: Run selected analyses
+# =============================================================================
+
+
+def _slug(value: str) -> str:
+    """Lowercase + sanitize for use in filenames/run ids."""
+    cleaned = re.sub(r"[^a-zA-Z0-9_\-]+", "_", value or "")
+    return cleaned.strip("_").lower()
+
+
+def _safe_basename(input_path: str) -> str:
+    base = os.path.splitext(os.path.basename(input_path))[0]
+    return _slug(base)
+
+
+@dataclass
+class RunSpec:
+    id: str
+    title: str
+    prompt_text: str
+    input_text: str
+    output_path: str
+
+
+@dataclass
+class RunResult:
+    spec: RunSpec
+    success: bool
+    error: str = ""
+    output_chars: int = 0
+
+
+def _build_run_list(session: dict, narrative: str, full: str,
+                    safe_basename: str, output_dir: str) -> list[RunSpec]:
+    """Translate user_config + catalog into concrete RunSpec instances."""
+    scripts_dir = os.path.dirname(os.path.abspath(__file__))
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    from MED_CHRON_ANALYSES.catalog import CATALOG_BY_ID, load_prompt
+
+    cfg = session["user_config"]
+    runs: list[RunSpec] = []
+
+    for cat_id in cfg.get("selected_catalog_ids", []):
+        if cat_id not in CATALOG_BY_ID:
+            log_event(f"Skipping unknown catalog id: {cat_id}", level="warning")
+            continue
+        d = CATALOG_BY_ID[cat_id]
+        runs.append(RunSpec(
+            id=cat_id,
+            title=d.title,
+            prompt_text=load_prompt(d.prompt_file),
+            input_text=narrative if not d.uses_tables else full,
+            output_path=os.path.join(
+                output_dir, f"med_chron_{cat_id}_{safe_basename}.docx"
+            ),
+        ))
+
+    wrapper = None
+    for i, c in enumerate(cfg.get("custom_analyses", []), 1):
+        if wrapper is None:
+            wrapper = load_prompt("_custom_wrapper.txt")
+        label_slug = _slug(c["label"])
+        context_block = _render_context_block(c.get("context_files", []) or [])
+        prompt_text = wrapper.replace("{user_instruction}", c["instruction"]).replace(
+            "{context_block}", context_block
+        )
+        runs.append(RunSpec(
+            id=f"custom_{i}_{label_slug}",
+            title=c["label"],
+            prompt_text=prompt_text,
+            input_text=full,
+            output_path=os.path.join(
+                output_dir, f"med_chron_custom_{i}_{label_slug}_{safe_basename}.docx"
+            ),
+        ))
+
+    return runs
+
+
+def _drop_rewrite_if_narrative_missing(runs: list[RunSpec], narrative: str) -> list[RunSpec]:
+    if narrative.strip():
+        return runs
+    kept = []
+    for r in runs:
+        if r.id == "rewrite_chronology":
+            log_event(
+                "Skipping Rewrite Chronology — no pre/post-injury synopsis "
+                "headings found in this document.",
+                level="warning",
+            )
+            continue
+        kept.append(r)
+    return kept
+
+
+def _run_one_analysis(spec: RunSpec, llm_caller: LLMCaller,
+                       provider_name: str, file_number: str | None = None) -> RunResult:
+    """Execute a single analysis. Caller MUST NOT let exceptions escape."""
+    try:
+        log_event(f"[{spec.id}] starting LLM call ({len(spec.input_text)} chars)")
+        result = llm_caller.call(
+            prompt=spec.prompt_text,
+            text=spec.input_text,
+            task_type="summary",
+        )
+        if not result:
+            return RunResult(spec=spec, success=False, error="LLM returned empty result")
+
+        os.makedirs(os.path.dirname(spec.output_path), exist_ok=True)
+        save_to_docx_at_path(result, spec.output_path, provider_name, spec.title)
+        log_event(f"[{spec.id}] done: {len(result)} chars → {spec.output_path}")
+
+        # Best-effort: persist to case database. A DB failure doesn't fail the analysis.
+        if file_number:
+            try:
+                safe_provider = re.sub(r"[^a-zA-Z0-9_]", "_", (provider_name or "unknown").lower())
+                CaseDataManager().save_variable(
+                    file_number,
+                    f"med_chron_{spec.id}_{safe_provider}",
+                    result,
+                    source="med_chron_agent",
+                    extra_tags=["Evidence", "Medical Records", spec.title],
+                )
+            except Exception as db_err:
+                log_event(f"[{spec.id}] CaseDataManager save failed (non-fatal): {db_err}", level="warning")
+
+        return RunResult(spec=spec, success=True, output_chars=len(result))
+    except Exception as e:
+        log_event(f"[{spec.id}] failed: {e}", level="error")
+        return RunResult(spec=spec, success=False, error=str(e))
+
+
+def save_to_docx_at_path(content: str, output_path: str,
+                         provider_name: str, analysis_title: str) -> None:
+    """Write content to output_path with the existing Med-Cron styling.
+
+    If the destination is locked (e.g., open in Word), auto-version up to
+    10 attempts: ``out.docx`` -> ``out v.2.docx`` -> ``out v.3.docx``.
+    """
+    from docx import Document
+    from docx.shared import Pt
+
+    base, ext = os.path.splitext(output_path)
+    attempt = 1
+    last_err = None
+    while attempt <= 10:
+        candidate = output_path if attempt == 1 else f"{base} v.{attempt}{ext}"
+        try:
+            doc = Document()
+            style = doc.styles['Normal']
+            style.font.name = 'Times New Roman'
+            style.font.size = Pt(12)
+            style.paragraph_format.line_spacing = 1.0
+
+            p = doc.add_paragraph()
+            run = p.add_run(f"{analysis_title} — {provider_name}")
+            run.bold = True
+            run.underline = True
+            run.font.name = 'Times New Roman'
+            run.font.size = Pt(12)
+
+            doc.add_paragraph(f"Generated on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            add_markdown_to_doc(doc, content)
+            doc.save(candidate)
+            return
+        except (PermissionError, IOError) as e:
+            last_err = e
+            attempt += 1
+    raise RuntimeError(f"Could not save after {attempt - 1} attempts: {last_err}")
+
+
+def process_run(session_path: str, output_dir: str) -> int:
+    """Phase 2: load session, fan out analyses in parallel, write docx each.
+
+    Returns 0 if at least one analysis succeeded, 1 if all failed or the
+    session is malformed.
+    """
+    from icharlotte_core.med_chron import session_manager
+
+    try:
+        session = session_manager.read_session(session_path)
+    except Exception as e:
+        log_event(f"Could not load session at {session_path}: {e}", level="error")
+        return 1
+
+    if session.get("phase") != "ready_to_run":
+        log_event(
+            f"Session phase is {session.get('phase')!r}; expected ready_to_run",
+            level="error",
+        )
+        return 1
+
+    try:
+        narrative = Path(session["narrative_text_path"]).read_text(encoding="utf-8")
+        full = Path(session["full_text_path"]).read_text(encoding="utf-8")
+        safe_basename = _safe_basename(session["input_path"])
+    except (KeyError, FileNotFoundError, OSError) as e:
+        log_event(f"Session is corrupt or cache files missing: {e}", level="error")
+        return 1
+
+    runs = _build_run_list(session, narrative, full, safe_basename, output_dir)
+    runs = _drop_rewrite_if_narrative_missing(runs, narrative)
+
+    if not runs:
+        log_event("No runs scheduled (after skip rules). Nothing to do.", level="warning")
+        return 1
+
+    llm_caller = LLMCaller()
+    provider_name = session.get("provider_name") or "Unknown Provider"
+    file_number = session.get("file_number")
+
+    successes = 0
+    failures = 0
+    total = len(runs)
+
+    log_event(f"Starting {total} analyses (max 4 concurrent)")
+    with ThreadPoolExecutor(max_workers=min(total, 4)) as ex:
+        futures = {
+            ex.submit(_run_one_analysis, r, llm_caller, provider_name, file_number): r
+            for r in runs
+        }
+        done = 0
+        for f in as_completed(futures):
+            result = f.result()
+            done += 1
+            if result.success:
+                successes += 1
+            else:
+                failures += 1
+            pct = int(20 + (done * 70 / total))
+            print(f"PROGRESS:{pct}:{done}/{total} done ({failures} failed)", flush=True)
+
+    log_event(f"Phase 2 complete: {successes}/{total} succeeded, {failures} failed")
+    print(f"PROGRESS:100:{successes}/{total} analyses complete ({failures} failed)", flush=True)
+    return 0 if successes > 0 else 1
+
+
+def _resolve_output_dir(input_path: str) -> str:
+    """Compute the case AI-OUTPUT directory using the existing rules.
+
+    Lifted from the old main() so all three phases share one implementation.
+    """
     parts = input_path.split(os.sep)
     output_dir = None
     case_root_parts = None
 
-    # Priority 1: Find folder starting with exactly 3 digits (Case Folder)
+    # Priority 1: folder starting with exactly 3 digits.
     for i in range(len(parts) - 1, -1, -1):
         if re.match(r'^\d{3}(\D|$)', parts[i]):
-            log_event(f"Identified Case Folder by 3-digit pattern: {parts[i]}")
-            case_root_parts = parts[:i+1]
+            case_root_parts = parts[:i + 1]
             break
 
-    # Priority 2: Standard "Current Clients" structure (Client/Case)
+    # Priority 2: "Current Clients" / Client / Matter pattern.
     if not case_root_parts:
         for i, part in enumerate(parts):
             if part.lower() == "current clients":
                 if i + 2 < len(parts):
-                    log_event("Identified Case Folder by Standard Structure (Current Clients + 2)")
-                    case_root_parts = parts[:i+3]
+                    case_root_parts = parts[:i + 3]
                 break
-    
+
     if case_root_parts:
         output_dir = os.sep.join(case_root_parts + ["NOTES", "AI OUTPUT"])
 
     if not output_dir:
-        # Fallback 1: If "NOTES" is already in the path, use it.
         for i in range(len(parts) - 1, -1, -1):
             if parts[i].upper() == "NOTES":
-                output_dir = os.path.join(os.sep.join(parts[:i+1]), "AI OUTPUT")
+                output_dir = os.path.join(os.sep.join(parts[:i + 1]), "AI OUTPUT")
                 break
-    
+
     if not output_dir:
-        # Fallback 2: Sibling NOTES to the file's parent folder
         input_dir = os.path.dirname(input_path)
         parent_dir = os.path.dirname(input_dir)
         output_dir = os.path.join(parent_dir, "NOTES", "AI OUTPUT")
 
-    if not os.path.exists(output_dir):
-        try:
-            os.makedirs(output_dir)
-        except Exception:
-            pass
+    os.makedirs(output_dir, exist_ok=True)
+    return output_dir
 
-    save_to_docx(final_content, output_dir, provider_name, filename)
-    log_event("--- Agent Finished ---")
+
+def process_legacy(input_path: str, *, output_dir_override: str | None = None) -> int:
+    """Legacy single-rewrite mode: ``python med_chron.py <file>`` with no --phase.
+
+    Used by the older IndexTab agent runner. Runs only the Rewrite analysis
+    on the narrative-only text, writing to the existing filename pattern
+    ``med_chron_<safe_filename>.docx`` so external callers keep working.
+    """
+    if os.path.isdir(input_path):
+        script_path = os.path.abspath(__file__)
+        files_to_process = []
+        for root, _, files in os.walk(input_path):
+            for file in files:
+                if file.lower().endswith(('.pdf', '.docx')) and "med_chron" not in file.lower():
+                    files_to_process.append(os.path.join(root, file))
+        if not files_to_process:
+            log_event("No suitable files found in directory.", level="warning")
+            return 0
+        for file_path in files_to_process:
+            try:
+                subprocess.run([sys.executable, script_path, file_path], check=True)
+            except subprocess.CalledProcessError as e:
+                log_event(f"Subprocess failed for {file_path}: {e}", level="error")
+        return 0
+
+    raw_text = extract_text(input_path)
+    if not raw_text:
+        log_event(f"Could not extract text from {input_path}", level="error")
+        return 1
+    narrative = filter_content(raw_text)
+    if not narrative:
+        log_event("No valid content under PRE/POST-INJURY headings.", level="warning")
+        return 0
+
+    scripts_dir = os.path.dirname(os.path.abspath(__file__))
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    from MED_CHRON_ANALYSES.catalog import load_prompt
+
+    prompt = load_prompt("rewrite_chronology.txt")
+    llm = LLMCaller()
+    content = llm.call(prompt=prompt, text=narrative, task_type="summary")
+    if not content:
+        return 1
+
+    filename = os.path.basename(input_path)
+    provider_name = extract_provider_from_filename(filename)
+    output_dir = output_dir_override or _resolve_output_dir(input_path)
+    safe_name = re.sub(r"[^a-zA-Z0-9_\-]", "_", os.path.splitext(filename)[0])
+    output_path = os.path.join(output_dir, f"med_chron_{safe_name}.docx")
+    save_to_docx_at_path(content, output_path, provider_name,
+                          "Medical Record Chronology")
+
+    # Existing CaseDataManager wiring (best-effort).
+    try:
+        data_manager = CaseDataManager()
+        file_num_match = re.search(r"(\d{4}\.\d{3})", input_path)
+        if file_num_match:
+            safe_provider = re.sub(r"[^a-zA-Z0-9_]", "_", provider_name.lower())
+            data_manager.save_variable(
+                file_num_match.group(1),
+                f"med_chron_{safe_provider}",
+                content,
+                source="med_chron_agent",
+                extra_tags=["Evidence", "Medical Records", "Chronology"],
+            )
+    except Exception as e:
+        log_event(f"Could not save to case data: {e}", level="warning")
+
+    log_event(f"Legacy rewrite done → {output_path}")
+    return 0
+
+
+def main():
+    """CLI dispatcher.
+
+    Modes:
+      med_chron.py <file>                       → legacy single-rewrite
+      med_chron.py --phase=prep <file>          → Phase 1 (prep)
+      med_chron.py --phase=run  <session.json>  → Phase 2 (run)
+    """
+    args = sys.argv[1:]
+    if not args:
+        log_event("Error: No file path provided.", level="error")
+        sys.exit(1)
+
+    phase = None
+    positional = []
+    output_dir_override = None
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a.startswith("--phase="):
+            phase = a.split("=", 1)[1].strip().lower()
+            i += 1
+        elif a == "--output_path" and i + 1 < len(args):
+            output_dir_override = args[i + 1]
+            i += 2
+        else:
+            positional.append(a)
+            i += 1
+
+    combined = " ".join(positional).strip().strip('"').strip("'")
+    if positional and os.path.exists(combined):
+        target = combined
+    elif positional and os.path.exists(positional[0]):
+        target = positional[0]
+    else:
+        log_event(f"Error: path not found: {combined or '(empty)'}", level="error")
+        sys.exit(1)
+    target = os.path.abspath(target)
+
+    if phase == "prep":
+        out_dir = output_dir_override or _resolve_output_dir(target)
+        rc = process_prep(target, out_dir)
+        sys.exit(rc)
+
+    if phase == "run":
+        # target is a session.json path. Output dir is the cache dir's
+        # great-grandparent — i.e., the original NOTES/AI OUTPUT folder.
+        out_dir = output_dir_override or str(Path(target).parent.parent.parent)
+        rc = process_run(target, out_dir)
+        sys.exit(rc)
+
+    # No --phase flag: legacy single-rewrite mode.
+    rc = process_legacy(target, output_dir_override=output_dir_override)
+    sys.exit(rc)
+
 
 if __name__ == '__main__':
     main()

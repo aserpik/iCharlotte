@@ -101,7 +101,8 @@ class PromptManager:
 
         # Create agent subdirectories
         for agent in ['summarize', 'discovery', 'deposition', 'timeline', 'contradiction',
-                      'word_assistant', 'legal_research', 'mediation_brief']:
+                      'word_assistant', 'legal_research', 'mediation_brief',
+                      'oppose_motion']:
             agent_dir = os.path.join(self.prompts_dir, agent)
             if not os.path.exists(agent_dir):
                 os.makedirs(agent_dir)
@@ -432,8 +433,7 @@ class PromptManager:
             DEFAULT_WORD_REDLINE_SYSTEM_PROMPT,
             EMAIL_SYSTEM_PROMPT,
             DEFAULT_REDLINE_PREFIX,
-            DEFAULT_PLACEHOLDER_INSTRUCTIONS,
-            DEFAULT_CURSOR_INSTRUCTIONS,
+            DEFAULT_INSERTION_INSTRUCTIONS,
             DEFAULT_SELECTION_INSTRUCTIONS,
         )
         from icharlotte_core.legal_research.prompts import (
@@ -446,15 +446,53 @@ class PromptManager:
             CITATION_INSTRUCTION,
         )
         from icharlotte_core.mediation_brief import MediationBriefGenerator
+        from icharlotte_core.opposition import prompts as oppose_prompts
+
+        # ── Migration: prune deprecated word_assistant entries ──────────────
+        # placeholder_instructions and cursor_instructions were consolidated
+        # into the templated insertion_instructions entry. Remove the
+        # orphaned registry entries + files so the workbench UI stops
+        # showing them. Safe to run multiple times (no-op if already pruned).
+        deprecated = [
+            ("word_assistant", "placeholder_instructions"),
+            ("word_assistant", "cursor_instructions"),
+        ]
+        pruned = 0
+        for agent, pass_name in deprecated:
+            key = self._get_prompt_key(agent, pass_name)
+            if key not in self._registry.get("prompts", {}):
+                continue
+            # Delete all version files + the current pointer for this prompt
+            entry = self._registry["prompts"][key]
+            for v_meta in entry.get("versions", []):
+                version_id = v_meta.get("version") if isinstance(v_meta, dict) else None
+                if not version_id:
+                    continue
+                vpath = self._get_prompt_path(agent, pass_name, version_id)
+                if os.path.exists(vpath):
+                    try:
+                        os.remove(vpath)
+                    except OSError as e:
+                        print(f"[PromptManager] Could not remove {vpath}: {e}")
+            current_path = self._get_current_path(agent, pass_name)
+            if os.path.exists(current_path):
+                try:
+                    os.remove(current_path)
+                except OSError as e:
+                    print(f"[PromptManager] Could not remove {current_path}: {e}")
+            del self._registry["prompts"][key]
+            pruned += 1
+        if pruned:
+            self._save_registry()
+            print(f"[PromptManager] Pruned {pruned} deprecated word_assistant prompts")
 
         seeds = [
-            ("word_assistant", "system_prompt", DEFAULT_WORD_SYSTEM_PROMPT, "Default Word system prompt"),
-            ("word_assistant", "redline_system_prompt", DEFAULT_WORD_REDLINE_SYSTEM_PROMPT, "Default redline system prompt"),
-            ("word_assistant", "email_system_prompt", EMAIL_SYSTEM_PROMPT, "Default Outlook email system prompt"),
-            ("word_assistant", "redline_prefix", DEFAULT_REDLINE_PREFIX, "Prefix prepended in redline mode"),
-            ("word_assistant", "placeholder_instructions", DEFAULT_PLACEHOLDER_INSTRUCTIONS, "Instructions for filling blank/placeholder"),
-            ("word_assistant", "cursor_instructions", DEFAULT_CURSOR_INSTRUCTIONS, "Instructions for cursor-position insertion"),
-            ("word_assistant", "selection_instructions", DEFAULT_SELECTION_INSTRUCTIONS, "Instructions for selected text with full doc"),
+            ("word_assistant", "system_prompt", DEFAULT_WORD_SYSTEM_PROMPT, "Word free-form system prompt (preamble + Word delta)"),
+            ("word_assistant", "redline_system_prompt", DEFAULT_WORD_REDLINE_SYSTEM_PROMPT, "Redline system prompt (preamble + redline delta)"),
+            ("word_assistant", "email_system_prompt", EMAIL_SYSTEM_PROMPT, "Outlook email system prompt (preamble + email delta)"),
+            ("word_assistant", "redline_prefix", DEFAULT_REDLINE_PREFIX, "Prefix appended at end of user message in redline mode"),
+            ("word_assistant", "insertion_instructions", DEFAULT_INSERTION_INSTRUCTIONS, "Shared insertion-instructions template (placeholder + cursor). Uses {anchor_label}, {anchor_short}, {extra_rules}."),
+            ("word_assistant", "selection_instructions", DEFAULT_SELECTION_INSTRUCTIONS, "Instructions for transforming a selection with full-doc context"),
             ("legal_research", "query_planning", QUERY_PLANNING_PROMPT, "Structured JSON query generation"),
             ("legal_research", "query_extraction", QUERY_EXTRACTION_PROMPT, "Extract queries from litigation prompt"),
             ("legal_research", "synthesis", SYNTHESIS_PROMPT, "Synthesize authorities into memo"),
@@ -464,6 +502,11 @@ class PromptManager:
             ("legal_research", "citation_instruction", CITATION_INSTRUCTION, "Strict citation rules"),
             ("mediation_brief", "style_guide", MediationBriefGenerator.STYLE_GUIDE, "Defense writing style/tone guide"),
             ("mediation_brief", "formatting_rules", MediationBriefGenerator.FORMATTING_RULES, "Structural formatting rules"),
+            ("oppose_motion", "analyze_motion", oppose_prompts.ANALYZE_MOTION_PROMPT, "Motion analysis: extract metadata + principal arguments"),
+            ("oppose_motion", "generate_outline", oppose_prompts.GENERATE_OUTLINE_PROMPT, "Outline generation from analyzed metadata"),
+            ("oppose_motion", "draft_memorandum", oppose_prompts.DRAFT_MEMORANDUM_PROMPT, "Drafter prompt (no pre-draft research; uses style exemplars)"),
+            ("oppose_motion", "verify_citation", oppose_prompts.VERIFY_CITATION_PROMPT, "Per-citation verifier: case + statute"),
+            ("oppose_motion", "find_replacement", oppose_prompts.FIND_REPLACEMENT_PROMPT, "Optional replacement-case search on red verdicts"),
         ]
 
         seeded = 0

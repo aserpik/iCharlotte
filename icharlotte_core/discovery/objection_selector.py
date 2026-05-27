@@ -13,6 +13,7 @@ import re
 from typing import Dict, Optional, Set
 
 from icharlotte_core.discovery.response_parser import ParsedRequest
+from icharlotte_core.discovery.response_drafter import get_fi_fixed_objections
 from icharlotte_core.discovery.response_rules import ResponseRules
 
 
@@ -115,8 +116,10 @@ class ObjectionMenu:
 # Form Interrogatory fixed objections
 # ---------------------------------------------------------------------------
 
-def select_fi_objections(rules: ResponseRules) -> str:
-    """Return the fixed Form Interrogatory objections from ResponseRules."""
+def select_fi_objections(rules: ResponseRules, number_str: str | None = None) -> str:
+    """Return fixed Form Interrogatory objections from ResponseRules."""
+    if number_str:
+        return get_fi_fixed_objections(number_str, rules)
     return rules.fi_objections
 
 

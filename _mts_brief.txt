@@ -1,0 +1,92 @@
+BORDIN SEMMER LLP Joshua Bordin-Wosk, State Bar No. 241077 jbordinwosk@bordinsemmer.com Andrei Serpik, State Bar No. 301260 aserpik@bordinsemmer.com  Frank J. Mottola III, State Bar No. 332615 FMottola@BordinSemmer.com 101 Continental Blvd., Suite 700 El Segundo, CA 90245 Telephone:	(323) 457-2110 Facsimile:	(323) 457-2120 Attorneys for Defendant  HOLIDAY INN EXPRESS & SUITES,  BRANDEN BECENTI
+SUPERIOR COURT OF THE STATE OF CALIFORNIA
+COUNTY OF RIVERSIDE
+
+IRMA MONDRAGON, an individual  Plaintiff, v. COUNTY OF RIVERSIDE, a Public Entity; Holiday Inn Express & Suites, an Unknown Entity, BRANDEN BECENTI; and DOES 1 through 25, inclusive, Defendants. |  | Case No. CVPS2406360 (Assigned for all purposes to Hon. Manuel Bustamante, Dept. PS2) DEFENDANTS HOLIDAY INN EXPRESS & SUITES AND BRANDEN BECENTI’S NOTICE OF MOTION AND MOTION TO STRIKE PORTIONS OF PLAINTIFF’S SECOND AMENDED COMPLAINT; MEMORANDUM OF POINTS AND AUTHORITIES [Filed Concurrently with Demurrer to Second Amended Complaint; Declaration of Andrei Serpik; [Proposed] Order] Complaint Filed:	October 1, 2024 SAC Filed:	September 17, 2025 Trial Date:	None Set Hearing: Date:	____________, 202__ Time:	____ _.m. Dept.:	PS2
+
+
+
+TO THE COURT, ALL PARTIES AND THEIR ATTORNEYS OF RECORD:
+PLEASE TAKE NOTICE that on _____________, 2026, at ____, or as soon thereafter as the matter may be heard, in Department ___ of the above-entitled Court, located at ___________, Defendants HOLIDAY INN EXPRESS & SUITES and BRANDEN BECENTI (collectively, “Moving Defendants”) will and hereby do move this Court for an order striking the following portions of Plaintiff Irma Mondragon’s Second Amended Complaint (“SAC”):
+1.	From paragraph 63 (page 13, line 17), the words: “intentional and malicious, ” and the phrase “intentional and malicious” wherever it appears in that paragraph in reference to Defendant Holiday Inn Express & Suites;
+2.	From the Prayer for Relief, subparagraph B (page 22, lines 19–22): “For punitive damages pursuant to Civil Code §3294 against the individual defendants only for intentional misconduct, malice, and oppression, to punish wrongdoing and deter future misconduct;” — to the extent the prayer seeks punitive damages against Defendant Branden Becenti; and
+3.	From the Prayer for Relief, subparagraph C (page 22, line 23): “For attorney fees;” — in its entirety as to Moving Defendants Holiday Inn Express & Suites and Branden Becenti.
+This Motion is brought pursuant to California Code of Civil Procedure sections 435, 436, and 437, on the grounds that the matters challenged are irrelevant, false, or improper, and constitute matter not drawn or filed in conformity with California law. Specifically, the SAC fails to plead facts sufficient to support an award of punitive damages against Moving Defendants under Civil Code section 3294, and fails to allege any statutory or contractual basis on which Plaintiff could recover attorney’s fees from Moving Defendants.
+This Motion is based on this Notice; the attached Memorandum of Points and Authorities; the concurrently filed Declaration of Andrei Serpik; the pleadings, records, and files on file herein; and on such oral and documentary evidence as may be presented at the hearing on this matter.
+
+Dated: May 22, 2026	BORDIN SEMMER LLP
+By:	
+Joshua Bordin-Wosk
+Andrei Serpik
+Attorneys for Defendants
+HOLIDAY INN EXPRESS & SUITES and BRANDEN BECENTI 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+MEMORANDUM OF POINTS AND AUTHORITIES
+I.	INTRODUCTION
+Plaintiff Irma Mondragon was injured in the course of her employment with the County of Riverside Department of Child Protective Services (“CPS”) when she was assigned, alone and against established County policy, to supervise a violent juvenile ward at a Holiday Inn Express in Corona. The assailant was a court ward in the County’s exclusive legal custody. The decision to assign Plaintiff to the dangerous task, the failure to disclose the child’s violent history, the directive that Plaintiff physically restrain the child, and the failure to provide back-up were all the County’s alone. Moving Defendants Holiday Inn Express & Suites and its General Manager Branden Becenti played no role in any of those decisions.
+Despite this, Plaintiff has tacked onto her workplace lawsuit a series of common-law tort claims against the Hotel and its General Manager, and has further tagged Moving Defendants with two extraordinary categories of relief that the SAC does not (and cannot) support: (a) punitive damages premised on a conclusory label of “intentional and malicious” conduct, and (b) attorney’s fees for which no statutory or contractual basis is alleged or could be alleged.
+The SAC’s only operative allegations as to Moving Defendants are these: hotel staff and Becenti observed the assault on surveillance video and, recognizing the danger to Plaintiff, immediately called Plaintiff’s CPS supervisor, Sherry Gaylord-Jansen, to report the in-progress attack. (SAC ¶¶ 23, 28.) Afterward, Holiday Inn personnel offered Plaintiff words of support and a copy of the surveillance video. (SAC ¶ 28.) That is the entirety of the conduct on which Plaintiff seeks to predicate punitive damages.
+Even taken as true and viewed in the most charitable light, those allegations describe, at most, a failure to physically intervene in an assault by a non-employee third party. They do not come within a country mile of “despicable conduct” carried out with “willful and conscious disregard” of Plaintiff’s rights under Civil Code section 3294. They cannot ground a claim for punitive damages against the General Manager individually, and they categorically cannot do so against Holiday Inn as a corporate entity because the SAC pleads none of the predicates required by Civil Code section 3294(b) (advance knowledge, authorization, or ratification by an officer, director, or managing agent acting with malice).
+The attorney-fees request fails for an even more straightforward reason: under the American Rule, codified at Code of Civil Procedure section 1021, parties to litigation bear their own attorney’s fees unless a statute or enforceable contract provides otherwise. The three causes of action asserted against Moving Defendants are common-law torts. None has a fee-shifting provision. Plaintiff’s sole statutory fee predicate, Government Code section 12965(b), authorizes fees in FEHA actions against employers; and the FEHA causes of action in this case are pled exclusively against the County. Holiday Inn was not Plaintiff’s employer, and Becenti was not her supervisor. There is no path to fees against Moving Defendants.
+The Court should strike the conclusory “intentional and malicious” allegations as to Holiday Inn, the punitive-damages prayer to the extent it reaches Becenti, and the attorney’s-fees prayer as to Moving Defendants, without leave to amend, because no additional facts could cure these defects.
+II.	PORTIONS OF THE SAC TO BE STRICKEN
+Moving Defendants seek to strike the following matter from the SAC:
+“intentional and malicious” (SAC ¶ 63, page 13, lines 17–18), as applied to Defendants Holiday Inn Express & Suites and Branden Becenti 
+Prayer for Relief, subparagraph B (page 22, lines 19–22), to the extent it seeks punitive damages under Civil Code section 3294 against Defendant Branden Becenti 
+Prayer for Relief, subparagraph C (page 22, line 23) — “For attorney fees;” as to Moving Defendants.
+III.	LEGAL STANDARD
+A motion to strike challenges “irrelevant, false, or improper matter inserted in any pleading” and “all or any part of any pleading not drawn or filed in conformity with the laws of this state, a court rule, or an order of the court.” (Code Civ. Proc., § 436(a)–(b).) A claim for damages or other relief unsupported by the pleaded facts is properly stricken on motion under section 436.
+Punitive-damages allegations in particular are routinely stricken when the pleading fails to allege specific facts of oppression, fraud, or malice. (Grieves v. Superior Court (1984) 157 Cal.App.3d 159, 163–164; Clauson v. Superior Court (1998) 67 Cal.App.4th 1253, 1255 [conclusory allegations regarding punitive damages stricken on motion to strike]; Smith v. Superior Court (1992) 10 Cal.App.4th 1033, 1041–1042.) Likewise, a prayer for attorney’s fees should be stricken where the pleading alleges no statutory or contractual basis for fee recovery. (Agricultural Ins. Co. v. Sup. Ct. (1999) 70 Cal.App.4th 385, 405–406.)
+IV.	ARGUMENT
+THE ALLEGATIONS OF “MALICE” AND THE PRAYER FOR PUNITIVE DAMAGES SHOULD BE STRICKEN BECAUSE THE SAC FAILS TO PLEAD FACTS SUFFICIENT TO SUPPORT AN AWARD OF PUNITIVE DAMAGES AGAINST MOVING DEFENDANTS
+Civil Code Section 3294 Requires Specific Factual Allegations of Oppression, Fraud, or Malice
+Punitive damages are recoverable in non-contract actions only “where it is proven by clear and convincing evidence that the defendant has been guilty of oppression, fraud, or malice.” (Civ. Code, § 3294(a).) Section 3294(c) supplies the controlling definitions:
+“Malice” means conduct “intended by the defendant to cause injury to the plaintiff or despicable conduct which is carried on by the defendant with a willful and conscious disregard of the rights or safety of others.” (Civ. Code, § 3294(c)(1).) “Oppression” means “despicable conduct that subjects a person to cruel and unjust hardship in conscious disregard of that person’s rights.” (Civ. Code, § 3294(c)(2).) “Fraud” means “an intentional misrepresentation, deceit, or concealment of a material fact known to the defendant with the intention on the part of the defendant of thereby depriving a person of property or legal rights or otherwise causing injury.” (Civ. Code, § 3294(c)(3).) “Despicable conduct,” in turn, is “conduct which is so vile, base, contemptible, miserable, wretched or loathsome that it would be looked down upon and despised by ordinary decent people.” (Mock v. Michigan Millers Mutual Ins. Co. (1992) 4 Cal.App.4th 306, 331.) The conduct must be “of a base, vile, or contemptible character.” (Coll. Hosp. Inc. v. Sup. Ct. (1994) 8 Cal.4th 704, 725.)
+Critically, a plaintiff must plead specific facts showing oppression, fraud, or malice; conclusory characterizations “the kind of textbook description of oppressive or malicious conduct” that adds adjectives without facts are insufficient and will be stricken. (Smith v. Superior Court, supra, 10 Cal.App.4th at p. 1042; G.D. Searle & Co. v. Superior Court (1975) 49 Cal.App.3d 22, 29 [“The mere allegation an intentional tort was committed is not sufficient to warrant an award of punitive damages. Not only must there be circumstances of oppression, fraud or malice, but facts must be alleged in the pleading to support such a claim.”].)
+Here, the sum total of the conduct the SAC ascribes to Defendant Becenti is this: (1) he and other Holiday Inn personnel saw the assault occurring on surveillance video; (2) “recognizing the great harm or threat of harm posed to Ms. Mondragon” he called Plaintiff’s CPS supervisor, Sherry Gaylord-Jansen, around 12:00 p.m. to notify her of the ongoing attack; and (3) he and other hotel staff afterward offered Plaintiff “words of support and a copy of surveillance video.” (SAC ¶ 28.) Paragraph 23 of the SAC adds only the conclusory complaint that Becenti “did nothing to help the Plaintiff or otherwise deescalate the attack.”
+Strikingly, the SAC nowhere alleges that Becenti acted with the intent to injure Plaintiff, harbored ill will toward Plaintiff, or undertook any affirmative act calculated to expose her to harm. The SAC alleges, at most, an omission by an unrelated bystander to take physical action to stop an assault committed by a non-employee. That omission (indeed, accompanied by the affirmative step of calling the supervisor responsible for the attacker and Plaintiff alike) is not “despicable conduct” under any conceivable application of section 3294(c). Failure to do what one has no legal duty to do is not vile, base, or contemptible.
+California courts routinely strike punitive-damages allegations on substantially stronger facts than those pled here. (See, e.g., Lackner v. North (2006) 135 Cal.App.4th 1188, 1212 [mere carelessness or ignorance does not justify punitive damages; even gross negligence is not enough]; Dawes v. Sup. Ct. (1980) 111 Cal.App.3d 82, 88–89 [conscious disregard requires awareness of probable dangerous consequences and willful and deliberate failure to avoid them].) Inaction, even with awareness, in the absence of duty does not meet that bar.
+The SAC’s sole rhetorical attempt to elevate Becenti’s conduct to malice is the boilerplate label in paragraph 63: that Holiday Inn was “intentional and malicious” in observing the attack “and subjected the Plaintiff to the ongoing harm and abuse.” That is a conclusion of law, not a fact, and the Court is not required to credit it on a motion to strike. (Blank v. Kirwan (1985) 39 Cal.3d 311, 318 [court does not assume the truth of contentions, deductions or conclusions of fact or law].)
+The SAC affirmatively concedes that Becenti, far from intending injury or consciously disregarding Plaintiff’s safety, took the very step a reasonable hotel manager would take: he called Plaintiff’s supervisor,  the official within the County with custody of the attacker and authority over Plaintiff, the moment hotel staff saw the assault on surveillance. (SAC ¶ 28.) The only effective response available to them is precisely the response they made. Conduct that affirmatively summons help to the plaintiff is the opposite of malice.  The allegations of “intentional and malicious” conduct in paragraph 63 are therefore not merely conclusory; they are inconsistent with the operative facts pled elsewhere in the SAC. They should be stricken.
+THE PRAYER FOR ATTORNEY’S FEES SHOULD BE STRICKEN BECAUSE NO STATUTE OR CONTRACT AUTHORIZES FEE-SHIFTING AGAINST MOVING DEFENDANTS
+California adheres to the American Rule, codified at Code of Civil Procedure section 1021: “Except as attorney’s fees are specifically provided for by statute, the measure and mode of compensation of attorneys and counselors at law is left to the agreement, express or implied, of the parties….” Each party therefore bears its own fees unless a statute or enforceable contract provides otherwise. (Trope v. Katz (1995) 11 Cal.4th 274, 278–279..) A naked request for fees, untethered to any statutory or contractual hook, is “improper matter” within the meaning of Code of Civil Procedure section 436 and is properly stricken. (Agricultural Ins. Co. v. Sup. Ct., supra, 70 Cal.App.4th at pp. 405–406.)
+Here, only three of the SAC’s twelve causes of action are pled against Moving Defendants: Intentional Misconduct (First), Negligent Hiring, Training, and Supervision (Second), and Premises Liability (Third). None of those theories carries a fee-shifting statute. Each is a common-law tort governed by the default American Rule. There is no contract between Plaintiff and Moving Defendants, and the SAC alleges none. There is therefore no path by which Plaintiff could recover attorney’s fees from Holiday Inn or Becenti on those causes of action.
+LEAVE TO AMEND SHOULD BE DENIED.
+Leave to amend should only be granted if the plaintiff can show a reasonable possibility of curing the defect in the complaint by amendment. Plaintiff has the burden of proving that an amendment would cure the defect. (Heritage Pacific Financial, LLC v. Monroy (2013) 215 Cal.App.4th 972, 994.) Plaintiff cannot allege facts that would support a prayer for punitive damages or attorneys’ fees against the Demurring Defendants. The Court should sustain the Motion to Strike without leave to amend.
+V.	CONCLUSION
+For the foregoing reasons, Defendants Holiday Inn Express & Suites and Branden Becenti respectfully request that the Court grant this Motion to Strike, in its entirety and without leave to amend, as follows: (1) striking the words “intentional and malicious” in paragraph 63 of the SAC as applied to Holiday Inn; (2) striking subparagraph B of the Prayer for Relief to the extent it seeks punitive damages against Branden Becenti; and (3) striking subparagraph C of the Prayer for Relief in its entirety as to Holiday Inn Express & Suites and Branden Becenti.
+
+Dated: May 22, 2026	BORDIN SEMMER LLP
+By:	
+Joshua Bordin-Wosk
+Andrei Serpik
+Attorneys for Defendants
+HOLIDAY INN EXPRESS & SUITES and BRANDEN BECENTI 

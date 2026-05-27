@@ -1,0 +1,85 @@
+<h2>Rules + Review Screens</h2>
+<p class="subtitle">Proposed shape of the two main wizard screens after the discovery PDF is selected.</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">Rules screen</div>
+    <div class="mockup-body">
+      <div class="label">Detected type</div>
+      <h3>Special Interrogatories</h3>
+      <p class="subtitle">Parsing continues in the background while the user selects output rules.</p>
+
+      <div class="section">
+        <h3>Objection Rules</h3>
+        <label><input type="checkbox" checked> Vague, ambiguous, overbroad</label><br>
+        <label><input type="checkbox" checked> Ambiguous or undefined term</label><br>
+        <label><input type="checkbox" checked> Relevance and privacy</label><br>
+        <label><input type="checkbox" checked> Burdensome / oppressive</label><br>
+        <label><input type="checkbox" checked> Privilege / work product</label><br>
+        <label><input type="checkbox" checked> Expert opinion / legal conclusion</label>
+      </div>
+
+      <div class="section">
+        <h3>Substantive Response Rules</h3>
+        <label><input type="checkbox" checked> Answer only the question using as few words as possible</label>
+      </div>
+
+      <button class="mock-button">+ Add Custom Rule</button>
+      <button class="mock-button">Next: Context Files</button>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">Review screen</div>
+    <div class="mockup-body">
+      <div style="display:flex;gap:18px">
+        <div style="flex:1.6">
+          <div class="label">Request 3 of 28</div>
+          <h3>Special Interrogatory No. 3</h3>
+          <p>State all facts supporting your contention that defendant was negligent.</p>
+
+          <div class="section">
+            <h3>Proposed Objections</h3>
+            <textarea class="mock-input" style="height:95px;width:100%">Responding Party objects to this Request on the grounds that it calls for speculation and is vague, ambiguous, uncertain and overbroad.</textarea>
+          </div>
+
+          <div class="section">
+            <h3>Proposed Substantive Response</h3>
+            <textarea class="mock-input" style="height:95px;width:100%">Responding Party lacks sufficient information to provide a further response at this time.</textarea>
+          </div>
+
+          <button class="mock-button">Back</button>
+          <button class="mock-button">Approve + Next</button>
+        </div>
+
+        <div style="flex:1">
+          <h3>Quick Objections</h3>
+          <label><input type="checkbox" checked> Vague / Ambiguous / Overbroad</label><br>
+          <label><input type="checkbox"> Relevance / Privacy</label><br>
+          <label><input type="checkbox"> Expert Opinion / Legal Conclusion</label><br>
+          <label><input type="checkbox"> Privilege</label><br>
+          <label><input type="checkbox"> Burdensome</label><br>
+          <label><input type="checkbox"> Argumentative</label><br>
+          <label><input type="checkbox"> Compound</label><br>
+          <label><input type="checkbox"> Undefined Term</label>
+
+          <div class="section">
+            <div class="label">Progress</div>
+            <p>2 approved, 26 remaining</p>
+            <button class="mock-button">Assemble Final Responses</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Behavior</h3>
+  <ul>
+    <li>The Rules screen changes based on FI, SI, RFA, or RPD.</li>
+    <li>For FI fixed mode, the Rules screen collapses to only the fixed-vs-custom choice.</li>
+    <li>Quick Objections append/remove standard text in the objection box for the current request.</li>
+    <li>Final assembly is locked until every request is approved.</li>
+  </ul>
+</div>

@@ -11,6 +11,7 @@ openai>=1.0.0
 # Document Processing
 pypdf>=3.0.0
 python-docx>=1.0.0
+mammoth>=1.6.0  # .docx → HTML for Wizard Mode output editor
 PyMuPDF>=1.23.0
 pytesseract>=0.3.10
 
@@ -28,6 +29,12 @@ pydantic>=2.0.0
 # Utilities
 python-dotenv>=1.0.0
 requests>=2.28.0
+markdown>=3.0.0
+keyboard>=0.13.5
 
 # Redlining Engine
 adeu>=0.1.0  # Agentic DOCX Redlining Engine
+
+# Testing
+pytest>=9.0.0
+pytest-qt>=4.5.0
