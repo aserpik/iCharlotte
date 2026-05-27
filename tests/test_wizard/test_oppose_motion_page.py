@@ -14,7 +14,9 @@ from icharlotte_core.ui.wizard.pages.oppose_motion_page import (
     OpposeMotionOutputPage,
     OpposeMotionSettingsPage,
     OpposeMotionTaskTab,
+    OpposeMotionWorker,
     SETTINGS_PAGE_CONFIRM,
+    TASK_PAGE_SETTINGS,
     TASK_PAGE_OUTPUT,
     build_oppose_motion_tab,
 )
@@ -76,6 +78,90 @@ def test_task_tab_starts_on_confirmation_page(qtbot):
     qtbot.addWidget(tab)
 
     assert tab.settings_page.currentIndex() == SETTINGS_PAGE_CONFIRM
+
+
+def test_task_tab_auto_analysis_populates_confirmation_and_outline(qtbot, monkeypatch):
+    started = []
+
+    class FakeSignal:
+        def __init__(self):
+            self._slots = []
+
+        def connect(self, slot):
+            self._slots.append(slot)
+
+        def emit(self, *args):
+            for slot in self._slots:
+                slot(*args)
+
+    class FakeAnalysisWorker:
+        def __init__(self, settings, parent=None):
+            self.settings = settings
+            self.progress = FakeSignal()
+            self.finished_analysis = FakeSignal()
+            self.finished = FakeSignal()
+
+        def start(self):
+            started.append(self.settings)
+            self.finished_analysis.emit(
+                True,
+                {
+                    "metadata": MotionMetadata(
+                        motion_type="Motion for Summary Judgment",
+                        relief_requested="summary judgment",
+                        principal_arguments=["no triable issue"],
+                    ),
+                    "outline": [
+                        OutlineNode(
+                            id="arg-1",
+                            text="There Are Triable Issues of Material Fact",
+                            children=[
+                                OutlineNode(
+                                    id="arg-1-a",
+                                    text="The moving party ignores disputed testimony",
+                                )
+                            ],
+                        )
+                    ],
+                },
+            )
+            self.finished.emit()
+
+        def deleteLater(self):
+            pass
+
+        def isRunning(self):
+            return False
+
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.OpposeMotionAnalysisWorker",
+        FakeAnalysisWorker,
+        raising=False,
+    )
+
+    tab = OpposeMotionTaskTab(
+        spec=type("Spec", (), {"task_id": "oppose_motion", "title": "Oppose a Motion"})(),
+        case_path="/tmp/case",
+        file_number="0000.000",
+        motion_file="/tmp/motion.pdf",
+        context_files=["/tmp/facts.pdf"],
+        auto_analyze=True,
+    )
+    qtbot.addWidget(tab)
+
+    assert started[0]["motion_file"] == "/tmp/motion.pdf"
+    assert started[0]["context_files"] == ["/tmp/facts.pdf"]
+    assert tab.currentIndex() == TASK_PAGE_SETTINGS
+    assert tab.settings_page.currentIndex() == SETTINGS_PAGE_CONFIRM
+    assert tab.settings_page.motion_type_edit.text() == "Motion for Summary Judgment"
+    assert tab.settings_page.relief_edit.text() == "summary judgment"
+    assert "no triable issue" in tab.settings_page.arguments_edit.toPlainText()
+    assert tab.settings_page.outline_tree.topLevelItem(0).text(0) == (
+        "There Are Triable Issues of Material Fact"
+    )
+    assert tab.settings_page.outline_tree.topLevelItem(0).child(0).text(0) == (
+        "The moving party ignores disputed testimony"
+    )
 
 
 def test_task_tab_loads_draft_result(qtbot):
@@ -154,6 +240,218 @@ def test_task_tab_stores_last_settings_when_run_is_requested(qtbot, monkeypatch)
     assert started[0]["motion_file"] == "/tmp/motion.pdf"
 
 
+def test_worker_reports_empty_draft_as_failure(monkeypatch, tmp_path):
+    results = []
+    assembled = []
+
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.extract_document_text",
+        lambda _path: type("ExtractResult", (), {"success": True, "text": "motion", "error": ""})(),
+    )
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.extract_context_bundle",
+        lambda _paths: ("context", []),
+    )
+    monkeypatch.setenv("COURTLISTENER_API_TOKEN", "tok")
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.draft_memorandum",
+        lambda **_kwargs: DraftDocument(
+            title="Opposition",
+            body_text="",
+            rejection_reason="LLM returned an empty body_text.",
+        ),
+    )
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.assemble_opposition_preview",
+        lambda **_kwargs: assembled.append(_kwargs),
+    )
+
+    worker = OpposeMotionWorker(
+        case_path=str(tmp_path),
+        file_number="0000.000",
+        settings={
+            "motion_file": "/tmp/motion.pdf",
+            "context_files": [],
+            "metadata": MotionMetadata(motion_type="Motion to Compel").to_dict(),
+            "outline": [],
+        },
+    )
+    worker.finished_result.connect(lambda success, payload: results.append((success, payload)))
+
+    worker.run()
+
+    assert results
+    assert results[0][0] is False
+    # The drafter's rejection_reason now flows into the worker's failure message.
+    assert "LLM returned an empty body_text" in results[0][1]
+    assert assembled == []
+
+
+def test_worker_drafts_then_verifies_parsed_citations(monkeypatch, tmp_path):
+    """End-to-end happy path: drafter -> citation parser -> verifier."""
+    from unittest.mock import MagicMock
+
+    results = []
+    draft_calls = []
+
+    monkeypatch.setenv("COURTLISTENER_API_TOKEN", "tok")
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.extract_document_text",
+        lambda _path: type("ExtractResult", (), {"success": True, "text": "motion", "error": ""})(),
+    )
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.extract_context_bundle",
+        lambda _paths: ("context", []),
+    )
+
+    def fake_draft_memorandum(**kwargs):
+        draft_calls.append(kwargs)
+        return DraftDocument(
+            title="Opposition",
+            body_text=(
+                "Argument. *Aguilar v. Atlantic Richfield Co.* (2001) "
+                "25 Cal.4th 826 controls the analysis."
+            ),
+        )
+
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.draft_memorandum",
+        fake_draft_memorandum,
+    )
+
+    verifier = MagicMock()
+    verifier.verify_all.return_value = [
+        CitationVerification(
+            citation_text="Aguilar v. Atlantic Richfield Co. 25 Cal.4th 826",
+            normalized_citation="Aguilar v. Atlantic Richfield Co. 25 Cal.4th 826",
+            verdict="SUPPORTED",
+            kind="case",
+            evidence="summary judgment burden passage",
+        )
+    ]
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.build_opposition_verifier",
+        lambda **_kwargs: verifier,
+    )
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.assemble_opposition_preview",
+        lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.validate_opposition_docx",
+        lambda _path: type("Validation", (), {"has_errors": False})(),
+    )
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.DiscoveryAssembler.find_caption_page",
+        lambda _case_path: "",
+    )
+
+    worker = OpposeMotionWorker(
+        case_path=str(tmp_path),
+        file_number="0000.000",
+        settings={
+            "motion_file": "/tmp/motion.pdf",
+            "context_files": ["/tmp/context.docx"],
+            "metadata": MotionMetadata(motion_type="Motion for Summary Judgment").to_dict(),
+            "outline": [OutlineNode(id="a", text="Triable Issues").to_dict()],
+        },
+    )
+    worker.finished_result.connect(lambda success, payload: results.append((success, payload)))
+
+    worker.run()
+
+    assert results and results[0][0] is True
+    # Drafter now gets style_exemplars (not the old authority_block).
+    assert "style_exemplars" in draft_calls[0]
+    assert "authority_block" not in draft_calls[0]
+    # Verifier was invoked with the parsed citation list.
+    verifier.verify_all.assert_called_once()
+    parsed_citations = verifier.verify_all.call_args.args[0]
+    assert parsed_citations and parsed_citations[0].kind == "case"
+    # The verdict-bearing citation flows through to the returned draft.
+    assert results[0][1].citations[0].verdict == "SUPPORTED"
+
+
+def test_worker_skips_verifier_when_draft_has_no_citations(
+    monkeypatch, tmp_path
+):
+    """When the drafted body contains no citations, the verifier is not built."""
+    from unittest.mock import MagicMock
+
+    results = []
+    draft_calls = []
+    progress_msgs = []
+    bov_calls: list = []
+
+    monkeypatch.setenv("COURTLISTENER_API_TOKEN", "tok")
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.extract_document_text",
+        lambda _path: type("ExtractResult", (), {"success": True, "text": "motion", "error": ""})(),
+    )
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.extract_context_bundle",
+        lambda _paths: ("context", []),
+    )
+
+    def fake_draft_memorandum(**kwargs):
+        draft_calls.append(kwargs)
+        # Body has no citations the parser can detect.
+        return DraftDocument(title="Opposition", body_text="Plaintiff opposes the motion.")
+
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.draft_memorandum",
+        fake_draft_memorandum,
+    )
+
+    def fake_build_verifier(**kwargs):
+        bov_calls.append(kwargs)
+        return MagicMock()
+
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.build_opposition_verifier",
+        fake_build_verifier,
+    )
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.assemble_opposition_preview",
+        lambda **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.validate_opposition_docx",
+        lambda _path: type("Validation", (), {"has_errors": False})(),
+    )
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.DiscoveryAssembler.find_caption_page",
+        lambda _case_path: "",
+    )
+
+    worker = OpposeMotionWorker(
+        case_path=str(tmp_path),
+        file_number="0000.000",
+        settings={
+            "motion_file": "/tmp/motion.pdf",
+            "context_files": [],
+            "metadata": MotionMetadata(motion_type="Demurrer").to_dict(),
+            "outline": [],
+        },
+    )
+    worker.progress.connect(lambda msg: progress_msgs.append(msg))
+    worker.finished_result.connect(lambda success, payload: results.append((success, payload)))
+
+    worker.run()
+
+    # Success even with no citations.
+    assert results and results[0][0] is True
+    # Drafter was called with style_exemplars (not authority_block).
+    assert draft_calls and "style_exemplars" in draft_calls[0]
+    assert "authority_block" not in draft_calls[0]
+    # User was warned about the missing citations.
+    assert any("No citations detected" in msg for msg in progress_msgs)
+    # Verifier is not constructed when there is nothing to verify.
+    assert bov_calls == []
+    # Returned draft carries no citations.
+    assert results[0][1].citations == []
+
+
 def test_task_tab_does_not_start_second_worker_while_running(qtbot, monkeypatch):
     started = []
 
@@ -226,6 +524,120 @@ def test_output_editor_is_read_only(qtbot):
     qtbot.addWidget(page)
 
     assert page.editor.isReadOnly() is True
+
+
+def test_output_renders_citations_as_clickable_anchors(qtbot):
+    page = OpposeMotionOutputPage()
+    qtbot.addWidget(page)
+    draft = DraftDocument(
+        title="Opposition",
+        body_text=(
+            "In *Sinaiko Healthcare Consulting, Inc. v. Pacific Healthcare Consultants* "
+            "(2007) 148 Cal. App. 4th 390, the court explained the rule. "
+            "See also 195 Cal. App. 4th 1275."
+        ),
+        citations=[
+            CitationVerification(
+                citation_text="148 Cal. App. 4th 390",
+                case_name="Sinaiko Healthcare Consulting, Inc. v. Pacific Healthcare Consultants",
+                status="exists_support_unconfirmed",
+            ),
+            CitationVerification(
+                citation_text="195 Cal. App. 4th 1275",
+                case_name="Simke, Chodos, Silberfeld & Anteau, Inc. v. Athans",
+                status="exists_support_unconfirmed",
+            ),
+        ],
+    )
+    page.show_result(draft)
+
+    html_text = page.editor.toHtml()
+    # Each citation gets a clickable anchor with index in the URL.
+    assert "citation:0" in html_text
+    assert "citation:1" in html_text
+    # The case name was italicized via *...* markdown syntax (QTextBrowser
+    # normalizes <i> into inline font-style:italic).
+    assert "font-style:italic" in html_text
+
+
+def test_output_anchor_click_opens_citation_dialog(qtbot, monkeypatch):
+    page = OpposeMotionOutputPage()
+    qtbot.addWidget(page)
+    draft = DraftDocument(
+        title="Opposition",
+        body_text="See 148 Cal. App. 4th 390.",
+        citations=[
+            CitationVerification(
+                citation_text="148 Cal. App. 4th 390",
+                case_name="Sinaiko Healthcare",
+                opinion_url="https://example.com/op/1",
+                status="exists_support_unconfirmed",
+            )
+        ],
+    )
+    page.show_result(draft)
+
+    opened: list[int] = []
+    monkeypatch.setattr(page, "open_citation_dialog", lambda index: opened.append(index))
+
+    # Simulate the QTextBrowser anchor click via the URL handler directly.
+    from PySide6.QtCore import QUrl
+
+    page._on_anchor_clicked(QUrl("citation:0"))
+
+    assert opened == [0]
+
+
+def test_citation_detail_dialog_shows_supporting_passage(qtbot):
+    from icharlotte_core.ui.wizard.pages.oppose_motion_page import CitationDetailDialog
+
+    citation = CitationVerification(
+        citation_text="148 Cal. App. 4th 390",
+        case_name="Sinaiko Healthcare Consulting, Inc. v. Pacific Healthcare Consultants",
+        court="California Court of Appeal",
+        date="2007-03-08",
+        opinion_url="https://www.courtlistener.com/opinion/2271540/",
+        status="support_passage_found",
+        supporting_passage="The party fails to make a timely response, the propounding party may move.",
+    )
+    dialog = CitationDetailDialog(citation)
+    qtbot.addWidget(dialog)
+
+    html_text = dialog.passage_view.toHtml()
+    assert "timely response" in html_text
+    assert dialog.open_btn.isEnabled() is True
+
+
+def test_citation_detail_dialog_explains_unconfirmed_status(qtbot):
+    from icharlotte_core.ui.wizard.pages.oppose_motion_page import CitationDetailDialog
+
+    citation = CitationVerification(
+        citation_text="148 Cal. App. 4th 390",
+        case_name="Sinaiko Healthcare",
+        opinion_url="https://example.com",
+        status="exists_support_unconfirmed",
+    )
+    dialog = CitationDetailDialog(citation)
+    qtbot.addWidget(dialog)
+
+    html_text = dialog.passage_view.toHtml()
+    # No passage; instead the user sees an explanatory note.
+    assert "CourtListener did not return the supporting opinion text" in html_text
+
+
+def test_citation_detail_dialog_disables_open_button_without_url(qtbot):
+    from icharlotte_core.ui.wizard.pages.oppose_motion_page import CitationDetailDialog
+
+    citation = CitationVerification(
+        citation_text="148 Cal. App. 4th 390",
+        case_name="Sinaiko Healthcare",
+        opinion_url="",
+        status="not_found",
+    )
+    dialog = CitationDetailDialog(citation)
+    qtbot.addWidget(dialog)
+
+    assert dialog.open_btn.isEnabled() is False
 
 
 def test_save_as_uses_dialog_and_does_not_save_when_cancelled(qtbot, tmp_path):
@@ -367,7 +779,7 @@ def test_builder_rejects_unsupported_motion_file(qtbot):
     assert warning.called
 
 
-def test_builder_filters_unsupported_context_files(qtbot, tmp_path):
+def test_builder_filters_unsupported_context_files(qtbot, tmp_path, monkeypatch):
     spec = type("Spec", (), {"task_id": "oppose_motion", "title": "Oppose a Motion"})()
     motion = tmp_path / "motion.pdf"
     motion.write_bytes(b"")
@@ -375,6 +787,7 @@ def test_builder_filters_unsupported_context_files(qtbot, tmp_path):
     bad_context = tmp_path / "notes.xlsx"
     good_context.write_text("facts")
     bad_context.write_text("spreadsheet")
+    monkeypatch.setattr(OpposeMotionTaskTab, "_start_analysis", lambda self: None)
 
     with patch(
         "icharlotte_core.ui.wizard.pages.oppose_motion_page.QFileDialog.getOpenFileName",
@@ -387,3 +800,73 @@ def test_builder_filters_unsupported_context_files(qtbot, tmp_path):
 
     qtbot.addWidget(tab)
     assert tab.settings_page.context_files == [str(good_context)]
+
+
+def test_worker_calls_verifier_with_parsed_citations(tmp_path, monkeypatch):
+    """Worker plumbing test: OpposeMotionWorker invokes the new pipeline."""
+    from unittest.mock import MagicMock, patch as _patch
+
+    from icharlotte_core.opposition.models import DraftDocument, MotionMetadata
+
+    monkeypatch.setenv("COURTLISTENER_API_TOKEN", "dummy-token")
+
+    motion_pdf = tmp_path / "motion.pdf"
+    motion_pdf.write_bytes(b"%PDF-1.4 dummy")
+
+    fake_motion_text = MagicMock(success=True, text="Motion text body.", error="")
+    fake_metadata = MotionMetadata(
+        motion_type="Motion to Compel",
+        relief_requested="An order compelling responses",
+        principal_arguments=["Late responses"],
+    )
+    fake_draft = DraftDocument(
+        title="Opposition to MTC",
+        body_text="The court held in *Smith v. Jones* (2010) 50 Cal.4th 100 that ...",
+    )
+
+    with _patch(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.extract_document_text",
+        return_value=fake_motion_text,
+    ), _patch(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.extract_context_bundle",
+        return_value=("ctx text", []),
+    ), _patch(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.draft_memorandum",
+        return_value=fake_draft,
+    ) as draft_fn, _patch(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.build_opposition_verifier"
+    ) as bov, _patch(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.assemble_opposition_preview"
+    ), _patch(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.validate_opposition_docx"
+    ) as validate:
+        verifier = MagicMock()
+        verifier.verify_all.return_value = []
+        bov.return_value = verifier
+        validate.return_value = MagicMock(has_errors=False)
+
+        worker = OpposeMotionWorker(
+            case_path=str(tmp_path),
+            file_number="X",
+            settings={
+                "motion_file": str(motion_pdf),
+                "context_files": [],
+                "metadata": fake_metadata.to_dict(),
+                "outline": [],
+            },
+        )
+
+        # Run the worker body directly (not via QThread.start) so we can assert.
+        results: list = []
+        worker.finished_result.connect(lambda ok, payload: results.append((ok, payload)))
+        worker.run()
+
+        # Drafter received style_exemplars (not authority_block).
+        assert draft_fn.call_args is not None
+        call_kwargs = draft_fn.call_args.kwargs
+        assert "style_exemplars" in call_kwargs
+        assert "authority_block" not in call_kwargs
+
+        # Verifier was constructed + called with parsed citations.
+        bov.assert_called_once()
+        verifier.verify_all.assert_called_once()

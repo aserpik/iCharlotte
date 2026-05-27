@@ -28,10 +28,8 @@ from PySide6.QtWidgets import (
 )
 
 from icharlotte_core.discovery.assembler import DiscoveryAssembler
-from icharlotte_core.legal_research.sources.courtlistener import CourtListenerClient
 from icharlotte_core.opposition.assembler import assemble_opposition_preview
-from icharlotte_core.opposition.authority import research_opposition_authorities
-from icharlotte_core.opposition.citation_verifier import verify_citations
+from icharlotte_core.opposition.citation_parser import extract_citations
 from icharlotte_core.opposition.drafter import draft_memorandum
 from icharlotte_core.opposition.extraction import (
     extract_context_bundle,
@@ -42,6 +40,11 @@ from icharlotte_core.opposition.extraction import (
 from icharlotte_core.opposition.models import DraftDocument, MotionMetadata, OutlineNode
 from icharlotte_core.opposition.motion_analyzer import analyze_motion, generate_outline
 from icharlotte_core.opposition.outline import selected_section_plan
+from icharlotte_core.opposition.style_examples import (
+    StyleExampleRegistry,
+    extract_exemplar_text,
+)
+from icharlotte_core.opposition.verifier import build_opposition_verifier
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
 from icharlotte_core.word_validator import validate_opposition_docx
 
@@ -680,72 +683,87 @@ class OpposeMotionWorker(QThread):
                     user_prompt,
                     system_prompt,
                     task_type="general",
-                    agent_id="agent_chat",
+                    agent_id="agent_oppose_motion",
                 ) or ""
 
-            token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
-            if not token:
-                self.finished_result.emit(
-                    False,
-                    (
-                        "CourtListener API token missing; cannot research and cite "
-                        "California case law for the opposition."
-                    ),
+            # Load style exemplars matching this motion type. The registry lives
+            # under the repo's Scripts/prompts/oppose_motion/ directory; the
+            # registry file is created on first save by the workbench so it may
+            # be missing here — StyleExampleRegistry.load() handles that.
+            self.progress.emit("Loading matching style exemplars...")
+            repo_root = os.path.dirname(
+                os.path.dirname(
+                    os.path.dirname(
+                        os.path.dirname(os.path.dirname(__file__))
+                    )
                 )
-                return
-
-            self.progress.emit("Researching California authorities...")
-            client = CourtListenerClient(token)
-            authority_packet = research_opposition_authorities(
-                metadata=metadata,
-                section_plan=plan,
-                motion_text=motion_result.text,
-                context_text=context_text,
-                courtlistener=client,
-                llm_callback=llm,
-                status_callback=self.progress.emit,
             )
-            for warning in getattr(authority_packet, "warnings", []) or []:
-                self.progress.emit(f"WARNING: {warning}")
-            if not getattr(authority_packet, "cases", []):
-                self.progress.emit(
-                    "WARNING: No California case law was found for the selected "
-                    "opposition issues. Drafting an opposition without case-law "
-                    "citations; statutes and facts from the moving papers may "
-                    "still be cited."
-                )
+            registry_path = os.path.join(
+                repo_root,
+                "Scripts",
+                "prompts",
+                "oppose_motion",
+                "style_examples.json",
+            )
+            registry = StyleExampleRegistry.load(registry_path)
+            matches = registry.matches_for_motion_type(metadata.motion_type)
+            cache_dir = os.path.join(
+                os.path.dirname(registry_path), ".cache", "style_examples"
+            )
+            exemplar_texts: list[str] = []
+            for m in matches:
+                text = extract_exemplar_text(m.path, cache_dir=cache_dir)
+                if text.strip():
+                    exemplar_texts.append(text)
+            if matches:
+                self.progress.emit(f"  Using {len(exemplar_texts)} style exemplar(s).")
+            else:
+                self.progress.emit("  No matching style exemplars; using default voice.")
 
-            self.progress.emit("Drafting memorandum with researched authorities...")
+            self.progress.emit("Drafting opposition memorandum...")
             draft = draft_memorandum(
                 metadata=metadata,
                 section_plan=plan,
                 motion_text=motion_result.text,
                 context_text=context_text,
-                authority_block=authority_packet.authority_block,
+                style_exemplars=exemplar_texts,
                 llm_callback=llm,
             )
             if not draft.body_text.strip():
                 reason = (draft.rejection_reason or "unknown reason").strip()
-                self.finished_result.emit(
-                    False,
-                    f"Drafting failed: {reason}",
-                )
+                self.finished_result.emit(False, f"Drafting failed: {reason}")
                 return
 
-            if authority_packet.cases:
-                self.progress.emit("Verifying citations...")
-                draft.citations = verify_citations(
-                    draft.body_text,
-                    citation_propositions=authority_packet.citation_propositions,
-                    courtlistener=client,
+            # Parse citations from the drafted body.
+            citations = extract_citations(draft.body_text)
+            if not citations:
+                self.progress.emit(
+                    "WARNING: No citations detected in the drafted opposition."
                 )
-                if not draft.citations:
-                    self.progress.emit(
-                        "WARNING: No citations were detected in the drafted "
-                        "opposition. Review the draft for unsupported assertions."
-                    )
-            else:
                 draft.citations = []
+            else:
+                token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
+                if not token:
+                    self.progress.emit(
+                        "WARNING: COURTLISTENER_API_TOKEN not set; case citations cannot be verified."
+                    )
+                self.progress.emit(f"Verifying citations ({len(citations)} found)...")
+                verifier = build_opposition_verifier(
+                    courtlistener_token=token,
+                    llm_callback=llm,
+                    max_workers=4,
+                )
+                draft.citations = verifier.verify_all(
+                    citations,
+                    on_progress=self.progress.emit,
+                )
+                verdict_counts: dict[str, int] = {}
+                for cv in draft.citations:
+                    verdict_counts[cv.verdict] = verdict_counts.get(cv.verdict, 0) + 1
+                summary = ", ".join(
+                    f"{v.lower()}: {n}" for v, n in sorted(verdict_counts.items())
+                )
+                self.progress.emit(f"Verification complete ({summary}).")
 
             preview_dir = os.path.join(
                 self.case_path,
