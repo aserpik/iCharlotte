@@ -129,3 +129,43 @@ def _progress_line(cv: CitationVerification) -> str:
     }.get(cv.verdict, cv.verdict or "?")
     label = cv.citation_text or cv.normalized_citation or "(citation)"
     return f"  {verdict_glyph}: {label}"
+
+
+import os as _os
+from icharlotte_core.legal_research.sources.ca_leginfo import CALegInfoClient as _CALeg
+from icharlotte_core.legal_research.sources.courtlistener import (
+    CourtListenerClient as _CL,
+)
+
+
+def build_opposition_verifier(
+    *,
+    courtlistener_token: str,
+    llm_callback: Callable[[str, str], str],
+    max_workers: int = 4,
+    cache_root: str | None = None,
+) -> "OppositionVerifier":
+    """Construct an OppositionVerifier wired to project cache dirs."""
+    if cache_root is None:
+        # Cache colocated with prompts.
+        repo_root = _os.path.dirname(_os.path.dirname(_os.path.dirname(__file__)))
+        cache_root = _os.path.join(
+            repo_root, "Scripts", "prompts", "oppose_motion", ".cache"
+        )
+    opinion_cache = _os.path.join(cache_root, "opinions")
+    statute_cache = _os.path.join(cache_root, "statutes")
+    case_v = CaseVerifier(
+        courtlistener_client=_CL(courtlistener_token),
+        llm_callback=llm_callback,
+        cache_dir=opinion_cache,
+    )
+    statute_v = StatuteVerifier(
+        leginfo_client=_CALeg(),
+        llm_callback=llm_callback,
+        cache_dir=statute_cache,
+    )
+    return OppositionVerifier(
+        case_verifier=case_v,
+        statute_verifier=statute_v,
+        max_workers=max_workers,
+    )

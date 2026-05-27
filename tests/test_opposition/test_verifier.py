@@ -118,3 +118,17 @@ def test_unknown_kind_is_unverified(tmp_cache_root):
     v = OppositionVerifier(case_verifier=case_v, statute_verifier=statute_v, max_workers=1)
     results = v.verify_all([Citation(kind="unknown", raw_text="???", normalized="???")])
     assert results[0].verdict == "UNVERIFIED"
+
+
+def test_build_opposition_verifier_uses_project_cache_paths():
+    from icharlotte_core.opposition.verifier import build_opposition_verifier
+
+    # Pass dummy callbacks; we only check the verifier object has the right shape.
+    def llm(_sys, _user):
+        return ""
+
+    v = build_opposition_verifier(courtlistener_token="X", llm_callback=llm)
+    assert isinstance(v, OppositionVerifier)
+    # Cache dirs should be under Scripts/prompts/oppose_motion/.cache
+    assert "oppose_motion" in v.case.cache_dir.replace("\\", "/").lower()
+    assert "oppose_motion" in v.statute.cache_dir.replace("\\", "/").lower()
