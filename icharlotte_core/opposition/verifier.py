@@ -169,3 +169,53 @@ def build_opposition_verifier(
         statute_verifier=statute_v,
         max_workers=max_workers,
     )
+
+
+def find_replacement_candidates(
+    *,
+    failed_citation: CitationVerification,
+    verifier: "OppositionVerifier",
+    llm_callback: Callable[[str, str], str],
+) -> list[CitationVerification]:
+    """Propose and verify replacement candidates for a failed citation."""
+    from icharlotte_core.opposition.citation_parser import extract_citations
+    from icharlotte_core.opposition import prompts as default_prompts
+    from icharlotte_core.prompt_manager import get_prompt
+    import json as _json
+    import re as _re
+
+    template = get_prompt("oppose_motion", "find_replacement") or default_prompts.FIND_REPLACEMENT_PROMPT
+    user_prompt = template.format(
+        proposition=failed_citation.proposition or "",
+        failed_citation=failed_citation.citation_text or "",
+        verifier_note=failed_citation.note or "",
+    )
+    try:
+        response = llm_callback("", user_prompt) or ""
+    except Exception:
+        logger.warning("find_replacement LLM call failed", exc_info=True)
+        return []
+
+    cleaned = response.strip()
+    fenced = _re.fullmatch(r"```(?:json)?\s*(.*?)\s*```", cleaned, _re.DOTALL | _re.I)
+    if fenced:
+        cleaned = fenced.group(1).strip()
+    try:
+        data = _json.loads(cleaned)
+    except (TypeError, ValueError):
+        return []
+    raw_candidates = (data.get("candidates") if isinstance(data, dict) else []) or []
+
+    # Parse each candidate's citation_text into a Citation and verify.
+    citations = []
+    for c in raw_candidates:
+        if not isinstance(c, dict):
+            continue
+        text = c.get("citation_text", "") or ""
+        parsed = extract_citations(text)
+        if parsed:
+            citations.append(parsed[0])
+
+    if not citations:
+        return []
+    return verifier.verify_all(citations)
