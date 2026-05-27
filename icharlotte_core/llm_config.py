@@ -66,6 +66,7 @@ AGENT_DEFINITIONS = [
     ("agent_complaint", "Complaint", "Complaint document analysis", "extraction"),
     ("agent_liability", "Liability Script", "Liability analysis script", "extraction"),
     ("agent_exposure", "Exposure", "Exposure calculation and analysis", "extraction"),
+    ("agent_oppose_motion", "Oppose Motion", "Opposition memorandum drafting + citation verification", "general"),
 
     # UI Functions
     ("func_chat", "Chat Tab", "Interactive AI chat", "general"),

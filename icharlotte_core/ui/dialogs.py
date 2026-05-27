@@ -397,6 +397,7 @@ WORKBENCH_TO_AGENT_ID = {
     "email_update": "func_email_compose",
     "chat": "func_chat",
     "mediation_brief": "agent_mediation_brief",
+    "oppose_motion": "agent_oppose_motion",
     "word_assistant": "func_word_assistant",
     "legal_research": "func_legal_research",
 }
@@ -1709,7 +1710,8 @@ class PromptsDialog(QDialog):
         for agent in ['summarize', 'discovery', 'deposition',
                       'liability', 'exposure', 'med_record', 'med_chron', 'separate',
                       'email_update', 'chat',
-                      'word_assistant', 'legal_research', 'mediation_brief']:
+                      'word_assistant', 'legal_research', 'mediation_brief',
+                      'oppose_motion']:
             agents.add(agent)
 
         for agent in sorted(agents):
