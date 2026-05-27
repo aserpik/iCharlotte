@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QInputDialog,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -590,6 +591,74 @@ class RespondDiscoverySettingsPage(QWidget):
         )
         self.finalize_btn.setEnabled(not any_pending)
 
+    def _on_regenerate_clicked(self) -> None:
+        review = self._current_review()
+        if not review or not self.parsed_discovery or not self._coordinator:
+            return
+        instruction = self.regenerate_instruction_edit.text().strip()
+        response_rules = self._loaded_response_rules or load_respond_response_rules(
+            self.file_number,
+        )
+        queued = self._coordinator.regenerate(
+            request_number=review.number,
+            parsed=self.parsed_discovery,
+            selected_rules=self.selected_rules(),
+            context_chunks=self._context_chunks,
+            response_rules=response_rules,
+            fi_mode=self.fi_mode,
+            override_instruction=instruction,
+        )
+        if not queued:
+            return
+        review.is_pending = True
+        review.review_reason = "Regenerating..."
+        review.needs_review = False
+        review.approved = False
+        review.pending_replacement = None
+        self.regenerate_instruction_edit.clear()
+        self._load_current_review()
+        self._refresh_finalize_button()
+
+    def _view_pending_replacement(self) -> None:
+        review = self._current_review()
+        if not review or not review.pending_replacement:
+            return
+        QMessageBox.information(
+            self,
+            f"New draft for Request No. {review.number}",
+            review.pending_replacement.proposed_substantive_response
+            or "(no substantive text in draft)",
+        )
+
+    def _apply_pending_replacement(self) -> None:
+        review = self._current_review()
+        if not review or not review.pending_replacement:
+            return
+        response_rules = self._loaded_response_rules or load_respond_response_rules(
+            self.file_number,
+        )
+        _apply_proposal_to_review_state(
+            review_state=self.review_state,
+            req_number=review.number,
+            proposal=review.pending_replacement,
+            parsed=self.parsed_discovery,
+            selected_rules=self.selected_rules(),
+            response_rules=response_rules,
+            fi_mode=self.fi_mode,
+        )
+        # _apply_proposal_to_review_state replaces the row; re-fetch.
+        new_review = self._current_review()
+        if new_review:
+            new_review.pending_replacement = None
+        self._load_current_review()
+
+    def _discard_pending_replacement(self) -> None:
+        review = self._current_review()
+        if not review:
+            return
+        review.pending_replacement = None
+        self._load_current_review()
+
     # ------------------------------------------------------------------
     # Review screen
     # ------------------------------------------------------------------
@@ -655,6 +724,40 @@ class RespondDiscoverySettingsPage(QWidget):
         quick_response_layout.addStretch(1)
         quick_row.addWidget(quick_response_group, 1)
         layout.addLayout(quick_row)
+
+        # Conflict banner — shown when a new draft arrives for a row the
+        # user has already edited.
+        self.conflict_banner = QWidget()
+        banner_layout = QHBoxLayout(self.conflict_banner)
+        banner_layout.setContentsMargins(8, 6, 8, 6)
+        self.conflict_banner.setStyleSheet(
+            "background-color: #fff7d6; border: 1px solid #d4b85a; border-radius: 4px;"
+        )
+        banner_label = QLabel("New draft available — your edits are preserved.")
+        banner_label.setStyleSheet("font-weight: 600;")
+        banner_layout.addWidget(banner_label, 1)
+        self.conflict_view_btn = QPushButton("View")
+        self.conflict_view_btn.clicked.connect(self._view_pending_replacement)
+        self.conflict_apply_btn = QPushButton("Apply")
+        self.conflict_apply_btn.clicked.connect(self._apply_pending_replacement)
+        self.conflict_discard_btn = QPushButton("Discard")
+        self.conflict_discard_btn.clicked.connect(self._discard_pending_replacement)
+        for btn in (self.conflict_view_btn, self.conflict_apply_btn, self.conflict_discard_btn):
+            banner_layout.addWidget(btn)
+        self.conflict_banner.hide()
+        layout.addWidget(self.conflict_banner)
+
+        # Regenerate row.
+        regenerate_row = QHBoxLayout()
+        self.regenerate_instruction_edit = QLineEdit()
+        self.regenerate_instruction_edit.setPlaceholderText(
+            "Optional instructions for regeneration (e.g., lean harder on privilege)"
+        )
+        regenerate_row.addWidget(self.regenerate_instruction_edit, 1)
+        self.regenerate_btn = QPushButton("Regenerate")
+        self.regenerate_btn.clicked.connect(self._on_regenerate_clicked)
+        regenerate_row.addWidget(self.regenerate_btn)
+        layout.addLayout(regenerate_row)
 
         self.review_status_label = QLabel("")
         self.review_status_label.setStyleSheet("color: #666; font-style: italic;")
@@ -738,6 +841,10 @@ class RespondDiscoverySettingsPage(QWidget):
             cb.blockSignals(False)
         self.prev_btn.setEnabled(self._current_review_index > 0)
         self.next_review_btn.setEnabled(self._current_review_index < count - 1)
+
+        has_pending_replacement = review.pending_replacement is not None
+        if hasattr(self, "conflict_banner"):
+            self.conflict_banner.setVisible(has_pending_replacement)
 
     def _status_icon_for(self, review) -> str:
         if review.is_pending:

@@ -798,5 +798,125 @@ class ReviewScreenStatusIndicatorTests(unittest.TestCase):
         self.assertIn("⚠", page.request_label.text())  # warning U+26A0
 
 
+class RegenerateAndConflictTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls._app = QApplication.instance() or QApplication([])
+
+    def _make_page(self, n=2):
+        from icharlotte_core.discovery.response_parser import (
+            ParsedDiscovery, ParsedRequest,
+        )
+        parsed = ParsedDiscovery(
+            discovery_type="SI",
+            propounding_party="P",
+            responding_party="D",
+            set_number=1, set_word="ONE", case_number="1",
+            requests=[
+                ParsedRequest(number=str(i + 1), text=f"Request {i + 1}.")
+                for i in range(n)
+            ],
+        )
+        page = RespondDiscoverySettingsPage(
+            case_root="", file_number="1234.001",
+            discovery_file=r"C:\case\srogg.pdf",
+            detected_type="SI",
+        )
+        page.parsed_discovery = parsed
+        page._open_review_screen_with_pending(parsed)
+        return page, parsed
+
+    def test_regenerate_button_calls_coordinator_with_current_request(self):
+        page, parsed = self._make_page()
+        # Install a real coordinator with a no-op stub.
+        regen_calls = []
+        class _Stub:
+            def regenerate(self, request_number, **kwargs):
+                regen_calls.append((request_number, kwargs.get("override_instruction", "")))
+                return True
+            def cancel(self): pass
+            def start(self, **kwargs): pass
+            def is_done(self): return False
+        page._coordinator = _Stub()
+        page._context_chunks = []
+        page._loaded_response_rules = None
+
+        page._current_review_index = 0
+        page.regenerate_instruction_edit.setText("more privilege")
+        page._on_regenerate_clicked()
+
+        self.assertEqual(regen_calls, [("1", "more privilege")])
+
+    def test_regenerate_marks_row_pending_until_proposal_arrives(self):
+        page, parsed = self._make_page()
+        class _Stub:
+            def regenerate(self, **kwargs): return True
+            def cancel(self): pass
+            def start(self, **kwargs): pass
+            def is_done(self): return False
+        page._coordinator = _Stub()
+        page._context_chunks = []
+        from icharlotte_core.discovery.response_generation_engine import (
+            StructuredProposal,
+        )
+        page._on_proposal_ready(
+            "1",
+            StructuredProposal(
+                request_number="1", proposed_substantive_response="Initial."
+            ),
+        )
+        self.assertFalse(page.review_state.requests[0].is_pending)
+
+        page._current_review_index = 0
+        page.regenerate_instruction_edit.setText("")
+        page._on_regenerate_clicked()
+        self.assertTrue(page.review_state.requests[0].is_pending)
+
+    def test_conflict_banner_view_apply_replaces_user_text(self):
+        from icharlotte_core.discovery.response_generation_engine import (
+            StructuredProposal,
+        )
+        page, parsed = self._make_page()
+        page.review_state.requests[0].proposed_substantive_response = "USER TEXT"
+        page._on_proposal_ready(
+            "1",
+            StructuredProposal(
+                request_number="1", proposed_substantive_response="DRAFT"
+            ),
+        )
+        page._current_review_index = 0
+        page._load_current_review()
+        self.assertTrue(page.conflict_banner.isVisibleTo(page))
+
+        page._apply_pending_replacement()
+        self.assertEqual(
+            page.review_state.requests[0].proposed_substantive_response,
+            "DRAFT",
+        )
+        self.assertIsNone(page.review_state.requests[0].pending_replacement)
+        self.assertFalse(page.conflict_banner.isVisibleTo(page))
+
+    def test_conflict_banner_discard_keeps_user_text(self):
+        from icharlotte_core.discovery.response_generation_engine import (
+            StructuredProposal,
+        )
+        page, parsed = self._make_page()
+        page.review_state.requests[0].proposed_substantive_response = "USER TEXT"
+        page._on_proposal_ready(
+            "1",
+            StructuredProposal(
+                request_number="1", proposed_substantive_response="DRAFT"
+            ),
+        )
+        page._current_review_index = 0
+        page._load_current_review()
+        page._discard_pending_replacement()
+        self.assertEqual(
+            page.review_state.requests[0].proposed_substantive_response,
+            "USER TEXT",
+        )
+        self.assertIsNone(page.review_state.requests[0].pending_replacement)
+
+
 if __name__ == "__main__":
     unittest.main()
