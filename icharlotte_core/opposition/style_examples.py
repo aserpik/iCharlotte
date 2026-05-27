@@ -111,3 +111,47 @@ class StyleExampleRegistry:
             if len(matches) >= max_results:
                 break
         return matches[:max_results]
+
+
+def _cache_key(path: str) -> str:
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        mtime = 0.0
+    digest = hashlib.sha1(f"{os.path.abspath(path)}|{mtime}".encode("utf-8")).hexdigest()
+    return digest
+
+
+def extract_exemplar_text(path: str, *, cache_dir: str) -> str:
+    """Extract plain text from a .docx file, caching by path+mtime."""
+    if not path or not os.path.isfile(path):
+        return ""
+    os.makedirs(cache_dir, exist_ok=True)
+    cache_path = os.path.join(cache_dir, f"{_cache_key(path)}.txt")
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, "r", encoding="utf-8") as f:
+                return f.read()
+        except OSError:
+            logger.warning("Could not read exemplar cache: %s", cache_path, exc_info=True)
+
+    try:
+        from icharlotte_core.document_processor import extract_docx_text
+        text = extract_docx_text(path) or ""
+    except Exception:
+        # Fallback: plain-paragraph reader.
+        try:
+            from docx import Document
+            doc = Document(path)
+            text = "\n".join(p.text for p in doc.paragraphs if p.text)
+        except Exception:
+            logger.warning("Could not extract exemplar text from %s", path, exc_info=True)
+            text = ""
+
+    if text:
+        try:
+            with open(cache_path, "w", encoding="utf-8") as f:
+                f.write(text)
+        except OSError:
+            logger.warning("Could not write exemplar cache: %s", cache_path, exc_info=True)
+    return text

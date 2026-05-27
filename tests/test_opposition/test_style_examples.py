@@ -81,3 +81,46 @@ def test_remove_and_update(tmp_registry_path):
     assert len(reg.examples) == 1
     assert reg.examples[0].label == "A revised"
     assert reg.examples[0].motion_types == ["msj"]
+
+
+from icharlotte_core.opposition.style_examples import extract_exemplar_text
+
+
+def test_extract_exemplar_text_reads_docx_paragraphs(tmp_path):
+    from docx import Document
+
+    docx_path = tmp_path / "sample.docx"
+    doc = Document()
+    doc.add_paragraph("First paragraph.")
+    doc.add_paragraph("Second paragraph.")
+    doc.save(str(docx_path))
+
+    text = extract_exemplar_text(str(docx_path), cache_dir=str(tmp_path / "cache"))
+    assert "First paragraph." in text
+    assert "Second paragraph." in text
+
+
+def test_extract_exemplar_text_caches_by_mtime(tmp_path):
+    from docx import Document
+
+    docx_path = tmp_path / "sample.docx"
+    doc = Document()
+    doc.add_paragraph("First version.")
+    doc.save(str(docx_path))
+
+    cache_dir = str(tmp_path / "cache")
+    first = extract_exemplar_text(str(docx_path), cache_dir=cache_dir)
+    assert "First version." in first
+
+    # Touch but don't change content; cache should still hit.
+    os.utime(str(docx_path), None)
+    second = extract_exemplar_text(str(docx_path), cache_dir=cache_dir)
+    assert second == first
+
+
+def test_extract_exemplar_text_missing_file_returns_empty(tmp_path):
+    text = extract_exemplar_text(
+        str(tmp_path / "does_not_exist.docx"),
+        cache_dir=str(tmp_path / "cache"),
+    )
+    assert text == ""
