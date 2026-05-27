@@ -28,6 +28,28 @@ def test_underline_color_for_supported_verdict_is_green():
     assert "#1e8e3e" in html.lower() or "supported" in html.lower()
 
 
+def test_ampersand_inside_italics_renders_as_single_entity():
+    # Regression: pre-escaping inside the italic-marker lambda combined
+    # with the outer html.escape() produced "&amp;amp;" in HTML, which
+    # rendered as a visible "&amp;" in the QTextBrowser.
+    from icharlotte_core.opposition.models import CitationVerification, DraftDocument
+    from icharlotte_core.ui.wizard.pages.oppose_motion_page import _render_draft_html
+
+    draft = DraftDocument(
+        title="Opp",
+        body_text="See *Goldberg & Bagula v. Court* (2006) 137 Cal.App.4th 579.",
+        citations=[CitationVerification(
+            citation_text="Goldberg & Bagula v. Court (2006) 137 Cal.App.4th 579",
+            verdict="SUPPORTED",
+            kind="case",
+        )],
+    )
+    html = _render_draft_html(draft)
+    # Properly escaped: exactly "&amp;" once, never "&amp;amp;".
+    assert "&amp;amp;" not in html
+    assert "&amp;" in html
+
+
 def test_underline_color_for_not_supported_is_red():
     from icharlotte_core.opposition.models import CitationVerification, DraftDocument
     from icharlotte_core.ui.wizard.pages.oppose_motion_page import _render_draft_html

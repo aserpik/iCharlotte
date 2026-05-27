@@ -69,6 +69,46 @@ def test_case_name_with_comma_on_right_side():
     assert cites[0].case_name == "Smith v. Jones, Inc."
 
 
+def test_law_firm_case_name_with_ampersand_and_commas():
+    # Real-world law-firm case name with multiple commas and an ampersand.
+    body = (
+        "In *Hecht, Solberg, Robinson, Goldberg & Bagula v. Superior Court* "
+        "(2006) 137 Cal.App.4th 579, 591-592, the court held that ..."
+    )
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    c = cites[0]
+    assert c.case_name == (
+        "Hecht, Solberg, Robinson, Goldberg & Bagula v. Superior Court"
+    )
+    assert c.year == "2006"
+    assert c.reporter_citation == "137 Cal.App.4th 579"
+
+
+def test_case_name_ampersand_only():
+    body = "See *Latham & Watkins v. Smith* (2015) 60 Cal.App.4th 100."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    assert cites[0].case_name == "Latham & Watkins v. Smith"
+
+
+def test_amp_entity_in_body_is_normalized():
+    # If the LLM ever emits "&amp;" instead of "&", the parser must still
+    # capture the full case name. The renderer's double-escape bug also
+    # produces "&amp;" in HTML — this defensive normalization handles it.
+    body = "See *X &amp; Y v. Z* (2010) 50 Cal.4th 100."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    assert cites[0].case_name == "X & Y v. Z"
+
+
+def test_vs_period_form_accepted():
+    body = "See *Smith vs. Jones* (2010) 50 Cal.4th 100."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    assert "Smith vs. Jones" == cites[0].case_name
+
+
 def test_case_name_without_italic_markers():
     body = "The court held this in Cottini v. Enloe Medical Center (2014) 226 Cal.App.4th 401."
     cites = extract_citations(body)

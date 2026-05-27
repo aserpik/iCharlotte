@@ -41,19 +41,25 @@ _REPORTER_PATTERN = (
     r"|P\.\s*(?:2d|3d)"
 )
 
-# Case name: Two capitalized phrases separated by " v. ". May be wrapped in
-# *...* or _..._ italic markers. We capture the inner name without markers.
-# Allows hyphens, apostrophes, ampersands inside the names, plus optional
-# commas between word tokens (so "X Co., Inc. v. Y, LLC" matches as one
-# case name rather than stopping at the comma).
+# Case name: Two capitalized phrases separated by " v. " or " vs. ". May be
+# wrapped in *...* or _..._ italic markers. We capture the inner name without
+# markers. Allows hyphens, apostrophes, and dots inside individual words.
+# Word tokens may be joined by:
+#   - whitespace alone ("Smith Jones")
+#   - comma + whitespace ("Sinaiko, Inc.")
+#   - ampersand + whitespace ("Goldberg & Bagula")
+#   - combinations ("Hecht, Solberg, Robinson, Goldberg & Bagula")
+# Up to 10 word tokens per side so long law-firm names match.
+_WORD = r"[A-Z][A-Za-z0-9'.\-]*"
+_WORD_SEP = r"(?:\s*[,&]\s*|\s+)"
 _CASE_NAME_FRAGMENT = (
     r"(?:[\*_])?"                                # optional italic open
-    r"([A-Z][A-Za-z0-9&'.\-]*"                   # first word
+    r"(" + _WORD +                                # first word
     r"(?:\s+(?:de|del|la|of|the|von|van))?"      # optional connector
-    r"(?:,?\s+[A-Z][A-Za-z0-9&'.\-]*){0,6}"      # 0-6 more capitalized words (comma OK)
-    r"\s+v\.\s+"                                 # required " v. "
-    r"[A-Z][A-Za-z0-9&'.\-]*"
-    r"(?:,?\s+[A-Z][A-Za-z0-9&'.\-]*){0,6}"      # 0-6 more capitalized words (comma OK)
+    r"(?:" + _WORD_SEP + _WORD + r"){0,10}"      # up to 10 more words
+    r"\s+vs?\.\s+"                               # required " v. " or " vs. "
+    + _WORD +
+    r"(?:" + _WORD_SEP + _WORD + r"){0,10}"      # up to 10 more words
     r")"
     r"(?:[\*_])?"                                # optional italic close
 )
@@ -188,11 +194,27 @@ def _proposition_for_offset(body_text: str, offset: int) -> str:
     return body_text[start:end].strip()
 
 
+def _normalize_body_text(body_text: str) -> str:
+    """Defensive cleanup of LLM body text before parsing citations.
+
+    - Convert HTML entities the LLM occasionally emits (``&amp;`` → ``&``)
+      so the case-name regex sees the actual ampersand.
+    - Collapse non-breaking spaces (U+00A0) to regular spaces so the
+      whitespace tokens in regexes match.
+    """
+    if not body_text:
+        return ""
+    text = body_text.replace("&amp;", "&")
+    text = text.replace(" ", " ")
+    return text
+
+
 def extract_citations(body_text: str) -> list[Citation]:
     """Extract case + statute + rule citations from a draft body."""
     citations: list[Citation] = []
     if not body_text:
         return citations
+    body_text = _normalize_body_text(body_text)
 
     # Case cites
     for m in _CASE_CITE_RE.finditer(body_text):

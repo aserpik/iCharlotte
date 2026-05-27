@@ -512,8 +512,12 @@ def _build_citation_index(draft: DraftDocument) -> list[tuple[str, int, str]]:
 
 def _format_inline_html(line: str, citation_spans: list[tuple[str, int, str]]) -> str:
     """Escape, italicize *case names*, and wrap citation texts as clickable anchors."""
+    # Mark italic spans with placeholders WITHOUT pre-escaping the inner
+    # content. Pre-escaping plus the outer html.escape() double-escapes
+    # entities (e.g. "&" → "&amp;" → "&amp;amp;"), which surfaces as
+    # literal "&amp;" in the rendered HTML.
     italicized = _MD_ITALIC_RE.sub(
-        lambda match: f"\x00ITA{html.escape(match.group(1))}\x00ITAEND",
+        lambda match: f"\x00ITA{match.group(1)}\x00ITAEND",
         line,
     )
     escaped = html.escape(italicized)
