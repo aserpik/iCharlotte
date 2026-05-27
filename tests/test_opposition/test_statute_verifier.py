@@ -125,3 +125,22 @@ def test_invalid_llm_json_falls_back_to_unverified(tmp_cache_dir):
 
     assert cv.verdict == "UNVERIFIED"
     assert "could not parse" in cv.note.lower() or "invalid" in cv.note.lower()
+
+
+from icharlotte_core.opposition.statute_verifier import _parse_verdict_response
+
+
+@pytest.mark.parametrize(
+    "raw, expected_verdict",
+    [
+        ('{"verdict": "SUPPORTED", "evidence": "x", "note": "y"}', "SUPPORTED"),
+        ('```json\n{"verdict": "PARTIAL", "evidence": "x", "note": "y"}\n```', "PARTIAL"),
+        ('  ```\n{"verdict": "NOT_SUPPORTED", "evidence": "", "note": ""}\n```  ', "NOT_SUPPORTED"),
+        ("not json at all", ""),
+        ("", ""),
+        ('{"verdict": "supported", "evidence": "x", "note": "y"}', "SUPPORTED"),  # lowercase upper-cased
+    ],
+)
+def test_parse_verdict_response_variants(raw, expected_verdict):
+    verdict, _evidence, _note = _parse_verdict_response(raw)
+    assert verdict == expected_verdict
