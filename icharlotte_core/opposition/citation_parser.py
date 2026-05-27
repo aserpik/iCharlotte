@@ -75,12 +75,76 @@ def _normalize_case(case_name: str, vol: str, reporter: str, page: str) -> str:
     return f"{name} {vol} {reporter} {page}".strip()
 
 
+# ---------------------------------------------------------------------------
+# Statute cites
+# ---------------------------------------------------------------------------
+
+# Map normalized citation prefixes to leginfo lawCode values.
+_CODE_ALIASES: dict[str, str] = {
+    "code of civil procedure": "CCP",
+    "code civ. proc.": "CCP",
+    "code civ proc": "CCP",
+    "ccp": "CCP",
+    "evidence code": "EVID",
+    "evid. code": "EVID",
+    "evid code": "EVID",
+    "civil code": "CIV",
+    "civ. code": "CIV",
+    "civ code": "CIV",
+    "penal code": "PEN",
+    "pen. code": "PEN",
+    "government code": "GOV",
+    "gov. code": "GOV",
+    "business and professions code": "BPC",
+    "bus. & prof. code": "BPC",
+    "b&p code": "BPC",
+    "health and safety code": "HSC",
+    "health & saf. code": "HSC",
+    "labor code": "LAB",
+    "lab. code": "LAB",
+    "vehicle code": "VEH",
+    "veh. code": "VEH",
+    "family code": "FAM",
+    "fam. code": "FAM",
+    "probate code": "PROB",
+    "prob. code": "PROB",
+}
+
+# Build a single alternation for the code-name prefix, longest match first.
+_CODE_PREFIX_ALT = "|".join(
+    sorted((re.escape(k) for k in _CODE_ALIASES.keys()), key=len, reverse=True)
+)
+
+_SECTION_TOKEN = r"(?:§|§|section|sec\.?|s\.)"
+
+_STATUTE_CITE_RE = re.compile(
+    rf"({_CODE_PREFIX_ALT})\s*,?\s*{_SECTION_TOKEN}\s*(\d+[\w.]*)",
+    re.IGNORECASE,
+)
+
+
+def _normalize_statute(code_prefix: str, section_num: str) -> tuple[str, str]:
+    law_code = _CODE_ALIASES.get(code_prefix.strip().lower(), "")
+    return law_code, section_num.strip().rstrip(".")
+
+
+# ---------------------------------------------------------------------------
+# Rules of Court
+# ---------------------------------------------------------------------------
+
+_RULE_CITE_RE = re.compile(
+    r"(?:California\s+Rules?\s+of\s+Court|CRC),?\s+rule\s+(\d+\.\d+(?:\.\d+)?)",
+    re.IGNORECASE,
+)
+
+
 def extract_citations(body_text: str) -> list[Citation]:
     """Extract case + statute + rule citations from a draft body."""
     citations: list[Citation] = []
     if not body_text:
         return citations
 
+    # Case cites
     for m in _CASE_CITE_RE.finditer(body_text):
         case_name_raw, year, vol, reporter, page = m.group(1, 2, 3, 4, 5)
         raw_text = m.group(0)
@@ -95,6 +159,37 @@ def extract_citations(body_text: str) -> list[Citation]:
                 case_name=case_name,
                 year=year,
                 reporter_citation=f"{vol} {reporter} {page}",
+            )
+        )
+
+    # Statute cites
+    for m in _STATUTE_CITE_RE.finditer(body_text):
+        prefix, section = m.group(1, 2)
+        law_code, section_num = _normalize_statute(prefix, section)
+        if not law_code:
+            continue
+        citations.append(
+            Citation(
+                kind="statute",
+                raw_text=m.group(0),
+                normalized=f"{law_code} {section_num}",
+                proposition="",
+                body_offset=m.start(),
+                law_code=law_code,
+                section_num=section_num,
+            )
+        )
+
+    # Rules of Court
+    for m in _RULE_CITE_RE.finditer(body_text):
+        rule_num = m.group(1)
+        citations.append(
+            Citation(
+                kind="rule",
+                raw_text=m.group(0),
+                normalized=f"CRC rule {rule_num}",
+                proposition="",
+                body_offset=m.start(),
             )
         )
 

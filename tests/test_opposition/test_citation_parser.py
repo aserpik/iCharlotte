@@ -46,3 +46,52 @@ def test_multiple_case_cites_in_one_paragraph():
     cites = extract_citations(body)
     assert len(cites) == 2
     assert {c.case_name for c in cites} == {"Smith v. Jones", "Brown v. Davis"}
+
+
+def test_statute_cite_with_section_symbol():
+    body = "Plaintiff failed to comply with Code Civ. Proc., § 2024.020."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    c = cites[0]
+    assert c.kind == "statute"
+    assert c.law_code == "CCP"
+    assert c.section_num == "2024.020"
+
+
+def test_statute_cite_evidence_code():
+    body = "Under Evid. Code § 352 the court may exclude this."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    c = cites[0]
+    assert c.kind == "statute"
+    assert c.law_code == "EVID"
+    assert c.section_num == "352"
+
+
+def test_statute_full_name_form():
+    body = "The Code of Civil Procedure section 2031.030 governs."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    c = cites[0]
+    assert c.kind == "statute"
+    assert c.law_code == "CCP"
+
+
+def test_rule_of_court_cite():
+    body = "Pursuant to California Rules of Court, rule 3.1345."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    c = cites[0]
+    assert c.kind == "rule"
+    assert "3.1345" in c.raw_text
+
+
+def test_mixed_case_statute_rule_in_one_body():
+    body = (
+        "*Smith v. Jones* (2010) 50 Cal.4th 100 establishes the rule. "
+        "Code Civ. Proc., § 2024.020 codifies the deadline. "
+        "California Rules of Court, rule 3.1345 controls format."
+    )
+    cites = extract_citations(body)
+    kinds = sorted(c.kind for c in cites)
+    assert kinds == ["case", "rule", "statute"]
