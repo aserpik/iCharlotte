@@ -340,5 +340,59 @@ class TestGetOpinionText(unittest.TestCase):
         self.assertIsNone(text)
 
 
+class TestRetry(unittest.TestCase):
+    """Tests for transient-failure retry (HTTP 429 / 5xx)."""
+
+    @patch("icharlotte_core.legal_research.sources.courtlistener.time.sleep", lambda *_: None)
+    @patch("icharlotte_core.legal_research.sources.courtlistener.requests.get")
+    def test_get_opinion_text_retries_on_429_then_succeeds(self, mock_get):
+        # First cluster fetch is throttled (429), retry succeeds; then the
+        # opinion fetch returns text. Without retry this would be None.
+        throttled = MagicMock()
+        throttled.status_code = 429
+        throttled.headers = {}
+
+        cluster_ok = MagicMock()
+        cluster_ok.status_code = 200
+        cluster_ok.headers = {}
+        cluster_ok.raise_for_status = MagicMock()
+        cluster_ok.json.return_value = {
+            "sub_opinions": [
+                "https://www.courtlistener.com/api/rest/v4/opinions/1/"
+            ],
+        }
+
+        opinion_ok = MagicMock()
+        opinion_ok.status_code = 200
+        opinion_ok.headers = {}
+        opinion_ok.raise_for_status = MagicMock()
+        opinion_ok.json.return_value = {"plain_text": "Recovered opinion text."}
+
+        mock_get.side_effect = [throttled, cluster_ok, opinion_ok]
+
+        client = CourtListenerClient(token="tok")
+        text = client.get_opinion_text(1037173)
+
+        self.assertEqual(text, "Recovered opinion text.")
+        self.assertEqual(mock_get.call_count, 3)  # 1 throttled + 1 retry + 1 opinion
+
+    @patch("icharlotte_core.legal_research.sources.courtlistener.time.sleep", lambda *_: None)
+    @patch("icharlotte_core.legal_research.sources.courtlistener.requests.get")
+    def test_get_opinion_text_gives_up_after_max_retries(self, mock_get):
+        # Persistent 429 — exhaust retries, raise_for_status fails, return None.
+        throttled = MagicMock()
+        throttled.status_code = 429
+        throttled.headers = {}
+        throttled.raise_for_status.side_effect = Exception("429 Too Many Requests")
+        mock_get.return_value = throttled
+
+        client = CourtListenerClient(token="tok")
+        text = client.get_opinion_text(1037173)
+
+        self.assertIsNone(text)
+        # 1 initial + _MAX_RETRIES retries = 4 attempts on the cluster fetch.
+        self.assertEqual(mock_get.call_count, 4)
+
+
 if __name__ == "__main__":
     unittest.main()

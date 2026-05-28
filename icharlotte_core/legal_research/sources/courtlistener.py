@@ -2,7 +2,8 @@
 
 import logging
 import re
-from typing import Dict, List, Optional
+import time
+from typing import Callable, Dict, List, Optional
 from urllib.parse import urljoin
 
 import requests
@@ -20,6 +21,60 @@ CA_COURTS = (
 )
 
 REQUEST_TIMEOUT = 30  # seconds
+
+# Retry policy for transient failures (HTTP 429 throttling, 5xx, timeouts).
+# During a bulk verification run (many citations, parallel workers) the API
+# will rate-limit some requests; without retry a transient 429 silently
+# downgrades a citation to UNVERIFIED — which can mask a would-be
+# NOT_SUPPORTED flag. Exponential backoff with a respected Retry-After.
+_MAX_RETRIES = 3
+_RETRY_BASE_DELAY = 1.0   # seconds; doubled each attempt
+_MAX_RETRY_WAIT = 20.0    # cap any single sleep
+
+
+def _send_with_retry(send_fn: Callable[[], "requests.Response"]) -> "requests.Response":
+    """Call ``send_fn`` (a zero-arg request) with retry on 429/5xx/timeout.
+
+    Returns the final Response. Retries are exhausted on persistent failure;
+    the last response (or raised exception) propagates to the caller, which
+    already handles non-2xx via ``raise_for_status`` + try/except.
+    """
+    delay = _RETRY_BASE_DELAY
+    last_resp: "requests.Response | None" = None
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            resp = send_fn()
+        except requests.RequestException:
+            if attempt >= _MAX_RETRIES:
+                raise
+            time.sleep(min(delay, _MAX_RETRY_WAIT))
+            delay *= 2
+            continue
+
+        last_resp = resp
+        status = getattr(resp, "status_code", None)
+        transient = status == 429 or (isinstance(status, int) and 500 <= status < 600)
+        if transient and attempt < _MAX_RETRIES:
+            wait = delay
+            retry_after = None
+            try:
+                retry_after = resp.headers.get("Retry-After")
+            except Exception:
+                retry_after = None
+            if retry_after:
+                try:
+                    wait = float(retry_after)
+                except (TypeError, ValueError):
+                    wait = delay
+            logger.warning(
+                "CourtListener returned %s; retrying in %.1fs (attempt %d/%d)",
+                status, min(wait, _MAX_RETRY_WAIT), attempt + 1, _MAX_RETRIES,
+            )
+            time.sleep(min(wait, _MAX_RETRY_WAIT))
+            delay *= 2
+            continue
+        return resp
+    return last_resp  # pragma: no cover - loop always returns earlier
 
 
 def opinion_url_for_cluster(cluster: dict) -> str:
@@ -105,11 +160,13 @@ class CourtListenerClient:
             return []
 
         try:
-            resp = requests.post(
-                f"{BASE_URL}/citation-lookup/",
-                headers=self._auth_headers(),
-                data={"text": text},
-                timeout=REQUEST_TIMEOUT,
+            resp = _send_with_retry(
+                lambda: requests.post(
+                    f"{BASE_URL}/citation-lookup/",
+                    headers=self._auth_headers(),
+                    data={"text": text},
+                    timeout=REQUEST_TIMEOUT,
+                )
             )
             resp.raise_for_status()
             data = resp.json()
@@ -126,10 +183,12 @@ class CourtListenerClient:
     def get_cluster(self, cluster_id: int | str) -> dict | None:
         """Fetch a CourtListener opinion cluster by ID."""
         try:
-            resp = requests.get(
-                f"{BASE_URL}/clusters/{cluster_id}/",
-                headers=self._headers(),
-                timeout=REQUEST_TIMEOUT,
+            resp = _send_with_retry(
+                lambda: requests.get(
+                    f"{BASE_URL}/clusters/{cluster_id}/",
+                    headers=self._headers(),
+                    timeout=REQUEST_TIMEOUT,
+                )
             )
             resp.raise_for_status()
             data = resp.json()
@@ -234,10 +293,12 @@ class CourtListenerClient:
             Plain text of the opinion (or cluster summary), or None.
         """
         try:
-            cluster_resp = requests.get(
-                f"{BASE_URL}/clusters/{cluster_id}/",
-                headers=self._headers(),
-                timeout=REQUEST_TIMEOUT,
+            cluster_resp = _send_with_retry(
+                lambda: requests.get(
+                    f"{BASE_URL}/clusters/{cluster_id}/",
+                    headers=self._headers(),
+                    timeout=REQUEST_TIMEOUT,
+                )
             )
             cluster_resp.raise_for_status()
             cluster_data = cluster_resp.json()
@@ -257,10 +318,12 @@ class CourtListenerClient:
                     continue
 
                 try:
-                    opinion_resp = requests.get(
-                        opinion_url,
-                        headers=self._headers(),
-                        timeout=REQUEST_TIMEOUT,
+                    opinion_resp = _send_with_retry(
+                        lambda url=opinion_url: requests.get(
+                            url,
+                            headers=self._headers(),
+                            timeout=REQUEST_TIMEOUT,
+                        )
                     )
                     opinion_resp.raise_for_status()
                 except Exception:
