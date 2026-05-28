@@ -44,7 +44,7 @@ def render_outline_docx(*, outline: dict, output_path: Union[str, Path]) -> None
     for topic in outline.get("topics", []):
         title = topic.get("title", "(Untitled topic)")
         strat = topic.get("strategic_note", "")
-        _para(doc, title, bold=True, size=13, space_after_pt=4)
+        _para(doc, title.upper(), bold=True, size=13, space_after_pt=4)
         if strat:
             _para(doc, f"Strategic: {strat}", italic=True, size=11,
                   indent_left=0.25, space_after_pt=6)

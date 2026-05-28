@@ -36,7 +36,7 @@ def test_render_creates_docx_with_expected_structure(tmp_path):
     doc = Document(str(out))
     text = "\n".join(p.text for p in doc.paragraphs)
     assert "Jane Doe" in text
-    assert "Pre-existing conditions" in text
+    assert "PRE-EXISTING CONDITIONS" in text  # uppercase topic header
     assert "Before 2024" in text
     assert "Coverage" in text  # coverage notes section
 
