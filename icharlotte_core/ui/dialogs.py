@@ -400,6 +400,7 @@ WORKBENCH_TO_AGENT_ID = {
     "oppose_motion": "agent_oppose_motion",
     "word_assistant": "func_word_assistant",
     "legal_research": "func_legal_research",
+    "depo_prep": "DepoPrep",
 }
 
 WORKBENCH_PASS_TO_AGENT_ID = {
@@ -1714,7 +1715,7 @@ class PromptsDialog(QDialog):
                       'liability', 'exposure', 'med_record', 'med_chron', 'separate',
                       'email_update', 'chat',
                       'word_assistant', 'legal_research', 'mediation_brief',
-                      'oppose_motion']:
+                      'oppose_motion', 'depo_prep']:
             agents.add(agent)
 
         for agent in sorted(agents):

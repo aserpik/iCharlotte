@@ -511,6 +511,16 @@ class PromptManager:
             ("oppose_motion", "find_replacement", oppose_prompts.FIND_REPLACEMENT_PROMPT, "Optional replacement-case search on red verdicts"),
         ]
 
+        # Depo Prep prompts (Scripts/depo_prep_lib). Guarded so a Scripts import
+        # problem can't break seeding of the in-process agents above.
+        try:
+            from Scripts.depo_prep_lib import prompts as _depo_prompts
+            for _pass, _tmpl in _depo_prompts.DEPO_PREP_PROMPT_DEFAULTS.items():
+                _desc = _depo_prompts.DEPO_PREP_PROMPT_DESCRIPTIONS.get(_pass, "")
+                seeds.append(("depo_prep", _pass, _tmpl, _desc))
+        except Exception as e:
+            print(f"[PromptManager] Could not seed depo_prep prompts: {e}")
+
         seeded = 0
         for agent, pass_name, content, description in seeds:
             key = self._get_prompt_key(agent, pass_name)
