@@ -1,54 +1,90 @@
 """
 Token counting utilities for estimating context usage.
+
+Context-window lookup is layered so it stays accurate as new models ship:
+
+  1. ``MODEL_CONTEXT_LIMITS``  — exact model-ID overrides (use sparingly,
+     only when a specific model deviates from its family's typical window).
+  2. ``MODEL_FAMILY_PATTERNS`` — ordered list of (regex, limit) tuples that
+     catch whole model families (e.g. any ``gpt-5.*`` variant). New versions
+     within a known family resolve correctly without code changes.
+  3. ``PROVIDER_DEFAULT_LIMITS`` — last-resort fallback by provider name.
+
+When a new model family launches (e.g. Claude 5, GPT-6, Gemini 4) add ONE
+entry to ``MODEL_FAMILY_PATTERNS`` — that covers every version/snapshot in
+the family. Only add to ``MODEL_CONTEXT_LIMITS`` for one-off exceptions.
 """
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Pattern, Tuple
 import re
 
 
-# Context window limits for various models
-MODEL_CONTEXT_LIMITS = {
-    # Gemini models
-    'gemini-3.1-pro-preview': 1048576,
-    'gemini-3.5-flash': 1048576,
-    'gemini-3.1-flash-lite': 1048576,
-
-    # OpenAI models
-    'gpt-4o': 128000,
-    'gpt-4o-mini': 128000,
-    'gpt-4-turbo': 128000,
-    'gpt-4-turbo-preview': 128000,
+# Exact model-ID overrides. Add entries here ONLY for models whose window
+# differs from what their family pattern would say (e.g. legacy small variants).
+MODEL_CONTEXT_LIMITS: Dict[str, int] = {
+    # OpenAI legacy / small variants
     'gpt-4': 8192,
     'gpt-4-32k': 32768,
     'gpt-3.5-turbo': 16385,
     'gpt-3.5-turbo-16k': 16385,
-    'o1': 200000,
-    'o1-preview': 200000,
+    'gpt-3.5-turbo-instruct': 4096,
     'o1-mini': 128000,
-    'o3': 200000,
     'o3-mini': 200000,
-
-    # Claude models
-    'claude-3-opus': 200000,
-    'claude-3-sonnet': 200000,
-    'claude-3-haiku': 200000,
-    'claude-3.5-sonnet': 200000,
-    'claude-3.5-haiku': 200000,
-    'claude-3-opus-20240229': 200000,
-    'claude-3-sonnet-20240229': 200000,
-    'claude-3-haiku-20240307': 200000,
-    'claude-3-5-sonnet-20240620': 200000,
-    'claude-3-5-sonnet-20241022': 200000,
-    'claude-sonnet-4-20250514': 200000,
-    'claude-opus-4-20250514': 200000,
-    'claude-haiku-4-20250514': 200000,
-    'claude-haiku-4-5-20251001': 200000,
 }
 
-# Default limits by provider
-PROVIDER_DEFAULT_LIMITS = {
-    'Gemini': 1048576,
-    'OpenAI': 128000,
-    'Claude': 200000,
+
+# Family pattern → context window, checked in order. First match wins, so
+# put MORE-SPECIFIC patterns before more-general ones. Patterns are anchored
+# at the start (``re.match``) so they only match real model-ID prefixes.
+#
+# Public context-window references (verified against provider docs as of
+# 2026-05):
+#   - GPT-4.1 family ........ 1,047,576 (1M)
+#   - GPT-5 family (all) .... 400,000 (incl. Pro / Thinking / Instant)
+#   - GPT-4o / GPT-4 Turbo .. 128,000
+#   - o-series (o1/o3/o4) ... 200,000
+#   - Claude Sonnet 4.5+ .... 1,000,000 (with 1M-context beta header)
+#   - Claude Opus 4.6+ ...... 1,000,000 (with 1M-context beta header)
+#   - Other Claude 3.x/4.x .. 200,000
+#   - Gemini 2.x+ / 3.x ..... 1,048,576 (1M)
+#
+# IMPORTANT regex caveat: model IDs frequently carry an 8-digit date suffix
+# (e.g. ``claude-sonnet-4-20250514``). A naive ``\d+`` for the minor version
+# would swallow the date and mis-classify the model. We constrain minor
+# versions to 1-2 digits via ``(?:[N-9]|[1-9]\d)`` followed by ``(?![0-9])``
+# so an 8-digit date can never satisfy the version capture.
+MODEL_FAMILY_PATTERNS: List[Tuple[Pattern[str], int]] = [
+    # ---- OpenAI ----
+    # GPT-4.1 family — 1M context
+    (re.compile(r'^gpt-4\.1(?![0-9])', re.IGNORECASE), 1_047_576),
+    # GPT-5 family and any future GPT-N where N>=5 — 400k context
+    # Covers gpt-5, gpt-5-pro, gpt-5.1-thinking, gpt-5.5-pro, gpt-6, etc.
+    (re.compile(r'^gpt-(?:[5-9]|[1-9]\d)(?![0-9])', re.IGNORECASE), 400_000),
+    # GPT-4o, GPT-4o-mini, GPT-4 Turbo, chatgpt-* snapshots — 128k
+    (re.compile(r'^(?:gpt-4o|gpt-4-turbo|chatgpt-)', re.IGNORECASE), 128_000),
+    # o-series reasoning models (o1/o3/o4/...) — 200k (mini variants overridden above)
+    (re.compile(r'^o[1-9](?![0-9])', re.IGNORECASE), 200_000),
+
+    # ---- Claude ----
+    # Claude Sonnet 4.5+ and Opus 4.6+ ship with optional 1M-context beta
+    (re.compile(r'^claude-sonnet-4-(?:[5-9]|[1-9]\d)(?![0-9])', re.IGNORECASE), 1_000_000),
+    (re.compile(r'^claude-opus-4-(?:[6-9]|[1-9]\d)(?![0-9])', re.IGNORECASE), 1_000_000),
+    # Future Claude 5.x default (no public spec yet — assume 1M like 4.5+)
+    (re.compile(r'^claude-(?:opus|sonnet|haiku)-(?:[5-9]|[1-9]\d)(?![0-9])', re.IGNORECASE), 1_000_000),
+    # All other Claude 3.x / 4.x models → 200k
+    (re.compile(r'^claude-(?:3|4|opus|sonnet|haiku)', re.IGNORECASE), 200_000),
+
+    # ---- Gemini ----
+    # Gemini 2.x / 3.x and beyond — 1M default
+    # (iCharlotte does not support Gemini 1.x; see tests/test_gemini_model_catalog.py)
+    (re.compile(r'^gemini-(?:[2-9]|[1-9]\d)(?![0-9])', re.IGNORECASE), 1_048_576),
+]
+
+
+# Provider-level fallback when neither exact match nor family pattern hits.
+PROVIDER_DEFAULT_LIMITS: Dict[str, int] = {
+    'Gemini': 1_048_576,
+    'OpenAI': 128_000,
+    'Claude': 200_000,
 }
 
 
@@ -129,28 +165,45 @@ class TokenCounter:
         """
         Get the context window limit for a model.
 
+        Resolution order:
+            1. Exact match in MODEL_CONTEXT_LIMITS
+            2. Family-pattern match in MODEL_FAMILY_PATTERNS
+            3. Substring match against MODEL_CONTEXT_LIMITS keys (legacy)
+            4. Provider default in PROVIDER_DEFAULT_LIMITS
+            5. 128k ultimate fallback
+
         Args:
-            model: Model name (e.g., 'gemini-3.5-flash', 'gpt-4o')
+            model: Model name (e.g., 'gemini-3.5-flash', 'gpt-5.5-pro')
             provider: Optional provider name for fallback
 
         Returns:
             Context window size in tokens
         """
-        # Try exact match first
+        if not model:
+            if provider and provider in PROVIDER_DEFAULT_LIMITS:
+                return PROVIDER_DEFAULT_LIMITS[provider]
+            return 128000
+
+        # 1. Exact match
         if model in MODEL_CONTEXT_LIMITS:
             return MODEL_CONTEXT_LIMITS[model]
 
-        # Try partial match (model name contains key)
+        # 2. Family-pattern match (handles new model versions automatically)
+        for pattern, limit in MODEL_FAMILY_PATTERNS:
+            if pattern.match(model):
+                return limit
+
+        # 3. Legacy substring match against exact-overrides dict
         model_lower = model.lower()
         for key, limit in MODEL_CONTEXT_LIMITS.items():
             if key.lower() in model_lower:
                 return limit
 
-        # Fallback to provider default
+        # 4. Provider default
         if provider and provider in PROVIDER_DEFAULT_LIMITS:
             return PROVIDER_DEFAULT_LIMITS[provider]
 
-        # Ultimate fallback
+        # 5. Ultimate fallback
         return 128000
 
     @staticmethod

@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 import unittest
 
-from icharlotte_core.chat.token_counter import MODEL_CONTEXT_LIMITS
+from icharlotte_core.chat.token_counter import TokenCounter
 from icharlotte_core.llm_config import (
     DEFAULT_MODEL_SEQUENCE,
     FAST_MODEL_SEQUENCE,
@@ -77,8 +77,15 @@ class GeminiModelCatalogTests(unittest.TestCase):
         self.assertEqual(blocked, [])
 
     def test_token_counter_knows_current_gemini_models(self):
+        # Each supported Gemini model must resolve to its real 1M window —
+        # not the 128k ultimate fallback. The lookup is family-pattern based,
+        # so we test the resolved value rather than dict membership.
         for model in CURRENT_GEMINI_MODEL_IDS:
-            self.assertIn(model, MODEL_CONTEXT_LIMITS)
+            self.assertEqual(
+                TokenCounter.get_context_limit(model),
+                1_048_576,
+                f"{model} should resolve to the Gemini 1M context window",
+            )
 
     def test_runtime_source_has_no_blocked_hard_coded_gemini_ids(self):
         source_roots = [

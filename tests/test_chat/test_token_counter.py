@@ -183,6 +183,143 @@ class TestTokenCounter(unittest.TestCase):
         self.assertEqual(count_openai, count_claude)
 
 
+class TestModelFamilyContextLimits(unittest.TestCase):
+    """Verify family-pattern resolution gives the right window for every
+    currently-shipping model and adapts to new versions in known families."""
+
+    # ---- OpenAI ----
+
+    def test_gpt_5_family_resolves_to_400k(self):
+        # Cases the user actually sees in the dialog (live OpenAI catalog
+        # has gpt-5.1/5.2 variants today; users will type/select gpt-5.5-pro
+        # once it ships). All should land on 400k, not the 128k OpenAI default.
+        for model in (
+            'gpt-5',
+            'gpt-5-pro',
+            'gpt-5.1-instant',
+            'gpt-5.1-thinking',
+            'gpt-5.2-instant',
+            'gpt-5.2-thinking',
+            'gpt-5.5-pro',
+            'gpt-5-pro-2026-04-01',
+        ):
+            self.assertEqual(
+                TokenCounter.get_context_limit(model),
+                400_000,
+                f"{model} should resolve to GPT-5 family (400k)",
+            )
+
+    def test_gpt_4_1_family_resolves_to_1m(self):
+        for model in ('gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', 'gpt-4.1-2025-04-14'):
+            self.assertEqual(
+                TokenCounter.get_context_limit(model),
+                1_047_576,
+                f"{model} should resolve to GPT-4.1 family (1M)",
+            )
+
+    def test_gpt_4o_family_resolves_to_128k(self):
+        for model in ('gpt-4o', 'gpt-4o-mini', 'gpt-4o-2024-08-06', 'gpt-4-turbo', 'gpt-4-turbo-2024-04-09'):
+            self.assertEqual(TokenCounter.get_context_limit(model), 128_000)
+
+    def test_o_series_reasoning_resolves_to_200k(self):
+        # o1 / o3 / o4 / future o-series → 200k, except mini variants (overridden)
+        for model in ('o1', 'o1-preview', 'o3', 'o4-preview'):
+            self.assertEqual(
+                TokenCounter.get_context_limit(model),
+                200_000,
+                f"{model} should be 200k",
+            )
+
+    def test_o_series_mini_variants_overridden(self):
+        self.assertEqual(TokenCounter.get_context_limit('o1-mini'), 128_000)
+        self.assertEqual(TokenCounter.get_context_limit('o3-mini'), 200_000)
+
+    def test_chatgpt_snapshots_resolve_to_128k(self):
+        self.assertEqual(TokenCounter.get_context_limit('chatgpt-4o-latest'), 128_000)
+
+    # ---- Claude ----
+
+    def test_claude_sonnet_4_5_plus_resolves_to_1m(self):
+        for model in ('claude-sonnet-4-5', 'claude-sonnet-4-6', 'claude-sonnet-4-7',
+                      'claude-sonnet-4-5-20250929'):
+            self.assertEqual(
+                TokenCounter.get_context_limit(model),
+                1_000_000,
+                f"{model} should resolve to 1M (Sonnet 4.5+)",
+            )
+
+    def test_claude_opus_4_6_plus_resolves_to_1m(self):
+        for model in ('claude-opus-4-6', 'claude-opus-4-7', 'claude-opus-4-7-20260201'):
+            self.assertEqual(
+                TokenCounter.get_context_limit(model),
+                1_000_000,
+                f"{model} should resolve to 1M (Opus 4.6+)",
+            )
+
+    def test_claude_4_base_resolves_to_200k(self):
+        for model in ('claude-sonnet-4-20250514', 'claude-opus-4-20250514',
+                      'claude-haiku-4-20250514', 'claude-haiku-4-5-20251001',
+                      'claude-sonnet-4-4'):
+            self.assertEqual(
+                TokenCounter.get_context_limit(model),
+                200_000,
+                f"{model} should be 200k (Claude 4 base / pre-1M)",
+            )
+
+    def test_claude_3_resolves_to_200k(self):
+        for model in ('claude-3-opus', 'claude-3.5-sonnet', 'claude-3-5-sonnet-20241022',
+                      'claude-3-haiku-20240307'):
+            self.assertEqual(TokenCounter.get_context_limit(model), 200_000)
+
+    def test_future_claude_5_resolves_to_1m(self):
+        # Future-proof: Claude 5.x assumed to inherit the 1M ceiling
+        for model in ('claude-opus-5', 'claude-sonnet-5-2', 'claude-haiku-5-20270101'):
+            self.assertEqual(TokenCounter.get_context_limit(model), 1_000_000)
+
+    # ---- Gemini ----
+
+    def test_gemini_3_resolves_to_1m(self):
+        for model in ('gemini-3.1-pro-preview', 'gemini-3.5-flash', 'gemini-3.1-flash-lite',
+                      'gemini-3.7-ultra'):
+            self.assertEqual(TokenCounter.get_context_limit(model), 1_048_576)
+
+    def test_gemini_2_resolves_to_1m(self):
+        for model in ('gemini-2.0-flash', 'gemini-2.5-pro'):
+            self.assertEqual(TokenCounter.get_context_limit(model), 1_048_576)
+
+    def test_future_gemini_family_uses_1m_default(self):
+        for model in ('gemini-4-pro', 'gemini-10-ultra'):
+            self.assertEqual(TokenCounter.get_context_limit(model), 1_048_576)
+
+    # ---- Provider fallback ----
+
+    def test_unknown_openai_model_uses_provider_default(self):
+        self.assertEqual(
+            TokenCounter.get_context_limit('davinci-codex-007', provider='OpenAI'),
+            128_000,
+        )
+
+    def test_unknown_claude_model_uses_provider_default(self):
+        self.assertEqual(
+            TokenCounter.get_context_limit('mystery-anthropic-model', provider='Claude'),
+            200_000,
+        )
+
+    def test_patterns_are_anchored_to_model_id_start(self):
+        """Family patterns must not match if the family token appears mid-string.
+
+        A custom finetune ID like ``ft:org:gpt-4o:custom`` shouldn't be
+        treated as a GPT-4o-class model by the regex pass. (It may still
+        be resolved later via the legacy substring fallback — that's fine
+        and intentional — but the regex stage must stay strict.)"""
+        from icharlotte_core.chat.token_counter import MODEL_FAMILY_PATTERNS
+        for pattern, _ in MODEL_FAMILY_PATTERNS:
+            self.assertIsNone(
+                pattern.match("ft:org:gpt-4o:custom"),
+                f"pattern {pattern.pattern} should not match finetune-style ID",
+            )
+
+
 class TestTokenCounterEdgeCases(unittest.TestCase):
     """Edge case tests for TokenCounter."""
 
