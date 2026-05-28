@@ -38,6 +38,12 @@ def test_source_digest_roundtrip():
     # Round-trip
     digest2 = SourceDigest.from_dict(d)
     assert digest2.summary == digest.summary
+    assert digest2.deponent_statements[0].text == digest.deponent_statements[0].text
+    assert digest2.deponent_statements[0].location == digest.deponent_statements[0].location
+    assert digest2.factual_anchors[0].fact == digest.factual_anchors[0].fact
+    assert digest2.factual_anchors[0].topic_tags == digest.factual_anchors[0].topic_tags
+    assert digest2.inconsistencies[0].claim_a == digest.inconsistencies[0].claim_a
+    assert digest2.inconsistencies[0].claim_b_source == digest.inconsistencies[0].claim_b_source
 
 
 def test_validate_source_digest_rejects_missing_field():
@@ -81,3 +87,31 @@ def test_validate_topics_dict_accepts_minimal_topic():
 def test_validate_topics_dict_rejects_non_list_topics():
     with pytest.raises(ValueError):
         validate_topics_dict({"topics": "nope"})
+
+
+def test_question_to_dict_omits_none_optional_fields():
+    q = Question(n=1, text="Q only")
+    d = q.to_dict()
+    assert "purpose" not in d
+    assert "source_facts" not in d
+    assert "impeachment_hook" not in d
+    assert "objection_alts" not in d
+    assert d == {"n": 1, "text": "Q only"}
+
+
+def test_question_from_dict_handles_missing_optional_fields():
+    q = Question.from_dict({"n": 5, "text": "Q"})
+    assert q.purpose is None
+    assert q.source_facts is None
+    assert q.impeachment_hook is None
+    assert q.objection_alts is None
+
+
+def test_question_roundtrip_preserves_set_optional_fields():
+    q = Question(n=1, text="Q", purpose="P", source_facts=["a", "b"],
+                 impeachment_hook="hook", objection_alts=["alt1"])
+    q2 = Question.from_dict(q.to_dict())
+    assert q2.purpose == "P"
+    assert q2.source_facts == ["a", "b"]
+    assert q2.impeachment_hook == "hook"
+    assert q2.objection_alts == ["alt1"]
