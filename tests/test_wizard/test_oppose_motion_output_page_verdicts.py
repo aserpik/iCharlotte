@@ -195,3 +195,59 @@ def test_dialog_shows_what_case_actually_holds_for_not_supported(qtbot):
     qtbot.addWidget(dlg)
     assert "waiver" in dlg.body_html.lower() or "waives" in dlg.body_html.lower()
     assert "not_supported" in dlg.body_html.lower() or "does not hold" in dlg.body_html.lower() or "actually holds" in dlg.body_html.lower()
+
+
+def test_detail_panel_renders_supported_citation(qtbot):
+    from icharlotte_core.opposition.models import CitationVerification
+    from icharlotte_core.ui.wizard.pages.oppose_motion_page import CitationDetailPanel
+
+    panel = CitationDetailPanel()
+    qtbot.addWidget(panel)
+    panel.set_citation(CitationVerification(
+        citation_text="Smith v. Jones (2010) 50 Cal.4th 100",
+        case_name="Smith v. Jones",
+        verdict="SUPPORTED",
+        proposition="A duty of care applies.",
+        evidence="The court held a duty of care exists.",
+        note="Direct support.",
+        opinion_url="https://www.courtlistener.com/opinion/1/",
+        kind="case",
+    ))
+    assert "SUPPORTED" in panel.header_label.text()
+    assert "Smith v. Jones" in panel.header_label.text()
+    assert "duty of care exists" in panel.body_html
+    assert "Direct support" in panel.body_html
+    # Open + find-replacement button visibility per verdict.
+    assert not panel.open_btn.isHidden()
+    assert panel.find_btn.isHidden()       # green verdict — no find-replacement
+
+
+def test_detail_panel_shows_find_replacement_for_not_supported(qtbot):
+    from icharlotte_core.opposition.models import CitationVerification
+    from icharlotte_core.ui.wizard.pages.oppose_motion_page import CitationDetailPanel
+
+    panel = CitationDetailPanel()
+    qtbot.addWidget(panel)
+    panel.set_citation(CitationVerification(
+        citation_text="Sinaiko Healthcare (2007) 148 Cal.App.4th 390",
+        case_name="Sinaiko Healthcare",
+        verdict="NOT_SUPPORTED",
+        proposition="Serving discovery responses moots a motion to compel.",
+        evidence="A party who fails to serve timely responses waives objections.",
+        note="Sinaiko addresses waiver, not mootness.",
+        kind="case",
+    ))
+    assert not panel.find_btn.isHidden()   # red verdict — find-replacement visible
+    assert "NOT SUPPORTED" in panel.header_label.text()
+    assert "waives" in panel.body_html.lower()
+
+
+def test_detail_panel_clears_to_placeholder(qtbot):
+    from icharlotte_core.ui.wizard.pages.oppose_motion_page import CitationDetailPanel
+
+    panel = CitationDetailPanel()
+    qtbot.addWidget(panel)
+    panel.clear("No citations to display.")
+    assert "No citations to display" in panel.body_html
+    assert panel.open_btn.isHidden()
+    assert panel.find_btn.isHidden()

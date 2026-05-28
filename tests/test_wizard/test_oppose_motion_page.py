@@ -184,8 +184,8 @@ def test_task_tab_loads_draft_result(qtbot):
         citations=[
             CitationVerification(
                 citation_text="69 Cal.2d 108",
-                status="verified",
-                supporting_passage="ordinary care",
+                verdict="SUPPORTED",
+                evidence="ordinary care",
             )
         ],
     )
@@ -194,7 +194,9 @@ def test_task_tab_loads_draft_result(qtbot):
 
     assert tab.currentIndex() == TASK_PAGE_OUTPUT
     assert "Argument text" in tab.output_page.editor.toPlainText()
-    assert "ordinary care" in tab.output_page.source_drawer.toPlainText()
+    # Detail panel shows the verdict-aware HTML rendering — evidence is
+    # rendered under the "Verified holding:" heading for SUPPORTED.
+    assert "ordinary care" in tab.output_page.detail_panel.body_html
 
 
 def test_settings_from_dict_accepts_missing_state_and_refreshes_motion_label(qtbot):
@@ -489,7 +491,7 @@ def test_task_tab_does_not_start_second_worker_while_running(qtbot, monkeypatch)
     assert started[0]["motion_file"] == "/tmp/first.pdf"
 
 
-def test_output_page_show_citation_updates_drawer(qtbot):
+def test_output_page_show_citation_updates_detail_panel(qtbot):
     page = OpposeMotionOutputPage()
     qtbot.addWidget(page)
     draft = DraftDocument(
@@ -499,29 +501,28 @@ def test_output_page_show_citation_updates_drawer(qtbot):
             CitationVerification(
                 citation_text="69 Cal.2d 108",
                 normalized_citation="69 Cal.2d 108",
-                status="verified",
                 case_name="Rowland v. Christian",
-                court="California Supreme Court",
-                date="1968-08-08",
+                verdict="SUPPORTED",
+                proposition="A duty of ordinary care applies.",
+                evidence="ordinary care language",
+                note="Direct support.",
                 opinion_url="https://www.courtlistener.com/opinion/123/",
-                supporting_passage="ordinary care language",
-                warning="warning text",
             )
         ],
     )
     page.show_result(draft)
     page.show_citation(0)
 
-    drawer_text = page.source_drawer.toPlainText()
-    assert "69 Cal.2d 108" in drawer_text
-    assert "Normalized: 69 Cal.2d 108" in drawer_text
-    assert "Status: verified" in drawer_text
-    assert "Rowland v. Christian" in drawer_text
-    assert "California Supreme Court" in drawer_text
-    assert "1968-08-08" in drawer_text
-    assert "https://www.courtlistener.com/opinion/123/" in drawer_text
-    assert "ordinary care language" in drawer_text
-    assert "warning text" in drawer_text
+    # The detail panel renders verdict-aware content rather than a raw dump.
+    header_text = page.detail_panel.header_label.text()
+    body_html = page.detail_panel.body_html
+    assert "SUPPORTED" in header_text
+    assert "Rowland v. Christian" in header_text
+    assert "ordinary care language" in body_html
+    assert "ordinary care applies" in body_html
+    # The "Open in CourtListener" button is shown (citation has an
+    # opinion_url). Use isHidden() since the page isn't show()'n in headless tests.
+    assert not page.detail_panel.open_btn.isHidden()
 
 
 def test_output_editor_is_read_only(qtbot):
@@ -565,7 +566,9 @@ def test_output_renders_citations_as_clickable_anchors(qtbot):
     assert "font-style:italic" in html_text
 
 
-def test_output_anchor_click_opens_citation_dialog(qtbot, monkeypatch):
+def test_output_anchor_click_updates_detail_panel_without_popup(qtbot, monkeypatch):
+    # Anchor clicks must update the right-side detail panel in place; the
+    # legacy popup dialog must NOT auto-open.
     page = OpposeMotionOutputPage()
     qtbot.addWidget(page)
     draft = DraftDocument(
@@ -576,21 +579,30 @@ def test_output_anchor_click_opens_citation_dialog(qtbot, monkeypatch):
                 citation_text="148 Cal. App. 4th 390",
                 case_name="Sinaiko Healthcare",
                 opinion_url="https://example.com/op/1",
-                status="exists_support_unconfirmed",
+                verdict="SUPPORTED",
+                evidence="Sample evidence quote.",
             )
         ],
     )
     page.show_result(draft)
 
-    opened: list[int] = []
-    monkeypatch.setattr(page, "open_citation_dialog", lambda index: opened.append(index))
+    # Guard: if the popup ever sneaks back in, we want the test to fail loudly.
+    dialog_opens: list[object] = []
+    from icharlotte_core.ui.wizard.pages import oppose_motion_page as page_mod
 
-    # Simulate the QTextBrowser anchor click via the URL handler directly.
+    monkeypatch.setattr(
+        page_mod.CitationDetailDialog,
+        "exec",
+        lambda self: dialog_opens.append(self) or 0,
+    )
+
     from PySide6.QtCore import QUrl
 
     page._on_anchor_clicked(QUrl("citation:0"))
 
-    assert opened == [0]
+    assert dialog_opens == []  # no popup
+    assert "Sinaiko Healthcare" in page.detail_panel.header_label.text()
+    assert "Sample evidence quote" in page.detail_panel.body_html
 
 
 def test_citation_detail_dialog_shows_supporting_passage(qtbot):

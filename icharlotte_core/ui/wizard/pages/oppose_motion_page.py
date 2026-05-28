@@ -268,9 +268,8 @@ class OpposeMotionOutputPage(QWidget):
         self.editor.anchorClicked.connect(self._on_anchor_clicked)
         layout.addWidget(self.editor, 2)
 
-        self.source_drawer = QPlainTextEdit()
-        self.source_drawer.setReadOnly(True)
-        layout.addWidget(self.source_drawer, 1)
+        self.detail_panel = CitationDetailPanel()
+        layout.addWidget(self.detail_panel, 1)
         outer.addLayout(layout, 1)
 
         row = QHBoxLayout()
@@ -287,11 +286,11 @@ class OpposeMotionOutputPage(QWidget):
         if draft.citations:
             self.show_citation(0)
         else:
-            self.source_drawer.setPlainText(
-                "No citations were detected in this opposition.\n\n"
-                "If California case-law research returned no results, the draft "
-                "was written without case citations. Review the brief for any "
-                "factual or statutory support that may need strengthening."
+            self.detail_panel.clear(
+                "No citations were detected in this opposition. If California "
+                "case-law research returned no results, the draft was written "
+                "without case citations. Review the brief for any factual or "
+                "statutory support that may need strengthening."
             )
 
     def _refresh_summary_banner(self) -> None:
@@ -328,16 +327,10 @@ class OpposeMotionOutputPage(QWidget):
                 index = int(url.path().lstrip("/") or url.host() or "0")
             except (TypeError, ValueError):
                 return
+            # Click updates the right-side detail panel in place. No popup.
             self.show_citation(index)
-            self.open_citation_dialog(index)
             return
         QDesktopServices.openUrl(url)
-
-    def open_citation_dialog(self, index: int) -> None:
-        if index < 0 or index >= len(self.draft.citations):
-            return
-        dialog = CitationDetailDialog(self.draft.citations[index], parent=self)
-        dialog.exec()
 
     @property
     def output_path(self) -> str:
@@ -372,25 +365,7 @@ class OpposeMotionOutputPage(QWidget):
     def show_citation(self, index: int) -> None:
         if index < 0 or index >= len(self.draft.citations):
             return
-        citation = self.draft.citations[index]
-        self.source_drawer.setPlainText(
-            "\n".join(
-                [
-                    citation.citation_text,
-                    f"Normalized: {citation.normalized_citation}",
-                    f"Status: {citation.status}",
-                    f"Case: {citation.case_name}",
-                    f"Court: {citation.court}",
-                    f"Date: {citation.date}",
-                    f"Opinion: {citation.opinion_url}",
-                    "",
-                    "Supporting passage:",
-                    citation.supporting_passage or "(support not confirmed)",
-                    "",
-                    citation.warning,
-                ]
-            ).strip()
-        )
+        self.detail_panel.set_citation(self.draft.citations[index])
 
     def save_as(self) -> None:
         if not self.draft.preview_path:
@@ -544,23 +519,240 @@ def _format_inline_html(line: str, citation_spans: list[tuple[str, int, str]]) -
     return escaped
 
 
-class CitationDetailDialog(QDialog):
-    """Modal dialog showing a single citation's verification details."""
+# ─── Verdict-aware citation rendering helpers (used by panel + dialog) ─────
 
-    _VERDICT_HEADER_COLORS = {
-        "SUPPORTED": "#1e8e3e",
-        "PARTIAL": "#f9ab00",
-        "NOT_SUPPORTED": "#c5221f",
-        "NOT_FOUND": "#c5221f",
-        "UNVERIFIED": "#80868b",
-    }
-    _VERDICT_LABELS = {
-        "SUPPORTED": "SUPPORTED",
-        "PARTIAL": "PARTIAL",
-        "NOT_SUPPORTED": "NOT SUPPORTED",
-        "NOT_FOUND": "CITATION NOT FOUND",
-        "UNVERIFIED": "UNVERIFIED",
-    }
+_VERDICT_HEADER_COLORS = {
+    "SUPPORTED": "#1e8e3e",
+    "PARTIAL": "#f9ab00",
+    "NOT_SUPPORTED": "#c5221f",
+    "NOT_FOUND": "#c5221f",
+    "UNVERIFIED": "#80868b",
+}
+_VERDICT_LABELS = {
+    "SUPPORTED": "SUPPORTED",
+    "PARTIAL": "PARTIAL",
+    "NOT_SUPPORTED": "NOT SUPPORTED",
+    "NOT_FOUND": "CITATION NOT FOUND",
+    "UNVERIFIED": "UNVERIFIED",
+}
+
+
+def _citation_header_html(citation, verdict: str) -> str:
+    color = _VERDICT_HEADER_COLORS.get(verdict, "#80868b")
+    label = _VERDICT_LABELS.get(verdict, verdict or "UNVERIFIED")
+    title = html.escape(citation.case_name or citation.citation_text or "Citation")
+    return (
+        f"<div style='border-left: 6px solid {color}; padding-left: 8px;'>"
+        f"<div style='color:{color}; font-weight:bold; font-size:14pt;'>{html.escape(label)}</div>"
+        f"<div style='font-size:11pt;'>{title}</div>"
+        "</div>"
+    )
+
+
+def _citation_body_html(citation, verdict: str) -> str:
+    parts: list[str] = []
+
+    prop = (citation.proposition or "").strip()
+    if prop:
+        parts.append(
+            f"<p><b>Brief's proposition:</b><br><i>{html.escape(prop)}</i></p>"
+        )
+
+    if verdict == "SUPPORTED":
+        if citation.evidence:
+            parts.append(
+                f"<p><b>Verified holding:</b><br>{html.escape(citation.evidence)}</p>"
+            )
+        if citation.note:
+            parts.append(f"<p><b>Verifier note:</b> {html.escape(citation.note)}</p>")
+
+    elif verdict == "PARTIAL":
+        if citation.evidence:
+            parts.append(
+                f"<p><b>Relevant passage:</b><br>{html.escape(citation.evidence)}</p>"
+            )
+        if citation.note:
+            parts.append(
+                f"<p><b>Why partial:</b> {html.escape(citation.note)}</p>"
+            )
+
+    elif verdict == "NOT_SUPPORTED":
+        parts.append(
+            "<p><b>⚠ The authority does NOT hold what the brief claims.</b></p>"
+        )
+        if citation.evidence:
+            parts.append(
+                f"<p><b>What it actually holds:</b><br>{html.escape(citation.evidence)}</p>"
+            )
+        if citation.note:
+            parts.append(f"<p><b>Verifier note:</b> {html.escape(citation.note)}</p>")
+
+    elif verdict == "NOT_FOUND":
+        parts.append(
+            "<p><b>⚠ This citation was not found in the authoritative source.</b></p>"
+            "<p>Likely causes:</p>"
+            "<ul>"
+            "<li>The case or statute was invented by the LLM</li>"
+            "<li>The citation is mis-typed</li>"
+            "<li>The case is unpublished or pre-1900</li>"
+            "</ul>"
+        )
+        if citation.note:
+            parts.append(f"<p><b>Verifier note:</b> {html.escape(citation.note)}</p>")
+
+    else:  # UNVERIFIED
+        parts.append(
+            "<p>The verifier doesn't cover this source in v1. Verify manually.</p>"
+        )
+        if citation.note:
+            parts.append(f"<p>{html.escape(citation.note)}</p>")
+
+    return "\n".join(parts)
+
+
+def _run_find_replacement(parent_widget, citation):
+    """Run the find-replacement LLM call and pop a result summary.
+
+    Shared by the panel button and the (legacy) dialog button. Shows
+    a QMessageBox with candidates or with the appropriate error. Returns
+    nothing; intended as a fire-and-forget UI action.
+    """
+    from icharlotte_core.llm_config import call_llm
+    from icharlotte_core.opposition.verifier import (
+        build_opposition_verifier,
+        find_replacement_candidates,
+    )
+
+    token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
+    if not token:
+        QMessageBox.warning(
+            parent_widget,
+            "Missing API token",
+            "COURTLISTENER_API_TOKEN is not set; replacement search is unavailable.",
+        )
+        return
+
+    def llm(system_prompt, user_prompt):
+        return call_llm(
+            user_prompt,
+            system_prompt,
+            task_type="general",
+            agent_id="agent_oppose_motion",
+        ) or ""
+
+    verifier = build_opposition_verifier(courtlistener_token=token, llm_callback=llm)
+    candidates = find_replacement_candidates(
+        failed_citation=citation,
+        verifier=verifier,
+        llm_callback=llm,
+    )
+
+    if not candidates:
+        QMessageBox.information(
+            parent_widget,
+            "No replacements found",
+            "No supported replacement candidates were found. Try editing the proposition or searching manually.",
+        )
+        return
+    lines = [f"{c.citation_text} — {c.verdict}\n  {c.note}" for c in candidates]
+    QMessageBox.information(parent_widget, "Replacement candidates", "\n\n".join(lines))
+
+
+class CitationDetailPanel(QWidget):
+    """Right-side panel showing verdict-aware citation detail.
+
+    Replaces the popup dialog: anchor clicks in the draft body update this
+    panel in-place. Exposes ``set_citation()`` and ``clear()``.
+    """
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.citation = None
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
+
+        self.header_label = QLabel("")
+        self.header_label.setTextFormat(Qt.TextFormat.RichText)
+        self.header_label.setWordWrap(True)
+        layout.addWidget(self.header_label)
+
+        self.body_browser = QTextBrowser()
+        self.body_browser.setOpenExternalLinks(False)
+        self.body_browser.setStyleSheet("QTextBrowser { background: transparent; }")
+        layout.addWidget(self.body_browser, 1)
+
+        button_row = QHBoxLayout()
+        button_row.addStretch()
+        self.find_btn = QPushButton("Find replacement case")
+        self.find_btn.clicked.connect(self._on_find_replacement)
+        self.find_btn.setVisible(False)
+        button_row.addWidget(self.find_btn)
+        self.open_btn = QPushButton("Open source")
+        self.open_btn.clicked.connect(self._open_opinion_url)
+        self.open_btn.setVisible(False)
+        button_row.addWidget(self.open_btn)
+        layout.addLayout(button_row)
+
+        # Initial empty state.
+        self.clear("Select a citation in the draft to see verification details.")
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def set_citation(self, citation) -> None:
+        self.citation = citation
+        verdict = (citation.verdict or "UNVERIFIED").upper()
+        self.header_label.setText(_citation_header_html(citation, verdict))
+        self.body_browser.setHtml(_citation_body_html(citation, verdict))
+
+        # Toggle action buttons based on what makes sense for this citation.
+        if citation.opinion_url:
+            label = "Open in CourtListener" if citation.kind == "case" else "Open in leginfo"
+            self.open_btn.setText(label)
+            self.open_btn.setVisible(True)
+        else:
+            self.open_btn.setVisible(False)
+
+        self.find_btn.setVisible(verdict in {"NOT_SUPPORTED", "NOT_FOUND"})
+
+    def clear(self, message: str = "") -> None:
+        self.citation = None
+        self.header_label.setText("")
+        self.body_browser.setHtml(
+            f"<p style='color:#80868b;'>{html.escape(message)}</p>" if message else ""
+        )
+        self.open_btn.setVisible(False)
+        self.find_btn.setVisible(False)
+
+    @property
+    def body_html(self) -> str:
+        """Current rendered body HTML (for tests)."""
+        return self.body_browser.toHtml()
+
+    # ------------------------------------------------------------------
+    # Handlers
+    # ------------------------------------------------------------------
+
+    def _open_opinion_url(self) -> None:
+        if self.citation and self.citation.opinion_url:
+            QDesktopServices.openUrl(QUrl(self.citation.opinion_url))
+
+    def _on_find_replacement(self) -> None:
+        if self.citation is not None:
+            _run_find_replacement(self, self.citation)
+
+
+class CitationDetailDialog(QDialog):
+    """Modal popup version (legacy). The output page no longer auto-opens
+    this; it's retained as an opt-in surface for programmatic use and for
+    backward compatibility with existing tests.
+    """
+
+    _VERDICT_HEADER_COLORS = _VERDICT_HEADER_COLORS
+    _VERDICT_LABELS = _VERDICT_LABELS
 
     def __init__(self, citation, parent: QWidget | None = None):
         super().__init__(parent)
@@ -574,13 +766,12 @@ class CitationDetailDialog(QDialog):
         layout.setContentsMargins(16, 16, 16, 16)
         layout.setSpacing(10)
 
-        self.header = QLabel(self._header_html(citation, verdict))
+        self.header = QLabel(_citation_header_html(citation, verdict))
         self.header.setTextFormat(Qt.TextFormat.RichText)
         self.header.setWordWrap(True)
         layout.addWidget(self.header)
 
-        # Render verdict-specific body content into self.body_html for tests.
-        self.body_html = self._body_html(citation, verdict)
+        self.body_html = _citation_body_html(citation, verdict)
         self.body_label = QLabel(self.body_html)
         self.body_label.setTextFormat(Qt.TextFormat.RichText)
         self.body_label.setWordWrap(True)
@@ -598,132 +789,19 @@ class CitationDetailDialog(QDialog):
         close_btn.clicked.connect(self.accept)
         button_row.addWidget(close_btn)
 
-        verdict_upper = (citation.verdict or "").upper()
-        if verdict_upper in {"NOT_SUPPORTED", "NOT_FOUND"}:
+        if verdict in {"NOT_SUPPORTED", "NOT_FOUND"}:
             self.find_btn = QPushButton("Find replacement case")
             self.find_btn.clicked.connect(self._on_find_replacement)
             button_row.insertWidget(button_row.count() - 1, self.find_btn)
 
         layout.addLayout(button_row)
 
-    def _header_html(self, citation, verdict: str) -> str:
-        color = self._VERDICT_HEADER_COLORS.get(verdict, "#80868b")
-        label = self._VERDICT_LABELS.get(verdict, verdict or "UNVERIFIED")
-        title = html.escape(citation.case_name or citation.citation_text or "Citation")
-        return (
-            f"<div style='border-left: 6px solid {color}; padding-left: 8px;'>"
-            f"<div style='color:{color}; font-weight:bold; font-size:14pt;'>{html.escape(label)}</div>"
-            f"<div style='font-size:11pt;'>{title}</div>"
-            "</div>"
-        )
-
-    def _body_html(self, citation, verdict: str) -> str:
-        parts: list[str] = []
-
-        prop = (citation.proposition or "").strip()
-        if prop:
-            parts.append(
-                f"<p><b>Brief's proposition:</b><br><i>{html.escape(prop)}</i></p>"
-            )
-
-        if verdict == "SUPPORTED":
-            if citation.evidence:
-                parts.append(
-                    f"<p><b>Verified holding:</b><br>{html.escape(citation.evidence)}</p>"
-                )
-            if citation.note:
-                parts.append(f"<p><b>Verifier note:</b> {html.escape(citation.note)}</p>")
-
-        elif verdict == "PARTIAL":
-            if citation.evidence:
-                parts.append(
-                    f"<p><b>Relevant passage:</b><br>{html.escape(citation.evidence)}</p>"
-                )
-            if citation.note:
-                parts.append(
-                    f"<p><b>Why partial:</b> {html.escape(citation.note)}</p>"
-                )
-
-        elif verdict == "NOT_SUPPORTED":
-            parts.append(
-                "<p><b>⚠ The authority does NOT hold what the brief claims.</b></p>"
-            )
-            if citation.evidence:
-                parts.append(
-                    f"<p><b>What it actually holds:</b><br>{html.escape(citation.evidence)}</p>"
-                )
-            if citation.note:
-                parts.append(f"<p><b>Verifier note:</b> {html.escape(citation.note)}</p>")
-
-        elif verdict == "NOT_FOUND":
-            parts.append(
-                "<p><b>⚠ This citation was not found in the authoritative source.</b></p>"
-                "<p>Likely causes:</p>"
-                "<ul>"
-                "<li>The case or statute was invented by the LLM</li>"
-                "<li>The citation is mis-typed</li>"
-                "<li>The case is unpublished or pre-1900</li>"
-                "</ul>"
-            )
-            if citation.note:
-                parts.append(f"<p><b>Verifier note:</b> {html.escape(citation.note)}</p>")
-
-        else:  # UNVERIFIED
-            parts.append(
-                "<p>The verifier doesn't cover this source in v1. Verify manually.</p>"
-            )
-            if citation.note:
-                parts.append(f"<p>{html.escape(citation.note)}</p>")
-
-        return "\n".join(parts)
-
     def _open_opinion_url(self) -> None:
         if self.citation.opinion_url:
             QDesktopServices.openUrl(QUrl(self.citation.opinion_url))
 
     def _on_find_replacement(self) -> None:
-        from icharlotte_core.llm_config import call_llm
-        from icharlotte_core.opposition.verifier import (
-            build_opposition_verifier,
-            find_replacement_candidates,
-        )
-
-        token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
-        if not token:
-            QMessageBox.warning(
-                self,
-                "Missing API token",
-                "COURTLISTENER_API_TOKEN is not set; replacement search is unavailable.",
-            )
-            return
-
-        def llm(system_prompt, user_prompt):
-            return call_llm(
-                user_prompt,
-                system_prompt,
-                task_type="general",
-                agent_id="agent_oppose_motion",
-            ) or ""
-
-        verifier = build_opposition_verifier(courtlistener_token=token, llm_callback=llm)
-        candidates = find_replacement_candidates(
-            failed_citation=self.citation,
-            verifier=verifier,
-            llm_callback=llm,
-        )
-
-        if not candidates:
-            QMessageBox.information(
-                self,
-                "No replacements found",
-                "No supported replacement candidates were found. Try editing the proposition or searching manually.",
-            )
-            return
-
-        lines = [
-            f"{c.citation_text} — {c.verdict}\n  {c.note}" for c in candidates
-        ]
-        QMessageBox.information(self, "Replacement candidates", "\n\n".join(lines))
+        _run_find_replacement(self, self.citation)
 
 
 class OpposeMotionAnalysisWorker(QThread):
