@@ -48,3 +48,19 @@ class DepoPrepOutputPage(OutputPage):
                 self.md_viewer.setPlainText(md_path.read_text(encoding="utf-8"))
         else:
             self.md_viewer.clear()
+
+        # Save-on-demand: the generated outline lives in a scratch session
+        # folder. The user should only commit it to a location they choose when
+        # they press Save, so make the Save button always prompt (Save As),
+        # matching the Oppose-a-Motion output flow.
+        p = Path(output_path)
+        session_dir = p.parent
+        # Default the save dialog to the case's NOTES/AI Output folder with a
+        # filename derived from the session (which already encodes deponent+time).
+        default_dir = str(session_dir.parent)
+        suggested = f"{session_dir.name}.docx" if session_dir.name else p.name
+        self.set_save_as_defaults(
+            default_dir=default_dir,
+            suggested_filename=suggested,
+            required=True,
+        )
