@@ -287,6 +287,29 @@ class CourtListenerClient:
             )
             return []
 
+    def get_authority_signals(self, cluster_id: int | str) -> Dict[str, object]:
+        """Return soft good-law signals: citation count + latest citing year.
+
+        This is NOT a Shepard's/KeyCite good-law check (CourtListener has no
+        clean 'overruled' flag). It is a cheap staleness hint only.
+        """
+        citation_count = None
+        latest_citing_year = ""
+        try:
+            cluster = self.get_cluster(cluster_id) or {}
+            raw_count = cluster.get("citation_count")
+            citation_count = int(raw_count) if raw_count is not None else None
+        except (TypeError, ValueError):
+            citation_count = None
+        try:
+            citing = self.get_citing_cases(int(cluster_id), max_results=1) or []
+        except (TypeError, ValueError):
+            citing = []
+        if citing:
+            date = getattr(citing[0], "date", "") or ""
+            latest_citing_year = date[:4] if len(date) >= 4 else ""
+        return {"citation_count": citation_count, "latest_citing_year": latest_citing_year}
+
     def get_opinion_text(self, cluster_id: int) -> Optional[str]:
         """Fetch the full text of an opinion by cluster ID.
 
