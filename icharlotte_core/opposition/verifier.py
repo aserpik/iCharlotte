@@ -137,6 +137,41 @@ def _norm_reporter(s: str) -> str:
     return _re.sub(r"\s+", "", (s or "")).lower()
 
 
+def _reporter_in(needle: str, haystack: str) -> bool:
+    """True if ``needle`` appears in ``haystack`` bounded by non-digits, so a
+    volume/page number can't partially overlap a longer number (e.g.
+    "0cal.app.4th100" must NOT match inside "100cal.app.4th1000")."""
+    if not needle or not haystack:
+        return False
+    start = 0
+    while True:
+        idx = haystack.find(needle, start)
+        if idx == -1:
+            return False
+        before_ok = idx == 0 or not haystack[idx - 1].isdigit()
+        after = idx + len(needle)
+        after_ok = after >= len(haystack) or not haystack[after].isdigit()
+        if before_ok and after_ok:
+            return True
+        start = idx + 1
+
+
+def _reporter_matches(cite: str, pool_citation: str) -> bool:
+    """Whether a parsed cite and a pool citation refer to the same reporter cite.
+
+    Exact after whitespace/case normalization, or one embedded in the other at a
+    digit boundary — which tolerates a case-name prefix (``normalized_citation``)
+    or a trailing pincite/parallel on the pool side, without the digit-overlap
+    false positives a bare substring test produced.
+    """
+    c, p = _norm_reporter(cite), _norm_reporter(pool_citation)
+    if not c or not p:
+        return False
+    if c == p:
+        return True
+    return _reporter_in(p, c) or _reporter_in(c, p)
+
+
 def pool_membership_check(
     citations: list[Citation],
     retrieved: list[RetrievedAuthority],
@@ -151,15 +186,15 @@ def pool_membership_check(
     if not retrieved:
         return list(citations), []
 
-    pool_norms = {_norm_reporter(a.citation) for a in retrieved if a.citation}
+    pool_citations = [a.citation for a in retrieved if a.citation]
     to_verify: list[Citation] = []
     off_pool: list[CitationVerification] = []
     for c in citations:
         if c.kind != "case":
             to_verify.append(c)
             continue
-        cite_norm = _norm_reporter(c.reporter_citation or c.normalized)
-        in_pool = any(cite_norm and (cite_norm in p or p in cite_norm) for p in pool_norms)
+        cite_str = c.reporter_citation or c.normalized
+        in_pool = any(_reporter_matches(cite_str, p) for p in pool_citations)
         if in_pool:
             to_verify.append(c)
         else:
@@ -189,16 +224,12 @@ def enrich_with_pool_signals(
     case verifications (matched by normalized reporter citation). Mutates in place."""
     if not retrieved:
         return
-    by_norm = {}
-    for a in retrieved:
-        if a.citation:
-            by_norm[_norm_reporter(a.citation)] = a
+    pool = [a for a in retrieved if a.citation]
     for cv in verifications:
         if cv.kind != "case":
             continue
-        cv_norm = _norm_reporter(cv.normalized_citation)
-        for pool_norm, a in by_norm.items():
-            if cv_norm and (cv_norm in pool_norm or pool_norm in cv_norm):
+        for a in pool:
+            if _reporter_matches(cv.normalized_citation, a.citation):
                 cv.citation_count = a.citation_count
                 cv.latest_citing_year = a.latest_citing_year
                 break
