@@ -157,3 +157,12 @@ def test_retrieved_authority_roundtrip():
     restored = RetrievedAuthority.from_dict(data)
     assert restored == ra
     assert RetrievedAuthority.from_dict({}).cluster_id == ""
+
+
+def test_citation_verification_has_goodlaw_fields():
+    from icharlotte_core.opposition.models import CitationVerification
+
+    cv = CitationVerification.from_dict({"citation_count": 37, "latest_citing_year": "2021"})
+    assert cv.citation_count == 37
+    assert cv.latest_citing_year == "2021"
+    assert CitationVerification().citation_count is None

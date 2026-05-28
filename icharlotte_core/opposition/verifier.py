@@ -181,6 +181,29 @@ def pool_membership_check(
     return to_verify, off_pool
 
 
+def enrich_with_pool_signals(
+    verifications: list[CitationVerification],
+    retrieved: list[RetrievedAuthority],
+) -> None:
+    """Copy citation_count / latest_citing_year from the pool onto matching
+    case verifications (matched by normalized reporter citation). Mutates in place."""
+    if not retrieved:
+        return
+    by_norm = {}
+    for a in retrieved:
+        if a.citation:
+            by_norm[_norm_reporter(a.citation)] = a
+    for cv in verifications:
+        if cv.kind != "case":
+            continue
+        cv_norm = _norm_reporter(cv.normalized_citation)
+        for pool_norm, a in by_norm.items():
+            if cv_norm and (cv_norm in pool_norm or pool_norm in cv_norm):
+                cv.citation_count = a.citation_count
+                cv.latest_citing_year = a.latest_citing_year
+                break
+
+
 import os as _os
 from icharlotte_core.legal_research.sources.ca_leginfo import CALegInfoClient as _CALeg
 from icharlotte_core.legal_research.sources.courtlistener import (

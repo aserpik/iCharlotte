@@ -45,3 +45,17 @@ def test_empty_pool_passes_cases_through():
     to_verify, off_pool = pool_membership_check(cites, [])
     assert len(to_verify) == 1
     assert off_pool == []
+
+
+def test_enrich_with_pool_signals_copies_count_and_year():
+    from icharlotte_core.opposition.models import CitationVerification
+    from icharlotte_core.opposition.verifier import enrich_with_pool_signals
+
+    verifications = [CitationVerification(citation_text="*A v. B* (2014) 226 Cal.App.4th 401",
+                                          kind="case", verdict="SUPPORTED",
+                                          normalized_citation="A v. B 226 Cal.App.4th 401")]
+    pool = [RetrievedAuthority(cluster_id="1", case_name="A v. B", citation="226 Cal.App.4th 401",
+                               citation_count=37, latest_citing_year="2021")]
+    enrich_with_pool_signals(verifications, pool)
+    assert verifications[0].citation_count == 37
+    assert verifications[0].latest_citing_year == "2021"

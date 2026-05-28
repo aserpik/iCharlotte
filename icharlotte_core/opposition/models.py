@@ -193,6 +193,10 @@ class CitationVerification:
     law_code: str = ""
     section_num: str = ""
 
+    # Soft good-law hint (not a Shepard's/KeyCite check).
+    citation_count: int | None = None
+    latest_citing_year: str = ""
+
     # Legacy fields retained for back-compat with the old verifier.
     supporting_passage: str = ""
     support_start: int | None = None
@@ -224,6 +228,8 @@ class CitationVerification:
             cluster_id=data.get("cluster_id", ""),
             law_code=data.get("law_code", ""),
             section_num=data.get("section_num", ""),
+            citation_count=data.get("citation_count"),
+            latest_citing_year=data.get("latest_citing_year", ""),
             supporting_passage=data.get("supporting_passage", ""),
             support_start=data.get("support_start"),
             support_end=data.get("support_end"),

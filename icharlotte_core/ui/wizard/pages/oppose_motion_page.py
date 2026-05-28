@@ -614,6 +614,10 @@ def _format_inline_html(line: str, citation_spans: list[tuple[str, int, str]]) -
     # Replace closing placeholder before opening — otherwise "\x00ITA" matches
     # the prefix of "\x00ITAEND" and leaves "END" stranded in the output.
     escaped = escaped.replace("\x00ITAEND", "</i>").replace("\x00ITA", "<i>")
+    escaped = escaped.replace(
+        html.escape("[no case authority retrieved for this point]"),
+        "<span style=\"color:#80868b;\">[no case authority retrieved for this point]</span>",
+    )
     for citation_text, index, verdict in citation_spans:
         if not citation_text:
             continue
@@ -680,6 +684,14 @@ def _citation_body_html(citation, verdict: str) -> str:
             )
         if citation.note:
             parts.append(f"<p><b>Verifier note:</b> {html.escape(citation.note)}</p>")
+        if getattr(citation, "citation_count", None) is not None:
+            year = (getattr(citation, "latest_citing_year", "") or "").strip()
+            tail = f", most recently {html.escape(year)}" if year else ""
+            parts.append(
+                f"<p style='color:#80868b;'><b>Good-law hint:</b> cited by "
+                f"{citation.citation_count} case(s){tail}. (Not a Shepard's check — "
+                "confirm the case is still good law.)</p>"
+            )
 
     elif verdict == "PARTIAL":
         if citation.evidence:
@@ -689,6 +701,14 @@ def _citation_body_html(citation, verdict: str) -> str:
         if citation.note:
             parts.append(
                 f"<p><b>Why partial:</b> {html.escape(citation.note)}</p>"
+            )
+        if getattr(citation, "citation_count", None) is not None:
+            year = (getattr(citation, "latest_citing_year", "") or "").strip()
+            tail = f", most recently {html.escape(year)}" if year else ""
+            parts.append(
+                f"<p style='color:#80868b;'><b>Good-law hint:</b> cited by "
+                f"{citation.citation_count} case(s){tail}. (Not a Shepard's check — "
+                "confirm the case is still good law.)</p>"
             )
 
     elif verdict == "NOT_SUPPORTED":
@@ -1160,6 +1180,8 @@ class OpposeMotionWorker(QThread):
                     list(verified) + list(off_pool),
                     key=lambda cv: cv.body_offset if cv.body_offset is not None else 0,
                 )
+                from icharlotte_core.opposition.verifier import enrich_with_pool_signals
+                enrich_with_pool_signals(draft.citations, retrieved)
                 verdict_counts: dict[str, int] = {}
                 for cv in draft.citations:
                     verdict_counts[cv.verdict] = verdict_counts.get(cv.verdict, 0) + 1
