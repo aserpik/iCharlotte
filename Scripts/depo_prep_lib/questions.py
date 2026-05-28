@@ -71,7 +71,7 @@ def generate_questions_for_topic(
 
     try:
         raw = llm_caller.call(
-            prompt, text_payload,
+            prompt=prompt, text=text_payload,
             task_type="general", agent_id="DepoPrep", pass_name="topic_questions",
         )
         data = _parse_llm_json(raw)

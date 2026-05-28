@@ -84,7 +84,7 @@ def test_generate_questions_resolves_relevant_refs():
     )
     # The text payload should contain the chronic LBP fact, not the irrelevant one.
     call = caller.call.call_args
-    text = call.kwargs.get("text") or call.args[1] if len(call.args) > 1 else ""
+    text = call.kwargs.get("text") or (call.args[1] if len(call.args) > 1 else "")
     assert "chronic LBP" in text
     assert "irrelevant" not in text
 
@@ -104,7 +104,7 @@ def test_generate_questions_lawyer_added_uses_full_digest():
                "impeachment_hook": False, "objection_alts": False},
     )
     call = caller.call.call_args
-    text = call.kwargs.get("text") or call.args[1] if len(call.args) > 1 else ""
+    text = call.kwargs.get("text") or (call.args[1] if len(call.args) > 1 else "")
     # Whole digest should be in the payload for lawyer-added topics.
     assert "chronic LBP" in text
 
