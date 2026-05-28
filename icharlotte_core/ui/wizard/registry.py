@@ -105,7 +105,7 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         task_id="depo_prep",
         title="Depo Prep",
         description="Generate a deposition outline with questions grounded in case sources.",
-        icon_glyph="❔",  # white question mark ornament
+        icon_glyph="❔",  # ❔ white question mark ornament
         script_name="depo_prep.py",
         default_folders=["DISCOVERY", "PLEADINGS", "RECORDS"],
         phase1_args=["--phase=analyze"],
