@@ -82,9 +82,45 @@ def test_settings_page_reveals_topic_editor_on_attach_phase1_complete(qtbot, spe
     page.show()
     page._on_phase1_complete(str(session_dir / "session.json"))
 
+    # Topics are shown on the dedicated review screen, not inline on setup.
+    assert page._stack.currentIndex() == 1  # review screen
     assert page.topic_editor.isVisible() is True
     assert len(page.topic_editor.get_topics()) == 1
     assert page.generate_btn.isEnabled() is True
+
+
+def test_analyze_switches_to_review_screen(qtbot, spec, tmp_path):
+    from icharlotte_core.ui.wizard.pages.depo_prep_settings_page import DepoPrepSettingsPage
+    page = DepoPrepSettingsPage(spec, files=[], case_root=str(tmp_path))
+    qtbot.addWidget(page)
+
+    # Starts on the setup screen.
+    assert page._stack.currentIndex() == 0
+
+    page.set_deponent_name("Jane Doe")
+    (tmp_path / "depo.pdf").write_bytes(b"")
+    page.add_deponent_files([str(tmp_path / "depo.pdf")])
+
+    page._on_analyze_clicked()
+
+    # Pressing Analyze swaps the whole page to the review screen (topics are NOT
+    # shown at the bottom of the setup form).
+    assert page._stack.currentIndex() == 1
+    # During analysis the topic editor is hidden and Generate is disabled.
+    assert page.generate_btn.isEnabled() is False
+
+
+def test_back_button_returns_to_setup_screen(qtbot, spec, tmp_path):
+    from icharlotte_core.ui.wizard.pages.depo_prep_settings_page import DepoPrepSettingsPage
+    page = DepoPrepSettingsPage(spec, files=[], case_root=str(tmp_path))
+    qtbot.addWidget(page)
+    page.set_deponent_name("Jane Doe")
+    (tmp_path / "depo.pdf").write_bytes(b"")
+    page.add_deponent_files([str(tmp_path / "depo.pdf")])
+    page._on_analyze_clicked()
+    assert page._stack.currentIndex() == 1
+    page._on_back_clicked()
+    assert page._stack.currentIndex() == 0
 
 
 def test_settings_page_generate_emits_phase2_requested(qtbot, spec, tmp_path):

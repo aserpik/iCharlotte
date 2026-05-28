@@ -26,6 +26,10 @@ _STYLES = [
     ("friendly", "Friendly (own client prep)"),
 ]
 
+# Internal stack page indices.
+_PAGE_SETUP = 0
+_PAGE_REVIEW = 1
+
 
 def _load_case_parties(case_root: str) -> List[str]:
     """Best-effort: return list of party names from CaseDataManager. Empty on any error."""
@@ -57,18 +61,46 @@ def _load_case_parties(case_root: str) -> List[str]:
         return []
 
 
+def _detach_layout(layout) -> None:
+    """Recursively remove and delete every widget in ``layout`` (including those
+    nested inside sub-layouts).
+
+    The base SettingsPage builds a placeholder UI with buttons nested in
+    sub-layouts (the file-button row and the Proceed-button row). A shallow
+    strip leaves those buttons parented to the page with no layout slot, so they
+    paint as orphans over our UI — the base 'Proceed' button is blue, which
+    showed up as a stray blue block. Recursing fixes that.
+    """
+    while layout.count():
+        item = layout.takeAt(0)
+        w = item.widget()
+        if w is not None:
+            w.setParent(None)
+            w.deleteLater()
+            continue
+        sub = item.layout()
+        if sub is not None:
+            _detach_layout(sub)
+
+
 class DepoPrepSettingsPage(SettingsPage):
     """Custom settings page for Depo Prep.
 
-    Phase 1 is triggered on demand by the "Analyze Sources" button, which emits
+    The page is an internal two-screen stack:
+      * Setup screen — deponent, source files, instructions, per-topic content,
+        and the "Analyze Sources" button.
+      * Review screen — appears after Analyze; shows the proposed topics in an
+        editable TopicEditor plus the "Generate Outline" button.
+
+    Phase 1 is triggered on demand by "Analyze Sources", which emits
     ``analyze_requested``. TaskTab routes that to a settings-owned worker run
-    (mirroring the speculative path) WITHOUT switching pages, so the topic editor
-    can appear inline on this page once Phase 1 completes. We do NOT reuse
+    (mirroring the speculative path) WITHOUT switching the *TaskTab* page, so the
+    review screen can take over this page once Phase 1 completes. We do NOT reuse
     ``proceed_requested`` because that switches the tab to the Status page and
     routes ``awaiting_input`` to the generic deposition dialog instead of our
     embedded TopicEditor.
 
-    ``phase2_requested(str)`` fires on the "Generate Outline" click, carrying the
+    ``phase2_requested(str)`` fires on "Generate Outline", carrying the
     session.json path; TaskTab connects it to ``advance_to_status_with_phase2``.
     """
 
@@ -80,15 +112,39 @@ class DepoPrepSettingsPage(SettingsPage):
     def __init__(self, spec: TaskSpec, files, case_root: str | None = None, parent=None):
         super().__init__(spec, files=files, case_root=case_root, parent=parent)
 
+        # Discard the base SettingsPage placeholder UI entirely; we render our
+        # own. Recursively detach so no orphan base widgets paint over our page.
         outer = self.layout()
-        # Strip the base layout — we rebuild fully.
-        while outer.count():
-            item = outer.takeAt(0)
-            if item.widget():
-                item.widget().setParent(None)
+        _detach_layout(outer)
+        for _attr in ("files_label", "files_list", "add_files_btn",
+                      "remove_btn", "proceed_btn"):
+            if hasattr(self, _attr):
+                delattr(self, _attr)
 
-        outer.setContentsMargins(24, 24, 24, 24)
-        outer.setSpacing(10)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        self._deponent_files: List[str] = []
+        self._context_files: List[str] = []
+        self._session_path: Optional[str] = None
+
+        # Internal two-screen stack.
+        self._stack = QStackedWidget()
+        self._stack.addWidget(self._build_setup_page())    # index 0 = setup
+        self._stack.addWidget(self._build_review_page())   # index 1 = review
+        self._stack.setCurrentIndex(_PAGE_SETUP)
+        outer.addWidget(self._stack)
+
+        self._refresh_buttons()
+
+    # ------------------------------------------------------------------ #
+    # Screen builders
+    # ------------------------------------------------------------------ #
+    def _build_setup_page(self) -> QWidget:
+        page = QWidget()
+        v = QVBoxLayout(page)
+        v.setContentsMargins(24, 24, 24, 24)
+        v.setSpacing(10)
 
         # ---- Deponent ----
         deponent_box = QGroupBox("Deponent")
@@ -98,7 +154,7 @@ class DepoPrepSettingsPage(SettingsPage):
         row1.addWidget(QLabel("Name:"))
         self.deponent_name_combo = QComboBox()
         self.deponent_name_combo.setEditable(True)
-        for name in _load_case_parties(case_root or ""):
+        for name in _load_case_parties(self._case_root or ""):
             self.deponent_name_combo.addItem(name)
         self.deponent_name_combo.currentTextChanged.connect(self._refresh_buttons)
         row1.addWidget(self.deponent_name_combo, 1)
@@ -111,13 +167,12 @@ class DepoPrepSettingsPage(SettingsPage):
         row2.addWidget(self.deponent_role_edit, 1)
         dep_layout.addLayout(row2)
 
-        outer.addWidget(deponent_box)
+        v.addWidget(deponent_box)
 
         # ---- Sources ----
         sources_box = QGroupBox("Source files")
         s_layout = QVBoxLayout(sources_box)
 
-        # Deponent materials section
         s_layout.addWidget(QLabel("Deponent's own materials:"))
         dep_files_row = QHBoxLayout()
         self.add_deponent_files_btn = QPushButton("+ Add files")
@@ -133,9 +188,7 @@ class DepoPrepSettingsPage(SettingsPage):
         self.deponent_files_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.deponent_files_list.setMaximumHeight(80)
         s_layout.addWidget(self.deponent_files_list)
-        self._deponent_files: List[str] = []
 
-        # Context section
         s_layout.addWidget(QLabel("Case context:"))
         ctx_files_row = QHBoxLayout()
         self.add_context_files_btn = QPushButton("+ Add files")
@@ -151,9 +204,8 @@ class DepoPrepSettingsPage(SettingsPage):
         self.context_files_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.context_files_list.setMaximumHeight(80)
         s_layout.addWidget(self.context_files_list)
-        self._context_files: List[str] = []
 
-        outer.addWidget(sources_box)
+        v.addWidget(sources_box)
 
         # ---- Instructions ----
         instr_box = QGroupBox("Instructions")
@@ -168,10 +220,10 @@ class DepoPrepSettingsPage(SettingsPage):
         i_layout.addWidget(QLabel("Free-text strategy notes:"))
         self.free_text_edit = QPlainTextEdit()
         self.free_text_edit.setPlaceholderText(
-            "Case theory, topics to emphasize, key admissions to extract, things to avoid…")
+            "Case theory, topics to emphasize, key admissions to extract, things to avoid...")
         self.free_text_edit.setMinimumHeight(80)
         i_layout.addWidget(self.free_text_edit)
-        outer.addWidget(instr_box)
+        v.addWidget(instr_box)
 
         # ---- Per-topic content flags ----
         flags_box = QGroupBox("Per-topic content")
@@ -185,9 +237,11 @@ class DepoPrepSettingsPage(SettingsPage):
         for cb in (self.flag_strategic, self.flag_source_facts,
                    self.flag_impeachment, self.flag_objection):
             f_layout.addWidget(cb)
-        outer.addWidget(flags_box)
+        v.addWidget(flags_box)
 
-        # ---- Action row + topic editor area ----
+        v.addStretch(1)
+
+        # ---- Action row ----
         action_row = QHBoxLayout()
         action_row.addStretch()
         self.analyze_btn = QPushButton("Analyze Sources")
@@ -195,33 +249,54 @@ class DepoPrepSettingsPage(SettingsPage):
             "background-color: #1976D2; color: white; font-weight: 600; padding: 8px 24px;")
         self.analyze_btn.clicked.connect(self._on_analyze_clicked)
         action_row.addWidget(self.analyze_btn)
-        outer.addLayout(action_row)
+        v.addLayout(action_row)
 
-        # Topic editor area (hidden until Phase 1 completes).
+        return page
+
+    def _build_review_page(self) -> QWidget:
+        page = QWidget()
+        v = QVBoxLayout(page)
+        v.setContentsMargins(24, 24, 24, 24)
+        v.setSpacing(10)
+
+        self._review_header = QLabel("Proposed Topics")
+        self._review_header.setStyleSheet("font-size: 15px; font-weight: 700;")
+        v.addWidget(self._review_header)
+
+        hint = QLabel(
+            "Review the topics below. Check/uncheck to include, edit titles, "
+            "drag to reorder, or add your own. Then click Generate Outline.")
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #555;")
+        v.addWidget(hint)
+
         self._phase1_status_label = QLabel("")
         self._phase1_status_label.setStyleSheet("color: #555; font-style: italic;")
-        self._phase1_status_label.setVisible(False)
-        outer.addWidget(self._phase1_status_label)
+        self._phase1_status_label.setWordWrap(True)
+        v.addWidget(self._phase1_status_label)
 
         self.topic_editor = TopicEditor()
         self.topic_editor.setVisible(False)
-        outer.addWidget(self.topic_editor, 1)
+        v.addWidget(self.topic_editor, 1)
 
-        generate_row = QHBoxLayout()
-        generate_row.addStretch()
+        btn_row = QHBoxLayout()
+        self.back_btn = QPushButton("< Back to settings")
+        self.back_btn.clicked.connect(self._on_back_clicked)
+        btn_row.addWidget(self.back_btn)
+        btn_row.addStretch()
         self.generate_btn = QPushButton("Generate Outline")
         self.generate_btn.setStyleSheet(
             "background-color: #43A047; color: white; font-weight: 600; padding: 8px 24px;")
         self.generate_btn.setEnabled(False)
-        self.generate_btn.setVisible(False)
         self.generate_btn.clicked.connect(self._on_generate_clicked)
-        generate_row.addWidget(self.generate_btn)
-        outer.addLayout(generate_row)
+        btn_row.addWidget(self.generate_btn)
+        v.addLayout(btn_row)
 
-        self._session_path: Optional[str] = None
-        self._refresh_buttons()
+        return page
 
-    # ---- Compatibility with base class ----
+    # ------------------------------------------------------------------ #
+    # Compatibility with base class
+    # ------------------------------------------------------------------ #
     def _refresh_files_list(self) -> None:
         # Base SettingsPage calls this from __init__; ours does nothing because
         # we manage two separate lists.
@@ -233,7 +308,9 @@ class DepoPrepSettingsPage(SettingsPage):
         # For Depo Prep, that's the config.json path after _on_analyze_clicked.
         return list(self._files)
 
-    # ---- Public setters used in tests ----
+    # ------------------------------------------------------------------ #
+    # Public setters used in tests
+    # ------------------------------------------------------------------ #
     def set_deponent_name(self, name: str) -> None:
         self.deponent_name_combo.setEditText(name)
 
@@ -254,7 +331,9 @@ class DepoPrepSettingsPage(SettingsPage):
                 self.context_files_list.addItem(QListWidgetItem(os.path.basename(p)))
         self._refresh_buttons()
 
-    # ---- Internals ----
+    # ------------------------------------------------------------------ #
+    # Internals
+    # ------------------------------------------------------------------ #
     def _on_add_deponent_files(self) -> None:
         paths, _ = QFileDialog.getOpenFileNames(
             self, "Add deponent's own materials", self._case_root or "", "All files (*.*)")
@@ -276,6 +355,8 @@ class DepoPrepSettingsPage(SettingsPage):
         self._refresh_buttons()
 
     def _refresh_buttons(self) -> None:
+        if not hasattr(self, "analyze_btn"):
+            return
         has_name = bool(self.deponent_name_combo.currentText().strip())
         has_sources = bool(self._deponent_files or self._context_files)
         self.analyze_btn.setEnabled(has_name and has_sources)
@@ -306,9 +387,18 @@ class DepoPrepSettingsPage(SettingsPage):
         cfg_path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
         # Replace _files so TaskTab uses cfg_path as the positional argv.
         self._files = [str(cfg_path)]
-        self._phase1_status_label.setText("Analyzing sources…")
+
+        # Move to the review screen and show analysis-in-progress state.
+        deponent = cfg["deponent_name"] or "deponent"
+        self._review_header.setText(f"Proposed Topics — {deponent}")
+        self._phase1_status_label.setStyleSheet("color: #1976D2; font-style: italic;")
+        self._phase1_status_label.setText("Analyzing sources... this can take a minute.")
         self._phase1_status_label.setVisible(True)
+        self.topic_editor.setVisible(False)
+        self.generate_btn.setEnabled(False)
         self.analyze_btn.setEnabled(False)
+        self._stack.setCurrentIndex(_PAGE_REVIEW)
+
         self.analyze_requested.emit()
 
     def to_dict(self) -> dict:
@@ -323,6 +413,8 @@ class DepoPrepSettingsPage(SettingsPage):
 
     def _on_phase1_complete(self, session_path: str) -> None:
         self._session_path = session_path
+        # Ensure we're on the review screen (covers direct calls in tests).
+        self._stack.setCurrentIndex(_PAGE_REVIEW)
         session_dir = Path(session_path).parent
         try:
             topics_payload = json.loads(
@@ -332,19 +424,25 @@ class DepoPrepSettingsPage(SettingsPage):
             return
         self.topic_editor.set_topics(topics_payload.get("topics", []))
         self.topic_editor.setVisible(True)
-        self.generate_btn.setVisible(True)
         self.generate_btn.setEnabled(True)
         warning = topics_payload.get("warning")
         if warning:
             self._phase1_status_label.setText(warning)
             self._phase1_status_label.setStyleSheet("color: #E65100; font-style: italic;")
+            self._phase1_status_label.setVisible(True)
         else:
             self._phase1_status_label.setVisible(False)
 
     def _on_phase1_failed(self, err: str) -> None:
         self._phase1_status_label.setText(f"Analysis failed: {err}")
         self._phase1_status_label.setStyleSheet("color: #C62828; font-style: italic;")
+        self._phase1_status_label.setVisible(True)
+        # Let the user go back and adjust; re-enable Analyze on the setup screen.
         self.analyze_btn.setEnabled(True)
+
+    def _on_back_clicked(self) -> None:
+        self._stack.setCurrentIndex(_PAGE_SETUP)
+        self._refresh_buttons()
 
     def _on_generate_clicked(self) -> None:
         if not self._session_path:
