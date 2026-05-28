@@ -601,11 +601,20 @@ def _citation_body_html(citation, verdict: str) -> str:
             parts.append(f"<p><b>Verifier note:</b> {html.escape(citation.note)}</p>")
 
     else:  # UNVERIFIED
-        parts.append(
-            "<p>The verifier doesn't cover this source in v1. Verify manually.</p>"
-        )
+        # The note (when present) explains the specific reason -- cluster
+        # found but no opinion text, LLM call failed, prompt missing,
+        # parse failure, etc. Show the note directly. Only fall back to
+        # the generic "doesn't cover" message when no note is available
+        # (which corresponds to genuinely out-of-scope citation kinds
+        # like federal cases or local court rules).
         if citation.note:
-            parts.append(f"<p>{html.escape(citation.note)}</p>")
+            parts.append(
+                f"<p><b>⚠ Could not verify:</b> {html.escape(citation.note)}</p>"
+            )
+        else:
+            parts.append(
+                "<p>The verifier doesn't cover this source in v1. Verify manually.</p>"
+            )
 
     return "\n".join(parts)
 

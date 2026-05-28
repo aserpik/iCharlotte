@@ -221,17 +221,19 @@ class CourtListenerClient:
     def get_opinion_text(self, cluster_id: int) -> Optional[str]:
         """Fetch the full text of an opinion by cluster ID.
 
-        Retrieves the cluster metadata first, then fetches the first
-        sub-opinion's plain text.
+        Iterates ALL sub-opinions (concurrence/dissent in addition to the
+        lead opinion) and tries multiple text fields per sub-opinion.
+        Falls back to cluster-level summary/syllabus when no full-text
+        body is available — that's still enough for the verifier LLM to
+        compare against the brief's proposition.
 
         Args:
             cluster_id: CourtListener cluster ID.
 
         Returns:
-            Plain text of the opinion, or None on error.
+            Plain text of the opinion (or cluster summary), or None.
         """
         try:
-            # Step 1: Get cluster to find sub_opinions
             cluster_resp = requests.get(
                 f"{BASE_URL}/clusters/{cluster_id}/",
                 headers=self._headers(),
@@ -241,36 +243,50 @@ class CourtListenerClient:
             cluster_data = cluster_resp.json()
 
             sub_opinions = cluster_data.get("sub_opinions") or []
-            if not sub_opinions:
-                logger.warning("No sub_opinions for cluster %s", cluster_id)
-                return None
 
-            # Step 2: Fetch the first sub-opinion
-            # sub_opinions can be URLs (strings) or dicts with "id"
-            first = sub_opinions[0]
-            if isinstance(first, str):
-                opinion_url = first
-            elif isinstance(first, dict):
-                opinion_id = first.get("id")
-                opinion_url = f"{BASE_URL}/opinions/{opinion_id}/"
-            else:
-                return None
+            # Try every sub-opinion in order; return the first non-empty body.
+            for sub in sub_opinions:
+                opinion_url: Optional[str] = None
+                if isinstance(sub, str):
+                    opinion_url = sub
+                elif isinstance(sub, dict):
+                    opinion_id = sub.get("id")
+                    if opinion_id is not None:
+                        opinion_url = f"{BASE_URL}/opinions/{opinion_id}/"
+                if not opinion_url:
+                    continue
 
-            opinion_resp = requests.get(
-                opinion_url,
-                headers=self._headers(),
-                timeout=REQUEST_TIMEOUT,
+                try:
+                    opinion_resp = requests.get(
+                        opinion_url,
+                        headers=self._headers(),
+                        timeout=REQUEST_TIMEOUT,
+                    )
+                    opinion_resp.raise_for_status()
+                except Exception:
+                    logger.warning(
+                        "CourtListener sub-opinion fetch failed for %s",
+                        opinion_url,
+                        exc_info=True,
+                    )
+                    continue
+
+                opinion_data = opinion_resp.json()
+                text = _first_nonempty_text(opinion_data)
+                if text:
+                    return text
+
+            # Fallback: cluster-level summary fields. These are short but
+            # contain enough doctrinal substance for the verifier to
+            # compare against the brief's proposition.
+            cluster_text = _first_nonempty_text(cluster_data)
+            if cluster_text:
+                return cluster_text
+
+            logger.warning(
+                "No opinion text or cluster summary for cluster %s", cluster_id,
             )
-            opinion_resp.raise_for_status()
-            opinion_data = opinion_resp.json()
-
-            # Prefer plain_text, fall back to stripping HTML
-            text = opinion_data.get("plain_text") or ""
-            if not text:
-                html = opinion_data.get("html_with_citations") or ""
-                text = re.sub(r"<[^>]+>", "", html)
-
-            return text if text else None
+            return None
 
         except Exception:
             logger.warning(
@@ -279,3 +295,38 @@ class CourtListenerClient:
                 exc_info=True,
             )
             return None
+
+
+# ---------------------------------------------------------------------------
+# Text-extraction helpers
+# ---------------------------------------------------------------------------
+
+# Fields to try in order. CourtListener stores opinion bodies in multiple
+# columns depending on the ingestion source (Resource.org, Columbia,
+# LawBox, Harvard CAP, recent OCR, etc.). Cluster-level "syllabus" /
+# "summary" / "headmatter" / "headnotes" are short but still useful for
+# the verifier LLM when full text isn't available.
+_TEXT_FIELDS = (
+    "plain_text",
+    "html_with_citations",
+    "html",
+    "html_columbia",
+    "html_lawbox",
+    "xml_harvard",
+    "syllabus",
+    "summary",
+    "headmatter",
+    "headnotes",
+)
+
+
+def _first_nonempty_text(record: dict) -> str:
+    """Return the first non-empty body field from a CL opinion/cluster record."""
+    for key in _TEXT_FIELDS:
+        raw = record.get(key) or ""
+        if not raw:
+            continue
+        stripped = re.sub(r"<[^>]+>", "", raw).strip()
+        if stripped:
+            return stripped
+    return ""

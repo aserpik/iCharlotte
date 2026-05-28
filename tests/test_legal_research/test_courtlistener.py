@@ -252,6 +252,93 @@ class TestGetOpinionText(unittest.TestCase):
 
         self.assertIsNone(text)
 
+    @patch("icharlotte_core.legal_research.sources.courtlistener.requests.get")
+    def test_get_opinion_text_iterates_to_second_sub_opinion(self, mock_get):
+        # Regression: first sub-opinion has no body fields populated; the
+        # second has plain_text. We must keep going, not give up.
+        cluster_resp = MagicMock()
+        cluster_resp.raise_for_status = MagicMock()
+        cluster_resp.json.return_value = {
+            "sub_opinions": [
+                "https://www.courtlistener.com/api/rest/v4/opinions/1/",
+                "https://www.courtlistener.com/api/rest/v4/opinions/2/",
+            ],
+        }
+
+        empty_opinion = MagicMock()
+        empty_opinion.raise_for_status = MagicMock()
+        empty_opinion.json.return_value = {"plain_text": "", "html_with_citations": ""}
+
+        good_opinion = MagicMock()
+        good_opinion.raise_for_status = MagicMock()
+        good_opinion.json.return_value = {"plain_text": "Holding text here."}
+
+        mock_get.side_effect = [cluster_resp, empty_opinion, good_opinion]
+
+        client = CourtListenerClient(token="tok")
+        text = client.get_opinion_text(12345)
+
+        self.assertEqual(text, "Holding text here.")
+
+    @patch("icharlotte_core.legal_research.sources.courtlistener.requests.get")
+    def test_get_opinion_text_tries_alternate_html_fields(self, mock_get):
+        # plain_text and html_with_citations are empty; html_columbia has
+        # the body. Must extract it.
+        cluster_resp = MagicMock()
+        cluster_resp.raise_for_status = MagicMock()
+        cluster_resp.json.return_value = {
+            "sub_opinions": [
+                "https://www.courtlistener.com/api/rest/v4/opinions/1/"
+            ],
+        }
+        opinion_resp = MagicMock()
+        opinion_resp.raise_for_status = MagicMock()
+        opinion_resp.json.return_value = {
+            "plain_text": "",
+            "html_with_citations": "",
+            "html_columbia": "<p>The court held X.</p>",
+        }
+        mock_get.side_effect = [cluster_resp, opinion_resp]
+
+        client = CourtListenerClient(token="tok")
+        text = client.get_opinion_text(12345)
+
+        self.assertEqual(text, "The court held X.")
+
+    @patch("icharlotte_core.legal_research.sources.courtlistener.requests.get")
+    def test_get_opinion_text_falls_back_to_cluster_syllabus(self, mock_get):
+        # All sub-opinions are empty; cluster has a syllabus that should
+        # be returned as the authority text.
+        cluster_resp = MagicMock()
+        cluster_resp.raise_for_status = MagicMock()
+        cluster_resp.json.return_value = {
+            "sub_opinions": [
+                "https://www.courtlistener.com/api/rest/v4/opinions/1/"
+            ],
+            "syllabus": "<p>The Court held that discovery is limited.</p>",
+        }
+        opinion_resp = MagicMock()
+        opinion_resp.raise_for_status = MagicMock()
+        opinion_resp.json.return_value = {"plain_text": "", "html": ""}
+        mock_get.side_effect = [cluster_resp, opinion_resp]
+
+        client = CourtListenerClient(token="tok")
+        text = client.get_opinion_text(12345)
+
+        self.assertEqual(text, "The Court held that discovery is limited.")
+
+    @patch("icharlotte_core.legal_research.sources.courtlistener.requests.get")
+    def test_get_opinion_text_returns_none_when_nothing_available(self, mock_get):
+        cluster_resp = MagicMock()
+        cluster_resp.raise_for_status = MagicMock()
+        cluster_resp.json.return_value = {"sub_opinions": []}
+        mock_get.return_value = cluster_resp
+
+        client = CourtListenerClient(token="tok")
+        text = client.get_opinion_text(12345)
+
+        self.assertIsNone(text)
+
 
 if __name__ == "__main__":
     unittest.main()

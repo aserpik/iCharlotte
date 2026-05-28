@@ -251,3 +251,26 @@ def test_detail_panel_clears_to_placeholder(qtbot):
     assert "No citations to display" in panel.body_html
     assert panel.open_btn.isHidden()
     assert panel.find_btn.isHidden()
+
+
+def test_unverified_panel_shows_specific_note_not_generic_message(qtbot):
+    # Regression: when verdict=UNVERIFIED has a specific note (e.g.
+    # "CourtListener returned a cluster but no opinion text..."),
+    # the panel must show that note rather than the misleading
+    # "verifier doesn't cover this source" boilerplate.
+    from icharlotte_core.opposition.models import CitationVerification
+    from icharlotte_core.ui.wizard.pages.oppose_motion_page import CitationDetailPanel
+
+    panel = CitationDetailPanel()
+    qtbot.addWidget(panel)
+    panel.set_citation(CitationVerification(
+        citation_text="Williams v. Superior Court (2017) 3 Cal.5th 531",
+        case_name="Williams v. Superior Court",
+        verdict="UNVERIFIED",
+        note="CourtListener returned a cluster but no opinion text was available; verify manually.",
+        kind="case",
+    ))
+    body = panel.body_html
+    assert "no opinion text" in body.lower()
+    # Generic boilerplate must NOT appear when a specific note is present.
+    assert "doesn't cover this source" not in body.lower()
