@@ -1372,7 +1372,7 @@ def build_oppose_motion_tab(
         case_path=case_path,
         file_number=file_number,
         motion_file=motion_file,
-        context_files=list(context_files or []),
+        context_files=list(context_files),
         auto_analyze=True,
         parent=parent,
     )
