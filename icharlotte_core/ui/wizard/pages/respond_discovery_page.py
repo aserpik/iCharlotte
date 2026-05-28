@@ -60,6 +60,7 @@ from icharlotte_core.discovery.response_type_detector import normalize_discovery
 from icharlotte_core.discovery._io import (
     read_document_text,
 )
+from icharlotte_core.ui.context_files_dialog import ContextFilesDialog
 
 
 def parsed_discovery_to_dict(parsed: ParsedDiscovery | None) -> dict | None:
@@ -455,13 +456,15 @@ class RespondDiscoverySettingsPage(QWidget):
     # ------------------------------------------------------------------
 
     def _on_select_context_files(self) -> None:
-        paths, _ = QFileDialog.getOpenFileNames(
+        paths = ContextFilesDialog.get_files(
             self,
-            "Select context file(s)",
-            context_file_start_dir(self.discovery_file, self.case_root),
-            "Context files (*.pdf *.docx *.txt);;All files (*.*)",
+            title="Select context file(s)",
+            start_dir=context_file_start_dir(self.discovery_file, self.case_root),
+            file_filter="Context files (*.pdf *.docx *.txt);;All files (*.*)",
         )
-        self.context_files = list(paths or [])
+        if paths is None:
+            return  # user cancelled — stay on the rules screen, do not generate
+        self.context_files = list(paths)
         self._generate_proposals()
 
     def _generate_proposals(self) -> None:

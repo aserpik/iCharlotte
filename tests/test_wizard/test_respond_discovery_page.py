@@ -420,12 +420,12 @@ class RespondDiscoverySettingsPageTests(unittest.TestCase):
 
             with patch.object(page, "_generate_proposals") as mock_generate:
                 with patch(
-                    "icharlotte_core.ui.wizard.pages.respond_discovery_page.QFileDialog.getOpenFileNames",
-                    return_value=([], ""),
+                    "icharlotte_core.ui.wizard.pages.respond_discovery_page.ContextFilesDialog.get_files",
+                    return_value=[],
                 ) as mock_dialog:
                     page._on_select_context_files()
 
-            self.assertEqual(mock_dialog.call_args.args[2], str(status))
+            self.assertEqual(mock_dialog.call_args.kwargs["start_dir"], str(status))
             mock_generate.assert_called_once()
 
     def test_context_file_picker_prefers_case_status_folder(self):
@@ -446,13 +446,37 @@ class RespondDiscoverySettingsPageTests(unittest.TestCase):
 
             with patch.object(page, "_generate_proposals") as mock_generate:
                 with patch(
-                    "icharlotte_core.ui.wizard.pages.respond_discovery_page.QFileDialog.getOpenFileNames",
-                    return_value=([], ""),
+                    "icharlotte_core.ui.wizard.pages.respond_discovery_page.ContextFilesDialog.get_files",
+                    return_value=[],
                 ) as mock_dialog:
                     page._on_select_context_files()
 
-            self.assertEqual(mock_dialog.call_args.args[2], str(case_status))
+            self.assertEqual(mock_dialog.call_args.kwargs["start_dir"], str(case_status))
             mock_generate.assert_called_once()
+
+    def test_context_file_picker_cancel_aborts_generation(self):
+        with tempfile.TemporaryDirectory(dir="C:\\geminiterminal2") as tmp:
+            propounded = Path(tmp) / "DISCOVERY" / "PROPOUNDED"
+            propounded.mkdir(parents=True)
+            discovery_file = propounded / "srogg.pdf"
+            discovery_file.write_text("SPECIAL INTERROGATORIES")
+
+            page = RespondDiscoverySettingsPage(
+                case_root=tmp,
+                file_number="1234.001",
+                discovery_file=str(discovery_file),
+                detected_type="SI",
+            )
+
+            with patch.object(page, "_generate_proposals") as mock_generate:
+                with patch(
+                    "icharlotte_core.ui.wizard.pages.respond_discovery_page.ContextFilesDialog.get_files",
+                    return_value=None,
+                ):
+                    page._on_select_context_files()
+
+            mock_generate.assert_not_called()
+            self.assertEqual(page.context_files, [])
 
     def test_si_quick_response_refer_to_document_inserts_text(self):
         page = self._review_page_for_type("SI")
