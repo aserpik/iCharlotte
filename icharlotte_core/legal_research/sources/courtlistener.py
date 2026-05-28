@@ -204,15 +204,21 @@ class CourtListenerClient:
     def search_opinions(
         self,
         query: str,
+        *,
+        semantic: bool = False,
         jurisdiction: str = "cal",
         max_results: int = 15,
+        published_only: bool = True,
     ) -> List[CaseResult]:
         """Search CourtListener for California case opinions.
 
         Args:
             query: Free-text search query.
+            semantic: When True, use the hosted semantic-search engine
+                (server-side embedding) instead of keyword/BM25.
             jurisdiction: Unused (reserved); California courts are always used.
             max_results: Maximum number of results to return.
+            published_only: Restrict to precedential (published) opinions.
 
         Returns:
             List of CaseResult objects, or empty list on error.
@@ -224,6 +230,10 @@ class CourtListenerClient:
             "order_by": "score desc",
             "page_size": max_results,
         }
+        if semantic:
+            params["semantic"] = "true"
+        if published_only:
+            params["stat_Published"] = "on"
         try:
             resp = requests.get(
                 f"{BASE_URL}/search/",
