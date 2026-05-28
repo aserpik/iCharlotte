@@ -45,6 +45,7 @@ from icharlotte_core.opposition.style_examples import (
 )
 from icharlotte_core.opposition.verifier import build_opposition_verifier
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
+from icharlotte_core.ui.context_files_dialog import ContextFilesDialog
 from icharlotte_core.word_validator import validate_opposition_docx
 
 
@@ -1357,11 +1358,11 @@ def build_oppose_motion_tab(
         )
         return None
 
-    context_files, _ = QFileDialog.getOpenFileNames(
+    context_files = ContextFilesDialog.get_files(
         parent,
-        "Select context document(s)",
-        os.path.dirname(motion_file) or case_path,
-        "Context files (*.pdf *.docx *.txt *.msg);;All files (*.*)",
+        title="Select context document(s)",
+        start_dir=os.path.dirname(motion_file) or case_path,
+        file_filter="Context files (*.pdf *.docx *.txt *.msg);;All files (*.*)",
     )
     context_files = [
         path for path in (context_files or []) if is_supported_context_file(path)
