@@ -63,6 +63,15 @@ def test_remove_selected_drops_rows(qtbot):
     assert dlg.selected_files() == [r"C:\a\one.pdf", r"C:\c\three.pdf"]
 
 
+def test_remove_selected_with_nothing_selected_is_noop(qtbot):
+    dlg = ContextFilesDialog(initial=[r"C:\a\one.pdf"])
+    qtbot.addWidget(dlg)
+
+    dlg._on_remove_selected()  # nothing selected
+
+    assert dlg.selected_files() == [r"C:\a\one.pdf"]
+
+
 def test_initial_paths_are_listed(qtbot):
     dlg = ContextFilesDialog(initial=[r"C:\a\one.pdf", r"C:\b\two.pdf"])
     qtbot.addWidget(dlg)

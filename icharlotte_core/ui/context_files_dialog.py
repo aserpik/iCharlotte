@@ -72,7 +72,7 @@ class ContextFilesDialog(QDialog):
         button_box.rejected.connect(self.reject)
         outer.addWidget(button_box)
 
-        if initial:
+        if initial is not None:
             self._add_paths(list(initial))
 
     @staticmethod
@@ -85,6 +85,10 @@ class ContextFilesDialog(QDialog):
         return os.path.basename(parent) or parent
 
     def _add_paths(self, paths: List[str]) -> None:
+        # Paths are expected to be absolute (QFileDialog returns absolute paths;
+        # callers passing `initial=` should too). Dedup keys via `_key` use
+        # os.path.abspath, which would otherwise resolve relatives against the
+        # current working directory and break dedup determinism.
         for path in paths:
             if not path:
                 continue
