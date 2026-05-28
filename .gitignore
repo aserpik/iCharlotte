@@ -81,3 +81,6 @@ PRN
 
 # Wizard Mode per-case metadata
 **/.icharlotte/
+
+# Scratch/debug output from oppose-motion dev runs
+tmp_oppose_test_out*/
