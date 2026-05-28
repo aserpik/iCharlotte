@@ -136,3 +136,33 @@ def test_citation_verification_from_dict_statute_kind():
     assert cv.law_code == "CCP"
     assert cv.section_num == "2024.020"
     assert cv.verdict == "PARTIAL"
+
+
+def test_retrieved_authority_roundtrip():
+    from icharlotte_core.opposition.models import RetrievedAuthority
+
+    ra = RetrievedAuthority(
+        argument_id="arg-1",
+        argument_text="Discovery cutoff bars the motion",
+        cluster_id="12345",
+        case_name="Cottini v. Enloe Medical Center",
+        citation="226 Cal.App.4th 401",
+        supports="A trial court retains discretion over late discovery motions.",
+        passage="The trial court did not abuse its discretion.",
+        opinion_url="https://www.courtlistener.com/opinion/12345/cottini/",
+        citation_count=37,
+        latest_citing_year="2021",
+    )
+    data = ra.to_dict()
+    restored = RetrievedAuthority.from_dict(data)
+    assert restored == ra
+    assert RetrievedAuthority.from_dict({}).cluster_id == ""
+
+
+def test_citation_verification_has_goodlaw_fields():
+    from icharlotte_core.opposition.models import CitationVerification
+
+    cv = CitationVerification.from_dict({"citation_count": 37, "latest_citing_year": "2021"})
+    assert cv.citation_count == 37
+    assert cv.latest_citing_year == "2021"
+    assert CitationVerification().citation_count is None

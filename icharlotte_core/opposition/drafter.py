@@ -6,7 +6,7 @@ import json
 import re
 from typing import Any, Callable
 
-from icharlotte_core.opposition.models import DraftDocument, MotionMetadata, SectionPlanItem
+from icharlotte_core.opposition.models import DraftDocument, MotionMetadata, RetrievedAuthority, SectionPlanItem
 from icharlotte_core.opposition.motion_analyzer import (
     _json_source_payload,
     _motion_metadata_payload,
@@ -22,6 +22,7 @@ def draft_memorandum(
     context_text: str,
     *,
     style_exemplars: list[str],
+    retrieved_authorities: list[RetrievedAuthority] | None = None,
     llm_callback: LLMCallback,
 ) -> DraftDocument:
     """Draft an opposition memorandum using an injected LLM callback."""
@@ -40,6 +41,7 @@ def draft_memorandum(
 
     user_prompt = template.format(
         style_exemplars=_format_style_exemplars(style_exemplars),
+        authority_pool=_format_authority_pool(retrieved_authorities or []),
         drafting_side_json=_drafting_side_payload(metadata),
         metadata_json=_motion_metadata_payload(metadata),
         section_plan_text=_format_section_plan(section_plan),
@@ -98,6 +100,34 @@ def draft_memorandum(
     if _forbidden_output_hit(title) or _wrong_side_output_hit(title, scope="title"):
         title = _default_title(metadata)
     return DraftDocument(title=title, body_text=body_text)
+
+
+def _format_authority_pool(authorities: list[RetrievedAuthority]) -> str:
+    if not authorities:
+        return (
+            "(no California case authority was retrieved for this brief; argue "
+            "from the controlling statutes and the motion's own admissions, and "
+            "do not cite any cases from memory)"
+        )
+    grouped: dict[str, list[RetrievedAuthority]] = {}
+    order: list[str] = []
+    for a in authorities:
+        label = a.argument_text or "General"
+        if label not in grouped:
+            grouped[label] = []
+            order.append(label)
+        grouped[label].append(a)
+    blocks: list[str] = []
+    for label in order:
+        lines = [f'For "{label}":']
+        for a in grouped[label]:
+            lines.append(f"  - {a.case_name}, {a.citation}")
+            if a.supports:
+                lines.append(f"    Supports: {a.supports}")
+            if a.passage:
+                lines.append(f'    Holding (verbatim): "{a.passage}"')
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
 
 
 def _format_style_exemplars(exemplars: list[str]) -> str:

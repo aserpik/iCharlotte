@@ -588,12 +588,21 @@
     "oppose_motion:draft_memorandum": {
       "agent": "oppose_motion",
       "pass_name": "draft_memorandum",
-      "current_version": "v1",
+      "current_version": "v2",
       "versions": [
         {
           "version": "v1",
           "created": "2026-05-27T08:09:30.420942",
           "description": "Drafter prompt (no pre-draft research; uses style exemplars)",
+          "author": "system",
+          "is_current": false,
+          "performance_score": 0.0,
+          "usage_count": 0
+        },
+        {
+          "version": "v2",
+          "created": "2026-05-27T22:33:21.830377",
+          "description": "Cite-only-from-authority-pool: add {authority_pool} placeholder + strict pool citation rules",
           "author": "system",
           "is_current": true,
           "performance_score": 0.0,

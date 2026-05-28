@@ -204,15 +204,21 @@ class CourtListenerClient:
     def search_opinions(
         self,
         query: str,
+        *,
+        semantic: bool = False,
         jurisdiction: str = "cal",
         max_results: int = 15,
+        published_only: bool = True,
     ) -> List[CaseResult]:
         """Search CourtListener for California case opinions.
 
         Args:
             query: Free-text search query.
+            semantic: When True, use the hosted semantic-search engine
+                (server-side embedding) instead of keyword/BM25.
             jurisdiction: Unused (reserved); California courts are always used.
             max_results: Maximum number of results to return.
+            published_only: Restrict to precedential (published) opinions.
 
         Returns:
             List of CaseResult objects, or empty list on error.
@@ -224,6 +230,10 @@ class CourtListenerClient:
             "order_by": "score desc",
             "page_size": max_results,
         }
+        if semantic:
+            params["semantic"] = "true"
+        if published_only:
+            params["stat_Published"] = "on"
         try:
             resp = requests.get(
                 f"{BASE_URL}/search/",
@@ -276,6 +286,29 @@ class CourtListenerClient:
                 exc_info=True,
             )
             return []
+
+    def get_authority_signals(self, cluster_id: int | str) -> Dict[str, object]:
+        """Return soft good-law signals: citation count + latest citing year.
+
+        This is NOT a Shepard's/KeyCite good-law check (CourtListener has no
+        clean 'overruled' flag). It is a cheap staleness hint only.
+        """
+        citation_count = None
+        latest_citing_year = ""
+        try:
+            cluster = self.get_cluster(cluster_id) or {}
+            raw_count = cluster.get("citation_count")
+            citation_count = int(raw_count) if raw_count is not None else None
+        except (TypeError, ValueError):
+            citation_count = None
+        try:
+            citing = self.get_citing_cases(int(cluster_id), max_results=1) or []
+        except (TypeError, ValueError):
+            citing = []
+        if citing:
+            date = getattr(citing[0], "date", "") or ""
+            latest_citing_year = date[:4] if len(date) >= 4 else ""
+        return {"citation_count": citation_count, "latest_citing_year": latest_citing_year}
 
     def get_opinion_text(self, cluster_id: int) -> Optional[str]:
         """Fetch the full text of an opinion by cluster ID.

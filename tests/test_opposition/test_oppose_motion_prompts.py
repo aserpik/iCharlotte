@@ -35,3 +35,21 @@ def test_verify_prompt_returns_json_verdict_keys():
 def test_draft_prompt_supports_style_exemplar_blocks():
     # The drafter prompt must reference the style_exemplars placeholder.
     assert "{style_exemplars}" in prompts.DRAFT_MEMORANDUM_PROMPT
+
+
+def test_research_queries_prompt_has_argument_placeholder():
+    from icharlotte_core.opposition import prompts
+
+    assert "{argument}" in prompts.RESEARCH_QUERIES_PROMPT
+    assert "queries" in prompts.RESEARCH_QUERIES_PROMPT.lower()
+    # Must format cleanly with only the documented field.
+    prompts.RESEARCH_QUERIES_PROMPT.format(argument="x")
+
+
+def test_rerank_select_prompt_has_placeholders():
+    from icharlotte_core.opposition import prompts
+
+    assert "{proposition}" in prompts.RERANK_SELECT_PROMPT
+    assert "{candidates}" in prompts.RERANK_SELECT_PROMPT
+    assert "passage" in prompts.RERANK_SELECT_PROMPT.lower()
+    prompts.RERANK_SELECT_PROMPT.format(proposition="p", candidates="c")
