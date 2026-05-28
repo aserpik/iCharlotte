@@ -51,9 +51,21 @@ def _cmd_analyze(config_path: str) -> int:
 
 
 def _cmd_generate(session_path: str) -> int:
-    # Implemented in Wave 3 — for now, a clear placeholder.
-    print("ERROR: --phase=generate not yet implemented (Wave 3)", flush=True)
-    return 2
+    from Scripts.depo_prep_lib import phase2
+    try:
+        phase2.run_phase2(
+            session_path=session_path, llm_caller=_make_llm_caller(),
+            progress=_progress,
+        )
+    except Exception as e:
+        print(f"ERROR: Phase 2 failed: {e}", flush=True)
+        traceback.print_exc()
+        return 1
+    # Print the absolute path of the produced .docx so the wizard can pick it up.
+    from pathlib import Path
+    docx = Path(session_path).parent / "outline.docx"
+    print(f"OUTPUT:{docx}", flush=True)
+    return 0
 
 
 def main():
