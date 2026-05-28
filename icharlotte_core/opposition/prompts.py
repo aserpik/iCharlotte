@@ -53,6 +53,35 @@ CONTEXT FACTS:
 {context_text}
 """
 
+RESEARCH_QUERIES_PROMPT = """You are preparing to research California case law to oppose a motion.
+
+You will be given ONE argument the moving party is expected to make. Produce 1-2 CourtListener search queries that will surface California Court of Appeal or Supreme Court opinions helpful to the party OPPOSING the motion on this point. Mix legal terms of art with a short natural-language description of the issue.
+
+Return strict JSON only: {{"queries": ["...", "..."]}}. One or two queries. No commentary.
+
+ARGUMENT THE OPPOSITION MUST ANSWER:
+{argument}
+"""
+
+RERANK_SELECT_PROMPT = """You are selecting the best California authorities to support one point in an opposition brief.
+
+You are given the PROPOSITION the opposition must support, and a numbered list of CANDIDATE opinions. Each candidate has an id and an excerpt of its ACTUAL opinion text. Choose the 3-5 candidates whose text most directly supports the proposition.
+
+For each chosen candidate return:
+- id: the candidate id exactly as given
+- supports: one sentence stating the proposition this opinion supports
+- passage: a VERBATIM quote copied exactly from THAT candidate's text that establishes the point. Copy it character-for-character; do not paraphrase, summarize, or combine.
+
+Return strict JSON only: {{"selections": [{{"id": "...", "supports": "...", "passage": "..."}}]}}.
+Choose only candidates whose text genuinely supports the proposition. If none do, return {{"selections": []}}. Never invent text that is not present in a candidate.
+
+PROPOSITION:
+{proposition}
+
+CANDIDATES:
+{candidates}
+"""
+
 DRAFT_MEMORANDUM_PROMPT = """You are drafting a comprehensive and persuasive California civil opposition memorandum for a litigation attorney. You represent the party opposing the motion. Return strict JSON only with keys "title" and "body_text".
 
 Side and scope:
