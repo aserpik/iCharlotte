@@ -15,6 +15,7 @@ def test_initial_tasks_registered():
         "summarize_documents",
         "summarize_discovery",
         "summarize_depositions",
+        "depo_prep",
         "medical_records",
         "med_chron_analysis",
         "med_record_extractor",

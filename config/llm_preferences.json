@@ -439,6 +439,24 @@
       "timeout_seconds": 120,
       "use_default": false
     },
+    "DepoPrep": {
+      "agent_id": "DepoPrep",
+      "display_name": "Depo Prep",
+      "description": "Deposition preparation wizard (topic clustering, questions, dedup, polish)",
+      "model_sequence": [
+        {
+          "provider": "Gemini",
+          "model": "gemini-3.1-pro-preview",
+          "max_tokens": -1,
+          "supports_thinking": true,
+          "supports_streaming": true,
+          "cost_tier": "high"
+        }
+      ],
+      "max_retries": 3,
+      "timeout_seconds": 180,
+      "use_default": false
+    },
     "agent_report_review": {
       "agent_id": "agent_report_review",
       "display_name": "Report Review",

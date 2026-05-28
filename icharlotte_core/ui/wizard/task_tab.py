@@ -39,7 +39,7 @@ class TaskTab(QStackedWidget):
 
         self.settings_page = spec.settings_page_cls(spec, files=self._files, case_root=case_path or None)
         self.status_page = StatusPage()
-        self.output_page = OutputPage()
+        self.output_page = spec.output_page_cls()
 
         self.addWidget(self.settings_page)  # index 0 = PAGE_SETTINGS
         self.addWidget(self.status_page)    # index 1 = PAGE_STATUS
@@ -50,6 +50,14 @@ class TaskTab(QStackedWidget):
         self.status_page.configure_requested.connect(self._on_configure_requested)
         self.output_page.edit_settings_requested.connect(self._on_edit_settings)
         self.output_page.rerun_requested.connect(self._on_rerun)
+
+        # Opportunistically wire analyze_requested for settings pages that drive
+        # Phase 1 on demand from an explicit button (e.g. DepoPrepSettingsPage).
+        # Unlike the speculative path, this is triggered by the user rather than
+        # at tab-open time, and must NOT switch away from the Settings page so the
+        # page can reveal its inline topic editor when Phase 1 completes.
+        if hasattr(self.settings_page, "analyze_requested"):
+            self.settings_page.analyze_requested.connect(self._start_analyze_run)
 
         # Opportunistically wire phase2_requested if the settings page exposes it.
         if hasattr(self.settings_page, "phase2_requested"):
@@ -129,6 +137,24 @@ class TaskTab(QStackedWidget):
 
         self._worker = worker
         worker.start()
+
+    def _start_analyze_run(self) -> None:
+        """Start Phase 1 on demand, owned by the settings page, without a page switch.
+
+        Triggered by the settings page's ``analyze_requested`` signal (the
+        explicit "Analyze Sources" button). The settings page has already written
+        a config file and set its ``files`` to ``[config_path]`` before emitting,
+        so we refresh our copy from the page, then reuse ``start_speculative_run``
+        (which sets ``_settings_owns_worker`` and calls ``attach_worker`` so the
+        page receives ``awaiting_input`` and reveals its inline topic editor).
+
+        We intentionally stay on PAGE_SETTINGS — the topic editor appears inline,
+        and the later ``phase2_requested`` signal drives the switch to PAGE_STATUS.
+        """
+        self._files = list(self.settings_page.files)
+        if not self._files:
+            return
+        self.start_speculative_run()
 
     def _restart_speculative_run(self, new_files: list) -> None:
         """Cancel the in-flight speculative worker and restart against new_files.

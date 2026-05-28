@@ -30,6 +30,21 @@ def _med_chron_settings_page_cls():
     return MedChronSettingsPage
 
 
+def _depo_prep_settings_page_cls():
+    from .pages.depo_prep_settings_page import DepoPrepSettingsPage
+    return DepoPrepSettingsPage
+
+
+def _depo_prep_output_page_cls():
+    from .pages.depo_prep_output_page import DepoPrepOutputPage
+    return DepoPrepOutputPage
+
+
+def _default_output_page_cls():
+    from .pages.output_page import OutputPage
+    return OutputPage
+
+
 @dataclass(frozen=True)
 class TaskSpec:
     task_id: str
@@ -43,6 +58,7 @@ class TaskSpec:
     # None means "use default SettingsPage"; resolved lazily in TaskTab.
     # Set to a factory callable that returns the class to avoid circular imports.
     _settings_page_cls_factory: Optional[object] = field(default=None, repr=False, compare=False)
+    _output_page_cls_factory: Optional[object] = field(default=None, repr=False, compare=False)
 
     @property
     def settings_page_cls(self) -> type:
@@ -50,6 +66,13 @@ class TaskSpec:
         if self._settings_page_cls_factory is not None:
             return self._settings_page_cls_factory()
         return _default_settings_page_cls()
+
+    @property
+    def output_page_cls(self) -> type:
+        """Return the OutputPage subclass for this task."""
+        if self._output_page_cls_factory is not None:
+            return self._output_page_cls_factory()
+        return _default_output_page_cls()
 
 
 TASK_REGISTRY: dict[str, TaskSpec] = {
@@ -77,6 +100,18 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         script_name="summarize_deposition.py",
         default_folders=["DISCOVERY/TRANSCRIPTS", "DISCOVERY"],
         _settings_page_cls_factory=_deposition_settings_page_cls,
+    ),
+    "depo_prep": TaskSpec(
+        task_id="depo_prep",
+        title="Depo Prep",
+        description="Generate a deposition outline with questions grounded in case sources.",
+        icon_glyph="❔",  # ❔ white question mark ornament
+        script_name="depo_prep.py",
+        default_folders=["DISCOVERY", "PLEADINGS", "RECORDS"],
+        phase1_args=["--phase=analyze"],
+        phase2_flag="--phase=generate",
+        _settings_page_cls_factory=_depo_prep_settings_page_cls,
+        _output_page_cls_factory=_depo_prep_output_page_cls,
     ),
     "medical_records": TaskSpec(
         task_id="medical_records",
