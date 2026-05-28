@@ -39,7 +39,6 @@ from .base import BaseWorker
 _AI_OUTPUT_SUBPATH = os.path.join("NOTES", "AI Output")
 _PROGRESS_RE = re.compile(r"^PROGRESS:\s*(\d+)\s*(?::(.*))?$")
 _AWAITING_RE = re.compile(r"^AWAITING_INPUT:(.+)$")
-_OUTPUT_RE = re.compile(r"^OUTPUT:(.+)$")
 
 
 class SubprocessWorker(BaseWorker):
@@ -71,11 +70,6 @@ class SubprocessWorker(BaseWorker):
         self._awaiting_session_path: Optional[str] = None
         # Track the newest .docx seen across all file runs.
         self._newest_output: Optional[str] = None
-        # Output path the agent declared explicitly via an `OUTPUT:<path>` line.
-        # When set, it is authoritative and bypasses the NOTES/AI Output scan —
-        # this lets agents that write into a session subfolder (e.g. Depo Prep)
-        # report their output reliably.
-        self._explicit_output: Optional[str] = None
 
     # ---- Lifecycle ----
 
@@ -83,7 +77,6 @@ class SubprocessWorker(BaseWorker):
         self._file_idx = 0
         self._newest_output = None
         self._awaiting_session_path = None
-        self._explicit_output = None
         self._start_file(self.files[self._file_idx])
 
     def _start_file(self, file_path: str) -> None:
@@ -145,7 +138,6 @@ class SubprocessWorker(BaseWorker):
     def resume_with_config(self, session_path: str) -> None:
         """Start Phase 2 with the configured phase2_flag."""
         self._awaiting_session_path = None
-        self._explicit_output = None
         self._stdout_buf = bytearray()
         # Refresh snapshot so we detect the Phase 2 .docx.
         self._pre_existing_outputs = self._scan_outputs()
@@ -191,14 +183,6 @@ class SubprocessWorker(BaseWorker):
             self._awaiting_session_path = m.group(1).strip()
             return  # suppress from status log
 
-        # OUTPUT:<path>  — agent explicitly declares the produced file. Honored
-        # over the NOTES/AI Output mtime-scan so agents that write into a
-        # session subfolder (e.g. Depo Prep) are detected correctly.
-        m = _OUTPUT_RE.match(line)
-        if m:
-            self._explicit_output = m.group(1).strip()
-            return  # suppress from status log
-
         if line:
             self.status.emit(line)
 
@@ -221,25 +205,6 @@ class SubprocessWorker(BaseWorker):
         if self._awaiting_session_path is not None:
             self.awaiting_input.emit(self._awaiting_session_path)
             return  # do NOT scan for .docx; do NOT advance to next file
-
-        # --- Explicit output declared by the agent (OUTPUT:<path>) ---
-        # Authoritative over the mtime-scan; covers agents that write into a
-        # session subfolder under NOTES/AI Output (e.g. Depo Prep) that the
-        # non-recursive scan would miss.
-        if self._explicit_output:
-            path = self._explicit_output
-            if os.path.isfile(path):
-                if (
-                    self._newest_output is None
-                    or os.path.getmtime(path) > os.path.getmtime(self._newest_output)
-                ):
-                    self._newest_output = path
-                self._advance()
-                return
-            self.failed.emit(
-                f"Agent reported OUTPUT:{path} but that file was not found on disk."
-            )
-            return
 
         # --- Normal completion: detect produced .docx by mtime ---
         # A path counts as "produced" if it didn't exist in the pre-run snapshot

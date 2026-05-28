@@ -113,56 +113,6 @@ def test_detects_new_output_file(tmp_path, qtbot):
     assert w._newest_output == str(new_file)
 
 
-def test_explicit_output_line_honored_for_nested_path(tmp_path, qtbot):
-    """Agents that write into a session subfolder under NOTES/AI Output declare
-    their file via an OUTPUT:<path> line. The worker must honor it even though
-    the non-recursive scan would not find a nested file (regression: Depo Prep
-    reported 'no .docx created' despite producing one)."""
-    out_dir = tmp_path / "NOTES" / "AI Output" / "Depo Prep - Jane - 2026-05-27 2119"
-    out_dir.mkdir(parents=True)
-    nested = out_dir / "outline.docx"
-    nested.write_text("generated")
-
-    w = _make_worker(tmp_path, [str(tmp_path / "config.json")])
-    w._pre_existing_outputs = w._scan_outputs()  # top-level scan misses the nested file
-
-    w._handle_line(f"OUTPUT:{nested}")
-
-    failed_signals = []
-    finished_signals = []
-    w.failed.connect(lambda m: failed_signals.append(m))
-    w.finished.connect(lambda p: finished_signals.append(p))
-    w._on_process_finished(exit_code=0, exit_status=QProcess.ExitStatus.NormalExit)
-
-    assert failed_signals == []
-    assert finished_signals == [str(nested)]
-    assert w._newest_output == str(nested)
-
-
-def test_explicit_output_missing_file_fails_clearly(tmp_path, qtbot):
-    """If the agent declares an OUTPUT path that doesn't exist, surface a clear
-    failure (not a silent success)."""
-    w = _make_worker(tmp_path, [str(tmp_path / "config.json")])
-    w._handle_line(r"OUTPUT:Z:\does\not\exist\outline.docx")
-
-    failed_signals = []
-    w.failed.connect(lambda m: failed_signals.append(m))
-    w._on_process_finished(exit_code=0, exit_status=QProcess.ExitStatus.NormalExit)
-
-    assert len(failed_signals) == 1
-    assert "not found" in failed_signals[0].lower()
-
-
-def test_output_line_suppressed_from_status_log(tmp_path, qtbot):
-    """The OUTPUT: line is captured, not echoed to the status log."""
-    w = _make_worker(tmp_path, [str(tmp_path / "config.json")])
-    status_lines = []
-    w.status.connect(lambda s: status_lines.append(s))
-    w._handle_line("OUTPUT:C:/x/outline.docx")
-    assert w._explicit_output == "C:/x/outline.docx"
-    assert status_lines == []
-
-
 def test_phase1_args_are_prepended_to_invocation(qtbot, tmp_path):
     """SubprocessWorker with phase1_args=['--phase=prep'] invokes the script
     with that flag before the file path."""
