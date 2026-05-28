@@ -46,6 +46,7 @@ from icharlotte_core.opposition.style_examples import (
 )
 from icharlotte_core.opposition.verifier import (
     build_opposition_verifier,
+    enrich_with_pool_signals,
     pool_membership_check,
 )
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
@@ -1180,7 +1181,6 @@ class OpposeMotionWorker(QThread):
                     list(verified) + list(off_pool),
                     key=lambda cv: cv.body_offset if cv.body_offset is not None else 0,
                 )
-                from icharlotte_core.opposition.verifier import enrich_with_pool_signals
                 enrich_with_pool_signals(draft.citations, retrieved)
                 verdict_counts: dict[str, int] = {}
                 for cv in draft.citations:
