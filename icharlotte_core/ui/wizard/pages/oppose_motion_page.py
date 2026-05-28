@@ -243,6 +243,50 @@ class OpposeMotionSettingsPage(QStackedWidget):
         )
 
 
+# ── DEV-ONLY: lightweight worker for the temporary Re-verify button. ──
+# Re-runs just the citation extraction + verification step on a body
+# that's already in the output page (e.g. after a restart, when the
+# previous .docx has been reloaded). Avoids re-running the full draft
+# pipeline. Remove this class along with the Re-verify button when no
+# longer needed.
+class _ReverifyWorker(QThread):
+    finished_result = Signal(bool, object)  # (success, list[CitationVerification] | error str)
+
+    def __init__(self, body_text: str, parent=None):
+        super().__init__(parent)
+        self.body_text = body_text
+
+    def run(self) -> None:
+        try:
+            from icharlotte_core.llm_config import call_llm
+
+            citations = extract_citations(self.body_text)
+            if not citations:
+                self.finished_result.emit(True, [])
+                return
+
+            token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
+
+            def llm(system_prompt, user_prompt):
+                return call_llm(
+                    user_prompt,
+                    system_prompt,
+                    task_type="general",
+                    agent_id="agent_oppose_motion",
+                ) or ""
+
+            verifier = build_opposition_verifier(
+                courtlistener_token=token,
+                llm_callback=llm,
+                max_workers=4,
+            )
+            results = verifier.verify_all(citations)
+            self.finished_result.emit(True, results)
+        except Exception as exc:
+            self.finished_result.emit(False, str(exc))
+# ── END DEV-ONLY ──
+
+
 class OpposeMotionOutputPage(QWidget):
     rerun_requested = Signal()
     edit_settings_requested = Signal()
@@ -274,10 +318,25 @@ class OpposeMotionOutputPage(QWidget):
 
         row = QHBoxLayout()
         row.addStretch()
+        # ── DEV-ONLY: re-verify button. Remove when no longer needed. ──
+        self.reverify_btn = QPushButton("Re-verify Citations (DEV)")
+        self.reverify_btn.setToolTip(
+            "Temporary developer button. Re-extracts citations from the "
+            "current body and re-runs the verifier so you can test "
+            "parser / verifier changes without re-running the full "
+            "draft pipeline."
+        )
+        self.reverify_btn.setStyleSheet("QPushButton { color: #b06000; }")
+        self.reverify_btn.clicked.connect(self._on_reverify_clicked)
+        row.addWidget(self.reverify_btn)
+        # ── END DEV-ONLY ──
         self.save_btn = QPushButton("Save")
         self.save_btn.clicked.connect(self.save_as)
         row.addWidget(self.save_btn)
         outer.addLayout(row)
+
+        # Worker handle for the dev-only re-verify path.
+        self._reverify_worker: _ReverifyWorker | None = None
 
     def show_result(self, draft: DraftDocument) -> None:
         self.draft = draft
@@ -366,6 +425,58 @@ class OpposeMotionOutputPage(QWidget):
         if index < 0 or index >= len(self.draft.citations):
             return
         self.detail_panel.set_citation(self.draft.citations[index])
+
+    # ── DEV-ONLY: re-verify handlers. Remove when no longer needed. ──
+
+    def _on_reverify_clicked(self) -> None:
+        if self._reverify_worker is not None:
+            return  # already running
+        body_text = (self.draft.body_text or "").strip()
+        if not body_text:
+            QMessageBox.warning(
+                self,
+                "Nothing to verify",
+                "No draft body is loaded. Re-open or re-run the task first.",
+            )
+            return
+        self.reverify_btn.setEnabled(False)
+        self.reverify_btn.setText("Re-verifying… (DEV)")
+        self.summary_banner.setText(
+            "<b>Re-verifying citations…</b> (this runs the verifier on the "
+            "current body without re-drafting)"
+        )
+        self.summary_banner.setVisible(True)
+        worker = _ReverifyWorker(body_text=body_text, parent=None)
+        worker.finished_result.connect(self._on_reverify_finished)
+        worker.finished.connect(worker.deleteLater)
+        self._reverify_worker = worker
+        worker.start()
+
+    def _on_reverify_finished(self, success: bool, payload: object) -> None:
+        self._reverify_worker = None
+        self.reverify_btn.setEnabled(True)
+        self.reverify_btn.setText("Re-verify Citations (DEV)")
+        if not success:
+            QMessageBox.critical(
+                self,
+                "Re-verify failed",
+                f"Re-verification failed:\n\n{payload}",
+            )
+            self._refresh_summary_banner()
+            return
+        citations = payload if isinstance(payload, list) else []
+        self.draft.citations = citations
+        # Re-render with updated colors + summary + panel.
+        self.editor.setHtml(_render_draft_html(self.draft))
+        self._refresh_summary_banner()
+        if citations:
+            self.show_citation(0)
+        else:
+            self.detail_panel.clear(
+                "Re-verify found no citations in the current body text."
+            )
+
+    # ── END DEV-ONLY ──
 
     def save_as(self) -> None:
         if not self.draft.preview_path:

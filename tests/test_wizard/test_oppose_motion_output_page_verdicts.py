@@ -253,6 +253,65 @@ def test_detail_panel_clears_to_placeholder(qtbot):
     assert panel.find_btn.isHidden()
 
 
+def test_reverify_button_dispatches_worker_and_updates_panel(qtbot, monkeypatch):
+    # DEV-ONLY: when the temporary Re-verify button is removed, delete
+    # this test too.
+    from icharlotte_core.opposition.models import CitationVerification, DraftDocument
+    from icharlotte_core.ui.wizard.pages import oppose_motion_page as page_mod
+    from icharlotte_core.ui.wizard.pages.oppose_motion_page import OpposeMotionOutputPage
+
+    page = OpposeMotionOutputPage()
+    qtbot.addWidget(page)
+    page.show_result(DraftDocument(
+        title="Opp",
+        body_text="See *Smith v. Jones* (2010) 50 Cal.4th 100 for support.",
+        citations=[],  # no citations from initial load
+    ))
+
+    # Stub out the worker so the button click runs synchronously with a
+    # fake result, no network calls.
+    class _FakeWorker:
+        def __init__(self, body_text, parent=None):
+            self.body_text = body_text
+            self.finished_result = MockSignal()
+            self.finished = MockSignal()
+
+        def start(self):
+            # Immediately fire the result with one SUPPORTED cite.
+            self.finished_result.emit(True, [
+                CitationVerification(
+                    citation_text="Smith v. Jones (2010) 50 Cal.4th 100",
+                    verdict="SUPPORTED",
+                    case_name="Smith v. Jones",
+                    evidence="The court held the duty applies.",
+                    kind="case",
+                )
+            ])
+
+        def deleteLater(self):
+            pass
+
+    class MockSignal:
+        def __init__(self):
+            self._slots = []
+
+        def connect(self, slot):
+            self._slots.append(slot)
+
+        def emit(self, *args):
+            for slot in self._slots:
+                slot(*args)
+
+    monkeypatch.setattr(page_mod, "_ReverifyWorker", _FakeWorker)
+
+    page._on_reverify_clicked()
+
+    # After the fake worker fires, the panel should reflect the new cite.
+    assert len(page.draft.citations) == 1
+    assert page.draft.citations[0].verdict == "SUPPORTED"
+    assert "SUPPORTED" in page.detail_panel.header_label.text()
+
+
 def test_unverified_panel_shows_specific_note_not_generic_message(qtbot):
     # Regression: when verdict=UNVERIFIED has a specific note (e.g.
     # "CourtListener returned a cluster but no opinion text..."),
