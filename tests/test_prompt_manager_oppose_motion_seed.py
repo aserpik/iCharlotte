@@ -39,3 +39,13 @@ def test_seed_is_idempotent(fresh_manager):
     fresh_manager.seed_pipeline_prompts()
     second = fresh_manager.get_prompt("oppose_motion", "draft_memorandum")
     assert first == second
+
+
+def test_seed_includes_research_and_rerank_prompts(tmp_path):
+    from icharlotte_core.prompt_manager import PromptManager
+
+    pm = PromptManager(prompts_dir=str(tmp_path))
+    pm.seed_pipeline_prompts()
+
+    assert pm.get_prompt("oppose_motion", "research_queries")
+    assert pm.get_prompt("oppose_motion", "rerank_select")

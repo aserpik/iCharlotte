@@ -504,6 +504,8 @@ class PromptManager:
             ("mediation_brief", "formatting_rules", MediationBriefGenerator.FORMATTING_RULES, "Structural formatting rules"),
             ("oppose_motion", "analyze_motion", oppose_prompts.ANALYZE_MOTION_PROMPT, "Motion analysis: extract metadata + principal arguments"),
             ("oppose_motion", "generate_outline", oppose_prompts.GENERATE_OUTLINE_PROMPT, "Outline generation from analyzed metadata"),
+            ("oppose_motion", "research_queries", oppose_prompts.RESEARCH_QUERIES_PROMPT, "Per-argument CourtListener search query generation"),
+            ("oppose_motion", "rerank_select", oppose_prompts.RERANK_SELECT_PROMPT, "Re-rank + select best authorities with verbatim passage"),
             ("oppose_motion", "draft_memorandum", oppose_prompts.DRAFT_MEMORANDUM_PROMPT, "Drafter prompt (no pre-draft research; uses style exemplars)"),
             ("oppose_motion", "verify_citation", oppose_prompts.VERIFY_CITATION_PROMPT, "Per-citation verifier: case + statute"),
             ("oppose_motion", "find_replacement", oppose_prompts.FIND_REPLACEMENT_PROMPT, "Optional replacement-case search on red verdicts"),
