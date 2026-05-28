@@ -125,6 +125,39 @@ class SectionPlanItem:
 
 
 @dataclass
+class RetrievedAuthority:
+    argument_id: str = ""          # outline node id / argument index
+    argument_text: str = ""        # heading or proposition researched
+    cluster_id: str = ""
+    case_name: str = ""
+    citation: str = ""             # from CourtListener metadata, not generated
+    supports: str = ""             # one-sentence proposition this case supports
+    passage: str = ""              # verbatim opinion quote
+    opinion_url: str = ""
+    citation_count: int | None = None
+    latest_citing_year: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> "RetrievedAuthority":
+        data = data or {}
+        return cls(
+            argument_id=data.get("argument_id", ""),
+            argument_text=data.get("argument_text", ""),
+            cluster_id=str(data.get("cluster_id", "") or ""),
+            case_name=data.get("case_name", ""),
+            citation=data.get("citation", ""),
+            supports=data.get("supports", ""),
+            passage=data.get("passage", ""),
+            opinion_url=data.get("opinion_url", ""),
+            citation_count=data.get("citation_count"),
+            latest_citing_year=data.get("latest_citing_year", ""),
+        )
+
+
+@dataclass
 class CitationVerification:
     citation_text: str = ""
     normalized_citation: str = ""
