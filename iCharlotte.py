@@ -1447,6 +1447,7 @@ class MainWindow(QMainWindow):
         )
         from icharlotte_core.ui.wizard.task_routing import (
             get_in_process_task_builder_name,
+            opens_settings_without_picker,
             requires_initial_file_picker,
         )
         from icharlotte_core.ui.wizard.task_tab import TaskTab
@@ -1496,6 +1497,29 @@ class MainWindow(QMainWindow):
             new_index = self.tabs.addTab(task_tab, title)
             self.tabs.setCurrentIndex(new_index)
             log_event(f"[wizard] opened in-process task tab '{title}'")
+            self._hide_fixed_close_buttons()
+            return
+
+        if opens_settings_without_picker(task_id):
+            # The Settings page manages its own source selection (e.g. Depo Prep's
+            # two-bucket pickers). Open it directly with no pre-Settings file
+            # picker so the user adds files in the correct bucket on the page.
+            existing_titles = [self.tabs.tabText(i) for i in range(self.tabs.count())]
+            suffix = next_instance_suffix(spec.title, existing_titles)
+            title = f"{spec.title} {suffix}".strip()
+            task_tab = TaskTab(
+                spec=spec,
+                files=[],
+                case_path=self.case_path,
+                file_number=self.file_number,
+                parent=self,
+            )
+            task_tab.setProperty("wizard_task_id", spec.task_id)
+            task_tab.setProperty("wizard_instance_suffix", suffix)
+            task_tab.task_completed.connect(self._on_task_completed)
+            new_index = self.tabs.addTab(task_tab, title)
+            self.tabs.setCurrentIndex(new_index)
+            log_event(f"[wizard] opened '{title}' (settings-managed sources)")
             self._hide_fixed_close_buttons()
             return
 

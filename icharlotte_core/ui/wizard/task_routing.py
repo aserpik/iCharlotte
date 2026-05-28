@@ -8,6 +8,13 @@ _IN_PROCESS_TASK_BUILDERS = {
 }
 
 
+# Tasks whose Settings page manages its own source selection. For these we skip
+# the generic pre-Settings file picker and open the Settings screen directly —
+# the page provides its own (often multi-bucket) file pickers, so a single
+# pre-Settings picker would be redundant and its selection would be dropped.
+_SETTINGS_MANAGED_SOURCE_TASKS = frozenset({"depo_prep"})
+
+
 def get_in_process_task_builder_name(task_id: str) -> str | None:
     """Return the builder name for wizard tasks backed by in-process workers."""
     return _IN_PROCESS_TASK_BUILDERS.get(task_id)
@@ -18,8 +25,16 @@ def is_in_process_task(task_id: str) -> bool:
     return get_in_process_task_builder_name(task_id) is not None
 
 
+def opens_settings_without_picker(task_id: str) -> bool:
+    """Whether this task opens its Settings page directly, with no pre-Settings
+    file picker (the Settings page manages its own source selection)."""
+    return task_id in _SETTINGS_MANAGED_SOURCE_TASKS
+
+
 def requires_initial_file_picker(task_id: str) -> bool:
     """Whether selecting this wizard task should first show the file picker."""
     if task_id == "chat":
+        return False
+    if opens_settings_without_picker(task_id):
         return False
     return get_in_process_task_builder_name(task_id) is None
