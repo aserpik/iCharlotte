@@ -60,11 +60,21 @@ def _load_case_parties(case_root: str) -> List[str]:
 class DepoPrepSettingsPage(SettingsPage):
     """Custom settings page for Depo Prep.
 
-    Reuses SettingsPage.proceed_requested(dict) for the "Analyze Sources" click —
-    TaskTab's existing wiring runs the subprocess with --phase=analyze and the
-    config.json path. Adds phase2_requested(str) for the "Generate Outline" click.
+    Phase 1 is triggered on demand by the "Analyze Sources" button, which emits
+    ``analyze_requested``. TaskTab routes that to a settings-owned worker run
+    (mirroring the speculative path) WITHOUT switching pages, so the topic editor
+    can appear inline on this page once Phase 1 completes. We do NOT reuse
+    ``proceed_requested`` because that switches the tab to the Status page and
+    routes ``awaiting_input`` to the generic deposition dialog instead of our
+    embedded TopicEditor.
+
+    ``phase2_requested(str)`` fires on the "Generate Outline" click, carrying the
+    session.json path; TaskTab connects it to ``advance_to_status_with_phase2``.
     """
 
+    # Emitted when the user clicks "Analyze Sources" (Phase 1 trigger).
+    analyze_requested = Signal()
+    # Emitted when the user clicks "Generate Outline" (Phase 2 trigger).
     phase2_requested = Signal(str)
 
     def __init__(self, spec: TaskSpec, files, case_root: str | None = None, parent=None):
@@ -299,7 +309,7 @@ class DepoPrepSettingsPage(SettingsPage):
         self._phase1_status_label.setText("Analyzing sources…")
         self._phase1_status_label.setVisible(True)
         self.analyze_btn.setEnabled(False)
-        self.proceed_requested.emit({})
+        self.analyze_requested.emit()
 
     def to_dict(self) -> dict:
         return self._build_config_dict()

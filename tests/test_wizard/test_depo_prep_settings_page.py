@@ -47,9 +47,10 @@ def test_settings_page_analyze_writes_config_and_emits(qtbot, spec, tmp_path):
     assert page.analyze_btn.isEnabled() is True
 
     captured = []
-    page.proceed_requested.connect(lambda d: captured.append(d))
-    with qtbot.waitSignal(page.proceed_requested, timeout=1000):
+    page.analyze_requested.connect(lambda: captured.append(True))
+    with qtbot.waitSignal(page.analyze_requested, timeout=1000):
         page._on_analyze_clicked()
+    assert captured == [True]
 
     # Settings page persists config to disk and reports its path as the single "file".
     files = page.files
