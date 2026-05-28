@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 from icharlotte_core.discovery.assembler import DiscoveryAssembler
+from icharlotte_core.opposition.argument_research import research_arguments
 from icharlotte_core.opposition.assembler import assemble_opposition_preview
 from icharlotte_core.opposition.citation_parser import extract_citations
 from icharlotte_core.opposition.drafter import draft_memorandum
@@ -43,7 +44,10 @@ from icharlotte_core.opposition.style_examples import (
     StyleExampleRegistry,
     extract_exemplar_text,
 )
-from icharlotte_core.opposition.verifier import build_opposition_verifier
+from icharlotte_core.opposition.verifier import (
+    build_opposition_verifier,
+    pool_membership_check,
+)
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
 from icharlotte_core.word_validator import validate_opposition_docx
 
@@ -1032,6 +1036,15 @@ class OpposeMotionWorker(QThread):
             ]
             plan = selected_section_plan(outline)
 
+            def make_llm(pass_name):
+                def _llm(system_prompt, user_prompt):
+                    return call_llm(
+                        user_prompt, system_prompt, task_type="general",
+                        agent_id="agent_oppose_motion", pass_name=pass_name,
+                        pass_agent_id="agent_oppose_motion",
+                    ) or ""
+                return _llm
+
             def llm(system_prompt, user_prompt):
                 return call_llm(
                     user_prompt,
@@ -1074,6 +1087,34 @@ class OpposeMotionWorker(QThread):
             else:
                 self.progress.emit("  No matching style exemplars; using default voice.")
 
+            # Retrieval-first grounding: research real California authority for
+            # each principal argument before drafting, so the drafter cites only
+            # from a verified pool.
+            token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
+            retrieved = []
+            if token and metadata.principal_arguments:
+                from icharlotte_core.legal_research.sources.courtlistener import CourtListenerClient
+                opinion_cache = os.path.join(
+                    os.path.dirname(registry_path), ".cache", "opinions"
+                )
+                self.progress.emit(
+                    f"Researching authorities ({len(metadata.principal_arguments)} arguments)..."
+                )
+                retrieved = research_arguments(
+                    metadata.principal_arguments,
+                    cl_client=CourtListenerClient(token),
+                    query_llm=make_llm("research_queries"),
+                    rerank_llm=make_llm("rerank_select"),
+                    max_workers=4,
+                    on_progress=self.progress.emit,
+                    cache_dir=opinion_cache,
+                )
+                self.progress.emit(f"Retrieved {len(retrieved)} grounded authorities.")
+            elif not token:
+                self.progress.emit(
+                    "WARNING: COURTLISTENER_API_TOKEN not set; drafting without grounded research."
+                )
+
             self.progress.emit("Drafting opposition memorandum...")
             draft = draft_memorandum(
                 metadata=metadata,
@@ -1081,6 +1122,7 @@ class OpposeMotionWorker(QThread):
                 motion_text=motion_result.text,
                 context_text=context_text,
                 style_exemplars=exemplar_texts,
+                retrieved_authorities=retrieved,
                 llm_callback=llm,
             )
             if not draft.body_text.strip():
@@ -1096,20 +1138,27 @@ class OpposeMotionWorker(QThread):
                 )
                 draft.citations = []
             else:
-                token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
+                to_verify, off_pool = pool_membership_check(citations, retrieved)
+                if off_pool:
+                    self.progress.emit(
+                        f"{len(off_pool)} citation(s) were not in the researched pool "
+                        "(flagged NOT_FOUND)."
+                    )
                 if not token:
                     self.progress.emit(
                         "WARNING: COURTLISTENER_API_TOKEN not set; case citations cannot be verified."
                     )
-                self.progress.emit(f"Verifying citations ({len(citations)} found)...")
+                self.progress.emit(f"Verifying citations ({len(to_verify)} found)...")
                 verifier = build_opposition_verifier(
                     courtlistener_token=token,
                     llm_callback=llm,
                     max_workers=4,
                 )
-                draft.citations = verifier.verify_all(
-                    citations,
-                    on_progress=self.progress.emit,
+                verified = verifier.verify_all(to_verify, on_progress=self.progress.emit)
+                # Merge verified + off-pool, restored to body order.
+                draft.citations = sorted(
+                    list(verified) + list(off_pool),
+                    key=lambda cv: cv.body_offset if cv.body_offset is not None else 0,
                 )
                 verdict_counts: dict[str, int] = {}
                 for cv in draft.citations:

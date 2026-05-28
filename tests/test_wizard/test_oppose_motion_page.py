@@ -853,6 +853,9 @@ def test_worker_calls_verifier_with_parsed_citations(tmp_path, monkeypatch):
         "icharlotte_core.ui.wizard.pages.oppose_motion_page.extract_context_bundle",
         return_value=("ctx text", []),
     ), _patch(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.research_arguments",
+        return_value=[],
+    ), _patch(
         "icharlotte_core.ui.wizard.pages.oppose_motion_page.draft_memorandum",
         return_value=fake_draft,
     ) as draft_fn, _patch(
@@ -892,3 +895,66 @@ def test_worker_calls_verifier_with_parsed_citations(tmp_path, monkeypatch):
         # Verifier was constructed + called with parsed citations.
         bov.assert_called_once()
         verifier.verify_all.assert_called_once()
+
+
+def test_worker_grounds_draft_and_runs_pool_check(monkeypatch, tmp_path):
+    import icharlotte_core.ui.wizard.pages.oppose_motion_page as page
+    from icharlotte_core.opposition.models import (
+        DraftDocument, MotionMetadata, RetrievedAuthority,
+    )
+    from icharlotte_core.opposition.citation_parser import Citation
+
+    # The research branch only runs when a CourtListener token is present.
+    monkeypatch.setenv("COURTLISTENER_API_TOKEN", "test-token")
+
+    # Stub document extraction so no real file is read.
+    monkeypatch.setattr(page, "extract_document_text",
+                        lambda p: type("R", (), {"success": True, "text": "motion text", "error": ""})())
+    monkeypatch.setattr(page, "extract_context_bundle", lambda files: ("ctx", []))
+
+    captured = {}
+
+    def fake_research(arguments, **kwargs):
+        captured["arguments"] = list(arguments)
+        if kwargs.get("on_progress"):
+            kwargs["on_progress"]("  arg — 1 case(s) found")
+        return [RetrievedAuthority(argument_text="arg one", cluster_id="1",
+                                   case_name="A v. B", citation="226 Cal.App.4th 401",
+                                   supports="s", passage="p")]
+    monkeypatch.setattr(page, "research_arguments", fake_research)
+
+    def fake_draft(**kwargs):
+        captured["authorities"] = kwargs.get("retrieved_authorities")
+        return DraftDocument(title="Opposition", body_text="*A v. B* (2014) 226 Cal.App.4th 401 controls.")
+    monkeypatch.setattr(page, "draft_memorandum", fake_draft)
+
+    # Verifier returns whatever it is asked to verify, marked SUPPORTED.
+    class FakeVerifier:
+        def verify_all(self, cites, on_progress=None):
+            from icharlotte_core.opposition.models import CitationVerification
+            return [CitationVerification(citation_text=c.raw_text, kind=c.kind,
+                                         verdict="SUPPORTED", body_offset=c.body_offset) for c in cites]
+    monkeypatch.setattr(page, "build_opposition_verifier", lambda **kw: FakeVerifier())
+
+    # Skip real assembly/validation.
+    monkeypatch.setattr(page, "assemble_opposition_preview", lambda **kw: None)
+    monkeypatch.setattr(page, "validate_opposition_docx",
+                        lambda p: type("V", (), {"has_errors": False})())
+    monkeypatch.setattr(page.DiscoveryAssembler, "find_caption_page", staticmethod(lambda p: ""))
+
+    settings = {
+        "motion_file": "m.pdf", "context_files": [],
+        "metadata": MotionMetadata(motion_type="MTC", relief_requested="x",
+                                   principal_arguments=["arg one", "arg two"]).to_dict(),
+        "outline": [],
+    }
+    worker = page.OpposeMotionWorker(case_path=str(tmp_path), file_number="123", settings=settings)
+
+    results = {}
+    worker.finished_result.connect(lambda ok, payload: results.update(ok=ok, payload=payload))
+    worker.run()   # run synchronously (do not start the thread)
+
+    assert results["ok"] is True
+    assert captured["arguments"] == ["arg one", "arg two"]
+    # The pool was forwarded to the drafter.
+    assert captured["authorities"] and captured["authorities"][0].cluster_id == "1"
