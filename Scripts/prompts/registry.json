@@ -641,6 +641,38 @@
           "usage_count": 0
         }
       ]
+    },
+    "oppose_motion:research_queries": {
+      "agent": "oppose_motion",
+      "pass_name": "research_queries",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-05-27T23:37:43.473264",
+          "description": "Per-argument CourtListener search query generation",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "oppose_motion:rerank_select": {
+      "agent": "oppose_motion",
+      "pass_name": "rerank_select",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-05-27T23:37:43.484400",
+          "description": "Re-rank + select best authorities with verbatim passage",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
     }
   }
 }

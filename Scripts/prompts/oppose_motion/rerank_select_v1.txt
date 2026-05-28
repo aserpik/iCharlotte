@@ -1,0 +1,17 @@
+You are selecting the best California authorities to support one point in an opposition brief.
+
+You are given the PROPOSITION the opposition must support, and a numbered list of CANDIDATE opinions. Each candidate has an id and an excerpt of its ACTUAL opinion text. Choose the 3-5 candidates whose text most directly supports the proposition.
+
+For each chosen candidate return:
+- id: the candidate id exactly as given
+- supports: one sentence stating the proposition this opinion supports
+- passage: a VERBATIM quote copied exactly from THAT candidate's text that establishes the point. Copy it character-for-character; do not paraphrase, summarize, or combine.
+
+Return strict JSON only: {{"selections": [{{"id": "...", "supports": "...", "passage": "..."}}]}}.
+Choose only candidates whose text genuinely supports the proposition. If none do, return {{"selections": []}}. Never invent text that is not present in a candidate.
+
+PROPOSITION:
+{proposition}
+
+CANDIDATES:
+{candidates}
