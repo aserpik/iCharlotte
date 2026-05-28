@@ -39,7 +39,7 @@ class TaskTab(QStackedWidget):
 
         self.settings_page = spec.settings_page_cls(spec, files=self._files, case_root=case_path or None)
         self.status_page = StatusPage()
-        self.output_page = OutputPage()
+        self.output_page = spec.output_page_cls()
 
         self.addWidget(self.settings_page)  # index 0 = PAGE_SETTINGS
         self.addWidget(self.status_page)    # index 1 = PAGE_STATUS

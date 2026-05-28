@@ -30,6 +30,11 @@ def _med_chron_settings_page_cls():
     return MedChronSettingsPage
 
 
+def _default_output_page_cls():
+    from .pages.output_page import OutputPage
+    return OutputPage
+
+
 @dataclass(frozen=True)
 class TaskSpec:
     task_id: str
@@ -43,6 +48,7 @@ class TaskSpec:
     # None means "use default SettingsPage"; resolved lazily in TaskTab.
     # Set to a factory callable that returns the class to avoid circular imports.
     _settings_page_cls_factory: Optional[object] = field(default=None, repr=False, compare=False)
+    _output_page_cls_factory: Optional[object] = field(default=None, repr=False, compare=False)
 
     @property
     def settings_page_cls(self) -> type:
@@ -50,6 +56,13 @@ class TaskSpec:
         if self._settings_page_cls_factory is not None:
             return self._settings_page_cls_factory()
         return _default_settings_page_cls()
+
+    @property
+    def output_page_cls(self) -> type:
+        """Return the OutputPage subclass for this task."""
+        if self._output_page_cls_factory is not None:
+            return self._output_page_cls_factory()
+        return _default_output_page_cls()
 
 
 TASK_REGISTRY: dict[str, TaskSpec] = {
