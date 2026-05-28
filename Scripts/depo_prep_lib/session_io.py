@@ -28,10 +28,11 @@ class SessionPaths:
 
 def build_session_folder_name(deponent_name: str, when_iso: str | None = None) -> str:
     """Return a Windows-safe folder name like 'Depo Prep - Jane Doe - 2026-05-27 1432'."""
-    when_iso = when_iso or datetime.now().isoformat(timespec="minutes")
+    when_iso = (when_iso or datetime.now().isoformat(timespec="minutes"))[:16]
     # Strip illegal chars; collapse whitespace.
     safe_name = _UNSAFE_FILENAME_CHARS.sub("", deponent_name or "Unknown").strip()
     safe_name = re.sub(r"\s+", " ", safe_name) or "Unknown"
+    safe_name = safe_name[:60].rstrip()
     # "2026-05-27T14:32" → "2026-05-27 1432"
     when = when_iso.replace("T", " ").replace(":", "")
     return f"Depo Prep - {safe_name} - {when}"

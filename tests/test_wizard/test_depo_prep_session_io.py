@@ -70,3 +70,28 @@ def test_file_sha256_is_stable(tmp_path):
     h2 = file_sha256(f)
     assert h1 == h2
     assert len(h1) == 64  # hex SHA-256
+
+
+def test_build_session_folder_name_truncates_very_long_deponent():
+    long_name = "A" * 200
+    name = build_session_folder_name(long_name, when_iso="2026-05-27T14:32:00")
+    # Within the folder name, the deponent slot must not exceed 60 chars.
+    # We assert the total folder length stays reasonable (well under 100 chars).
+    assert len(name) < 100
+
+
+def test_build_session_folder_name_normalizes_seconds_precision():
+    name = build_session_folder_name("Jane", when_iso="2026-05-27T14:32:00")
+    assert name.endswith("2026-05-27 1432")  # no "00" at the end
+
+
+def test_file_sha256_matches_hashlib():
+    import hashlib
+    (tmp := __import__("tempfile").NamedTemporaryFile(delete=False))
+    try:
+        tmp.write(b"hello world")
+        tmp.close()
+        assert file_sha256(tmp.name) == hashlib.sha256(b"hello world").hexdigest()
+    finally:
+        import os
+        os.unlink(tmp.name)
