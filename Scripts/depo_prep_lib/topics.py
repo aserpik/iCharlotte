@@ -57,7 +57,7 @@ def cluster_topics(
     if len(topics) > _MAX_TOPICS:
         topics = topics[:_MAX_TOPICS]
         warning = f"LLM produced more than {_MAX_TOPICS} topics; truncated."
-    if len(topics) < _MIN_TOPICS_WARN:
+    elif len(topics) < _MIN_TOPICS_WARN:
         warning = ("Source material appears thin - only "
                    f"{len(topics)} topic(s) emerged. Consider adding more sources "
                    "or detail in your strategy notes.")
