@@ -60,3 +60,72 @@ def test_select_authorities_ignores_unknown_ids():
     llm = MagicMock(return_value='{"selections": [{"id": "999", "supports": "x", "passage": "text one"}]}')
     out = select_authorities("x", cands, argument_text="arg", llm_callback=llm)
     assert out == []
+
+
+from icharlotte_core.opposition.argument_research import research_argument
+from icharlotte_core.legal_research.models import CaseResult
+
+
+def _case(cluster_id, name="A v. B", citation="2 Cal.5th 2"):
+    return CaseResult(name=name, citation=citation, date="2015-01-01", court="cal",
+                      snippet="snip", url=f"https://cl/opinion/{cluster_id}/", cluster_id=cluster_id)
+
+
+def test_research_argument_happy_path(tmp_path):
+    cl = MagicMock()
+    cl.search_opinions.return_value = [_case(111)]
+    cl.get_opinion_text.return_value = "The court held discretion is broad here."
+
+    query_llm = MagicMock(return_value='{"queries": ["discovery cutoff"]}')
+    rerank_llm = MagicMock(return_value='{"selections": [{"id": "111", "supports": "broad discretion", '
+                                        '"passage": "The court held discretion is broad here."}]}')
+
+    out = research_argument(
+        "The motion is untimely", cl_client=cl,
+        query_llm=query_llm, rerank_llm=rerank_llm, cache_dir=str(tmp_path),
+    )
+    assert len(out) == 1
+    assert out[0].cluster_id == "111"
+    assert out[0].argument_text == "The motion is untimely"
+
+
+def test_research_argument_unions_semantic_and_keyword(tmp_path):
+    cl = MagicMock()
+    # semantic call returns 111; keyword returns 111 (dup) + 222
+    cl.search_opinions.side_effect = [[_case(111)], [_case(111), _case(222)]]
+    cl.get_opinion_text.return_value = "text"
+    query_llm = MagicMock(return_value='{"queries": ["q1"]}')
+    rerank_llm = MagicMock(return_value='{"selections": []}')
+
+    research_argument("arg", cl_client=cl, query_llm=query_llm, rerank_llm=rerank_llm, cache_dir=str(tmp_path))
+
+    # First call semantic=True, second semantic default(False); both fired for one query.
+    assert cl.search_opinions.call_count == 2
+    first_kwargs = cl.search_opinions.call_args_list[0].kwargs
+    assert first_kwargs.get("semantic") is True
+
+
+def test_research_argument_empty_retries_once(tmp_path):
+    cl = MagicMock()
+    cl.search_opinions.return_value = []
+    query_llm = MagicMock(return_value='{"queries": ["alpha beta gamma"]}')
+    rerank_llm = MagicMock(return_value='{"selections": []}')
+
+    out = research_argument("arg", cl_client=cl, query_llm=query_llm, rerank_llm=rerank_llm, cache_dir=str(tmp_path))
+    assert out == []
+    # Original query (semantic+keyword = 2 calls) + one broadened retry (2 calls) = 4.
+    assert cl.search_opinions.call_count == 4
+
+
+def test_research_argument_stamps_goodlaw_signals(tmp_path):
+    cl = MagicMock()
+    cl.search_opinions.return_value = [_case(111)]
+    cl.get_opinion_text.return_value = "The court held discretion is broad here."
+    cl.get_authority_signals.return_value = {"citation_count": 42, "latest_citing_year": "2022"}
+    query_llm = MagicMock(return_value='{"queries": ["q"]}')
+    rerank_llm = MagicMock(return_value='{"selections": [{"id": "111", "supports": "s", '
+                                        '"passage": "The court held discretion is broad here."}]}')
+
+    out = research_argument("arg", cl_client=cl, query_llm=query_llm, rerank_llm=rerank_llm, cache_dir=str(tmp_path))
+    assert out[0].citation_count == 42
+    assert out[0].latest_citing_year == "2022"

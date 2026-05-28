@@ -126,3 +126,128 @@ def select_authorities(
             )
         )
     return out
+
+
+def _load_cached_opinion(cache_dir: str | None, cluster_id: str) -> str | None:
+    if not cache_dir or not cluster_id:
+        return None
+    path = os.path.join(cache_dir, f"{cluster_id}.json")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return (json.load(f) or {}).get("text") or None
+    except (OSError, ValueError):
+        return None
+
+
+def _save_cached_opinion(cache_dir: str | None, cluster_id: str, text: str) -> None:
+    if not cache_dir or not cluster_id:
+        return
+    try:
+        os.makedirs(cache_dir, exist_ok=True)
+        with open(os.path.join(cache_dir, f"{cluster_id}.json"), "w", encoding="utf-8") as f:
+            json.dump({"cluster_id": cluster_id, "text": text}, f)
+    except OSError:
+        logger.warning("could not cache opinion %s", cluster_id, exc_info=True)
+
+
+def _opinion_text(cl_client, cache_dir: str | None, cluster_id: str) -> str:
+    cached = _load_cached_opinion(cache_dir, cluster_id)
+    if cached is not None:
+        return cached
+    try:
+        text = cl_client.get_opinion_text(int(cluster_id)) or ""
+    except (TypeError, ValueError):
+        text = ""
+    except Exception:
+        logger.warning("opinion fetch failed for %s", cluster_id, exc_info=True)
+        text = ""
+    if text:
+        _save_cached_opinion(cache_dir, cluster_id, text)
+    return text
+
+
+def _hybrid_search(cl_client, query: str, max_results: int) -> list:
+    """Union semantic + keyword results by cluster_id, semantic first."""
+    found: dict[str, Any] = {}
+    for semantic in (True, False):
+        try:
+            results = cl_client.search_opinions(
+                query, semantic=semantic, max_results=max_results, published_only=True
+            ) or []
+        except Exception:
+            logger.warning("search failed (semantic=%s)", semantic, exc_info=True)
+            results = []
+        for r in results:
+            key = str(getattr(r, "cluster_id", "") or "")
+            if key and key not in found:
+                found[key] = r
+    return list(found.values())
+
+
+def _broaden(query: str) -> str:
+    parts = query.split()
+    return " ".join(parts[:-1]) if len(parts) > 1 else query
+
+
+def research_argument(
+    argument: str,
+    *,
+    cl_client,
+    query_llm: LLMCallback,
+    rerank_llm: LLMCallback,
+    argument_id: str = "",
+    max_candidates: int = 20,
+    fetch_top: int = 8,
+    cache_dir: str | None = None,
+) -> list[RetrievedAuthority]:
+    """Research one argument end-to-end; returns selected RetrievedAuthority."""
+    queries = generate_search_queries(argument, llm_callback=query_llm)
+    if not queries:
+        queries = [argument]
+
+    def _run(query_list: list[str]) -> list[RetrievedAuthority]:
+        candidates: dict[str, Any] = {}
+        for q in query_list:
+            for r in _hybrid_search(cl_client, q, max_candidates):
+                key = str(getattr(r, "cluster_id", "") or "")
+                if key and key not in candidates:
+                    candidates[key] = r
+        ordered = list(candidates.values())[:fetch_top]
+        cand_dicts: list[dict] = []
+        for r in ordered:
+            cid = str(getattr(r, "cluster_id", "") or "")
+            text = _opinion_text(cl_client, cache_dir, cid)
+            if not text:
+                continue
+            cand_dicts.append({
+                "cluster_id": cid,
+                "case_name": getattr(r, "name", ""),
+                "citation": getattr(r, "citation", ""),
+                "text": text,
+                "opinion_url": getattr(r, "url", ""),
+            })
+        return select_authorities(
+            argument, cand_dicts, argument_text=argument,
+            argument_id=argument_id, llm_callback=rerank_llm,
+        )
+
+    selected = _run(queries)
+    if not selected:
+        broadened = _broaden(queries[0])
+        if broadened and broadened != queries[0]:
+            selected = _run([broadened])
+
+    # Stamp the soft good-law hint (citation count + latest citing year) on the
+    # final selected authorities only — a bounded number of extra calls. Guarded
+    # so a non-dict return (e.g. a test MagicMock) is a no-op.
+    for ra in selected:
+        try:
+            signals = cl_client.get_authority_signals(ra.cluster_id)
+        except Exception:
+            signals = None
+        if isinstance(signals, dict):
+            ra.citation_count = signals.get("citation_count")
+            ra.latest_citing_year = signals.get("latest_citing_year", "")
+    return selected
