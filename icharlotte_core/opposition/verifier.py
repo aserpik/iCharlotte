@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import concurrent.futures
 import logging
+import re as _re
 from typing import Callable
 
 from icharlotte_core.opposition.case_verifier import CaseVerifier
 from icharlotte_core.opposition.citation_parser import Citation
-from icharlotte_core.opposition.models import CitationVerification
+from icharlotte_core.opposition.models import CitationVerification, RetrievedAuthority
 from icharlotte_core.opposition.statute_verifier import StatuteVerifier
 
 logger = logging.getLogger(__name__)
@@ -129,6 +130,55 @@ def _progress_line(cv: CitationVerification) -> str:
     }.get(cv.verdict, cv.verdict or "?")
     label = cv.citation_text or cv.normalized_citation or "(citation)"
     return f"  {verdict_glyph}: {label}"
+
+
+def _norm_reporter(s: str) -> str:
+    """Normalize a reporter citation for loose comparison: drop spaces, lowercase."""
+    return _re.sub(r"\s+", "", (s or "")).lower()
+
+
+def pool_membership_check(
+    citations: list[Citation],
+    retrieved: list[RetrievedAuthority],
+) -> tuple[list[Citation], list[CitationVerification]]:
+    """Split citations into (to_verify, off_pool_results).
+
+    Case cites whose reporter citation is not present in the retrieved pool get
+    a deterministic NOT_FOUND verdict (likely model-introduced). Statutes and
+    rules always pass through. If the pool is empty (grounding produced
+    nothing), everything passes through so the network verifier still runs.
+    """
+    if not retrieved:
+        return list(citations), []
+
+    pool_norms = {_norm_reporter(a.citation) for a in retrieved if a.citation}
+    to_verify: list[Citation] = []
+    off_pool: list[CitationVerification] = []
+    for c in citations:
+        if c.kind != "case":
+            to_verify.append(c)
+            continue
+        cite_norm = _norm_reporter(c.reporter_citation or c.normalized)
+        in_pool = any(cite_norm and (cite_norm in p or p in cite_norm) for p in pool_norms)
+        if in_pool:
+            to_verify.append(c)
+        else:
+            off_pool.append(
+                CitationVerification(
+                    citation_text=c.raw_text,
+                    normalized_citation=c.normalized,
+                    kind="case",
+                    case_name=c.case_name,
+                    proposition=c.proposition,
+                    body_offset=c.body_offset,
+                    verdict="NOT_FOUND",
+                    note=(
+                        "Cited a case that was not in the researched authority "
+                        "pool — likely model-introduced; verify or replace."
+                    ),
+                )
+            )
+    return to_verify, off_pool
 
 
 import os as _os
