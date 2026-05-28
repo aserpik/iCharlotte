@@ -251,3 +251,52 @@ def research_argument(
             ra.citation_count = signals.get("citation_count")
             ra.latest_citing_year = signals.get("latest_citing_year", "")
     return selected
+
+
+ProgressCallback = Callable[[str], None]
+
+
+def research_arguments(
+    arguments: list[str],
+    *,
+    cl_client,
+    query_llm: LLMCallback,
+    rerank_llm: LLMCallback,
+    max_workers: int = 4,
+    on_progress: ProgressCallback | None = None,
+    cache_dir: str | None = None,
+) -> list[RetrievedAuthority]:
+    """Research every argument in parallel; flatten the RetrievedAuthority list."""
+    args = [a.strip() for a in (arguments or []) if a and a.strip()]
+    if not args:
+        return []
+
+    def _one(idx_arg: tuple[int, str]) -> tuple[int, list[RetrievedAuthority]]:
+        idx, arg = idx_arg
+        result = research_argument(
+            arg, cl_client=cl_client, query_llm=query_llm, rerank_llm=rerank_llm,
+            argument_id=f"arg-{idx}", cache_dir=cache_dir,
+        )
+        if on_progress:
+            if result:
+                on_progress(f"  {arg[:60]} — {len(result)} case(s) found")
+            else:
+                on_progress(f"  {arg[:60]} — no on-point authority retrieved")
+        return idx, result
+
+    indexed = list(enumerate(args))
+    by_index: dict[int, list[RetrievedAuthority]] = {}
+    workers = max(1, int(max_workers))
+    if workers == 1:
+        for pair in indexed:
+            i, res = _one(pair)
+            by_index[i] = res
+    else:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+            for i, res in pool.map(_one, indexed):
+                by_index[i] = res
+
+    flat: list[RetrievedAuthority] = []
+    for i, _arg in indexed:
+        flat.extend(by_index.get(i, []))
+    return flat

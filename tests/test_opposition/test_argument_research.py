@@ -129,3 +129,29 @@ def test_research_argument_stamps_goodlaw_signals(tmp_path):
     out = research_argument("arg", cl_client=cl, query_llm=query_llm, rerank_llm=rerank_llm, cache_dir=str(tmp_path))
     assert out[0].citation_count == 42
     assert out[0].latest_citing_year == "2022"
+
+
+from icharlotte_core.opposition.argument_research import research_arguments
+
+
+def test_research_arguments_runs_each_and_emits_progress(tmp_path):
+    cl = MagicMock()
+    cl.search_opinions.return_value = [_case(111)]
+    cl.get_opinion_text.return_value = "The court held discretion is broad here."
+    query_llm = MagicMock(return_value='{"queries": ["q"]}')
+    rerank_llm = MagicMock(return_value='{"selections": [{"id": "111", "supports": "s", '
+                                        '"passage": "The court held discretion is broad here."}]}')
+    messages = []
+
+    out = research_arguments(
+        ["arg one", "arg two"], cl_client=cl, query_llm=query_llm, rerank_llm=rerank_llm,
+        max_workers=2, on_progress=messages.append, cache_dir=str(tmp_path),
+    )
+    # One authority per argument.
+    assert len(out) == 2
+    assert {a.argument_text for a in out} == {"arg one", "arg two"}
+    assert len(messages) >= 2
+
+
+def test_research_arguments_empty_list():
+    assert research_arguments([], cl_client=MagicMock(), query_llm=MagicMock(), rerank_llm=MagicMock()) == []
