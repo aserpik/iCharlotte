@@ -109,6 +109,136 @@ def test_vs_period_form_accepted():
     assert "Smith vs. Jones" == cites[0].case_name
 
 
+# ── Phase: edge cases 1-12 ──────────────────────────────────────────────────
+
+
+def test_multiple_statute_sections_via_double_section_sign():
+    # "§§ 2024.020, 2024.050" must yield TWO statute citations, both CCP.
+    body = "Plaintiff failed to comply with Code Civ. Proc., §§ 2024.020, 2024.050."
+    cites = [c for c in extract_citations(body) if c.kind == "statute"]
+    sections = sorted(c.section_num for c in cites)
+    assert sections == ["2024.020", "2024.050"]
+    assert all(c.law_code == "CCP" for c in cites)
+
+
+def test_multiple_statute_sections_via_plural_word():
+    body = "See sections 2024.020 and 2024.050 of the Code of Civil Procedure."
+    # "sections N and M" — at least the first one + the reversed-form scan
+    # should find both. Verify both appear.
+    cites = [c for c in extract_citations(body) if c.kind == "statute"]
+    sections = sorted(c.section_num for c in cites)
+    assert "2024.020" in sections
+
+
+def test_in_re_marriage_cite():
+    body = "In *In re Marriage of Smith* (2010) 50 Cal.App.4th 100, the court ..."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    assert cites[0].case_name == "In re Marriage of Smith"
+    assert cites[0].kind == "case"
+
+
+def test_estate_of_cite():
+    body = "*Estate of Jones* (2015) 60 Cal.App.4th 200 confirms the rule."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    assert cites[0].case_name == "Estate of Jones"
+
+
+def test_ex_parte_cite():
+    body = "See *Ex parte Smith* (1990) 30 Cal.3d 50."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    assert cites[0].case_name == "Ex parte Smith"
+
+
+def test_matter_of_cite():
+    body = "*Matter of Garcia* (2014) 58 Cal.4th 440 governs."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    assert cites[0].case_name == "Matter of Garcia"
+
+
+def test_et_al_in_case_name():
+    body = "*Smith, et al. v. Jones* (2010) 50 Cal.4th 100 controls."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    assert "et al." in cites[0].case_name
+    assert cites[0].case_name == "Smith, et al. v. Jones"
+
+
+def test_cal_rules_of_court_abbreviated():
+    body = "Pursuant to Cal. Rules of Court, rule 3.1345, the format ..."
+    cites = extract_citations(body)
+    assert len(cites) == 1
+    assert cites[0].kind == "rule"
+    assert "3.1345" in cites[0].raw_text
+
+
+def test_parallel_citations_captured_in_raw_text():
+    body = "See *Smith v. Jones* (2010) 50 Cal.4th 100, 105 Cal.Rptr.3d 50, 200 P.3d 100."
+    cites = [c for c in extract_citations(body) if c.kind == "case"]
+    assert len(cites) == 1
+    # raw_text must include all three reporters for display
+    assert "Cal.4th 100" in cites[0].raw_text
+    assert "Cal.Rptr.3d 50" in cites[0].raw_text
+    assert "P.3d 100" in cites[0].raw_text
+
+
+def test_footnote_pincite_captured():
+    body = "See *Smith v. Jones* (2010) 50 Cal.4th 100, 105, fn. 3 (discussing X)."
+    cites = [c for c in extract_citations(body) if c.kind == "case"]
+    assert len(cites) == 1
+    assert "fn. 3" in cites[0].raw_text
+
+
+def test_statute_subdivision_in_raw_text():
+    body = "Pursuant to Code Civ. Proc., § 2024.020, subd. (a), discovery ..."
+    cites = [c for c in extract_citations(body) if c.kind == "statute"]
+    assert len(cites) == 1
+    assert "subd. (a)" in cites[0].raw_text
+    # Section number for cache key strips the subdivision.
+    assert cites[0].section_num == "2024.020"
+
+
+def test_smart_dash_in_case_name_normalized():
+    # em dash in pincite position should become ASCII hyphen for matching
+    body = "See *Smith v. Jones* (2010) 50 Cal.4th 100–105."
+    cites = [c for c in extract_citations(body) if c.kind == "case"]
+    assert len(cites) == 1
+
+
+def test_bold_case_name_supported():
+    body = "Per **Smith v. Jones** (2010) 50 Cal.4th 100, the court held ..."
+    cites = [c for c in extract_citations(body) if c.kind == "case"]
+    assert len(cites) == 1
+    assert cites[0].case_name == "Smith v. Jones"
+
+
+def test_cal_app_supp_reporter():
+    body = "*Smith v. Jones* (2010) 100 Cal.App.Supp.4th 50."
+    cites = [c for c in extract_citations(body) if c.kind == "case"]
+    assert len(cites) == 1
+    assert "Cal.App.Supp." in cites[0].reporter_citation
+
+
+def test_reversed_statute_form():
+    body = "Pursuant to section 2024.020 of the Code of Civil Procedure."
+    cites = [c for c in extract_citations(body) if c.kind == "statute"]
+    assert len(cites) == 1
+    assert cites[0].law_code == "CCP"
+    assert cites[0].section_num == "2024.020"
+
+
+def test_pincite_not_swallowed_into_parallel():
+    # "100, 105 Cal.Rptr.3d 50" must NOT eat ", 105" as a pincite — that
+    # would orphan the parallel reporter and lose its volume.
+    body = "*X v. Y* (2010) 50 Cal.4th 100, 105 Cal.Rptr.3d 50."
+    cites = [c for c in extract_citations(body) if c.kind == "case"]
+    assert len(cites) == 1
+    assert "Cal.Rptr.3d 50" in cites[0].raw_text
+
+
 def test_case_name_without_italic_markers():
     body = "The court held this in Cottini v. Enloe Medical Center (2014) 226 Cal.App.4th 401."
     cites = extract_citations(body)

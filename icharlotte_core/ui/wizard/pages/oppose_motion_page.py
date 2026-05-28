@@ -450,7 +450,7 @@ class OpposeMotionOutputPage(QWidget):
 
 _HORIZONTAL_RULE_RE = re.compile(r"^[\*\-_]{3,}\s*$")
 _MD_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
-_MD_ITALIC_RE = re.compile(r"\*([^\*\n]+?)\*")
+_MD_ITALIC_RE = re.compile(r"\*{1,2}([^\*\n]+?)\*{1,2}")
 
 
 _VERDICT_COLORS = {
