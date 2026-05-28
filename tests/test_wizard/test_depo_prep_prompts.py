@@ -108,3 +108,52 @@ def test_polish_prompt_forbids_substantive_changes():
     assert "drop" in prompt.lower() or "remove" in prompt.lower()
     assert "phrasing" in prompt.lower() or "transitions" in prompt.lower()
     assert text == "full outline here"
+
+
+def test_per_topic_questions_prompt_no_trailing_comma_in_schema_example():
+    """The assembled JSON schema example must not have a trailing comma before the
+    closing object brace — the LLM mimics what it sees."""
+    import re
+    prompt, _ = build_per_topic_questions_prompt(
+        deponent_name="J", deponent_role="P", style="discovery",
+        topic_title="t", strategic_note="s", digest_excerpts_text="d",
+        free_text_notes="",
+        include_strategic_note=True, include_source_facts=True,
+        include_impeachment_hook=True, include_objection_alts=True,
+    )
+    # The schema example ends with the closing brace of the question object.
+    # Find the last "objection_alts" mention and the next "}" — there must NOT be
+    # a comma immediately before that brace.
+    idx = prompt.rfind("objection_alts")
+    assert idx != -1
+    tail = prompt[idx:]
+    # The closing brace of the question object is on the line after the last field.
+    # Match: any field value + optional whitespace/newline + closing brace.
+    # We assert there is no `,` immediately before the first `}` we see after the
+    # last field.
+    m = re.search(r"objection_alts.*?(?P<close>[,\s]*})", tail, re.DOTALL)
+    assert m is not None
+    closing_segment = m.group("close")
+    assert "," not in closing_segment, (
+        f"Trailing comma before closing brace in schema example. "
+        f"Segment: {closing_segment!r}")
+
+
+def test_per_topic_questions_prompt_no_trailing_comma_when_only_one_optional_field():
+    """Single-flag case: also no trailing comma."""
+    prompt, _ = build_per_topic_questions_prompt(
+        deponent_name="J", deponent_role="P", style="discovery",
+        topic_title="t", strategic_note="s", digest_excerpts_text="d",
+        free_text_notes="",
+        include_strategic_note=True, include_source_facts=False,
+        include_impeachment_hook=False, include_objection_alts=False,
+    )
+    # Find the purpose line; immediately after the closing quote/value there must
+    # not be a comma followed by whitespace/newline and then `}`.
+    idx = prompt.rfind('"purpose"')
+    assert idx != -1
+    tail = prompt[idx:]
+    import re
+    m = re.search(r'"purpose".*?(?P<close>[,\s]*})', tail, re.DOTALL)
+    assert m is not None
+    assert "," not in m.group("close")

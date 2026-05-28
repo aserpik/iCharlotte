@@ -157,7 +157,12 @@ def build_per_topic_questions_prompt(
             'vague/compound/asked-and-answered>", ... ],'
         )
 
-    optional_fields_block = "\n".join(field_instructions) if field_instructions else "  (only 'n' and 'text' fields)"
+    if field_instructions:
+        # Strip trailing comma from the last entry so the assembled JSON schema is valid.
+        field_instructions[-1] = field_instructions[-1].rstrip(",")
+        optional_fields_block = "\n".join(field_instructions)
+    else:
+        optional_fields_block = "  (only 'n' and 'text' fields)"
 
     prompt = f"""You are drafting deposition questions for one topic of an outline.
 
