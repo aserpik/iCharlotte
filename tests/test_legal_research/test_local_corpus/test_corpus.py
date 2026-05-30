@@ -1,0 +1,55 @@
+from icharlotte_core.legal_research.local_corpus import schema
+from icharlotte_core.legal_research.local_corpus.models import CaseRecord, PassageRecord
+from icharlotte_core.legal_research.local_corpus.embedder import FakeEmbedder
+from icharlotte_core.legal_research.local_corpus.indexer import CorpusIndexer
+from icharlotte_core.legal_research.local_corpus.corpus import LocalCaseCorpus
+from icharlotte_core.legal_research.models import CaseResult
+
+
+def _build(tmp_path):
+    db = str(tmp_path / "c.db"); vec = str(tmp_path / "v.f16")
+    con = schema.connect(db); schema.create_schema(con)
+    emb = FakeEmbedder(dim=64)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb)
+    idx.add(
+        CaseRecord(case_uid="cap:1", source="cap", name="Duty v. Care",
+                   citation="30 Cal. 4th 43", decision_date="2003-01-01", year="2003",
+                   full_text="The duty of care in negligence is well established."),
+        [PassageRecord(passage_uid="cap:1#0", case_uid="cap:1", ordinal=0, page_label="44",
+                       text="The duty of care in negligence is well established.")],
+    )
+    idx.add(
+        CaseRecord(case_uid="cap:2", source="cap", name="Privacy v. Discovery",
+                   citation="10 Cal. 5th 1", decision_date="2020-01-01", year="2020",
+                   full_text="Constitutional privacy limits civil discovery scope."),
+        [PassageRecord(passage_uid="cap:2#0", case_uid="cap:2", ordinal=0, page_label="2",
+                       text="Constitutional privacy limits civil discovery scope.")],
+    )
+    idx.finalize()
+    con.close()
+    return db, vec, emb
+
+
+def test_search_returns_caseresults_for_keyword(tmp_path):
+    db, vec, emb = _build(tmp_path)
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    results = corpus.search_opinions("privacy discovery", semantic=False, max_results=5)
+    assert results and isinstance(results[0], CaseResult)
+    assert results[0].cluster_id == "cap:2"
+    assert results[0].citation == "10 Cal. 5th 1"
+
+
+def test_search_semantic_path_runs(tmp_path):
+    db, vec, emb = _build(tmp_path)
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    results = corpus.search_opinions("negligence duty", semantic=True, max_results=5)
+    assert any(r.cluster_id == "cap:1" for r in results)
+
+
+def test_get_opinion_text_and_lookup(tmp_path):
+    db, vec, emb = _build(tmp_path)
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    assert "duty of care" in corpus.get_opinion_text("cap:1")
+    hit = corpus.lookup_by_citation("30 Cal. 4th 43")
+    assert hit is not None and hit["case_uid"] == "cap:1"
+    assert "negligence" in hit["full_text"]
