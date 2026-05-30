@@ -42,12 +42,19 @@ def build_from_cap_zips(zip_paths: list[str], *, db_path: str, vectors_path: str
     schema.create_schema(con)
     idx = CorpusIndexer(con, vectors_path=vectors_path, embedder=embedder)
     n_cases = 0
-    for zp in zip_paths:
-        with open(zp, "rb") as f:
-            data = f.read()
-        for case, passages in cap_loader.iter_cases_from_zip(data):
-            if idx.add(case, passages):
-                n_cases += 1
+    total = len(zip_paths)
+    for i, zp in enumerate(zip_paths, 1):
+        try:
+            with open(zp, "rb") as f:
+                data = f.read()
+            for case, passages in cap_loader.iter_cases_from_zip(data):
+                if idx.add(case, passages):
+                    n_cases += 1
+        except Exception:
+            logger.warning("CAP ingest failed for %s", zp, exc_info=True)
+        if i % 25 == 0 or i == total:
+            logger.info("CAP ingest: %d/%d volumes, %d cases so far", i, total, n_cases)
+    logger.info("CAP ingest: embedding + writing vectors (this is the slow step)...")
     idx.finalize()
     build_signals(con)
     con.close()
@@ -73,12 +80,18 @@ def build_from_cl_streams(*, courts_stream, clusters_stream, opinions_stream,
     return {"cases": n_cases}
 
 
-def _download_cap_volumes(scratch_dir: str) -> list[str]:  # pragma: no cover - network
-    """Download every CA reporter volume ZIP to scratch_dir; skip existing."""
+def _download_cap_volumes(scratch_dir: str, reporters: dict | None = None) -> list[str]:
+    """Download every CA reporter volume ZIP to scratch_dir; skip existing.
+
+    Idempotent: an already-downloaded volume is reused, so a re-run resumes.
+    """
     import urllib.request
+    reporters = reporters if reporters is not None else CAP_REPORTERS
     os.makedirs(scratch_dir, exist_ok=True)
+    total = sum(reporters.values())
     paths: list[str] = []
-    for rep, count in CAP_REPORTERS.items():
+    done = 0
+    for rep, count in reporters.items():
         for vol in range(1, count + 1):
             dest = os.path.join(scratch_dir, f"{rep}-{vol}.zip")
             if not os.path.exists(dest):
@@ -89,8 +102,12 @@ def _download_cap_volumes(scratch_dir: str) -> list[str]:  # pragma: no cover - 
                         out.write(r.read())
                 except Exception:
                     logger.warning("CAP download failed: %s", url, exc_info=True)
+                    done += 1
                     continue
             paths.append(dest)
+            done += 1
+            if done % 50 == 0 or done == total:
+                logger.info("CAP download: %d/%d volumes", done, total)
     return paths
 
 
