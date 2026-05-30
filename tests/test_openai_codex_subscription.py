@@ -179,6 +179,25 @@ class RoutingTests(unittest.TestCase):
                 "OpenAI", "gpt-5.2-thinking", "sys", "hi", "", _settings())
         self.assertEqual(out, "CODEX")
 
+    def test_no_api_key_and_codex_raises_gives_clear_error(self):
+        with patch.object(llm, "openai_subscription_enabled", return_value=True), \
+             patch.object(llm, "codex_available", return_value=True), \
+             patch.object(llm, "_generate_openai_codex_cli", side_effect=Exception("boom")), \
+             patch.dict(llm.API_KEYS, {"OpenAI": None}, clear=False):
+            with self.assertRaises(RuntimeError) as ctx:
+                llm.LLMHandler.generate(
+                    "OpenAI", "gpt-5.2-thinking", "sys", "hi", "", _settings())
+            self.assertIn("no OPENAI_API_KEY", str(ctx.exception))
+
+    def test_no_api_key_and_unsupported_model_gives_clear_error(self):
+        with patch.object(llm, "openai_subscription_enabled", return_value=True), \
+             patch.object(llm, "codex_available", return_value=True), \
+             patch.dict(llm.API_KEYS, {"OpenAI": None}, clear=False):
+            with self.assertRaises(RuntimeError) as ctx:
+                llm.LLMHandler.generate(
+                    "OpenAI", "gpt-4o", "sys", "hi", "", _settings())
+            self.assertIn("no OPENAI_API_KEY", str(ctx.exception))
+
 
 class ModelFilterTests(unittest.TestCase):
     def test_filters_to_codex_supported(self):

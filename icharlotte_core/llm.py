@@ -492,6 +492,13 @@ class LLMHandler:
                         f"Model '{model}' not available on ChatGPT subscription; "
                         f"using OpenAI API key", "info")
 
+            if not api_key:
+                raise RuntimeError(
+                    f"OpenAI ChatGPT subscription (Codex) was unavailable for "
+                    f"model '{model}' and no OPENAI_API_KEY is configured for "
+                    f"fallback."
+                )
+
             use_responses_api = _openai_uses_responses_api(model)
             request_stream = do_stream and _openai_model_supports_streaming(model)
             url = (
