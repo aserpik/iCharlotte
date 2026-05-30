@@ -7,6 +7,7 @@ deterministic, dependency-free embedder.
 from __future__ import annotations
 
 import hashlib
+import os
 from typing import Protocol, runtime_checkable
 
 import numpy as np
@@ -37,23 +38,33 @@ class FakeEmbedder:
 
 
 class OnnxEmbedder:
-    """fastembed BGE-small (ONNX, CPU). Lazy-loads the model on first encode."""
-    def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5", dim: int = 384) -> None:
+    """fastembed BGE-small (ONNX, CPU). Lazy-loads the model on first encode.
+
+    ``threads`` sets onnxruntime intra-op parallelism; defaults to all logical
+    cores. Building a ~150k-case corpus on the default (~1-2 threads) was ~30
+    passages/sec; using all cores is several times faster. We deliberately do
+    NOT use fastembed's multiprocessing ``parallel=`` — it deadlocks on Windows
+    without an ``if __name__ == '__main__'`` guard.
+    """
+    def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5", dim: int = 384,
+                 threads: int | None = None, batch_size: int = 256) -> None:
         self.model_name = model_name
         self.dim = dim
+        self.threads = threads if threads is not None else (os.cpu_count() or 4)
+        self.batch_size = batch_size
         self._model = None
 
     def _ensure(self):
         if self._model is None:
             from fastembed import TextEmbedding  # lazy import; heavy
-            self._model = TextEmbedding(model_name=self.model_name)
+            self._model = TextEmbedding(model_name=self.model_name, threads=self.threads)
         return self._model
 
     def encode(self, texts: list[str]) -> np.ndarray:
         if not texts:
             return np.zeros((0, self.dim), dtype=np.float32)
         model = self._ensure()
-        vecs = np.array(list(model.embed(texts)), dtype=np.float32)
+        vecs = np.array(list(model.embed(texts, batch_size=self.batch_size)), dtype=np.float32)
         norms = np.linalg.norm(vecs, axis=1, keepdims=True)
         norms[norms == 0] = 1.0
         return vecs / norms

@@ -36,11 +36,39 @@ def _default_paths() -> tuple[str, str]:
             os.path.join(CASELAW_DATA_DIR, "vectors.f16"))
 
 
+def _clear_temp(*paths: str) -> None:
+    for p in paths:
+        for suffix in ("", "-wal", "-shm"):
+            try:
+                os.remove(p + suffix)
+            except OSError:
+                pass
+
+
+def _finish_build(con, *, db_tmp: str, vec_tmp: str, db_path: str, vectors_path: str) -> None:
+    """Checkpoint, close, and atomically move temp build outputs into place.
+
+    Building into temp paths keeps a half-built corpus invisible to the wizard
+    (which requires BOTH final files) and leaves clean state on a crash.
+    """
+    build_signals(con)
+    try:
+        con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    except Exception:
+        logger.warning("wal_checkpoint failed", exc_info=True)
+    con.close()
+    os.replace(vec_tmp, vectors_path)   # vectors first...
+    os.replace(db_tmp, db_path)         # ...db last (its presence flips _corpus_available)
+    _clear_temp(db_tmp)
+
+
 def build_from_cap_zips(zip_paths: list[str], *, db_path: str, vectors_path: str,
                         embedder: Embedder) -> dict[str, Any]:
-    con = schema.connect(db_path)
+    db_tmp, vec_tmp = db_path + ".building", vectors_path + ".building"
+    _clear_temp(db_tmp, vec_tmp)
+    con = schema.connect(db_tmp)
     schema.create_schema(con)
-    idx = CorpusIndexer(con, vectors_path=vectors_path, embedder=embedder)
+    idx = CorpusIndexer(con, vectors_path=vec_tmp, embedder=embedder)
     n_cases = 0
     total = len(zip_paths)
     for i, zp in enumerate(zip_paths, 1):
@@ -54,19 +82,21 @@ def build_from_cap_zips(zip_paths: list[str], *, db_path: str, vectors_path: str
             logger.warning("CAP ingest failed for %s", zp, exc_info=True)
         if i % 25 == 0 or i == total:
             logger.info("CAP ingest: %d/%d volumes, %d cases so far", i, total, n_cases)
-    logger.info("CAP ingest: embedding + writing vectors (this is the slow step)...")
+    logger.info("CAP ingest: finalizing (last batch + good-law signals)...")
     idx.finalize()
-    build_signals(con)
-    con.close()
+    _finish_build(con, db_tmp=db_tmp, vec_tmp=vec_tmp, db_path=db_path, vectors_path=vectors_path)
+    logger.info("CAP ingest: DONE — %d cases", n_cases)
     return {"cases": n_cases}
 
 
 def build_from_cl_streams(*, courts_stream, clusters_stream, opinions_stream,
                           db_path: str, vectors_path: str, embedder: Embedder,
                           cutoff_date: str = CAP_CUTOFF_DATE) -> dict[str, Any]:
-    con = schema.connect(db_path)
+    db_tmp, vec_tmp = db_path + ".building", vectors_path + ".building"
+    _clear_temp(db_tmp, vec_tmp)
+    con = schema.connect(db_tmp)
     schema.create_schema(con)
-    idx = CorpusIndexer(con, vectors_path=vectors_path, embedder=embedder)
+    idx = CorpusIndexer(con, vectors_path=vec_tmp, embedder=embedder)
     n_cases = 0
     for case, passages in cl_bulk_loader.iter_recent_ca_cases(
         courts_stream=courts_stream, clusters_stream=clusters_stream,
@@ -75,8 +105,7 @@ def build_from_cl_streams(*, courts_stream, clusters_stream, opinions_stream,
         if idx.add(case, passages):
             n_cases += 1
     idx.finalize()
-    build_signals(con)
-    con.close()
+    _finish_build(con, db_tmp=db_tmp, vec_tmp=vec_tmp, db_path=db_path, vectors_path=vectors_path)
     return {"cases": n_cases}
 
 

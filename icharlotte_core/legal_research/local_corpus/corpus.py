@@ -7,6 +7,7 @@ lookup_by_citation serve the drafter + verifier without any network call.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import sqlite3
 from typing import Any
@@ -45,9 +46,16 @@ class LocalCaseCorpus:
 
     def _vecs(self) -> np.ndarray:
         if self._vectors is None:
-            self._vectors = np.memmap(
-                self.vectors_path, dtype=np.float16, mode="r"
-            ).reshape(-1, self.embedder.dim)
+            # np.memmap raises on a 0-byte file; an empty corpus has no vectors.
+            try:
+                if os.path.getsize(self.vectors_path) == 0:
+                    self._vectors = np.zeros((0, self.embedder.dim), dtype=np.float16)
+                else:
+                    self._vectors = np.memmap(
+                        self.vectors_path, dtype=np.float16, mode="r"
+                    ).reshape(-1, self.embedder.dim)
+            except OSError:
+                self._vectors = np.zeros((0, self.embedder.dim), dtype=np.float16)
         return self._vectors
 
     # ---- retrieval arms -------------------------------------------------
