@@ -45,10 +45,36 @@ from icharlotte_core.opposition.style_examples import (
     extract_exemplar_text,
 )
 from icharlotte_core.opposition.verifier import (
+    build_local_opposition_verifier,
     build_opposition_verifier,
     enrich_with_pool_signals,
     pool_membership_check,
 )
+import os as _os_corpus
+from icharlotte_core.config import CASELAW_DATA_DIR
+
+
+def _corpus_paths() -> tuple[str, str]:
+    return (_os_corpus.path.join(CASELAW_DATA_DIR, "corpus.db"),
+            _os_corpus.path.join(CASELAW_DATA_DIR, "vectors.f16"))
+
+
+def _corpus_available() -> bool:
+    db, _vec = _corpus_paths()
+    return _os_corpus.path.exists(db)
+
+
+def _corpus_embedder():
+    from icharlotte_core.legal_research.local_corpus.embedder import OnnxEmbedder
+    return OnnxEmbedder()
+
+
+def _make_local_corpus():
+    if not _corpus_available():
+        return None
+    from icharlotte_core.legal_research.local_corpus.corpus import LocalCaseCorpus
+    db, vec = _corpus_paths()
+    return LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=_corpus_embedder())
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
 from icharlotte_core.ui.context_files_dialog import ContextFilesDialog
 from icharlotte_core.word_validator import validate_opposition_docx
@@ -1112,15 +1138,33 @@ class OpposeMotionWorker(QThread):
             # Retrieval-first grounding: research real California authority for
             # each principal argument before drafting, so the drafter cites only
             # from a verified pool.
+            # Prefer the local CA corpus (offline, unlimited). Fall back to the
+            # live CourtListener API only if the corpus has not been built yet.
+            corpus = _make_local_corpus()
             token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
             retrieved = []
-            if token and metadata.principal_arguments:
-                from icharlotte_core.legal_research.sources.courtlistener import CourtListenerClient
-                opinion_cache = os.path.join(
-                    os.path.dirname(registry_path), ".cache", "opinions"
-                )
+            opinion_cache = os.path.join(
+                os.path.dirname(registry_path), ".cache", "opinions"
+            )
+            if corpus is not None and metadata.principal_arguments:
                 self.progress.emit(
-                    f"Researching authorities ({len(metadata.principal_arguments)} arguments)..."
+                    f"Researching authorities locally ({len(metadata.principal_arguments)} arguments)..."
+                )
+                retrieved = research_arguments(
+                    metadata.principal_arguments,
+                    cl_client=corpus,
+                    query_llm=make_llm("research_queries"),
+                    rerank_llm=make_llm("rerank_select"),
+                    max_workers=4,
+                    on_progress=self.progress.emit,
+                    cache_dir=opinion_cache,
+                )
+                self.progress.emit(f"Retrieved {len(retrieved)} grounded authorities.")
+            elif corpus is None and token and metadata.principal_arguments:
+                from icharlotte_core.legal_research.sources.courtlistener import CourtListenerClient
+                self.progress.emit(
+                    "Local corpus not built; falling back to CourtListener API "
+                    f"({len(metadata.principal_arguments)} arguments)..."
                 )
                 retrieved = research_arguments(
                     metadata.principal_arguments,
@@ -1132,9 +1176,10 @@ class OpposeMotionWorker(QThread):
                     cache_dir=opinion_cache,
                 )
                 self.progress.emit(f"Retrieved {len(retrieved)} grounded authorities.")
-            elif not token:
+            else:
                 self.progress.emit(
-                    "WARNING: COURTLISTENER_API_TOKEN not set; drafting without grounded research."
+                    "WARNING: no local corpus and no COURTLISTENER_API_TOKEN; "
+                    "drafting without grounded research."
                 )
 
             self.progress.emit("Drafting opposition memorandum...")
@@ -1166,16 +1211,24 @@ class OpposeMotionWorker(QThread):
                         f"{len(off_pool)} citation(s) were not in the researched pool "
                         "(flagged NOT_FOUND)."
                     )
-                if not token:
+                if corpus is None and not token:
                     self.progress.emit(
-                        "WARNING: COURTLISTENER_API_TOKEN not set; case citations cannot be verified."
+                        "WARNING: no local corpus and no COURTLISTENER_API_TOKEN; "
+                        "case citations cannot be verified."
                     )
                 self.progress.emit(f"Verifying citations ({len(to_verify)} found)...")
-                verifier = build_opposition_verifier(
-                    courtlistener_token=token,
-                    llm_callback=llm,
-                    max_workers=4,
-                )
+                if corpus is not None:
+                    verifier = build_local_opposition_verifier(
+                        corpus=corpus,
+                        llm_callback=llm,
+                        max_workers=4,
+                    )
+                else:
+                    verifier = build_opposition_verifier(
+                        courtlistener_token=token,
+                        llm_callback=llm,
+                        max_workers=4,
+                    )
                 verified = verifier.verify_all(to_verify, on_progress=self.progress.emit)
                 # Merge verified + off-pool, restored to body order.
                 draft.citations = sorted(
