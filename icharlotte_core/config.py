@@ -50,6 +50,12 @@ LOG_FILE = os.path.join(os.getcwd(), "icharlotte_Activity.log")
 GEMINI_DATA_DIR = os.path.join(os.getcwd(), ".gemini", "case_data")
 TEMP_DIR = os.path.join(os.getcwd(), ".gemini", "tmp")
 
+# Local CA case-law corpus storage (SQLite DB + vectors.f16 memmap).
+# Relocatable: set CASELAW_DATA_DIR env var to point at a roomier drive.
+CASELAW_DATA_DIR = os.environ.get(
+    "CASELAW_DATA_DIR", os.path.join(os.getcwd(), ".gemini", "caselaw")
+)
+
 # Templates & Resources
 TEMPLATES_DIR = os.path.join(os.getcwd(), "Templates")
 RESOURCES_DIR = r"C:\geminiterminal2\LLM Resources"

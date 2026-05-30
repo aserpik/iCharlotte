@@ -33,6 +33,10 @@ beautifulsoup4>=4.10.0  # HTML parsing for leginfo.ca.gov + courts.ca.gov scrape
 markdown>=3.0.0
 keyboard>=0.13.5
 
+# Local case-law corpus (offline retrieval) — ONNX embeddings, no torch
+fastembed>=0.3.0  # ONNX BGE-small embeddings for semantic rerank
+numpy>=1.24.0     # memmap cosine similarity over passage vectors
+
 # Redlining Engine
 adeu>=0.1.0  # Agentic DOCX Redlining Engine
 

@@ -32,6 +32,7 @@ NoteTaker/dist/
 # Project Specific
 .gemini/tmp/
 .gemini/case_data/
+.gemini/caselaw/
 *.pdf
 *.docx
 !Templates/litigation_report.docx
