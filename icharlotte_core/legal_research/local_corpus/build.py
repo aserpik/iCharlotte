@@ -64,12 +64,15 @@ def _finish_build(con, *, db_tmp: str, vec_tmp: str, db_path: str, vectors_path:
 
 def build_from_cap_zips(zip_paths: list[str], *, db_path: str, vectors_path: str,
                         embedder: Embedder, embed: bool = True,
+                        embed_year_cutoff: int | None = None,
                         resume: bool | None = None) -> dict[str, Any]:
     """Build (or resume) the corpus from CAP volume ZIPs.
 
     Volume-checkpointed: each volume is committed atomically, so a crash/reboot
     mid-build resumes from the last completed volume. ``resume`` defaults to
-    auto (resume iff a prior ``.building`` DB exists).
+    auto (resume iff a prior ``.building`` DB exists). ``embed_year_cutoff``
+    limits semantic embedding to cases from that year onward (older cases stay
+    keyword-searchable).
     """
     db_tmp, vec_tmp = db_path + ".building", vectors_path + ".building"
     if resume is None:
@@ -78,7 +81,8 @@ def build_from_cap_zips(zip_paths: list[str], *, db_path: str, vectors_path: str
         _clear_temp(db_tmp, vec_tmp)
     con = schema.connect(db_tmp)
     schema.create_schema(con)
-    idx = CorpusIndexer(con, vectors_path=vec_tmp, embedder=embedder, embed=embed, resume=resume)
+    idx = CorpusIndexer(con, vectors_path=vec_tmp, embedder=embedder, embed=embed,
+                        embed_year_cutoff=embed_year_cutoff, resume=resume)
     if resume:
         logger.info("CAP ingest: RESUMING — %d volumes already done", len(idx._done_volumes))
     n_cases = 0
@@ -166,6 +170,9 @@ def main() -> None:  # pragma: no cover - CLI wrapper
     ap.add_argument("--data-dir", default=None)
     ap.add_argument("--fts-only", action="store_true",
                     help="Skip semantic embedding (BM25 keyword search only; builds in minutes).")
+    ap.add_argument("--embed-since", type=int, default=None, metavar="YEAR",
+                    help="Only embed cases decided in YEAR or later; older cases stay "
+                         "keyword-searchable with a zero placeholder vector (cuts build time).")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -176,14 +183,20 @@ def main() -> None:  # pragma: no cover - CLI wrapper
         db_path, vectors_path = _default_paths()
     embed = not args.fts_only
     embedder = OnnxEmbedder()
-    logger.info("Build mode: %s", "FTS5 keyword-only (no embedding)" if args.fts_only
-                else "keyword + semantic embedding")
+    if args.fts_only:
+        mode = "FTS5 keyword-only (no embedding)"
+    elif args.embed_since:
+        mode = f"keyword for all + semantic embedding for cases >= {args.embed_since}"
+    else:
+        mode = "keyword + semantic embedding (all years)"
+    logger.info("Build mode: %s", mode)
 
     if args.source in ("cap", "all"):
         scratch = os.path.join(os.path.dirname(db_path), "_cap_scratch")
         zips = _download_cap_volumes(scratch)
         summary = build_from_cap_zips(zips, db_path=db_path, vectors_path=vectors_path,
-                                      embedder=embedder, embed=embed)
+                                      embedder=embedder, embed=embed,
+                                      embed_year_cutoff=args.embed_since)
         logger.info("CAP ingest: %s cases", summary["cases"])
     if args.source in ("cl", "all"):
         logger.info("CL bulk ingest: stream CourtListener bulk CSVs into "

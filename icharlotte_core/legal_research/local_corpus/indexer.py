@@ -1,15 +1,17 @@
 """Write normalized records into the corpus DB + vectors.f16 sidecar.
 
-Resumable, volume-checkpointed build: ``add()`` cases for a volume, then
-``commit_volume(name)`` to make that volume durable. On restart, construct with
-``resume=True`` against the same DB + vectors file and already-ingested volumes
-are skipped — so a crash/reboot mid-build loses at most the current volume,
-never the whole run.
+Resumable, volume-checkpointed build (see commit_volume/abort_volume). On
+restart, construct with ``resume=True`` and already-ingested volumes are skipped.
 
-Crash-safety ordering: each batch writes + fsyncs its vectors to the sidecar
-file BEFORE the DB rows are committed, so every committed passage always has its
-vector on disk. On resume we truncate the sidecar back to the committed passage
-count, dropping any vectors written for an uncommitted (partial) volume.
+``embed_year_cutoff``: cases decided before this year are still fully indexed
+for keyword (FTS5) search, but get a ZERO placeholder vector instead of a real
+embedding — skipping the expensive transformer call for old, rarely-cited cases
+while keeping vec_row<->passage alignment intact. Semantic search never returns
+them (zero vector => zero cosine); keyword search still does.
+
+Crash-safety ordering: each batch writes + fsyncs vectors BEFORE the DB commit,
+so committed passages always have their vector row on disk; on resume the
+sidecar is truncated to the committed passage count.
 """
 from __future__ import annotations
 
@@ -27,15 +29,16 @@ _BATCH = 256
 
 class CorpusIndexer:
     def __init__(self, con: sqlite3.Connection, *, vectors_path: str, embedder: Embedder,
-                 embed: bool = True, resume: bool = False) -> None:
+                 embed: bool = True, embed_year_cutoff: int | None = None,
+                 resume: bool = False) -> None:
         self.con = con
         self.vectors_path = vectors_path
         self.embedder = embedder
-        # FTS5-only mode (embed=False) skips transformer embedding entirely.
-        # Vectors stay empty; BM25 carries retrieval and a semantic layer can be
-        # added later without a rebuild.
+        # embed=False => FTS5-only (no vectors at all). embed=True with a cutoff
+        # => vectors for cases >= cutoff, zero placeholders for older ones.
         self.embed = embed
-        self._pending: list[PassageRecord] = []
+        self.embed_year_cutoff = embed_year_cutoff
+        self._pending: list[tuple[PassageRecord, bool]] = []  # (passage, do_embed)
         self._next_vec_row = 0
         self._seen_citation: set[str] = set()
         self._done_volumes: set[str] = set()
@@ -48,7 +51,6 @@ class CorpusIndexer:
 
     # ------------------------------------------------------------------
     def _resume(self) -> None:
-        """Reconcile in-memory state + the vectors file with the committed DB."""
         n_committed = self.con.execute("SELECT COUNT(*) FROM passages").fetchone()[0]
         self._next_vec_row = n_committed
         self._done_volumes = {
@@ -59,18 +61,29 @@ class CorpusIndexer:
             for r in self.con.execute("SELECT citation FROM cases")
             if r[0]
         }
-        # Truncate the sidecar to exactly the committed passage count (drop any
-        # vectors written for an uncommitted partial volume), then append.
-        want_bytes = n_committed * self._bytes_per_vec
-        if not os.path.exists(self.vectors_path):
-            open(self.vectors_path, "wb").close()
-        with open(self.vectors_path, "r+b") as f:
-            f.truncate(want_bytes)
-        self._vec_fh = open(self.vectors_path, "ab")
+        if self.embed:
+            # Truncate the sidecar to exactly the committed passage count, then append.
+            want_bytes = n_committed * self._bytes_per_vec
+            if not os.path.exists(self.vectors_path):
+                open(self.vectors_path, "wb").close()
+            with open(self.vectors_path, "r+b") as f:
+                f.truncate(want_bytes)
+            self._vec_fh = open(self.vectors_path, "ab")
+        else:
+            # FTS-only: no vector sidecar in use.
+            self._vec_fh = open(self.vectors_path, "ab")
 
     # ------------------------------------------------------------------
     def is_volume_done(self, name: str) -> bool:
         return name in self._done_volumes
+
+    def _should_embed_case(self, case: CaseRecord) -> bool:
+        if not self.embed:
+            return False
+        if self.embed_year_cutoff is None:
+            return True
+        y = (case.year or "")[:4]
+        return y.isdigit() and int(y) >= self.embed_year_cutoff
 
     def add(self, case: CaseRecord, passages: Iterable[PassageRecord]) -> bool:
         """Buffer one case + its passages (uncommitted until commit_volume).
@@ -89,8 +102,9 @@ class CorpusIndexer:
             ),
             list(row.values()),
         )
+        do_embed = self._should_embed_case(case)
         for p in passages:
-            self._pending.append(p)
+            self._pending.append((p, do_embed))
             if len(self._pending) >= _BATCH:
                 self._flush()
         return True
@@ -99,9 +113,19 @@ class CorpusIndexer:
         if not self._pending:
             return
         if self.embed:
-            vecs = self.embedder.encode([p.text for p in self._pending]).astype(np.float16)
-            self._vec_fh.write(np.ascontiguousarray(vecs, dtype=np.float16).tobytes())
-        for p in self._pending:
+            # Build the batch's vector block: real embeddings for to-embed
+            # passages, zero placeholders for the rest. Keeps one vector row per
+            # passage so vec_row <-> passage alignment is exact.
+            out = np.zeros((len(self._pending), self.embedder.dim), dtype=np.float16)
+            embed_idx = [i for i, (_p, e) in enumerate(self._pending) if e]
+            if embed_idx:
+                vecs = self.embedder.encode(
+                    [self._pending[i][0].text for i in embed_idx]
+                ).astype(np.float16)
+                for j, i in enumerate(embed_idx):
+                    out[i] = vecs[j]
+            self._vec_fh.write(np.ascontiguousarray(out, dtype=np.float16).tobytes())
+        for p, _e in self._pending:
             vec_row = self._next_vec_row
             self._next_vec_row += 1
             self.con.execute(
@@ -118,7 +142,6 @@ class CorpusIndexer:
     def commit_volume(self, name: str) -> None:
         """Checkpoint: flush the buffer, fsync vectors, then commit the volume."""
         self._flush()
-        # fsync vectors FIRST so committed passages always have vectors on disk.
         self._vec_fh.flush()
         os.fsync(self._vec_fh.fileno())
         self.con.execute("INSERT OR IGNORE INTO ingested_volumes (name) VALUES (?)", (name,))
@@ -126,19 +149,17 @@ class CorpusIndexer:
         self._done_volumes.add(name)
 
     def abort_volume(self) -> None:
-        """Roll back the current uncommitted volume's partial work and reconcile
-        the vectors file + in-memory state to the last committed checkpoint, so a
-        failed volume leaves no orphan rows for the next volume to commit."""
+        """Roll back the current uncommitted volume and reconcile state."""
         self.con.rollback()
         self._pending.clear()
         n_committed = self.con.execute("SELECT COUNT(*) FROM passages").fetchone()[0]
         self._next_vec_row = n_committed
         self._vec_fh.flush()
         self._vec_fh.close()
-        with open(self.vectors_path, "r+b") as f:
-            f.truncate(n_committed * self._bytes_per_vec)
+        if self.embed:
+            with open(self.vectors_path, "r+b") as f:
+                f.truncate(n_committed * self._bytes_per_vec)
         self._vec_fh = open(self.vectors_path, "ab")
-        # Drop citations added in-memory for the rolled-back (uncommitted) cases.
         self._seen_citation = {
             (r[0] or "").replace(" ", "").lower()
             for r in self.con.execute("SELECT citation FROM cases")
