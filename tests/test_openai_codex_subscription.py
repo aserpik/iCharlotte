@@ -128,6 +128,24 @@ class CodexGenerateTests(unittest.TestCase):
         self.assertIn("--sandbox", cmd)
         self.assertIn("read-only", cmd)
         self.assertIn("gpt-5.2-codex", cmd)
+        self.assertIn("--ask-for-approval", cmd)
+        # the value follows the flag
+        self.assertEqual(cmd[cmd.index("--ask-for-approval") + 1], "never")
+
+    def test_openai_api_key_removed_from_subprocess_env(self):
+        captured = {}
+        def fake_run(cmd, **kwargs):
+            captured["env"] = kwargs.get("env")
+            idx = cmd.index("--output-last-message")
+            with open(cmd[idx + 1], "w", encoding="utf-8") as f:
+                f.write("ok")
+            return MagicMock(returncode=0, stdout="", stderr="")
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-should-be-removed"}, clear=False), \
+             patch.object(llm.subprocess, "run", side_effect=fake_run):
+            llm._generate_openai_codex_cli(
+                "gpt-5.2-thinking", "sys", "hi", "", None, do_stream=False)
+        self.assertIsNotNone(captured["env"])
+        self.assertNotIn("OPENAI_API_KEY", captured["env"])
 
 
 def _settings(stream=False):

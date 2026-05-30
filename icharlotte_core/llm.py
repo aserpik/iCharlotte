@@ -114,6 +114,7 @@ def _build_codex_command(codex_model, last_message_path):
     return [
         "codex", "exec",
         "--sandbox", "read-only",
+        "--ask-for-approval", "never",
         "--skip-git-repo-check",
         "--output-last-message", last_message_path,
         "-m", codex_model,
@@ -146,6 +147,7 @@ def _generate_openai_codex_cli(model, system_prompt, user_prompt, file_contents,
     cwd = tempfile.gettempdir()  # never a client folder
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)
+    env.pop("OPENAI_API_KEY", None)  # force Codex to use the ChatGPT login, not the API key
     creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
 
     fd, last_msg_path = tempfile.mkstemp(suffix=".txt", prefix="codex_out_")
