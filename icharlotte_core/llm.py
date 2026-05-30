@@ -77,6 +77,27 @@ def codex_available():
     return _codex_on_path() and _codex_logged_in()
 
 
+def _subscription_prefs_path():
+    """Path to llm_preferences.json (lazy import avoids circular import)."""
+    try:
+        from .llm_config import CONFIG_FILE
+        return CONFIG_FILE
+    except Exception:
+        return os.path.join(os.getcwd(), "config", "llm_preferences.json")
+
+
+def openai_subscription_enabled():
+    """Whether OpenAI calls should try the ChatGPT subscription first.
+    Reads top-level 'openai_use_subscription' from llm_preferences.json
+    (default True)."""
+    try:
+        with open(_subscription_prefs_path(), "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return bool(data.get("openai_use_subscription", True))
+    except Exception:
+        return True
+
+
 def _curated_gemini_models():
     return list(model_catalog.CURATED_GEMINI_MODELS)
 

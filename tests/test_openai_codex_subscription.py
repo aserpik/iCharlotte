@@ -48,5 +48,35 @@ class CodexAvailableTests(unittest.TestCase):
             self.assertFalse(llm.codex_available())
 
 
+class SubscriptionEnabledTests(unittest.TestCase):
+    def _write_prefs(self, payload):
+        fd, path = tempfile.mkstemp(suffix=".json")
+        os.close(fd)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f)
+        self.addCleanup(lambda: os.remove(path))
+        return path
+
+    def test_enabled_when_flag_true(self):
+        path = self._write_prefs({"openai_use_subscription": True})
+        with patch.object(llm, "_subscription_prefs_path", return_value=path):
+            self.assertTrue(llm.openai_subscription_enabled())
+
+    def test_disabled_when_flag_false(self):
+        path = self._write_prefs({"openai_use_subscription": False})
+        with patch.object(llm, "_subscription_prefs_path", return_value=path):
+            self.assertFalse(llm.openai_subscription_enabled())
+
+    def test_default_true_when_key_missing(self):
+        path = self._write_prefs({"version": "2.1"})
+        with patch.object(llm, "_subscription_prefs_path", return_value=path):
+            self.assertTrue(llm.openai_subscription_enabled())
+
+    def test_default_true_when_file_missing(self):
+        with patch.object(llm, "_subscription_prefs_path",
+                          return_value="C:/nonexistent/does-not-exist.json"):
+            self.assertTrue(llm.openai_subscription_enabled())
+
+
 if __name__ == "__main__":
     unittest.main()

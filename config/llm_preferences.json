@@ -1,5 +1,6 @@
 {
   "version": "2.1",
+  "openai_use_subscription": true,
   "default_provider": "Gemini",
   "tasks": {
     "general": {
