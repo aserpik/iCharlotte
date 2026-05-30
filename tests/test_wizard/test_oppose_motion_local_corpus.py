@@ -3,13 +3,21 @@ import io, json, zipfile
 from icharlotte_core.ui.wizard.pages import oppose_motion_page as omp
 
 
-def test_corpus_available_true_when_db_exists(tmp_path, monkeypatch):
-    db = tmp_path / "corpus.db"; db.write_text("x")
+def test_corpus_available_true_when_both_files_exist(tmp_path, monkeypatch):
+    (tmp_path / "corpus.db").write_text("x")
+    (tmp_path / "vectors.f16").write_bytes(b"\x00\x00")
     monkeypatch.setattr(omp, "CASELAW_DATA_DIR", str(tmp_path))
     assert omp._corpus_available() is True
 
 
 def test_corpus_available_false_when_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(omp, "CASELAW_DATA_DIR", str(tmp_path))
+    assert omp._corpus_available() is False
+
+
+def test_corpus_available_false_during_partial_build(tmp_path, monkeypatch):
+    # corpus.db exists but vectors.f16 not yet written (mid-build) -> not ready.
+    (tmp_path / "corpus.db").write_text("x")
     monkeypatch.setattr(omp, "CASELAW_DATA_DIR", str(tmp_path))
     assert omp._corpus_available() is False
 

@@ -60,8 +60,12 @@ def _corpus_paths() -> tuple[str, str]:
 
 
 def _corpus_available() -> bool:
-    db, _vec = _corpus_paths()
-    return _os_corpus.path.exists(db)
+    # Require BOTH files: corpus.db is created (empty) at the start of a build,
+    # but vectors.f16 is only written at finalize(). Requiring both means an
+    # in-progress or partial build safely falls back to the live API instead of
+    # using an empty corpus with a missing vector sidecar.
+    db, vec = _corpus_paths()
+    return _os_corpus.path.exists(db) and _os_corpus.path.exists(vec)
 
 
 def _corpus_embedder():
