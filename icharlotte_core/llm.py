@@ -60,6 +60,11 @@ def _map_openai_model_to_codex(model):
     return None
 
 
+def subscription_supported_openai_model_ids(model_ids):
+    """Subset of *model_ids* usable on the ChatGPT subscription (Codex)."""
+    return [m for m in model_ids if _map_openai_model_to_codex(m) is not None]
+
+
 def _codex_on_path():
     return shutil.which("codex") is not None
 

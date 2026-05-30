@@ -130,5 +130,14 @@ class CodexGenerateTests(unittest.TestCase):
         self.assertIn("gpt-5.2-codex", cmd)
 
 
+class ModelFilterTests(unittest.TestCase):
+    def test_filters_to_codex_supported(self):
+        ids = ["gpt-5.2-thinking", "gpt-5.2-instant", "gpt-4o", "o1"]
+        self.assertEqual(
+            llm.subscription_supported_openai_model_ids(ids),
+            ["gpt-5.2-thinking", "gpt-5.2-instant"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
