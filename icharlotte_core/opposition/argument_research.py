@@ -156,10 +156,11 @@ def _opinion_text(cl_client, cache_dir: str | None, cluster_id: str) -> str:
     cached = _load_cached_opinion(cache_dir, cluster_id)
     if cached is not None:
         return cached
+    # Pass the id through as-is. CourtListener cluster_ids are numeric strings
+    # that drop straight into the request URL; LocalCaseCorpus expects a string
+    # case_uid (e.g. "cap:269732"). Forcing int() here broke the local path.
     try:
-        text = cl_client.get_opinion_text(int(cluster_id)) or ""
-    except (TypeError, ValueError):
-        text = ""
+        text = cl_client.get_opinion_text(cluster_id) or ""
     except Exception:
         logger.warning("opinion fetch failed for %s", cluster_id, exc_info=True)
         text = ""
