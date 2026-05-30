@@ -60,6 +60,23 @@ def _map_openai_model_to_codex(model):
     return None
 
 
+def _codex_on_path():
+    return shutil.which("codex") is not None
+
+
+def _codex_auth_path():
+    return os.path.join(os.path.expanduser("~"), ".codex", "auth.json")
+
+
+def _codex_logged_in():
+    return os.path.isfile(_codex_auth_path())
+
+
+def codex_available():
+    """True when the Codex CLI is installed AND a ChatGPT login exists."""
+    return _codex_on_path() and _codex_logged_in()
+
+
 def _curated_gemini_models():
     return list(model_catalog.CURATED_GEMINI_MODELS)
 

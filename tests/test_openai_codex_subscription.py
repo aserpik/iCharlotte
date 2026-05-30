@@ -31,5 +31,22 @@ class MapModelTests(unittest.TestCase):
         self.assertIsNone(llm._map_openai_model_to_codex(None))
 
 
+class CodexAvailableTests(unittest.TestCase):
+    def test_available_when_on_path_and_logged_in(self):
+        with patch.object(llm.shutil, "which", return_value="C:/codex.exe"), \
+             patch.object(llm.os.path, "isfile", return_value=True):
+            self.assertTrue(llm.codex_available())
+
+    def test_unavailable_when_not_on_path(self):
+        with patch.object(llm.shutil, "which", return_value=None), \
+             patch.object(llm.os.path, "isfile", return_value=True):
+            self.assertFalse(llm.codex_available())
+
+    def test_unavailable_when_not_logged_in(self):
+        with patch.object(llm.shutil, "which", return_value="C:/codex.exe"), \
+             patch.object(llm.os.path, "isfile", return_value=False):
+            self.assertFalse(llm.codex_available())
+
+
 if __name__ == "__main__":
     unittest.main()
