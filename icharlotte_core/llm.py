@@ -98,6 +98,77 @@ def openai_subscription_enabled():
         return True
 
 
+_CODEX_PERSONA_PREAMBLE = (
+    "You are a general-purpose assistant answering the user's request directly. "
+    "Do NOT write code, run commands, create or modify files, or use tools "
+    "unless the user explicitly asks for that. Respond in plain prose."
+)
+
+
+def _build_codex_command(codex_model, last_message_path):
+    return [
+        "codex", "exec",
+        "--sandbox", "read-only",
+        "--skip-git-repo-check",
+        "--output-last-message", last_message_path,
+        "-m", codex_model,
+    ]
+
+
+def _build_codex_prompt(system_prompt, user_prompt, file_contents, history):
+    parts = [_CODEX_PERSONA_PREAMBLE]
+    if system_prompt:
+        parts.append(f"[SYSTEM INSTRUCTIONS]:\n{system_prompt}")
+    if history:
+        for msg in history:
+            role_label = "User" if msg.get("role") == "user" else "Assistant"
+            parts.append(f"[{role_label}]: {msg.get('content', '')}")
+    parts.append(f"[User]: {user_prompt}")
+    if file_contents:
+        parts.append("\n\n[ATTACHED FILES]:\n" + file_contents)
+    return "\n\n".join(parts)
+
+
+def _generate_openai_codex_cli(model, system_prompt, user_prompt, file_contents,
+                               history, do_stream, timeout=300):
+    """Generate via the Codex CLI (ChatGPT subscription). Raises on unsupported
+    model or CLI failure so the caller can fall back to the API key."""
+    codex_model = _map_openai_model_to_codex(model)
+    if codex_model is None:
+        raise ValueError(f"Model '{model}' is not available via ChatGPT subscription")
+
+    prompt = _build_codex_prompt(system_prompt, user_prompt, file_contents, history)
+    cwd = tempfile.gettempdir()  # never a client folder
+    env = os.environ.copy()
+    env.pop("CLAUDECODE", None)
+    creationflags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+
+    fd, last_msg_path = tempfile.mkstemp(suffix=".txt", prefix="codex_out_")
+    os.close(fd)
+    try:
+        cmd = _build_codex_command(codex_model, last_msg_path)
+        log_event(f"Sending request to Codex CLI (Model: {codex_model})")
+        result = subprocess.run(
+            cmd, input=prompt, capture_output=True, text=True,
+            encoding="utf-8", errors="replace", cwd=cwd, env=env,
+            timeout=timeout, creationflags=creationflags,
+        )
+        if result.returncode != 0:
+            raise Exception(f"Codex CLI Error (exit {result.returncode}): {result.stderr}")
+        try:
+            with open(last_msg_path, "r", encoding="utf-8", errors="replace") as f:
+                text = f.read().strip()
+        except OSError:
+            text = (result.stdout or "").strip()
+    finally:
+        try:
+            os.remove(last_msg_path)
+        except OSError:
+            pass
+
+    return iter([text] if text else []) if do_stream else text
+
+
 def _curated_gemini_models():
     return list(model_catalog.CURATED_GEMINI_MODELS)
 

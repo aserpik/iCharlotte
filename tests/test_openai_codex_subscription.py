@@ -78,5 +78,57 @@ class SubscriptionEnabledTests(unittest.TestCase):
             self.assertTrue(llm.openai_subscription_enabled())
 
 
+class CodexGenerateTests(unittest.TestCase):
+    def _fake_run_writes(self, text, returncode=0, stderr=""):
+        def fake_run(cmd, **kwargs):
+            idx = cmd.index("--output-last-message")
+            out_path = cmd[idx + 1]
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(text)
+            return MagicMock(returncode=returncode, stdout="BANNER NOISE", stderr=stderr)
+        return fake_run
+
+    def test_returns_last_message_not_stdout(self):
+        with patch.object(llm.subprocess, "run", side_effect=self._fake_run_writes("Hello from Codex")):
+            out = llm._generate_openai_codex_cli(
+                "gpt-5.2-thinking", "sys", "hi", "", None, do_stream=False)
+        self.assertEqual(out, "Hello from Codex")
+
+    def test_streaming_returns_iterator(self):
+        with patch.object(llm.subprocess, "run", side_effect=self._fake_run_writes("chunked")):
+            gen = llm._generate_openai_codex_cli(
+                "gpt-5.2-thinking", "sys", "hi", "", None, do_stream=True)
+        self.assertEqual(list(gen), ["chunked"])
+
+    def test_unsupported_model_raises(self):
+        with self.assertRaises(ValueError):
+            llm._generate_openai_codex_cli("gpt-4o", "sys", "hi", "", None, do_stream=False)
+
+    def test_nonzero_exit_raises(self):
+        def fake_run(cmd, **kwargs):
+            return MagicMock(returncode=1, stdout="", stderr="boom")
+        with patch.object(llm.subprocess, "run", side_effect=fake_run):
+            with self.assertRaises(Exception):
+                llm._generate_openai_codex_cli(
+                    "gpt-5.2-thinking", "sys", "hi", "", None, do_stream=False)
+
+    def test_command_uses_readonly_sandbox_and_model(self):
+        captured = {}
+        def fake_run(cmd, **kwargs):
+            captured["cmd"] = cmd
+            idx = cmd.index("--output-last-message")
+            with open(cmd[idx + 1], "w", encoding="utf-8") as f:
+                f.write("ok")
+            return MagicMock(returncode=0, stdout="", stderr="")
+        with patch.object(llm.subprocess, "run", side_effect=fake_run):
+            llm._generate_openai_codex_cli(
+                "gpt-5.2-thinking", "sys", "hi", "", None, do_stream=False)
+        cmd = captured["cmd"]
+        self.assertEqual(cmd[:2], ["codex", "exec"])
+        self.assertIn("--sandbox", cmd)
+        self.assertIn("read-only", cmd)
+        self.assertIn("gpt-5.2-codex", cmd)
+
+
 if __name__ == "__main__":
     unittest.main()
