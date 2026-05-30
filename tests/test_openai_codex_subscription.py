@@ -130,6 +130,56 @@ class CodexGenerateTests(unittest.TestCase):
         self.assertIn("gpt-5.2-codex", cmd)
 
 
+def _settings(stream=False):
+    return {"stream": stream}
+
+
+class RoutingTests(unittest.TestCase):
+    def test_uses_codex_when_enabled_available_supported(self):
+        with patch.object(llm, "openai_subscription_enabled", return_value=True), \
+             patch.object(llm, "codex_available", return_value=True), \
+             patch.object(llm, "_generate_openai_codex_cli", return_value="CODEX") as gen, \
+             patch.dict(llm.API_KEYS, {"OpenAI": "sk-test"}, clear=False):
+            out = llm.LLMHandler.generate(
+                "OpenAI", "gpt-5.2-thinking", "sys", "hi", "", _settings())
+        self.assertEqual(out, "CODEX")
+        gen.assert_called_once()
+
+    def test_falls_back_to_api_when_codex_raises(self):
+        fake_resp = MagicMock(status_code=200)
+        fake_resp.json.return_value = {"choices": [{"message": {"content": "API"}}]}
+        with patch.object(llm, "openai_subscription_enabled", return_value=True), \
+             patch.object(llm, "codex_available", return_value=True), \
+             patch.object(llm, "_generate_openai_codex_cli", side_effect=Exception("boom")), \
+             patch.object(llm.requests, "post", return_value=fake_resp), \
+             patch.dict(llm.API_KEYS, {"OpenAI": "sk-test"}, clear=False):
+            out = llm.LLMHandler.generate(
+                "OpenAI", "gpt-4o", "sys", "hi", "", _settings())
+        self.assertEqual(out, "API")
+
+    def test_unsupported_model_skips_codex_uses_api(self):
+        fake_resp = MagicMock(status_code=200)
+        fake_resp.json.return_value = {"choices": [{"message": {"content": "API"}}]}
+        with patch.object(llm, "openai_subscription_enabled", return_value=True), \
+             patch.object(llm, "codex_available", return_value=True), \
+             patch.object(llm, "_generate_openai_codex_cli") as gen, \
+             patch.object(llm.requests, "post", return_value=fake_resp), \
+             patch.dict(llm.API_KEYS, {"OpenAI": "sk-test"}, clear=False):
+            out = llm.LLMHandler.generate(
+                "OpenAI", "gpt-4o", "sys", "hi", "", _settings())
+        gen.assert_not_called()
+        self.assertEqual(out, "API")
+
+    def test_no_api_key_with_subscription_does_not_raise(self):
+        with patch.object(llm, "openai_subscription_enabled", return_value=True), \
+             patch.object(llm, "codex_available", return_value=True), \
+             patch.object(llm, "_generate_openai_codex_cli", return_value="CODEX"), \
+             patch.dict(llm.API_KEYS, {"OpenAI": None}, clear=False):
+            out = llm.LLMHandler.generate(
+                "OpenAI", "gpt-5.2-thinking", "sys", "hi", "", _settings())
+        self.assertEqual(out, "CODEX")
+
+
 class ModelFilterTests(unittest.TestCase):
     def test_filters_to_codex_supported(self):
         ids = ["gpt-5.2-thinking", "gpt-5.2-instant", "gpt-4o", "o1"]

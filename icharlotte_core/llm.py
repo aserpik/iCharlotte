@@ -317,7 +317,13 @@ class LLMHandler:
         
         api_key = API_KEYS.get(provider)
         if not api_key and provider != "Claude":
-            raise ValueError(f"API Key for {provider} not found.")
+            _openai_sub = (
+                provider == "OpenAI"
+                and openai_subscription_enabled()
+                and codex_available()
+            )
+            if not _openai_sub:
+                raise ValueError(f"API Key for {provider} not found.")
 
         if provider == "Gemini":
             if not genai:
@@ -470,6 +476,22 @@ class LLMHandler:
                     _cleanup_uploads(client, uploaded_files)
 
         elif provider == "OpenAI":
+            if openai_subscription_enabled() and codex_available():
+                if _map_openai_model_to_codex(model) is not None:
+                    try:
+                        return _generate_openai_codex_cli(
+                            model, system_prompt, user_prompt, file_contents,
+                            history, do_stream,
+                        )
+                    except Exception as e:
+                        log_event(
+                            f"Codex subscription path failed, falling back to "
+                            f"OpenAI API key: {e}", "warning")
+                else:
+                    log_event(
+                        f"Model '{model}' not available on ChatGPT subscription; "
+                        f"using OpenAI API key", "info")
+
             use_responses_api = _openai_uses_responses_api(model)
             request_stream = do_stream and _openai_model_supports_streaming(model)
             url = (
