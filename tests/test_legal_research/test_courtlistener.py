@@ -109,10 +109,12 @@ class TestSearchOpinions(unittest.TestCase):
 
         self.assertEqual(results, [])
 
+    @patch("icharlotte_core.legal_research.sources.courtlistener.time.sleep", lambda *_: None)
     @patch("icharlotte_core.legal_research.sources.courtlistener.requests.get")
     def test_search_opinions_handles_api_error(self, mock_get):
         resp = MagicMock()
         resp.status_code = 429
+        resp.headers = {}
         resp.raise_for_status.side_effect = Exception("429 Too Many Requests")
         mock_get.return_value = resp
 
@@ -392,6 +394,67 @@ class TestRetry(unittest.TestCase):
         self.assertIsNone(text)
         # 1 initial + _MAX_RETRIES retries = 4 attempts on the cluster fetch.
         self.assertEqual(mock_get.call_count, 4)
+
+    @patch("icharlotte_core.legal_research.sources.courtlistener.time.sleep", lambda *_: None)
+    @patch("icharlotte_core.legal_research.sources.courtlistener.requests.get")
+    def test_search_opinions_retries_on_429_then_succeeds(self, mock_get):
+        # The opposition research feature depends entirely on search_opinions
+        # and fires a parallel burst (4 workers x semantic+keyword) that the
+        # API throttles with 429. Without retry the search silently returns []
+        # -> zero candidates -> a draft with no case cites. It must back off
+        # and retry like every other CL method.
+        throttled = MagicMock()
+        throttled.status_code = 429
+        throttled.headers = {}
+
+        ok = MagicMock()
+        ok.status_code = 200
+        ok.headers = {}
+        ok.raise_for_status = MagicMock()
+        ok.json.return_value = SAMPLE_SEARCH_RESPONSE
+
+        mock_get.side_effect = [throttled, ok]
+
+        client = CourtListenerClient(token="tok")
+        results = client.search_opinions("negligence", semantic=True)
+
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0].name, "Smith v. Jones")
+        self.assertEqual(mock_get.call_count, 2)  # 1 throttled + 1 retry
+
+    @patch("icharlotte_core.legal_research.sources.courtlistener.time.sleep", lambda *_: None)
+    @patch("icharlotte_core.legal_research.sources.courtlistener.requests.get")
+    def test_get_citing_cases_retries_on_429_then_succeeds(self, mock_get):
+        throttled = MagicMock()
+        throttled.status_code = 429
+        throttled.headers = {}
+
+        ok = MagicMock()
+        ok.status_code = 200
+        ok.headers = {}
+        ok.raise_for_status = MagicMock()
+        ok.json.return_value = {
+            "results": [
+                {
+                    "caseName": "Later Case v. Party",
+                    "citation": ["99 Cal.App.5th 100"],
+                    "dateFiled": "2023-01-10",
+                    "court": "calctapp",
+                    "snippet": "Citing Smith v. Jones.",
+                    "absolute_url": "/opinion/99999/later-case-v-party/",
+                    "cluster_id": 99999,
+                }
+            ]
+        }
+
+        mock_get.side_effect = [throttled, ok]
+
+        client = CourtListenerClient(token="tok")
+        results = client.get_citing_cases(12345)
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].name, "Later Case v. Party")
+        self.assertEqual(mock_get.call_count, 2)
 
 
 if __name__ == "__main__":

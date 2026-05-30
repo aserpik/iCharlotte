@@ -1,7 +1,9 @@
 """CourtListener REST API v4 client for California case law search."""
 
 import logging
+import os
 import re
+import threading
 import time
 from typing import Callable, Dict, List, Optional
 from urllib.parse import urljoin
@@ -31,6 +33,32 @@ _MAX_RETRIES = 3
 _RETRY_BASE_DELAY = 1.0   # seconds; doubled each attempt
 _MAX_RETRY_WAIT = 20.0    # cap any single sleep
 
+# Process-wide politeness throttle. CourtListener's search endpoints (the
+# semantic "Citegeist" engine especially) allow a small burst, then 429 with
+# Retry-After: 20s. When parallel workers (opposition research, bulk citation
+# verification) fire requests at once they stampede the throttle and even the
+# retry budget gets starved — the symptom was opposition research returning
+# zero authorities. Spacing every CL request by a minimum interval across all
+# threads removes the stampede while leaving callers' own parallelism (LLM
+# rerank, per-argument work) intact. Retry backoff sleeps happen outside this
+# lock, so a throttled request doesn't block the spacing of others.
+_MIN_REQUEST_INTERVAL = 1.0  # seconds between successive CL HTTP requests
+_throttle_lock = threading.Lock()
+_last_request_ts = 0.0
+
+
+def _throttle() -> None:
+    """Block until >= _MIN_REQUEST_INTERVAL has elapsed since the previous CL
+    request began (enforced process-wide across threads)."""
+    global _last_request_ts
+    if _MIN_REQUEST_INTERVAL <= 0 or os.environ.get("PYTEST_CURRENT_TEST"):
+        return  # disabled / under test: nothing to space out (HTTP is mocked)
+    with _throttle_lock:
+        wait = _last_request_ts + _MIN_REQUEST_INTERVAL - time.monotonic()
+        if wait > 0:
+            time.sleep(wait)
+        _last_request_ts = time.monotonic()
+
 
 def _send_with_retry(send_fn: Callable[[], "requests.Response"]) -> "requests.Response":
     """Call ``send_fn`` (a zero-arg request) with retry on 429/5xx/timeout.
@@ -42,6 +70,7 @@ def _send_with_retry(send_fn: Callable[[], "requests.Response"]) -> "requests.Re
     delay = _RETRY_BASE_DELAY
     last_resp: "requests.Response | None" = None
     for attempt in range(_MAX_RETRIES + 1):
+        _throttle()
         try:
             resp = send_fn()
         except requests.RequestException:
@@ -235,11 +264,13 @@ class CourtListenerClient:
         if published_only:
             params["stat_Published"] = "on"
         try:
-            resp = requests.get(
-                f"{BASE_URL}/search/",
-                headers=self._headers(),
-                params=params,
-                timeout=REQUEST_TIMEOUT,
+            resp = _send_with_retry(
+                lambda: requests.get(
+                    f"{BASE_URL}/search/",
+                    headers=self._headers(),
+                    params=params,
+                    timeout=REQUEST_TIMEOUT,
+                )
             )
             resp.raise_for_status()
             data = resp.json()
@@ -270,11 +301,13 @@ class CourtListenerClient:
             "page_size": max_results,
         }
         try:
-            resp = requests.get(
-                f"{BASE_URL}/search/",
-                headers=self._headers(),
-                params=params,
-                timeout=REQUEST_TIMEOUT,
+            resp = _send_with_retry(
+                lambda: requests.get(
+                    f"{BASE_URL}/search/",
+                    headers=self._headers(),
+                    params=params,
+                    timeout=REQUEST_TIMEOUT,
+                )
             )
             resp.raise_for_status()
             data = resp.json()
