@@ -63,40 +63,58 @@ def _finish_build(con, *, db_tmp: str, vec_tmp: str, db_path: str, vectors_path:
 
 
 def build_from_cap_zips(zip_paths: list[str], *, db_path: str, vectors_path: str,
-                        embedder: Embedder) -> dict[str, Any]:
+                        embedder: Embedder, embed: bool = True,
+                        resume: bool | None = None) -> dict[str, Any]:
+    """Build (or resume) the corpus from CAP volume ZIPs.
+
+    Volume-checkpointed: each volume is committed atomically, so a crash/reboot
+    mid-build resumes from the last completed volume. ``resume`` defaults to
+    auto (resume iff a prior ``.building`` DB exists).
+    """
     db_tmp, vec_tmp = db_path + ".building", vectors_path + ".building"
-    _clear_temp(db_tmp, vec_tmp)
+    if resume is None:
+        resume = os.path.exists(db_tmp)
+    if not resume:
+        _clear_temp(db_tmp, vec_tmp)
     con = schema.connect(db_tmp)
     schema.create_schema(con)
-    idx = CorpusIndexer(con, vectors_path=vec_tmp, embedder=embedder)
+    idx = CorpusIndexer(con, vectors_path=vec_tmp, embedder=embedder, embed=embed, resume=resume)
+    if resume:
+        logger.info("CAP ingest: RESUMING — %d volumes already done", len(idx._done_volumes))
     n_cases = 0
     total = len(zip_paths)
     for i, zp in enumerate(zip_paths, 1):
+        name = os.path.basename(zp)
+        if idx.is_volume_done(name):
+            continue
         try:
             with open(zp, "rb") as f:
                 data = f.read()
             for case, passages in cap_loader.iter_cases_from_zip(data):
                 if idx.add(case, passages):
                     n_cases += 1
+            idx.commit_volume(name)
         except Exception:
-            logger.warning("CAP ingest failed for %s", zp, exc_info=True)
+            logger.warning("CAP ingest failed for %s; rolling back volume", zp, exc_info=True)
+            idx.abort_volume()
         if i % 25 == 0 or i == total:
-            logger.info("CAP ingest: %d/%d volumes, %d cases so far", i, total, n_cases)
-    logger.info("CAP ingest: finalizing (last batch + good-law signals)...")
+            logger.info("CAP ingest: %d/%d volumes done, %d new cases this run", i, total, n_cases)
+    logger.info("CAP ingest: finalizing (good-law signals + atomic publish)...")
     idx.finalize()
     _finish_build(con, db_tmp=db_tmp, vec_tmp=vec_tmp, db_path=db_path, vectors_path=vectors_path)
-    logger.info("CAP ingest: DONE — %d cases", n_cases)
+    logger.info("CAP ingest: DONE — %d new cases this run", n_cases)
     return {"cases": n_cases}
 
 
 def build_from_cl_streams(*, courts_stream, clusters_stream, opinions_stream,
                           db_path: str, vectors_path: str, embedder: Embedder,
+                          embed: bool = True,
                           cutoff_date: str = CAP_CUTOFF_DATE) -> dict[str, Any]:
     db_tmp, vec_tmp = db_path + ".building", vectors_path + ".building"
     _clear_temp(db_tmp, vec_tmp)
     con = schema.connect(db_tmp)
     schema.create_schema(con)
-    idx = CorpusIndexer(con, vectors_path=vec_tmp, embedder=embedder)
+    idx = CorpusIndexer(con, vectors_path=vec_tmp, embedder=embedder, embed=embed)
     n_cases = 0
     for case, passages in cl_bulk_loader.iter_recent_ca_cases(
         courts_stream=courts_stream, clusters_stream=clusters_stream,
@@ -141,23 +159,31 @@ def _download_cap_volumes(scratch_dir: str, reporters: dict | None = None) -> li
 
 
 def main() -> None:  # pragma: no cover - CLI wrapper
-    ap = argparse.ArgumentParser(description="Build the local CA case-law corpus")
+    ap = argparse.ArgumentParser(
+        description="Build the local CA case-law corpus. Re-run after an "
+        "interruption to RESUME automatically (volume-checkpointed).")
     ap.add_argument("--source", choices=["cap", "cl", "all"], default="all")
     ap.add_argument("--data-dir", default=None)
+    ap.add_argument("--fts-only", action="store_true",
+                    help="Skip semantic embedding (BM25 keyword search only; builds in minutes).")
     args = ap.parse_args()
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     if args.data_dir:
         db_path = os.path.join(args.data_dir, "corpus.db")
         vectors_path = os.path.join(args.data_dir, "vectors.f16")
     else:
         db_path, vectors_path = _default_paths()
+    embed = not args.fts_only
     embedder = OnnxEmbedder()
+    logger.info("Build mode: %s", "FTS5 keyword-only (no embedding)" if args.fts_only
+                else "keyword + semantic embedding")
 
     if args.source in ("cap", "all"):
         scratch = os.path.join(os.path.dirname(db_path), "_cap_scratch")
         zips = _download_cap_volumes(scratch)
-        summary = build_from_cap_zips(zips, db_path=db_path, vectors_path=vectors_path, embedder=embedder)
+        summary = build_from_cap_zips(zips, db_path=db_path, vectors_path=vectors_path,
+                                      embedder=embedder, embed=embed)
         logger.info("CAP ingest: %s cases", summary["cases"])
     if args.source in ("cl", "all"):
         logger.info("CL bulk ingest: stream CourtListener bulk CSVs into "

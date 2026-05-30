@@ -46,6 +46,12 @@ CREATE VIRTUAL TABLE IF NOT EXISTS passages_fts USING fts5(
     text,
     content=''        -- external-content-less; we store text here directly
 );
+
+-- Volumes fully ingested + committed, for resumable builds. A volume is the
+-- checkpoint unit: on restart, already-listed volumes are skipped.
+CREATE TABLE IF NOT EXISTS ingested_volumes (
+    name TEXT PRIMARY KEY
+);
 """
 
 
