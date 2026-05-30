@@ -13,6 +13,39 @@ When adding new features or making significant changes:
 
 ---
 
+## 2026-05-29 - Local CA Case-Law Corpus (offline retrieval + verification)
+
+### Added
+- New package `icharlotte_core/legal_research/local_corpus/` that builds a local
+  California case-law corpus from bulk data (Harvard CAP ≤~2020 backbone +
+  CourtListener bulk 2020+ gap), replacing the rate-limited CourtListener live API
+  (5 req/min) in the Oppose-a-Motion research **and** verification pipeline.
+- Modules: `schema.py`, `models.py`, `textproc.py`, `pincite.py` (CAP HTML
+  page-label → pin-cite mapping), `loaders/cap_loader.py`, `loaders/cl_bulk_loader.py`
+  (stream-filter, never stores the 50 GB), `embedder.py` (swappable ONNX fastembed
+  BGE-small + `FakeEmbedder`), `indexer.py` (FTS5 + `vectors.f16` memmap),
+  `authority_signals.py` (good-law soft signal), `corpus.py` (`LocalCaseCorpus`
+  hybrid BM25 + semantic RRF), `build.py` (CLI).
+- `LocalCaseVerifier` + `build_local_opposition_verifier` in `icharlotte_core/opposition/`
+  verify case cites against local text (no network).
+- Wired into `oppose_motion_page.py`: prefers the local corpus, falls back to the CL
+  API only if the corpus is not yet built.
+
+### Decisions
+- Lightweight ONNX embeddings (fastembed, no PyTorch) to avoid DLL conflicts with
+  Qt/PyMuPDF on Windows; embedder is swappable via an `Embedder` Protocol.
+- Exact brute-force cosine over a float16 memmap (no ANN dependency) — right-sized
+  for the ~650k-passage CA corpus; sqlite-vec/hnswlib documented as the upgrade path.
+
+### Build
+`python -m icharlotte_core.legal_research.local_corpus.build --source all`
+(see `icharlotte_core/legal_research/local_corpus/README.md`).
+
+### New dependencies
+`fastembed>=0.3.0`, `numpy>=1.24.0`.
+
+---
+
 ## 2026-01-27 - Documentation Update
 
 ### Added
