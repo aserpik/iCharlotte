@@ -4,6 +4,8 @@ import datetime
 import subprocess
 import os
 import re
+import shutil
+import tempfile
 import threading
 from .config import API_KEYS
 from .utils import log_event
@@ -31,6 +33,30 @@ def _openai_reasoning_effort(model, thinking_level):
         return None
     if level in OPENAI_REASONING_EFFORTS:
         return level
+    return None
+
+
+# App OpenAI model id -> Codex model name for the ChatGPT subscription.
+# Anything that maps to None is not available via Codex; the caller falls back
+# to the OPENAI_API_KEY path.
+_CODEX_MODEL_OVERRIDES = {
+    "gpt-5.2-thinking": "gpt-5.2-codex",
+    "gpt-5.2-instant": "gpt-5.2-codex",
+    "gpt-5.1-thinking": "gpt-5.1-codex",
+    "gpt-5.1-instant": "gpt-5.1-codex",
+}
+
+
+def _map_openai_model_to_codex(model):
+    """Map an app OpenAI model id to a Codex model name, or None if the model is
+    not available on the ChatGPT subscription."""
+    if not model:
+        return None
+    model_id = model.strip().lower()
+    if model_id in _CODEX_MODEL_OVERRIDES:
+        return _CODEX_MODEL_OVERRIDES[model_id]
+    if model_id.startswith("gpt-5"):
+        return model_id if "codex" in model_id else "gpt-5-codex"
     return None
 
 
