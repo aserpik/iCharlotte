@@ -275,6 +275,32 @@ def build_opposition_verifier(
     )
 
 
+def build_local_opposition_verifier(
+    *,
+    corpus,
+    llm_callback: Callable[[str, str], str],
+    max_workers: int = 4,
+    cache_root: str | None = None,
+) -> "OppositionVerifier":
+    """OppositionVerifier whose case path is the local corpus (no network).
+
+    Statute path keeps the existing leginfo verifier (not rate-limited).
+    """
+    from icharlotte_core.opposition.local_case_verifier import LocalCaseVerifier
+    if cache_root is None:
+        repo_root = _os.path.dirname(_os.path.dirname(_os.path.dirname(__file__)))
+        cache_root = _os.path.join(repo_root, "Scripts", "prompts", "oppose_motion", ".cache")
+    statute_v = StatuteVerifier(
+        leginfo_client=_CALeg(), llm_callback=llm_callback,
+        cache_dir=_os.path.join(cache_root, "statutes"),
+    )
+    return OppositionVerifier(
+        case_verifier=LocalCaseVerifier(corpus=corpus, llm_callback=llm_callback),
+        statute_verifier=statute_v,
+        max_workers=max_workers,
+    )
+
+
 def find_replacement_candidates(
     *,
     failed_citation: CitationVerification,
