@@ -453,6 +453,9 @@ class MainWindow(QMainWindow):
 
         # Only populate tree and check docket if a case is loaded
         if self.case_path:
+            # A loaded case always opens in Wizard mode on the Wizard tab,
+            # overriding any restored initial_tab above.
+            self._default_to_wizard_mode()
             self.populate_tree()
             self.load_status_history()
             # Restore wizard task tabs for the initial case (if any).
@@ -896,6 +899,15 @@ class MainWindow(QMainWindow):
         self.logs_tab = LogsTab(self)
         self.tabs.addTab(self.logs_tab, "Logs")
 
+        # --- Lazy tab loading ---------------------------------------------
+        # On a case switch the active tab becomes "Case View", so none of the
+        # data tabs below are visible. Instead of eagerly reloading every one
+        # of them (JSON/DB reads + widget rebuilds, much of it on Z:\), we
+        # register a per-tab loader and defer it until that tab is actually
+        # shown. See load_case_by_number / _on_tab_changed.
+        self._register_lazy_tabs()
+        self.tabs.currentChanged.connect(self._on_tab_changed)
+
         # Add corner buttons next to the tabs
         self.corner_widget = QWidget()
         self.corner_layout = QHBoxLayout(self.corner_widget)
@@ -1034,6 +1046,20 @@ class MainWindow(QMainWindow):
             # Master List + task tabs (managed separately) stay visible.
         if not self.tabs.isTabVisible(self.tabs.currentIndex()):
             self.tabs.setCurrentIndex(0)
+
+    def _default_to_wizard_mode(self) -> None:
+        """A freshly loaded case always opens in Wizard mode on the Wizard tab.
+
+        Called from every case-load path (startup, Master List double-click,
+        Change File dialog). ``set_mode`` flips tab visibility via
+        ``_apply_mode_visibility``; we then explicitly select the Wizard tab
+        (visibility changes can bounce the selection to Master List).
+        """
+        from icharlotte_core.ui.wizard.mode_controller import MODE_WIZARD
+        self.mode_controller.set_mode(MODE_WIZARD)
+        wizard_idx = self._index_of_tab("Wizard")
+        if wizard_idx >= 0:
+            self.tabs.setCurrentIndex(wizard_idx)
 
     # --- Wizard Mode: per-case task-tab snapshot/restore ---
 
@@ -1861,6 +1887,9 @@ class MainWindow(QMainWindow):
                 if hasattr(self, 'discovery_tab'):
                     self.discovery_tab.load_case(new_file_num)
 
+                # A loaded case always defaults to Wizard mode on the Wizard tab.
+                self._default_to_wizard_mode()
+
                 log_event(f"Switched to case {new_file_num}")
             else:
                 QMessageBox.critical(self, "Error", f"Could not find case directory for {new_file_num}")
@@ -1875,7 +1904,73 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"Could not open directory: {e}")
 
+    def _register_lazy_tabs(self):
+        """Register deferred per-tab loaders, keyed by the tab widget.
+
+        Each loader takes the target file_number and refreshes that tab. They
+        are invoked lazily from ``_on_tab_changed`` the first time the tab is
+        shown after a case switch, rather than eagerly during the switch.
+        """
+        self._lazy_loaders = {}          # widget -> loader(file_number)
+        self._tabs_pending_reload = set()  # widgets awaiting reload for self.file_number
+
+        def _load_email(fn):
+            self.email_tab.search_bar.clear()
+            self.email_tab.check_db_init()
+            self.email_tab.perform_search()
+
+        candidates = [
+            ('index_tab', lambda fn: self.index_tab.load_data(fn)),
+            ('chat_tab', lambda fn: self.chat_tab.load_case(fn)),
+            ('liability_tab', lambda fn: self.liability_tab.reset_state()),
+            ('email_tab', _load_email),
+            ('email_update_tab', lambda fn: self.email_update_tab.on_case_changed(fn)),
+            ('deposition_tab', lambda fn: self.deposition_tab.load_case(fn)),
+            ('discovery_tab', lambda fn: self.discovery_tab.load_case(fn)),
+        ]
+        for attr, loader in candidates:
+            widget = getattr(self, attr, None)
+            if widget is not None:
+                self._lazy_loaders[widget] = loader
+
+    def _schedule_lazy_tab_reloads(self):
+        """Mark every lazy tab as needing a reload for the current case and
+        immediately load whichever lazy tab (if any) is currently visible.
+
+        Loaders read ``self.file_number``, which the caller must already have
+        pointed at the new case.
+        """
+        if not hasattr(self, '_lazy_loaders'):
+            return
+        self._tabs_pending_reload = set(self._lazy_loaders.keys())
+        self._maybe_load_current_tab()
+
+    def _maybe_load_current_tab(self):
+        """If the currently-visible tab has a pending reload, run its loader."""
+        if not getattr(self, '_tabs_pending_reload', None):
+            return
+        widget = self.tabs.currentWidget()
+        if widget in self._tabs_pending_reload:
+            self._tabs_pending_reload.discard(widget)
+            loader = self._lazy_loaders.get(widget)
+            if loader:
+                try:
+                    loader(self.file_number)
+                except Exception as e:
+                    log_event(f"[lazy-tab] load failed: {e}")
+
+    def _on_tab_changed(self, index):
+        self._maybe_load_current_tab()
+
     def load_case_by_number(self, file_number):
+        import time as _time
+        _t0 = _time.perf_counter()
+
+        def _lap(label, since):
+            now = _time.perf_counter()
+            log_event(f"[switch-timing] {label}: {(now - since) * 1000:.0f} ms")
+            return now
+
         log_debug(f"load_case_by_number: switching to {file_number}")
         new_path = get_case_path(file_number)
         if not new_path:
@@ -1895,10 +1990,12 @@ class MainWindow(QMainWindow):
         # _remove_all_task_tabs above. Save the persistent singleton too.
         if hasattr(self, 'chat_tab') and self.chat_tab:
             self.chat_tab.save_current_state()
+        _t = _lap("save old-case state", _t0)
         self.file_number = file_number
         self.case_path = new_path
         self._update_window_title()
         self.populate_tree()
+        _t = _lap("populate_tree", _t)
         self.clear_all_status()
 
         for btn in self.agent_buttons.values():
@@ -1908,39 +2005,24 @@ class MainWindow(QMainWindow):
                 self.agent_buttons[script].set_running(True)
 
         self.load_status_history()
+        _t = _lap("load_status_history", _t)
 
-        # Activate the appropriate tab for the current mode.
-        if self.mode_controller.is_wizard:
-            wizard_idx = self._index_of_tab("Wizard")
-            if wizard_idx >= 0:
-                self.tabs.setCurrentIndex(wizard_idx)
-        else:
-            case_view_idx = self._index_of_tab("Case View")
-            if case_view_idx >= 0:
-                self.tabs.setCurrentIndex(case_view_idx)
+        # A loaded case always defaults to Wizard mode on the Wizard tab.
+        self._default_to_wizard_mode()
 
-        if hasattr(self, 'index_tab'):
-            self.index_tab.load_data(self.file_number)
-        if hasattr(self, 'chat_tab'):
-            self.chat_tab.load_case(self.file_number)
-        if hasattr(self, 'liability_tab'):
-            self.liability_tab.reset_state()
-        if hasattr(self, 'email_tab'):
-            self.email_tab.search_bar.clear()
-            self.email_tab.check_db_init()
-            self.email_tab.perform_search()
-        if hasattr(self, 'email_update_tab'):
-            self.email_update_tab.on_case_changed(file_number)
-        if hasattr(self, 'deposition_tab'):
-            self.deposition_tab.load_case(file_number)
-        if hasattr(self, 'discovery_tab'):
-            self.discovery_tab.load_case(file_number)
+        # Defer Index/Chat/Email/Email Update/Depositions/Discovery/Liability
+        # reloads until their tab is actually shown (none are visible right
+        # after the switch). Loads whichever lazy tab is currently active, if
+        # any, immediately.
+        self._schedule_lazy_tab_reloads()
+        _t = _lap("schedule lazy tab reloads", _t)
 
         # ---- WIZARD: restore the new case's task tabs ----
         try:
             self._restore_task_tabs_for_case()
         except Exception as e:
             log_event(f"[wizard] restore failed: {e}")
+        _t = _lap("restore task tabs", _t)
 
         # Refresh Wizard tab's Recent Tasks list for the new case.
         if hasattr(self, "wizard_tab") and self.wizard_tab is not None:
@@ -1951,6 +2033,7 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 log_event(f"[wizard] refresh recent_tasks failed: {e}")
 
+        _lap("TOTAL switch", _t0)
         log_event(f"Switched to case {self.file_number}")
 
     def view_docket(self):
