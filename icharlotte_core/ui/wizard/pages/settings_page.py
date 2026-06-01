@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .. import theme
 from ..registry import TaskSpec
 
 
@@ -42,21 +43,29 @@ class SettingsPage(QWidget):
         self._case_root: str | None = case_root
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(24, 24, 24, 24)
-        outer.setSpacing(16)
+        outer.setContentsMargins(
+            theme.SPACE_XL, theme.SPACE_XL, theme.SPACE_XL, theme.SPACE_XL
+        )
+        outer.setSpacing(theme.SPACE_LG)
+
+        # One-line instruction so the page is self-explanatory.
+        self.instruction_label = theme.helper_text(
+            "Choose the documents to include, then click Continue."
+        )
+        outer.addWidget(self.instruction_label)
 
         # Files section
-        files_label = QLabel(self._format_files_label())
-        files_label.setStyleSheet("font-size: 13px; font-weight: 600;")
+        files_label = theme.section_header(self._format_files_label())
         outer.addWidget(files_label)
         self.files_label = files_label
 
         # Add Files... / Remove button row
         file_btn_row = QHBoxLayout()
-        self.add_files_btn = QPushButton("Add Files...")
+        file_btn_row.setSpacing(theme.SPACE_SM)
+        self.add_files_btn = theme.secondary_button("Add Files…")
         self.add_files_btn.clicked.connect(self._on_add_files)
         file_btn_row.addWidget(self.add_files_btn)
-        self.remove_btn = QPushButton("Remove")
+        self.remove_btn = theme.secondary_button("Remove")
         self.remove_btn.setEnabled(False)
         self.remove_btn.clicked.connect(self._on_remove_files)
         file_btn_row.addWidget(self.remove_btn)
@@ -67,22 +76,28 @@ class SettingsPage(QWidget):
         self.files_list.setMaximumHeight(150)
         self.files_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.files_list.itemSelectionChanged.connect(self._on_selection_changed)
-        self._refresh_files_list()
         outer.addWidget(self.files_list)
+
+        # Empty-state hint shown under the list when no files are selected.
+        self.empty_hint = theme.caption("No files yet — click “Add Files…” to get started.")
+        self.empty_hint.setStyleSheet(
+            f"font-size: {theme.FONT_CAPTION}px; color: {theme.TEXT_FAINT}; font-style: italic;"
+        )
+        outer.addWidget(self.empty_hint)
+
+        self._refresh_files_list()
 
         # Placeholder body
         body = QLabel(f"Settings for {spec.title} — to be defined.")
-        body.setStyleSheet("color: #666; font-style: italic; padding: 24px;")
-        body.setAlignment(body.alignment())
+        body.setStyleSheet(
+            f"color: {theme.TEXT_MUTED}; font-style: italic; padding: {theme.SPACE_XL}px;"
+        )
         outer.addWidget(body, 1)
 
-        # Proceed button bottom-right
+        # Continue button bottom-right
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        self.proceed_btn = QPushButton("Proceed")
-        self.proceed_btn.setStyleSheet(
-            "background-color: #1976D2; color: white; font-weight: 600; padding: 8px 24px; border-radius: 4px;"
-        )
+        self.proceed_btn = theme.primary_button("Continue")
         self.proceed_btn.clicked.connect(self._on_proceed)
         btn_row.addWidget(self.proceed_btn)
         outer.addLayout(btn_row)
@@ -93,6 +108,8 @@ class SettingsPage(QWidget):
         return f"Files ({len(self._files)})"
 
     def _refresh_files_list(self) -> None:
+        from PySide6.QtGui import QColor
+
         self.files_list.clear()
         for path in self._files:
             display = os.path.basename(path)
@@ -100,9 +117,11 @@ class SettingsPage(QWidget):
             item.setToolTip(path)
             if not os.path.exists(path):
                 item.setText(f"{display}  (missing)")
-                item.setForeground(item.foreground())  # placeholder; greyed via stylesheet if desired
+                item.setForeground(QColor(theme.ERROR))
             self.files_list.addItem(item)
         self.files_label.setText(self._format_files_label())
+        if hasattr(self, "empty_hint"):
+            self.empty_hint.setVisible(len(self._files) == 0)
         self._update_proceed_enabled()
 
     def _update_proceed_enabled(self) -> None:

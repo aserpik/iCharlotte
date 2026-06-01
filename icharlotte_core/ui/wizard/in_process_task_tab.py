@@ -22,13 +22,14 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
-    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
+from icharlotte_core.ui.wizard import theme
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
 from icharlotte_core.ui.wizard.pages.output_page import OutputPage
+from icharlotte_core.ui.wizard.task_scaffold import WizardTaskContainer
 
 
 PAGE_SETTINGS = 0
@@ -40,7 +41,7 @@ PAGE_OUTPUT = 2
 WorkerFactory = Callable[[str, str, dict, Optional[QWidget]], QThread]
 
 
-class InProcessTaskTab(QStackedWidget):
+class InProcessTaskTab(WizardTaskContainer):
     """Settings → Status → Output flow backed by an in-process QThread worker."""
 
     task_completed = Signal(dict)  # recent-tasks entry dict (parity with TaskTab)
@@ -56,8 +57,7 @@ class InProcessTaskTab(QStackedWidget):
         auto_run: bool = False,
         parent: QWidget | None = None,
     ):
-        super().__init__(parent)
-        self._spec = spec
+        super().__init__(spec, parent=parent)
         self._case_path = case_path
         self._file_number = file_number
         self._worker_factory = worker_factory
@@ -217,24 +217,18 @@ class SubpoenaSettingsPage(_RunnableSettingsPage):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(12)
 
-        intro = QLabel(
+        intro = theme.helper_text(
             "The Subpoena Tracker scans the case folder for issued subpoenas,"
             " received records, and medical chronologies, then produces a"
             " consolidated tracking report in NOTES/AI OUTPUT."
         )
-        intro.setWordWrap(True)
-        intro.setStyleSheet("font-size: 13px;")
         layout.addWidget(intro)
 
         layout.addStretch(1)
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        self.run_btn = QPushButton("Run Subpoena Tracker")
-        self.run_btn.setStyleSheet(
-            "background-color: #1976D2; color: white; font-weight: 600;"
-            " padding: 8px 24px; border-radius: 4px;"
-        )
+        self.run_btn = theme.primary_button("Run Subpoena Tracker")
         self.run_btn.clicked.connect(lambda: self.run_requested.emit({}))
         btn_row.addWidget(self.run_btn)
         layout.addLayout(btn_row)
@@ -249,14 +243,12 @@ class MedExtractorSettingsPage(_RunnableSettingsPage):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(12)
 
-        intro = QLabel(
+        intro = theme.helper_text(
             "Paste medical chronology entries below. Each entry should include"
-            " a date of treatment and provider/facility name.\n\n"
-            "Example: \"On March 22, 2016, Plaintiff was evaluated by"
-            " Vikram M Shaker, MD at Adventist Health for a CT of the abdomen...\""
+            " a date of treatment and provider/facility name.  Example: “On"
+            " March 22, 2016, Plaintiff was evaluated by Vikram M Shaker, MD at"
+            " Adventist Health for a CT of the abdomen…”"
         )
-        intro.setWordWrap(True)
-        intro.setStyleSheet("font-size: 13px;")
         layout.addWidget(intro)
 
         self.text_input = QPlainTextEdit()
@@ -268,11 +260,7 @@ class MedExtractorSettingsPage(_RunnableSettingsPage):
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        self.extract_btn = QPushButton("Extract")
-        self.extract_btn.setStyleSheet(
-            "background-color: #1976D2; color: white; font-weight: 600;"
-            " padding: 8px 24px; border-radius: 4px;"
-        )
+        self.extract_btn = theme.primary_button("Extract")
         self.extract_btn.clicked.connect(self._on_extract)
         btn_row.addWidget(self.extract_btn)
         layout.addLayout(btn_row)
@@ -303,26 +291,25 @@ class MedExtractorOutputPage(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(12)
 
-        header = QLabel("Extraction complete")
-        header.setStyleSheet("font-size: 15px; font-weight: 600;")
+        header = theme.page_title("Extraction complete")
         layout.addWidget(header)
 
         self.summary_view = QPlainTextEdit()
         self.summary_view.setReadOnly(True)
         self.summary_view.setStyleSheet(
-            "font-family: Consolas, 'Courier New', monospace; font-size: 12px;"
+            f"font-family: {theme.MONO}; font-size: {theme.FONT_BODY}px;"
         )
         layout.addWidget(self.summary_view, 1)
 
         btn_row = QHBoxLayout()
-        self.open_folder_btn = QPushButton("Open Output Folder")
+        self.open_folder_btn = theme.secondary_button("Open Output Folder")
         self.open_folder_btn.clicked.connect(self._on_open_folder)
         btn_row.addWidget(self.open_folder_btn)
         btn_row.addStretch()
-        self.rerun_btn = QPushButton("Run Again")
+        self.rerun_btn = theme.secondary_button("Run Again")
         self.rerun_btn.clicked.connect(self.rerun_requested.emit)
         btn_row.addWidget(self.rerun_btn)
-        self.edit_settings_btn = QPushButton("Edit Entries & Re-run")
+        self.edit_settings_btn = theme.secondary_button("Edit Entries & Re-run")
         self.edit_settings_btn.clicked.connect(self.edit_settings_requested.emit)
         btn_row.addWidget(self.edit_settings_btn)
         layout.addLayout(btn_row)

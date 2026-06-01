@@ -3,28 +3,29 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QMouseEvent
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout
 
+from . import theme
 from .registry import TaskSpec
 
 
-_CARD_STYLE = """
-TaskCard {
-    background-color: #ffffff;
-    border: 1px solid #e0e0e0;
-    border-radius: 10px;
-}
-TaskCard:hover {
-    border-color: #1976D2;
-    background-color: #fafcff;
-}
+_CARD_STYLE = f"""
+TaskCard {{
+    background-color: {theme.BG_CARD};
+    border: 1px solid {theme.BORDER};
+    border-radius: {theme.RADIUS_LG}px;
+}}
+TaskCard:hover {{
+    border-color: {theme.PRIMARY};
+    background-color: {theme.BG_SUBTLE};
+}}
 """
 
-_ICON_TILE_STYLE = """
-QLabel#icon_tile {
-    background-color: #fff7e6;
-    border-radius: 8px;
+_ICON_TILE_STYLE = f"""
+QLabel#icon_tile {{
+    background-color: {theme.PRIMARY_SUBTLE};
+    border-radius: {theme.RADIUS_MD}px;
     font-size: 22px;
     qproperty-alignment: AlignCenter;
-}
+}}
 """
 
 
@@ -54,7 +55,9 @@ class TaskCard(QFrame):
         header.addWidget(self.icon_tile)
 
         self.title_label = QLabel(spec.title)
-        self.title_label.setStyleSheet("font-size: 14px; font-weight: 600; color: #1a1a1a;")
+        self.title_label.setStyleSheet(
+            f"font-size: 14px; font-weight: 600; color: {theme.TEXT};"
+        )
         self.title_label.setWordWrap(True)
         header.addWidget(self.title_label, 1)
 
@@ -62,7 +65,9 @@ class TaskCard(QFrame):
 
         self.description_label = QLabel(spec.description)
         self.description_label.setWordWrap(True)
-        self.description_label.setStyleSheet("font-size: 12px; color: #666;")
+        self.description_label.setStyleSheet(
+            f"font-size: {theme.FONT_BODY}px; color: {theme.TEXT_MUTED};"
+        )
         outer.addWidget(self.description_label, 1)
 
     @property

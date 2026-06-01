@@ -13,6 +13,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .. import theme
+
 
 class StatusPage(QWidget):
     """Shows progress + log lines. Emits cancel_requested when Cancel is clicked."""
@@ -23,12 +25,16 @@ class StatusPage(QWidget):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(24, 24, 24, 24)
-        outer.setSpacing(12)
+        outer.setContentsMargins(
+            theme.SPACE_XL, theme.SPACE_XL, theme.SPACE_XL, theme.SPACE_XL
+        )
+        outer.setSpacing(theme.SPACE_MD)
 
         # 1. Status label
         self.status_label = QLabel("Starting…")
-        self.status_label.setStyleSheet("font-size: 13px; font-weight: 600;")
+        self.status_label.setStyleSheet(
+            f"font-size: {theme.FONT_H3}px; font-weight: 600; color: {theme.TEXT};"
+        )
         outer.addWidget(self.status_label)
 
         # 2. Progress row: bar + percent + ETA
@@ -41,11 +47,15 @@ class StatusPage(QWidget):
         progress_row.addWidget(self.progress_bar, 1)
 
         self.percent_label = QLabel("")
-        self.percent_label.setStyleSheet("font-weight: 600; min-width: 40px;")
+        self.percent_label.setStyleSheet(
+            f"font-weight: 600; min-width: 40px; color: {theme.TEXT};"
+        )
         progress_row.addWidget(self.percent_label)
 
         self.eta_label = QLabel("")
-        self.eta_label.setStyleSheet("color: #666; font-size: 11px;")
+        self.eta_label.setStyleSheet(
+            f"color: {theme.TEXT_MUTED}; font-size: {theme.FONT_CAPTION}px;"
+        )
         progress_row.addWidget(self.eta_label)
 
         outer.addLayout(progress_row)
@@ -55,9 +65,9 @@ class StatusPage(QWidget):
         self.log_toggle_btn.setCheckable(True)
         self.log_toggle_btn.setChecked(False)
         self.log_toggle_btn.setStyleSheet(
-            "QPushButton { background: #f5f5f5; border: 1px solid #ccc; padding: 4px 10px;"
-            " border-radius: 3px; text-align: left; }"
-            "QPushButton:hover { background: #e8e8e8; }"
+            f"QPushButton {{ background: {theme.BG_SUBTLE}; border: 1px solid {theme.BORDER};"
+            f" padding: 4px 10px; border-radius: {theme.RADIUS_SM}px; text-align: left; }}"
+            f"QPushButton:hover {{ background: #EEF1F4; }}"
         )
         self.log_toggle_btn.setMaximumWidth(140)
         self.log_toggle_btn.toggled.connect(self._on_log_toggle_clicked)
@@ -66,7 +76,9 @@ class StatusPage(QWidget):
         # 4. Log view (hidden by default)
         self.log_view = QPlainTextEdit()
         self.log_view.setReadOnly(True)
-        self.log_view.setStyleSheet("font-family: Consolas, 'Courier New', monospace; font-size: 11px;")
+        self.log_view.setStyleSheet(
+            f"font-family: {theme.MONO}; font-size: {theme.FONT_CAPTION}px;"
+        )
         self.log_view.setVisible(False)
         outer.addWidget(self.log_view, 1)
 
@@ -75,14 +87,12 @@ class StatusPage(QWidget):
         ai_layout = QHBoxLayout(self.awaiting_input_widget)
         ai_layout.setContentsMargins(0, 4, 0, 4)
         ai_label = QLabel("Topics extracted — pick which to summarize.")
-        ai_label.setStyleSheet("font-weight: bold; font-size: 13px;")
+        ai_label.setStyleSheet(
+            f"font-weight: bold; font-size: {theme.FONT_H3}px; color: {theme.TEXT};"
+        )
         ai_layout.addWidget(ai_label)
         ai_layout.addStretch()
-        self.configure_btn = QPushButton("Configure Topics & Continue")
-        self.configure_btn.setStyleSheet(
-            "background-color: #1565c0; color: white; font-weight: 600;"
-            " padding: 8px 20px; border-radius: 4px;"
-        )
+        self.configure_btn = theme.primary_button("Configure Topics & Continue")
         self.configure_btn.clicked.connect(self.configure_requested)
         ai_layout.addWidget(self.configure_btn)
         self.awaiting_input_widget.setVisible(False)
@@ -90,10 +100,7 @@ class StatusPage(QWidget):
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        self.cancel_btn = QPushButton("Cancel")
-        self.cancel_btn.setStyleSheet(
-            "background-color: #d32f2f; color: white; font-weight: 600; padding: 8px 20px; border-radius: 4px;"
-        )
+        self.cancel_btn = theme.danger_button("Cancel")
         self.cancel_btn.clicked.connect(self._on_cancel)
         btn_row.addWidget(self.cancel_btn)
         outer.addLayout(btn_row)

@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from . import theme
 from .registry import list_tasks
 from .task_card import TaskCard
 
@@ -32,23 +33,27 @@ class WizardTab(QWidget):
         self._build_ui()
 
     def _build_ui(self):
+        self.setStyleSheet(theme.wizard_stylesheet())
+
         outer = QVBoxLayout(self)
         outer.setContentsMargins(40, 32, 40, 32)
-        outer.setSpacing(24)
+        outer.setSpacing(theme.SPACE_XL)
 
         header = QLabel("What would you like to do?")
-        header.setStyleSheet("font-size: 22px; font-weight: 400; color: #1a1a1a;")
+        header.setStyleSheet(
+            f"font-size: {theme.FONT_H1}px; font-weight: 600; color: {theme.TEXT};"
+        )
         outer.addWidget(header)
+
+        subtitle = theme.helper_text(
+            "Pick a task to get started. Each one walks you through Settings → Running → Output."
+        )
+        outer.addWidget(subtitle)
 
         # Vertical splitter: cards on top, recent section on bottom
         self._splitter = QSplitter(Qt.Orientation.Vertical)
         self._splitter.setChildrenCollapsible(False)
         self._splitter.setHandleWidth(6)
-        self._splitter.setStyleSheet(
-            "QSplitter::handle { background: #e0e0e0; }"
-            " QSplitter::handle:hover { background: #b0b0b0; }"
-            " QSplitter::handle:pressed { background: #909090; }"
-        )
 
         # Card grid (top of splitter)
         scroll = QScrollArea()
@@ -77,9 +82,9 @@ class WizardTab(QWidget):
 
         self._recent_toggle_btn = QPushButton("Show Recent Tasks")
         self._recent_toggle_btn.setStyleSheet(
-            "QPushButton { font-size: 13px; color: #555; background: transparent;"
-            " border: none; padding: 4px 0; text-align: left; }"
-            " QPushButton:hover { color: #1a1a1a; }"
+            f"QPushButton {{ font-size: {theme.FONT_H3}px; color: {theme.TEXT_MUTED};"
+            f" background: transparent; border: none; padding: 4px 0; text-align: left; }}"
+            f" QPushButton:hover {{ color: {theme.TEXT}; }}"
         )
         self._recent_toggle_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._recent_toggle_btn.clicked.connect(self._on_toggle_recent)
@@ -92,8 +97,7 @@ class WizardTab(QWidget):
         recent_outer.setContentsMargins(0, 0, 0, 0)
         recent_outer.setSpacing(8)
 
-        recent_label = QLabel("Recent Tasks")
-        recent_label.setStyleSheet("font-size: 14px; font-weight: 600; color: #333;")
+        recent_label = theme.section_header("Recent Tasks")
         recent_outer.addWidget(recent_label)
 
         self._recent_layout = QVBoxLayout()
@@ -142,7 +146,7 @@ class WizardTab(QWidget):
     def _render_recent_empty_state(self):
         self._clear_recent_layout()
         empty = QLabel("No completed tasks for this case yet.")
-        empty.setStyleSheet("color: #999; font-style: italic;")
+        empty.setStyleSheet(f"color: {theme.TEXT_FAINT}; font-style: italic;")
         self._recent_layout.addWidget(empty)
 
     def _clear_recent_layout(self):
@@ -167,24 +171,25 @@ class WizardTab(QWidget):
 
     def _build_recent_row(self, entry: dict) -> QWidget:
         w = QFrame()
-        w.setStyleSheet("QFrame { border-bottom: 1px solid #f0f0f0; padding: 4px 0; }")
+        w.setStyleSheet(
+            f"QFrame {{ border-bottom: 1px solid {theme.BORDER_LIGHT}; padding: 4px 0; }}"
+        )
         h = QHBoxLayout(w)
         h.setContentsMargins(0, 0, 0, 0)
-        h.setSpacing(12)
+        h.setSpacing(theme.SPACE_MD)
 
         title = entry.get("title", entry.get("task_id", "Unknown"))
         ts = entry.get("completed_at", "")
         label = QLabel(f"• {title}  —  {ts}")
-        label.setStyleSheet("font-size: 12px; color: #333;")
+        label.setStyleSheet(f"font-size: {theme.FONT_BODY}px; color: {theme.TEXT_BODY};")
         h.addWidget(label, 1)
 
         out_path = entry.get("output_path") or ""
         if out_path:
             label.setToolTip(out_path)
 
-        btn = QPushButton("Reopen")
-        btn.setFixedHeight(26)
-        btn.setStyleSheet("padding: 0 12px;")
+        btn = theme.secondary_button("Reopen")
+        btn.setFixedHeight(28)
         btn.clicked.connect(lambda _=False, e=entry: self.reopen_requested.emit(e))
         h.addWidget(btn)
 

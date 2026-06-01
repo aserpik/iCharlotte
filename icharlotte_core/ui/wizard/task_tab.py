@@ -2,18 +2,19 @@
 from typing import List, Optional
 
 from PySide6.QtCore import Signal
-from PySide6.QtWidgets import QStackedWidget, QWidget
+from PySide6.QtWidgets import QWidget
 
 from icharlotte_core.ui.wizard.pages.settings_page import SettingsPage
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
 from icharlotte_core.ui.wizard.pages.output_page import OutputPage
+from icharlotte_core.ui.wizard.task_scaffold import WizardTaskContainer
 
 PAGE_SETTINGS = 0
 PAGE_STATUS = 1
 PAGE_OUTPUT = 2
 
 
-class TaskTab(QStackedWidget):
+class TaskTab(WizardTaskContainer):
     """Stateful container for one running task. Owns its own worker."""
 
     closed = Signal()  # emitted when the tab is being removed
@@ -27,8 +28,7 @@ class TaskTab(QStackedWidget):
         file_number: str = "",
         parent: QWidget | None = None,
     ):
-        super().__init__(parent)
-        self._spec = spec
+        super().__init__(spec, parent=parent)
         self._files: List[str] = list(files) if files else []
         self._case_path = case_path
         self._file_number = file_number

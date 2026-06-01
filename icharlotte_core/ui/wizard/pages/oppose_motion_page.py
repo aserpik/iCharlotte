@@ -80,6 +80,7 @@ def _make_local_corpus():
     db, vec = _corpus_paths()
     return LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=_corpus_embedder())
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
+from icharlotte_core.ui.wizard.task_scaffold import WizardTaskContainer
 from icharlotte_core.ui.context_files_dialog import ContextFilesDialog
 from icharlotte_core.word_validator import validate_opposition_docx
 
@@ -1276,7 +1277,7 @@ class OpposeMotionWorker(QThread):
             self.finished_result.emit(False, str(exc))
 
 
-class OpposeMotionTaskTab(QStackedWidget):
+class OpposeMotionTaskTab(WizardTaskContainer):
     task_completed = Signal(dict)
 
     def __init__(
@@ -1289,8 +1290,7 @@ class OpposeMotionTaskTab(QStackedWidget):
         auto_analyze: bool = False,
         parent: QWidget | None = None,
     ):
-        super().__init__(parent)
-        self._spec = spec
+        super().__init__(spec, parent=parent)
         self._case_path = case_path
         self._file_number = file_number
         self._files = [motion_file] + list(context_files)

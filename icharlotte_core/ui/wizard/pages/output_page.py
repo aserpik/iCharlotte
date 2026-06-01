@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .. import theme
 from ..docx_io import load_docx_as_html, save_qtextdocument_as_docx
 
 
@@ -41,21 +42,23 @@ class OutputPage(QWidget):
         self._save_suggested_filename = ""
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(24, 24, 24, 24)
-        outer.setSpacing(12)
+        outer.setContentsMargins(
+            theme.SPACE_XL, theme.SPACE_XL, theme.SPACE_XL, theme.SPACE_XL
+        )
+        outer.setSpacing(theme.SPACE_MD)
 
         # Picker row (hidden when only one output)
         picker_row = QHBoxLayout()
-        picker_row.setSpacing(8)
+        picker_row.setSpacing(theme.SPACE_SM)
         self.picker_label = QLabel("Output:")
-        self.picker_label.setStyleSheet("font-weight: 600;")
+        self.picker_label.setStyleSheet(f"font-weight: 600; color: {theme.TEXT};")
         picker_row.addWidget(self.picker_label)
         self.output_picker = QComboBox()
         self.output_picker.setMinimumWidth(360)
         self.output_picker.currentIndexChanged.connect(self._on_picker_changed)
         picker_row.addWidget(self.output_picker, 1)
         self.outputs_count_label = QLabel("")
-        self.outputs_count_label.setStyleSheet("color: #666;")
+        self.outputs_count_label.setStyleSheet(f"color: {theme.TEXT_MUTED};")
         picker_row.addWidget(self.outputs_count_label)
         self.picker_row_widget = QWidget()
         self.picker_row_widget.setLayout(picker_row)
@@ -65,7 +68,7 @@ class OutputPage(QWidget):
         # Inline progress hint shown while sibling files are still processing.
         self.progress_hint_label = QLabel("")
         self.progress_hint_label.setStyleSheet(
-            "color: #1976D2; font-style: italic; padding: 2px 4px;"
+            f"color: {theme.PRIMARY}; font-style: italic; padding: 2px 4px;"
         )
         self.progress_hint_label.setVisible(False)
         outer.addWidget(self.progress_hint_label)
@@ -76,17 +79,18 @@ class OutputPage(QWidget):
         self.failure_banner_label = QLabel("")
         self.failure_banner_label.setWordWrap(True)
         self.failure_banner_label.setStyleSheet(
-            "background-color: #FFF3E0; color: #B71C1C; border: 1px solid #E65100; "
-            "border-radius: 4px; padding: 8px 12px; font-weight: 600;"
+            f"background-color: {theme.WARNING_BG}; color: {theme.ERROR_HOVER};"
+            f" border: 1px solid {theme.WARNING}; border-radius: {theme.RADIUS_SM}px;"
+            f" padding: 8px 12px; font-weight: 600;"
         )
         self.failure_banner_label.setVisible(False)
         outer.addWidget(self.failure_banner_label)
 
         header = QHBoxLayout()
         self.file_label = QLabel("File: —")
-        self.file_label.setStyleSheet("font-weight: 600;")
+        self.file_label.setStyleSheet(f"font-weight: 600; color: {theme.TEXT};")
         header.addWidget(self.file_label, 1)
-        self.open_in_word_btn = QPushButton("Open in Word")
+        self.open_in_word_btn = theme.secondary_button("Open in Word")
         self.open_in_word_btn.clicked.connect(self._on_open_in_word)
         header.addWidget(self.open_in_word_btn)
         outer.addLayout(header)
@@ -98,19 +102,16 @@ class OutputPage(QWidget):
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
-        self.copy_all_btn = QPushButton("Copy All")
+        self.copy_all_btn = theme.secondary_button("Copy All")
         self.copy_all_btn.clicked.connect(self._on_copy_all)
         btn_row.addWidget(self.copy_all_btn)
-        self.rerun_btn = QPushButton("Re-run")
+        self.rerun_btn = theme.secondary_button("Re-run")
         self.rerun_btn.clicked.connect(self.rerun_requested.emit)
         btn_row.addWidget(self.rerun_btn)
-        self.edit_settings_btn = QPushButton("Edit Settings & Re-run")
+        self.edit_settings_btn = theme.secondary_button("Edit Settings & Re-run")
         self.edit_settings_btn.clicked.connect(self.edit_settings_requested.emit)
         btn_row.addWidget(self.edit_settings_btn)
-        self.save_btn = QPushButton("Save")
-        self.save_btn.setStyleSheet(
-            "background-color: #1976D2; color: white; font-weight: 600; padding: 6px 18px;"
-        )
+        self.save_btn = theme.primary_button("Save")
         self.save_btn.clicked.connect(self._on_save)
         btn_row.addWidget(self.save_btn)
         outer.addLayout(btn_row)
