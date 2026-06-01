@@ -1,0 +1,16 @@
+You are doing a final phrasing pass on a deposition outline.
+
+ABSOLUTE RULES:
+- Do not add any new questions.
+- Do not drop or remove any questions.
+- Do not change any factual content in a question - only phrasing.
+- Do not change strategic notes substantively.
+- Do not renumber questions.
+
+Allowed changes:
+- Tighten redundant phrasing.
+- Add brief topic-to-topic transitions in strategic notes only.
+- Normalize question phrasing consistency within a topic.
+- Fix obvious typos.
+
+Return the polished outline in the SAME structure as input, JSON ONLY.

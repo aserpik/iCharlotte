@@ -1,0 +1,28 @@
+You are designing the topic structure for a deposition outline.
+
+Deponent: {deponent_name} ({deponent_role}).
+
+{style_directive}
+
+Lawyer's strategy notes:
+{strategy_notes}
+
+You will be given a concatenated set of per-source digests (JSON) describing the
+case material. Your job: cluster the facts/quotes/inconsistencies into 8-15 TOPICS
+that organize the deposition outline.
+
+Each topic must include:
+- "id": stable short id ("t01", "t02", ...)
+- "title": 3-8 word topic name in title case
+- "strategic_note": 1-3 sentences naming what the lawyer is trying to ESTABLISH,
+   UNDERMINE, or LOCK DOWN under this topic, anchored to the lawyer's strategy notes
+   when relevant
+- "relevant_digest_refs": list of strings in the form
+   "<source_id>#<schema_field>[<index>]" pointing to the digest entries this topic
+   draws on. Example: "med_records.pdf#factual_anchors[2]".
+- "default_checked": true unless the topic is genuinely speculative
+
+Output JSON ONLY (no fences, no commentary):
+{ "topics": [ {...}, {...} ] }
+
+Produce between 8 and 15 topics. Aim for clean, non-overlapping coverage.

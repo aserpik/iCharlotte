@@ -649,7 +649,7 @@
       "versions": [
         {
           "version": "v1",
-          "created": "2026-05-27T23:37:43.473264",
+          "created": "2026-05-27T23:38:57.876781",
           "description": "Per-argument CourtListener search query generation",
           "author": "system",
           "is_current": true,
@@ -665,8 +665,88 @@
       "versions": [
         {
           "version": "v1",
-          "created": "2026-05-27T23:37:43.484400",
+          "created": "2026-05-27T23:38:57.896834",
           "description": "Re-rank + select best authorities with verbatim passage",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "depo_prep:source_digest": {
+      "agent": "depo_prep",
+      "pass_name": "source_digest",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-05-28T00:09:57.011524",
+          "description": "Phase 1: per-source structured digest extraction",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "depo_prep:topic_clustering": {
+      "agent": "depo_prep",
+      "pass_name": "topic_clustering",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-05-28T00:09:57.015285",
+          "description": "Phase 1: cluster per-source digests into 8-15 topics",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "depo_prep:topic_questions": {
+      "agent": "depo_prep",
+      "pass_name": "topic_questions",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-05-28T00:09:57.018285",
+          "description": "Phase 2: per-topic question generation (the optional-field block is injected by code based on the per-topic checkboxes)",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "depo_prep:dedup": {
+      "agent": "depo_prep",
+      "pass_name": "dedup",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-05-28T00:09:57.021287",
+          "description": "Phase 2: cross-topic dedup + coverage-gap check",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "depo_prep:polish": {
+      "agent": "depo_prep",
+      "pass_name": "polish",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-05-28T00:09:57.024283",
+          "description": "Phase 2: phrasing-only polish pass",
           "author": "system",
           "is_current": true,
           "performance_score": 0.0,

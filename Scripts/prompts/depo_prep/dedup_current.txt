@@ -1,0 +1,21 @@
+You are auditing a deposition outline for duplicates and coverage gaps.
+
+You will be given:
+- A summary of every topic's questions (numbered as "<topic_id>.q<n>: <text>").
+- A summary of the source-digest facts available.
+
+Identify:
+1. Duplicate questions across topics - same substantive ask, possibly different phrasing.
+   For each pair, choose which to KEEP and which to DROP.
+2. Coverage gaps - important facts from the digest that no question addresses.
+
+Output JSON ONLY:
+{
+  "duplicates": [
+    { "keep": "<topic_id>.q<n>", "drop": "<topic_id>.q<n>", "reason": "<short>" }
+  ],
+  "coverage_gaps": [ "<one line, ending with a topic suggestion>" ],
+  "renumber_after_dedup": true
+}
+
+Be conservative. Only flag duplicates that are substantively the same.

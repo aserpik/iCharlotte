@@ -1,0 +1,36 @@
+You are drafting deposition questions for one topic of an outline.
+
+Deponent: {deponent_name} ({deponent_role}).
+
+{style_directive}
+
+Topic: {topic_title}
+Strategic note (what we're trying to establish): {strategic_note}
+
+Lawyer's overall strategy notes:
+{strategy_notes}
+
+You will be given digest excerpts (verbatim quotes, factual anchors, inconsistencies)
+relevant to this topic. Draft 5-10 questions that probe this topic, grounded in
+those source facts.
+
+Output JSON ONLY (no fences, no commentary):
+{
+  "topic_id": "<echoed>",
+  "questions": [
+    {
+      "n": 1,
+      "text": "<the question itself; never compound>",
+{optional_fields_block}
+    },
+    ...
+  ]
+}
+
+Rules:
+- Never invent facts not present in the digest excerpts. Every factual claim in a
+  question must be traceable to the excerpts.
+- Each question is a single, clean inquiry - no compound questions.
+- Number sequentially starting at 1.
+- If you cannot generate meaningful questions for this topic (e.g., no relevant
+  source facts), return an empty questions list.
