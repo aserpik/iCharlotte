@@ -8,8 +8,10 @@ filtered to CA + post-cutoff. Both feed the same DB + vectors.f16 via CorpusInde
 from __future__ import annotations
 
 import argparse
+import io
 import logging
 import os
+import time
 from typing import Any
 
 from icharlotte_core.legal_research.local_corpus import schema
@@ -213,13 +215,103 @@ CL_BULK_BASE = "https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/bul
 CL_BULK_DATE = "2026-03-31"   # newest quarterly snapshot (browse the bucket for current)
 
 
+def _default_opener(url: str, headers: dict, timeout: int):  # pragma: no cover - network
+    import urllib.request
+    req = urllib.request.Request(url, headers=headers)
+    return urllib.request.urlopen(req, timeout=timeout)
+
+
+class _ResumableHTTPReader(io.RawIOBase):
+    """A read-only byte stream over an HTTP GET that transparently reconnects
+    with a ``Range`` request when the connection drops, so a 50 GB transfer over
+    hours survives transient drops. Presents a gap-free stream to bz2."""
+
+    def __init__(self, url, *, opener=_default_opener, max_retries: int = 12,
+                 timeout: int = 180, backoff: float = 2.0):
+        self.url = url
+        self._opener = opener
+        self.max_retries = max_retries
+        self.timeout = timeout
+        self.backoff = backoff
+        self.offset = 0          # absolute bytes delivered so far
+        self.total = None        # full Content-Length (from the offset=0 response)
+        self._resp = None
+        self._open()
+
+    def _open(self):
+        headers = {}
+        if self.offset:
+            headers["Range"] = f"bytes={self.offset}-"
+        self._resp = self._opener(self.url, headers, self.timeout)
+        if self.offset == 0:
+            try:
+                cl = self._resp.headers.get("Content-Length")
+                self.total = int(cl) if cl else None
+            except Exception:
+                self.total = None
+        elif self.offset:
+            # Defensive: a 200 (not 206) on a Range request would restart from 0
+            # and corrupt the stream. Detect and refuse.
+            status = getattr(self._resp, "status", None) or getattr(self._resp, "code", None)
+            if status not in (206, None):
+                raise IOError(f"Range request not honored (HTTP {status}); cannot resume safely")
+
+    def readable(self):
+        return True
+
+    def read(self, size=-1):
+        if size is None or size < 0:
+            chunks = []
+            while True:
+                b = self.read(1 << 20)
+                if not b:
+                    break
+                chunks.append(b)
+            return b"".join(chunks)
+        retries = 0
+        while True:
+            try:
+                data = self._resp.read(size)
+            except Exception:
+                data = None
+            if data:
+                self.offset += len(data)
+                return data
+            if data == b"":
+                # Clean end-of-response. If we know the total and haven't reached
+                # it, the connection ended early — reconnect and continue.
+                if self.total is None or self.offset >= self.total:
+                    return b""
+            # else: data is None (read raised) -> reconnect.
+            if retries >= self.max_retries:
+                raise IOError(f"resumable read failed at byte {self.offset} after {retries} retries")
+            retries += 1
+            wait = min(self.backoff * (2 ** (retries - 1)), 30.0) if self.backoff else 0.0
+            if wait:
+                time.sleep(wait)
+            logger.warning("CL stream: connection dropped at byte %d; reconnecting (retry %d/%d)",
+                           self.offset, retries, self.max_retries)
+            try:
+                self._open()
+            except Exception:
+                continue  # retry the reconnect
+
+    def close(self):
+        try:
+            if self._resp is not None:
+                self._resp.close()
+        except Exception:
+            pass
+        super().close()
+
+
 def _stream_cl_bulk(name: str, date: str):  # pragma: no cover - network
-    """Open a CL bulk .csv.bz2 from S3 as a decompressed, streaming text reader."""
-    import bz2, io, urllib.request
+    """Open a CL bulk .csv.bz2 from S3 as a resumable, decompressed text stream."""
+    import bz2
     url = f"{CL_BULK_BASE}/{name}-{date}.csv.bz2"
     logger.info("CL stream: opening %s", url)
-    raw = urllib.request.urlopen(url, timeout=600)
-    return io.TextIOWrapper(bz2.BZ2File(raw), encoding="utf-8", errors="replace")
+    reader = _ResumableHTTPReader(url)
+    return io.TextIOWrapper(bz2.BZ2File(reader), encoding="utf-8", errors="replace")
 
 
 def run_cl_append(*, db_path: str, vectors_path: str, embedder: Embedder,
