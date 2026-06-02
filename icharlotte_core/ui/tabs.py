@@ -595,6 +595,12 @@ class ChatTab(QWidget):
 
         # Repopulate the Saved Documents library tree for the new case
         self._refresh_library_tree()
+        if getattr(self, "persistence", None):
+            try:
+                saved = self.persistence.get_setting("library_selected_ids", [])
+            except Exception:
+                saved = []
+            self._restore_checked_entry_ids(saved)
 
     # ------------------------------------------------------------------
     # Saved Documents (document text library)
@@ -697,7 +703,49 @@ class ChatTab(QWidget):
             self.library_tree.topLevelItem(i).setCheckState(0, state)
 
     def _on_library_item_changed(self, item, column):
+        from PySide6.QtCore import Qt
+        data = item.data(0, Qt.ItemDataRole.UserRole) or {}
+        # Inline rename of an entry (top-level item, text changed).
+        if data.get("kind") == "entry" and column == 0:
+            lib = self._library()
+            new_label = item.text(0).strip()
+            if lib and new_label:
+                try:
+                    lib.rename_entry(data["id"], new_label)
+                except Exception:
+                    pass
         self._update_library_selected_label()
+        self._persist_library_selection()
+
+    def _collect_checked_entry_ids(self):
+        from PySide6.QtCore import Qt
+        ids = []
+        for i in range(self.library_tree.topLevelItemCount()):
+            top = self.library_tree.topLevelItem(i)
+            if top.checkState(0) in (Qt.CheckState.Checked,
+                                     Qt.CheckState.PartiallyChecked):
+                data = top.data(0, Qt.ItemDataRole.UserRole) or {}
+                if data.get("id"):
+                    ids.append(data["id"])
+        return ids
+
+    def _restore_checked_entry_ids(self, ids):
+        from PySide6.QtCore import Qt
+        wanted = set(ids or [])
+        for i in range(self.library_tree.topLevelItemCount()):
+            top = self.library_tree.topLevelItem(i)
+            data = top.data(0, Qt.ItemDataRole.UserRole) or {}
+            if data.get("id") in wanted:
+                top.setCheckState(0, Qt.CheckState.Checked)
+
+    def _persist_library_selection(self):
+        if not getattr(self, "persistence", None):
+            return
+        try:
+            self.persistence.set_setting(
+                "library_selected_ids", self._collect_checked_entry_ids())
+        except Exception:
+            pass
 
     def _iter_checked_library_members(self):
         from PySide6.QtCore import Qt

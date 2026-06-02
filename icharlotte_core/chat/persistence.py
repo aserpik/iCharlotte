@@ -421,6 +421,14 @@ class ChatPersistence:
         data['settings'] = settings
         self.save()
 
+    def get_setting(self, key: str, default: Any = None) -> Any:
+        """Get a single value from the per-case settings blob."""
+        return self.get_settings().get(key, default)
+
+    def set_setting(self, key: str, value: Any):
+        """Set a single value in the per-case settings blob and persist."""
+        self.update_settings(**{key: value})
+
     # --- Attached Files (Context Files) ---
 
     def get_attached_files(self) -> List[str]:

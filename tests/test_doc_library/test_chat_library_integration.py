@@ -88,3 +88,35 @@ def test_budget_warning_silent_when_under_limit(app, tmp_path):
     tab._case_root_for_library = str(tmp_path)
     tab._context_limit_for_test = 1_000_000
     assert tab._library_budget_warning("small text", history_tokens=0) is None
+
+
+def test_inline_rename_persists(app, tmp_path):
+    from PySide6.QtCore import Qt
+    from icharlotte_core.ui.tabs import ChatTab
+    _seed_library(str(tmp_path))
+    tab = ChatTab()
+    tab._case_root_for_library = str(tmp_path)
+    tab._refresh_library_tree()
+    top = tab.library_tree.topLevelItem(0)
+    top.setText(0, "Renamed Depo")
+    tab._on_library_item_changed(top, 0)
+    labels = [e.label for e in tab._library().list_entries()]
+    assert "Renamed Depo" in labels
+
+
+def test_selection_roundtrip(app, tmp_path):
+    from PySide6.QtCore import Qt
+    from icharlotte_core.ui.tabs import ChatTab
+    lib = _seed_library(str(tmp_path))
+    entry_id = lib.list_entries()[0].id
+    tab = ChatTab()
+    tab._case_root_for_library = str(tmp_path)
+    tab._refresh_library_tree()
+    tab.library_tree.topLevelItem(0).setCheckState(0, Qt.CheckState.Checked)
+    saved = tab._collect_checked_entry_ids()
+    assert entry_id in saved
+    tab2 = ChatTab()
+    tab2._case_root_for_library = str(tmp_path)
+    tab2._refresh_library_tree()
+    tab2._restore_checked_entry_ids(saved)
+    assert tab2.library_tree.topLevelItem(0).checkState(0) == Qt.CheckState.Checked
