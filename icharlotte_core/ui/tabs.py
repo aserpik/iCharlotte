@@ -20,10 +20,9 @@ from PySide6.QtCore import Qt, Signal, QThread, QFileInfo, QTimer, QSettings, QE
 from PySide6.QtGui import QTextCursor, QDragEnterEvent, QDropEvent, QAction, QPixmap, QBrush
 
 from ..config import API_KEYS, SCRIPTS_DIR, GEMINI_DATA_DIR
-from ..utils import log_event, sanitize_filename, format_date_to_mm_dd_yyyy
+from ..utils import log_event
 from ..llm import LLMWorker, ModelFetcher
 from .dialogs import SettingsDialog, SystemPromptDialog
-from .pdf_viewer_widget import PdfViewerWidget
 from .chat_widgets import (
     ConversationSidebar, ResizableInputArea, ContextIndicator,
     MessageWidget, SearchResultsWidget, get_theme, THEMES
