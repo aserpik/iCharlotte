@@ -59,15 +59,23 @@ the library to skip the second extraction. Not required for v1.
 
 ## Section 1 — Data model & storage layout
 
-New module: `icharlotte_core/doc_library/`. Storage in app-data (next to chat
-data, under `GEMINI_DATA_DIR`), keyed by case number — **never** written to the
-Z: case folder (avoids shared-drive write prompts; mirrors `ChatPersistence`).
+New module: `icharlotte_core/doc_library/`. Storage **travels with the case** under
+the existing `.icharlotte` state folder, alongside `wizard_state.json` — so the
+library moves/shares with the case files and is visible to every user on the
+network drive. Resolved via the same convention as `WizardStatePersistence`
+(`<case_root>/NOTES/AI OUTPUT/.icharlotte`, see
+`icharlotte_core/ui/wizard/persistence.py`).
 
 ```
-{GEMINI_DATA_DIR}/doc_library/{file_number}/
+<case_root>/NOTES/AI OUTPUT/.icharlotte/doc_library/
   index.json            # the catalog of entries for this case
   blobs/{sha1}.txt      # extracted text, one file per UNIQUE source document
 ```
+
+The library is keyed by `case_root` (the case folder path), which `ChatTab`
+already has via `main_win.case_path`. Because it lives on the case (Z:) drive,
+querying the library requires the drive to be available — acceptable, since the
+case's source documents live there anyway.
 
 `index.json`:
 
@@ -104,14 +112,19 @@ Z: case folder (avoids shared-drive write prompts; mirrors `ChatPersistence`).
   context without re-reading the text.
 - The **entry** is the expandable unit: the row shows `label`; expanding lists
   `members`.
-- Per-case isolation = one folder per `file_number`.
+- Per-case isolation is inherent — each case folder has its own `.icharlotte/doc_library/`.
+- **Concurrency (shared drive):** atomic tmp-+-`os.replace` writes prevent a
+  partial/corrupt `index.json`. Two users adding to the *same* case's library at the
+  same instant is rare; v1 accepts last-writer-wins on the index (a re-add recovers
+  any lost entry). Blobs are content-addressed, so concurrent blob writes are
+  idempotent.
 
 ## Section 2 — Population flow & dedup
 
 One entry point, two callers:
 
 ```python
-DocumentLibrary(file_number).add_entry(
+DocumentLibrary(case_root).add_entry(
     task_type,        # "summarize_depositions" | "manual" | …
     source_paths,     # list of files in this entry
     metadata,         # role/party/date hints for labeling (optional)
@@ -199,7 +212,7 @@ an entry bundles several files, the label uses the first file's cleaned name wit
 
 **UI.** A new collapsible **"Saved Documents"** group in the Chat settings sidebar,
 below the existing attached-files list — a `QTreeWidget` populated from
-`DocumentLibrary(file_number).list_entries()`:
+`DocumentLibrary(case_root).list_entries()`:
 - Top level = entries (renameable label) with a checkbox.
 - Expand → member files, each independently checkable. Checking an entry checks
   all members (tri-state).
@@ -237,9 +250,11 @@ block, like `attached_files`), so reopening the case keeps the last selection.
   other selections still send.
 - **Index corruption:** atomic writes prevent partial files; an unreadable index is
   backed up and re-initialized rather than crashing the Chat tab.
-- **Offline Z: source:** blobs are local, so querying saved documents works even
-  when Z: is unavailable (side benefit). Add/re-extract of an unreachable file
-  errors gracefully.
+- **Offline / unavailable case drive:** the library lives on the case (Z:) drive,
+  so if the drive is unreachable the "Saved Documents" panel shows an "unavailable —
+  reconnect the case drive" state rather than erroring. (The case's source files are
+  on the same drive, so the case isn't workable while it's offline regardless.)
+  Add/re-extract of an unreachable file errors gracefully.
 - **Snapshot semantics:** a blob is keyed to the file's bytes at capture time. If
   the source later changes, the old capture stays valid; re-adding produces a new
   hash/blob. (Optional: flag "source modified since capture" — not required v1.)
@@ -260,7 +275,8 @@ block, like `attached_files`), so reopening the case keeps the last selection.
 - Semantic search / embeddings over the library (this is exact-text inclusion, not
   retrieval).
 - Backfilling past task runs automatically (manual add covers the need).
-- Sharing the library across users / storing it on the Z: case folder.
+- Locking/merge for simultaneous multi-user writes to the same case (last-writer-
+  wins on the index is accepted for v1; blobs are content-addressed and safe).
 - "Source modified since capture" detection (noted as optional).
 
 ## Key integration points (existing code)
@@ -269,7 +285,11 @@ block, like `attached_files`), so reopening the case keeps the last selection.
   `extract_docx_text()` (~line 1019).
 - `icharlotte_core/ui/tabs.py` — `ChatTab`: `read_files_content()` (~1235),
   settings sidebar file list (~343), `load_case()` (~507), `get_attachment_info()`.
-- `icharlotte_core/chat/persistence.py` — per-case JSON pattern, settings block.
+- `icharlotte_core/chat/persistence.py` — per-case JSON pattern; **selection
+  memory** (last-checked library entries) is stored in the chat settings block.
+- `icharlotte_core/ui/wizard/persistence.py` — `.icharlotte` folder convention
+  (`<case_root>/NOTES/AI OUTPUT/.icharlotte`) and atomic-write pattern the library
+  reuses; library nests under it as `doc_library/`.
 - `icharlotte_core/chat/token_counter.py` — token estimation.
 - Wizard task completion handlers in `icharlotte_core/ui/wizard/` (per-task hook
   sites — to be enumerated in the implementation plan).
