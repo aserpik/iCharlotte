@@ -724,6 +724,27 @@ class ChatTab(QWidget):
             content += f"\n--- FILE: {m.get('name', 'document')} ---\n{text}\n"
         return content
 
+    def _context_limit(self) -> int:
+        forced = getattr(self, "_context_limit_for_test", None)
+        if forced is not None:
+            return forced
+        from icharlotte_core.chat.token_counter import TokenCounter
+        return TokenCounter.get_context_limit(
+            self.model_combo.currentText(), self.provider_combo.currentText())
+
+    def _library_budget_warning(self, file_content: str, history_tokens: int) -> str:
+        from icharlotte_core.chat.token_counter import TokenCounter
+        reserve = 16384
+        used = (TokenCounter.estimate_tokens(file_content) + history_tokens + reserve)
+        limit = self._context_limit()
+        if used <= limit:
+            return None
+        return (f"The selected documents (~{TokenCounter.format_token_count(used)} "
+                f"tokens) exceed this model's context window "
+                f"(~{TokenCounter.format_token_count(limit)}). The request may be "
+                f"truncated or rejected. Deselect some Saved Documents, or proceed "
+                f"anyway?")
+
     def _update_library_selected_label(self):
         members = list(self._iter_checked_library_members())
         toks = sum(int(m.get("tokens", 0)) for m in members)
@@ -1610,6 +1631,17 @@ class ChatTab(QWidget):
 
         # Prepare Content
         file_content = self.read_files_content() + self.read_library_content()
+        warn = self._library_budget_warning(file_content, history_tokens=0)
+        if warn:
+            from PySide6.QtWidgets import QMessageBox
+            reply = QMessageBox.warning(
+                self, "Context Budget", warn,
+                QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel)
+            if reply == QMessageBox.StandardButton.Cancel:
+                self.send_btn.setEnabled(True)
+                self.stop_btn.setEnabled(False)
+                return
         attachments = self.get_attachment_info()
 
         # Detect audio/video attachments

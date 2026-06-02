@@ -69,3 +69,22 @@ def test_read_library_content_empty_when_nothing_checked(app, tmp_path):
     tab._case_root_for_library = str(tmp_path)
     tab._refresh_library_tree()
     assert tab.read_library_content() == ""
+
+
+def test_budget_warning_fires_when_over_limit(app, tmp_path):
+    from icharlotte_core.ui.tabs import ChatTab
+    tab = ChatTab()
+    tab._case_root_for_library = str(tmp_path)
+    tab._context_limit_for_test = 100
+    huge = "x" * 100_000  # ~25k tokens
+    warn = tab._library_budget_warning(huge, history_tokens=0)
+    assert warn is not None
+    assert "context" in warn.lower()
+
+
+def test_budget_warning_silent_when_under_limit(app, tmp_path):
+    from icharlotte_core.ui.tabs import ChatTab
+    tab = ChatTab()
+    tab._case_root_for_library = str(tmp_path)
+    tab._context_limit_for_test = 1_000_000
+    assert tab._library_budget_warning("small text", history_tokens=0) is None
