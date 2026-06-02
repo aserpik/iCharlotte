@@ -14,34 +14,45 @@ def _csv(rows: list[dict]) -> io.StringIO:
     return buf
 
 
-def test_streams_only_ca_recent_cases():
-    courts = _csv([
-        {"id": "cal", "full_name": "Supreme Court of California"},
-        {"id": "ny", "full_name": "New York Court of Appeals"},
+def test_identifies_ca_by_citation_and_filters_published_recent():
+    # citations file: cluster_id -> reporter/volume/page. CA = reporter starts "Cal."
+    citations = _csv([
+        {"id": "1", "volume": "15", "reporter": "Cal. 5th", "page": "1", "type": "8", "cluster_id": "100"},
+        {"id": "2", "volume": "70", "reporter": "Cal. App. 5th", "page": "9", "type": "8", "cluster_id": "101"},
+        {"id": "3", "volume": "50", "reporter": "Cal. 3d", "page": "1", "type": "8", "cluster_id": "102"},  # old
+        {"id": "4", "volume": "1", "reporter": "N.Y.3d", "page": "1", "type": "8", "cluster_id": "103"},   # not CA
+        {"id": "5", "volume": "99", "reporter": "Cal. App. 5th", "page": "5", "type": "8", "cluster_id": "104"},  # unpub
     ])
     clusters = _csv([
-        {"id": "100", "court_id": "cal", "case_name": "Recent v. CA",
-         "date_filed": "2023-06-01", "citation": "15 Cal. 5th 1"},
-        {"id": "101", "court_id": "cal", "case_name": "Old v. CA",
-         "date_filed": "1990-01-01", "citation": "50 Cal. 3d 1"},  # before cutoff
-        {"id": "102", "court_id": "ny", "case_name": "NY thing",
-         "date_filed": "2024-01-01", "citation": "1 N.Y.3d 1"},     # wrong court
+        {"id": "100", "date_filed": "2023-06-01", "case_name": "Recent Pub v. CA",
+         "case_name_short": "Recent", "citation_count": "7", "precedential_status": "Published", "docket_id": "9"},
+        {"id": "101", "date_filed": "2024-01-15", "case_name": "Another Pub v. CA",
+         "case_name_short": "Another", "citation_count": "2", "precedential_status": "Published", "docket_id": "9"},
+        {"id": "102", "date_filed": "1990-01-01", "case_name": "Old v. CA",
+         "case_name_short": "Old", "citation_count": "99", "precedential_status": "Published", "docket_id": "9"},
+        {"id": "104", "date_filed": "2023-03-01", "case_name": "Unpub v. CA",
+         "case_name_short": "Unpub", "citation_count": "0", "precedential_status": "Unpublished", "docket_id": "9"},
     ])
     opinions = _csv([
-        {"cluster_id": "100", "plain_text": "Recent CA opinion about privacy.", "html": ""},
-        {"cluster_id": "101", "plain_text": "Old opinion.", "html": ""},
-        {"cluster_id": "102", "plain_text": "NY opinion.", "html": ""},
+        {"cluster_id": "100", "plain_text": "Recent published opinion about arbitration.", "html": "", "type": "020lead"},
+        {"cluster_id": "101", "plain_text": "Another published opinion about CEQA.", "html": "", "type": "020lead"},
+        {"cluster_id": "102", "plain_text": "Old opinion.", "html": "", "type": "020lead"},
+        {"cluster_id": "104", "plain_text": "Unpublished opinion.", "html": "", "type": "020lead"},
     ])
 
     out = list(cl_bulk_loader.iter_recent_ca_cases(
-        courts_stream=courts, clusters_stream=clusters, opinions_stream=opinions,
-        cutoff_date="2020-01-01",
+        citations_stream=citations, clusters_stream=clusters, opinions_stream=opinions,
+        cutoff_date="2017-01-01", published_only=True,
     ))
-    assert len(out) == 1
-    case, passages = out[0]
-    assert case.case_uid == "cl:100"
-    assert case.source == "cl"
-    assert case.citation == "15 Cal. 5th 1"
-    assert case.year == "2023"
-    assert "privacy" in case.full_text
+    uids = {c.case_uid for c, _ in out}
+    assert uids == {"cl:100", "cl:101"}   # CA + published + post-2017 only
+    by_uid = {c.case_uid: c for c, _ in out}
+    rec = by_uid["cl:100"]
+    assert rec.source == "cl"
+    assert rec.citation == "15 Cal. 5th 1"
+    assert rec.year == "2023"
+    assert rec.citation_count == 7
+    assert "arbitration" in rec.full_text
+    # passages present (keyword-indexable)
+    case, passages = next(o for o in out if o[0].case_uid == "cl:100")
     assert passages and passages[0].case_uid == "cl:100"

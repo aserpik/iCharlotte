@@ -1,14 +1,23 @@
 """CourtListener bulk CSV stream-filter -> normalized recent CA CaseRecords.
 
-CL bulk is full-corpus, single-format CSV. We never store the 50 GB opinions
-file: we stream it, keep only rows whose cluster is CA + post-cutoff, and
-discard the rest. Callers pass decompressed text streams (build.py wraps bz2).
+CL bulk is full-corpus CSV across several files. We identify California cases by
+their CITATION REPORTER (the `citations` file: reporter starting "Cal."), which
+avoids needing the 5 GB dockets file just to resolve a court. We then join:
+
+    citations (cluster_id -> CA reporter cite)   ~121 MB
+    opinion-clusters (cluster_id -> date_filed, case_name, citation_count,
+                      precedential_status)         ~2.3 GB
+    opinions (cluster_id -> opinion text)          ~50 GB  (streamed, never stored)
+
+filter to CA + published + decided after `cutoff_date`, and yield CaseRecord +
+PassageRecords. Callers pass decompressed text streams (build wraps bz2).
 """
 from __future__ import annotations
 
 import csv
 import logging
 import re
+import sys
 from typing import Iterator, TextIO
 
 from icharlotte_core.legal_research.local_corpus.models import CaseRecord, PassageRecord
@@ -16,36 +25,62 @@ from icharlotte_core.legal_research.local_corpus.textproc import chunk_passages,
 
 logger = logging.getLogger(__name__)
 
-# Court ids on CourtListener that are California state courts.
-CA_COURT_IDS = {
-    "cal", "calctapp", "calag", "calapp", "calsuperct",
-    "calapp1st", "calapp2nd", "calapp3rd", "calapp4th", "calapp5th", "calapp6th",
-}
-
 # Opinion text columns in priority order (mirror courtlistener.py field priority).
 _TEXT_COLS = ("plain_text", "html_with_citations", "html", "html_columbia",
               "html_lawbox", "xml_harvard")
 
+# CL precedential_status values we treat as "published".
+_PUBLISHED = {"Published"}
 
-def _ca_court_ids_from_courts(courts_stream: TextIO) -> set[str]:
-    found: set[str] = set()
-    for row in csv.DictReader(courts_stream):
-        cid = (row.get("id") or "").strip()
-        if cid in CA_COURT_IDS:
-            found.add(cid)
-    # Always include the known set even if the courts file is sparse.
-    return found or set(CA_COURT_IDS)
+# Big CSV fields (opinion html/text) can exceed the default csv field-size limit.
+try:
+    csv.field_size_limit(sys.maxsize)
+except OverflowError:  # pragma: no cover - platform-dependent
+    csv.field_size_limit(2**31 - 1)
 
 
-def _recent_ca_clusters(clusters_stream: TextIO, ca_courts: set[str], cutoff: str) -> dict[str, dict]:
+def _is_ca_reporter(reporter: str) -> bool:
+    # CA official + Cal. Rptr. all start with "Cal." (Cal., Cal. 2d..5th,
+    # Cal. App. ..., Cal. Rptr. ..., Cal. Unrep., Cal. App. Supp.).
+    return (reporter or "").strip().startswith("Cal.")
+
+
+def _prefer_official(cites: list[tuple[str, str]]) -> str:
+    """From [(reporter, 'vol rep page'), ...] prefer a non-Rptr official Cal. cite."""
+    if not cites:
+        return ""
+    official = [c for rep, c in cites if not rep.startswith("Cal. Rptr")]
+    return (official[0] if official else cites[0][1])
+
+
+def _ca_clusters_from_citations(citations_stream: TextIO) -> dict[str, str]:
+    """cluster_id -> preferred CA reporter citation, for CA cases only."""
+    by_cluster: dict[str, list[tuple[str, str]]] = {}
+    for row in csv.DictReader(citations_stream):
+        reporter = (row.get("reporter") or "").strip()
+        if not _is_ca_reporter(reporter):
+            continue
+        cid = (row.get("cluster_id") or "").strip()
+        vol = (row.get("volume") or "").strip()
+        page = (row.get("page") or "").strip()
+        if cid and vol and page:
+            by_cluster.setdefault(cid, []).append((reporter, f"{vol} {reporter} {page}"))
+    return {cid: _prefer_official(cites) for cid, cites in by_cluster.items()}
+
+
+def _recent_published(clusters_stream: TextIO, ca_cites: dict[str, str],
+                      cutoff: str, published_only: bool) -> dict[str, dict]:
     keep: dict[str, dict] = {}
     for row in csv.DictReader(clusters_stream):
-        court = (row.get("court_id") or "").strip()
+        cid = (row.get("id") or "").strip()
+        if cid not in ca_cites:
+            continue
         date = (row.get("date_filed") or "").strip()
-        if court in ca_courts and date >= cutoff:
-            cid = (row.get("id") or "").strip()
-            if cid:
-                keep[cid] = row
+        if date < cutoff:
+            continue
+        if published_only and (row.get("precedential_status") or "").strip() not in _PUBLISHED:
+            continue
+        keep[cid] = row
     return keep
 
 
@@ -55,40 +90,52 @@ def _strip_html(s: str) -> str:
 
 def iter_recent_ca_cases(
     *,
-    courts_stream: TextIO,
+    citations_stream: TextIO,
     clusters_stream: TextIO,
     opinions_stream: TextIO,
     cutoff_date: str,
+    published_only: bool = True,
 ) -> Iterator[tuple[CaseRecord, list[PassageRecord]]]:
-    ca_courts = _ca_court_ids_from_courts(courts_stream)
-    clusters = _recent_ca_clusters(clusters_stream, ca_courts, cutoff_date)
+    ca_cites = _ca_clusters_from_citations(citations_stream)
+    if not ca_cites:
+        return
+    clusters = _recent_published(clusters_stream, ca_cites, cutoff_date, published_only)
     if not clusters:
         return
 
+    # The opinions file has one row per opinion; a cluster may have several
+    # (lead + concurrence/dissent). Accumulate text per cluster across rows.
+    text_by_cluster: dict[str, str] = {}
     for row in csv.DictReader(opinions_stream):
         cid = (row.get("cluster_id") or "").strip()
-        meta = clusters.get(cid)
-        if not meta:
+        if cid not in clusters:
             continue
-        text = ""
         for col in _TEXT_COLS:
             raw = row.get(col) or ""
             if raw:
-                text = normalize_text(_strip_html(raw))
-                if text:
+                t = normalize_text(_strip_html(raw))
+                if t:
+                    text_by_cluster[cid] = (text_by_cluster.get(cid, "") + "\n\n" + t).strip()
                     break
+
+    for cid, meta in clusters.items():
+        text = text_by_cluster.get(cid, "")
         if not text:
             continue
         case_uid = f"cl:{cid}"
         date = (meta.get("date_filed") or "").strip()
+        try:
+            cc = int(meta.get("citation_count") or 0)
+        except (TypeError, ValueError):
+            cc = None
+        name = meta.get("case_name") or meta.get("case_name_short") or ""
         rec = CaseRecord(
             case_uid=case_uid, source="cl",
-            name=meta.get("case_name", ""), name_abbreviation=meta.get("case_name", ""),
-            citation=(meta.get("citation") or "").strip(),
-            court=(meta.get("court_id") or "").strip(),
-            decision_date=date, year=(date[:4] if len(date) >= 4 else ""),
+            name=name, name_abbreviation=meta.get("case_name_short", "") or name,
+            citation=ca_cites.get(cid, ""),
+            court="", decision_date=date, year=(date[:4] if len(date) >= 4 else ""),
             url=f"https://www.courtlistener.com/opinion/{cid}/",
-            full_text=text,
+            full_text=text, citation_count=cc,
         )
         passages = [
             PassageRecord(passage_uid=f"{case_uid}#{i}", case_uid=case_uid,
