@@ -2685,7 +2685,6 @@ class IndexTab(QWidget):
         self.file_number = None
         self.index_data = {}  # {pdf_path: [docs]}
         self.current_pdf_path = None
-        self.marked_start_page = None
         self.icon_provider = QFileIconProvider()
         self.setup_ui()
 
@@ -2734,150 +2733,29 @@ class IndexTab(QWidget):
         self._pdf_list_width = 200
         self._pdf_list_collapsed = False
 
-        # Middle: Index Table + Controls
-        middle_widget = QWidget()
-        middle_layout = QVBoxLayout(middle_widget)
-        middle_layout.setContentsMargins(0, 0, 0, 0)
+        # Right of the PDF list: the shared workbench.
+        from .separator_workbench import SeparatorWorkbench
+        self.workbench = SeparatorWorkbench()
+        self.workbench.reanalyze_requested.connect(self._on_workbench_reanalyze)
+        self.workbench.processing_complete.connect(self._on_workbench_processing_complete)
 
-        # Header row with expand button (hidden by default) and search bar
-        middle_header = QHBoxLayout()
-        middle_header.setContentsMargins(4, 4, 4, 4)
+        # Host-level affordance: persist manual table edits back into the index
+        # cache (the workbench is storage-agnostic by design).
+        save_row = QHBoxLayout()
+        save_row.addStretch()
+        self.save_index_btn = QPushButton("Save Edits to Index")
+        self.save_index_btn.setToolTip("Save the current table edits (titles, page ranges) to the cached index for this case.")
+        self.save_index_btn.clicked.connect(self.save_table_to_index)
+        save_row.addWidget(self.save_index_btn)
 
-        self.expand_pdf_btn = QToolButton()
-        self.expand_pdf_btn.setText("▶")
-        self.expand_pdf_btn.setToolTip("Show PDF list")
-        self.expand_pdf_btn.setFixedSize(24, 24)
-        self.expand_pdf_btn.setStyleSheet("QToolButton { border: 1px solid #ccc; border-radius: 4px; font-size: 12px; background: #f0f0f0; }")
-        self.expand_pdf_btn.clicked.connect(self.toggle_pdf_list_collapse)
-        self.expand_pdf_btn.setVisible(False)  # Hidden until collapsed
-        middle_header.addWidget(self.expand_pdf_btn)
+        right_host = QWidget()
+        right_host_layout = QVBoxLayout(right_host)
+        right_host_layout.setContentsMargins(0, 0, 0, 0)
+        right_host_layout.addWidget(self.workbench, 1)
+        right_host_layout.addLayout(save_row)
+        self.doc_splitter.addWidget(right_host)
 
-        # Search Bar
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Search by Date or Title...")
-        self.search_input.textChanged.connect(self.filter_documents)
-        middle_header.addWidget(self.search_input)
-
-        middle_layout.addLayout(middle_header)
-
-        # Sensitivity slider + Re-analyze
-        sensitivity_layout = QHBoxLayout()
-        sensitivity_layout.setContentsMargins(4, 2, 4, 2)
-
-        sensitivity_label = QLabel("Separation:")
-        sensitivity_layout.addWidget(sensitivity_label)
-
-        broad_label = QLabel("Broad")
-        broad_label.setStyleSheet("color: #666; font-size: 11px;")
-        sensitivity_layout.addWidget(broad_label)
-
-        self.sensitivity_slider = QSlider(Qt.Orientation.Horizontal)
-        self.sensitivity_slider.setMinimum(1)
-        self.sensitivity_slider.setMaximum(3)
-        self.sensitivity_slider.setValue(2)
-        self.sensitivity_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
-        self.sensitivity_slider.setTickInterval(1)
-        self.sensitivity_slider.setPageStep(1)
-        self.sensitivity_slider.setFixedWidth(100)
-        sensitivity_layout.addWidget(self.sensitivity_slider)
-
-        fine_label = QLabel("Fine")
-        fine_label.setStyleSheet("color: #666; font-size: 11px;")
-        sensitivity_layout.addWidget(fine_label)
-
-        self.reanalyze_btn = QPushButton("Re-analyze")
-        self.reanalyze_btn.setToolTip("Re-run document separation with the selected sensitivity level")
-        self.reanalyze_btn.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold; padding: 6px 12px;")
-        self.reanalyze_btn.clicked.connect(self.on_reanalyze_clicked)
-        sensitivity_layout.addWidget(self.reanalyze_btn)
-
-        sensitivity_layout.addStretch()
-        middle_layout.addLayout(sensitivity_layout)
-
-        self.doc_table = QTableWidget()
-        self.doc_table.setColumnCount(6)
-        self.doc_table.setHorizontalHeaderLabels(["Sep.", "Merge Group", "ID", "Date", "Pages", "Title"])
-        header = self.doc_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents) # Sep
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)      # Merge Group
-        self.doc_table.setColumnWidth(1, 100)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents) # ID
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents) # Date
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents) # Pages
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)          # Title
-        self.doc_table.setSortingEnabled(True)
-
-        # Connect click signals for PDF navigation
-        self.doc_table.cellClicked.connect(self.on_doc_clicked)
-        self.doc_table.cellDoubleClicked.connect(self.on_doc_double_clicked)
-
-        # Context Menu for Batch Edit
-        self.doc_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.doc_table.customContextMenuRequested.connect(self.show_context_menu)
-
-        middle_layout.addWidget(self.doc_table)
-
-        btn_layout = QHBoxLayout()
-
-        self.add_doc_btn = QPushButton("Add Document")
-        self.add_doc_btn.setToolTip("Add a document that was not identified by the agent (e.g., a missed page range)")
-        self.add_doc_btn.setStyleSheet("background-color: #FF9800; color: white; font-weight: bold; padding: 10px;")
-        self.add_doc_btn.clicked.connect(self.add_document_row)
-        btn_layout.addWidget(self.add_doc_btn)
-
-        self.delete_doc_btn = QPushButton("Delete Selected")
-        self.delete_doc_btn.setToolTip("Delete the selected document rows")
-        self.delete_doc_btn.setStyleSheet("background-color: #f44336; color: white; font-weight: bold; padding: 10px;")
-        self.delete_doc_btn.clicked.connect(self.delete_selected_rows)
-        btn_layout.addWidget(self.delete_doc_btn)
-
-        btn_layout.addStretch()
-
-        self.process_btn = QPushButton("Process Documents")
-        self.process_btn.setToolTip("Extracts checked 'Sep.' items and builds merged PDFs for 'Merge Group' items.")
-        self.process_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 10px;")
-        self.process_btn.clicked.connect(self.process_documents)
-        btn_layout.addWidget(self.process_btn)
-        middle_layout.addLayout(btn_layout)
-
-        self.doc_splitter.addWidget(middle_widget)
-
-        # Right: PDF Preview
-        preview_widget = QWidget()
-        preview_layout = QVBoxLayout(preview_widget)
-        preview_layout.setContentsMargins(0, 0, 0, 0)
-
-        # PDF Viewer with page tracking
-        self.pdf_viewer = PdfViewerWidget()
-        preview_layout.addWidget(self.pdf_viewer)
-
-        # Mark Range controls
-        mark_layout = QHBoxLayout()
-        self.mark_status = QLabel("Range: Not set")
-        self.mark_status.setStyleSheet("font-weight: bold; padding: 5px;")
-        mark_layout.addWidget(self.mark_status)
-
-        self.mark_start_btn = QPushButton("Mark Start")
-        self.mark_start_btn.setToolTip("Mark current page as start of new document")
-        self.mark_start_btn.setStyleSheet("background-color: #2196F3; color: white; padding: 8px;")
-        self.mark_start_btn.clicked.connect(self.mark_start_page)
-        mark_layout.addWidget(self.mark_start_btn)
-
-        self.mark_end_btn = QPushButton("Mark End && Add")
-        self.mark_end_btn.setToolTip("Mark current page as end and add new document")
-        self.mark_end_btn.setStyleSheet("background-color: #4CAF50; color: white; padding: 8px;")
-        self.mark_end_btn.clicked.connect(self.mark_end_and_add)
-        mark_layout.addWidget(self.mark_end_btn)
-
-        self.clear_mark_btn = QPushButton("Clear")
-        self.clear_mark_btn.setToolTip("Clear the marked page range")
-        self.clear_mark_btn.clicked.connect(self.clear_marked_range)
-        mark_layout.addWidget(self.clear_mark_btn)
-
-        preview_layout.addLayout(mark_layout)
-        self.doc_splitter.addWidget(preview_widget)
-
-        self.doc_splitter.setSizes([200, 400, 500])
+        self.doc_splitter.setSizes([200, 900])
         self.doc_splitter.setCollapsible(0, True)
 
     def toggle_pdf_list_collapse(self):
@@ -2885,26 +2763,25 @@ class IndexTab(QWidget):
         sizes = self.doc_splitter.sizes()
         if self._pdf_list_collapsed:
             # Expand
-            self.doc_splitter.setSizes([self._pdf_list_width, sizes[1] - self._pdf_list_width, sizes[2]])
+            self.doc_splitter.setSizes([self._pdf_list_width, sizes[1] - self._pdf_list_width])
             self.collapse_pdf_btn.setText("◀")
             self.collapse_pdf_btn.setToolTip("Collapse panel")
-            self.expand_pdf_btn.setVisible(False)
             self._pdf_list_collapsed = False
         else:
             # Collapse - store current width first
             if sizes[0] > 0:
                 self._pdf_list_width = sizes[0]
-            self.doc_splitter.setSizes([0, sizes[1] + sizes[0], sizes[2]])
+            self.doc_splitter.setSizes([0, sizes[1] + sizes[0]])
             self.collapse_pdf_btn.setText("▶")
             self.collapse_pdf_btn.setToolTip("Expand panel")
-            self.expand_pdf_btn.setVisible(True)
             self._pdf_list_collapsed = True
 
     def load_data(self, file_number):
         self.file_number = file_number
         self.index_data = {}
         self.pdf_list.clear()
-        self.doc_table.setRowCount(0)
+        if hasattr(self, 'workbench'):
+            self.workbench.load_docs("", [])
 
         # Load Index Data
         idx_path = os.path.join(GEMINI_DATA_DIR, f"{file_number}_index.json")
@@ -2947,547 +2824,49 @@ class IndexTab(QWidget):
             self.pdf_list.setCurrentItem(items[0])
             self.on_pdf_selected(items[0], None)
 
-        # Re-enable sensitivity controls
-        if hasattr(self, 'reanalyze_btn'):
-            self.reanalyze_btn.setEnabled(True)
-            self.sensitivity_slider.setEnabled(True)
+        if hasattr(self, 'workbench'):
+            self.workbench.set_busy(False)
 
-    def filter_documents(self, text):
-        text = text.lower()
-        for row in range(self.doc_table.rowCount()):
-            date_item = self.doc_table.item(row, 3)
-            title_widget = self.doc_table.cellWidget(row, 5)  # Title is now a QLineEdit
-
-            date_text = date_item.text().lower() if date_item else ""
-            title_text = title_widget.text().lower() if isinstance(title_widget, QLineEdit) else ""
-
-            if text in date_text or text in title_text:
-                self.doc_table.setRowHidden(row, False)
-            else:
-                self.doc_table.setRowHidden(row, True)
-
-    def on_pdf_selected(self, current, previous):
-        if not current: return
-        path = current.text()
-        self.current_pdf_path = path
-        docs = self.index_data.get(path, [])
-
-        # Load PDF in preview
-        if hasattr(self, 'pdf_viewer') and os.path.exists(path):
-            self.pdf_viewer.load_pdf(path)
-
-        # Clear any marked range when switching PDFs
-        if hasattr(self, 'clear_marked_range'):
-            self.clear_marked_range()
-
-        self.doc_table.setSortingEnabled(False)
-        self.doc_table.setRowCount(0)
-        for doc in docs:
-            self._add_doc_to_table(doc)
-
-        self.doc_table.setSortingEnabled(True)
-
-        # Apply filter
-        if hasattr(self, 'search_input'):
-            self.filter_documents(self.search_input.text())
-
-    def _add_doc_to_table(self, doc, check_sep=False):
-        """Helper to add a document row to the table. Used both for loading and adding new docs."""
-        row = self.doc_table.rowCount()
-        self.doc_table.insertRow(row)
-
-        # Col 0: Sep. Checkbox
-        chk_item = QTableWidgetItem()
-        chk_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-        chk_item.setCheckState(Qt.CheckState.Checked if check_sep else Qt.CheckState.Unchecked)
-        self.doc_table.setItem(row, 0, chk_item)
-
-        # Col 1: Merge Group (LineEdit)
-        merge_edit = QLineEdit()
-        merge_edit.setPlaceholderText("")
-        self.doc_table.setCellWidget(row, 1, merge_edit)
-
-        # Col 2: ID (read-only)
-        id_item = QTableWidgetItem(str(doc.get('id', '')))
-        id_item.setFlags(id_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-        self.doc_table.setItem(row, 2, id_item)
-
-        # Col 3: Date (read-only display, but stored)
-        date_val = doc.get('date', '')
-        formatted_date = format_date_to_mm_dd_yyyy(date_val)
-        date_item = DateTableWidgetItem(formatted_date)
-        date_item.setFlags(date_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-        self.doc_table.setItem(row, 3, date_item)
-
-        # Col 4: Pages (EDITABLE - use LineEdit for better UX)
-        start = doc.get('start', '')
-        end = doc.get('end', '')
-        pages = f"{start}-{end}" if start != end else str(start)
-        pages_edit = QLineEdit(pages)
-        pages_edit.setPlaceholderText("e.g., 5-7")
-        pages_edit.setToolTip("Edit page range (format: start-end or single page)")
-        self.doc_table.setCellWidget(row, 4, pages_edit)
-
-        # Col 5: Title (EDITABLE - use LineEdit)
-        title_edit = QLineEdit(str(doc.get('title', '')))
-        title_edit.setPlaceholderText("Document title")
-        title_edit.setToolTip("Edit document title")
-        title_edit.setCursorPosition(0)  # Show beginning of text, not end
-        self.doc_table.setCellWidget(row, 5, title_edit)
-
-        return row
-
-    def on_reanalyze_clicked(self):
+    def _on_workbench_reanalyze(self, sensitivity):
         if not self.current_pdf_path:
             return
-        sensitivity = self.sensitivity_slider.value()
-        # Disable controls while running
-        self.reanalyze_btn.setEnabled(False)
-        self.sensitivity_slider.setEnabled(False)
         main_window = self.window()
         if hasattr(main_window, 'run_separator_path'):
             main_window.run_separator_path(self.current_pdf_path, sensitivity=sensitivity)
 
-    def add_document_row(self):
-        """Add a new document row that the user can fill in manually."""
-        current_item = self.pdf_list.currentItem()
-        if not current_item:
-            QMessageBox.warning(self, "Warning", "Please select a PDF first.")
+    def _on_workbench_processing_complete(self, summary):
+        created = summary.get("created", [])
+        errors = summary.get("errors", [])
+        msg = f"Processed {len(created)} item(s).\n\nFiles Created:\n" + "\n".join(created[:10])
+        if len(created) > 10:
+            msg += f"\n...and {len(created) - 10} more."
+        if errors:
+            msg += "\n\nErrors:\n" + "\n".join(errors)
+            QMessageBox.warning(self, "Result with Errors", msg)
+        else:
+            QMessageBox.information(self, "Success", msg)
+
+    def on_pdf_selected(self, current, previous):
+        if not current:
             return
-
-        # Find the next available ID
-        max_id = 0
-        for row in range(self.doc_table.rowCount()):
-            id_item = self.doc_table.item(row, 2)
-            if id_item:
-                try:
-                    max_id = max(max_id, int(id_item.text()))
-                except ValueError:
-                    pass
-
-        new_id = max_id + 1
-
-        # Create a new doc dict for the new row
-        new_doc = {
-            'id': str(new_id),
-            'title': 'New Document',
-            'date': '',
-            'start': '',
-            'end': ''
-        }
-
-        # Disable sorting temporarily to add at the end
-        self.doc_table.setSortingEnabled(False)
-        row = self._add_doc_to_table(new_doc, check_sep=True)
-        self.doc_table.setSortingEnabled(True)
-
-        # Select and scroll to the new row
-        self.doc_table.selectRow(row)
-        self.doc_table.scrollToItem(self.doc_table.item(row, 0))
-
-        # Focus on the Pages field for immediate editing
-        pages_widget = self.doc_table.cellWidget(row, 4)
-        if pages_widget:
-            pages_widget.setFocus()
-            pages_widget.selectAll()
-
-    def delete_selected_rows(self):
-        """Delete the selected document rows."""
-        selected_rows = set()
-        for range_ in self.doc_table.selectedRanges():
-            for r in range(range_.topRow(), range_.bottomRow() + 1):
-                selected_rows.add(r)
-
-        if not selected_rows:
-            QMessageBox.information(self, "Info", "No rows selected.")
-            return
-
-        reply = QMessageBox.question(
-            self, "Confirm Delete",
-            f"Delete {len(selected_rows)} selected document(s)?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-
-        if reply == QMessageBox.StandardButton.Yes:
-            # Delete in reverse order to maintain correct indices
-            for row in sorted(selected_rows, reverse=True):
-                self.doc_table.removeRow(row)
+        path = current.text()
+        self.current_pdf_path = path
+        docs = self.index_data.get(path, [])
+        self.workbench.load_docs(path, docs)
 
     def save_table_to_index(self):
-        """Save the current table state (including edits and additions) back to index_data and file."""
-        current_item = self.pdf_list.currentItem()
-        if not current_item:
+        if not self.current_pdf_path:
             QMessageBox.warning(self, "Warning", "No PDF selected.")
             return
-
-        pdf_path = current_item.text()
+        wb = self.workbench
         new_docs = []
-
-        for row in range(self.doc_table.rowCount()):
-            doc_obj = self._get_doc_from_row(row)
-
-            # Validate page range
+        for row in range(wb.doc_table.rowCount()):
+            doc_obj = wb._get_doc_from_row(row)
             if doc_obj['start'] is None or doc_obj['end'] is None:
-                QMessageBox.warning(
-                    self, "Validation Error",
-                    f"Row {row + 1} (ID {doc_obj['id']}): Invalid page range. Cannot save."
-                )
+                QMessageBox.warning(self, "Validation Error",
+                    f"Row {row + 1} (ID {doc_obj['id']}): Invalid page range. Cannot save.")
                 return
-
-            new_docs.append({
-                'id': doc_obj['id'],
-                'title': doc_obj['title'],
-                'date': doc_obj['date'],
-                'start': doc_obj['start'],
-                'end': doc_obj['end']
-            })
-
-        # Update in-memory data
-        self.index_data[pdf_path] = new_docs
+            new_docs.append(doc_obj)
+        self.index_data[self.current_pdf_path] = new_docs
         self.save_data()
-
         QMessageBox.information(self, "Success", f"Saved {len(new_docs)} document(s) to index.")
-
-    def show_context_menu(self, position):
-        menu = QMenu()
-
-        add_doc_action = QAction("Add New Document", self)
-        add_doc_action.triggered.connect(self.add_document_row)
-        menu.addAction(add_doc_action)
-
-        delete_action = QAction("Delete Selected Row(s)", self)
-        delete_action.triggered.connect(self.delete_selected_rows)
-        menu.addAction(delete_action)
-
-        menu.addSeparator()
-
-        set_group_action = QAction("Set Merge Group for Selected", self)
-        set_group_action.triggered.connect(self.set_merge_group_batch)
-        menu.addAction(set_group_action)
-
-        clear_group_action = QAction("Clear Merge Group for Selected", self)
-        clear_group_action.triggered.connect(self.clear_merge_group_batch)
-        menu.addAction(clear_group_action)
-
-        menu.addSeparator()
-
-        save_changes_action = QAction("Save Changes to Index", self)
-        save_changes_action.triggered.connect(self.save_table_to_index)
-        menu.addAction(save_changes_action)
-
-        menu.exec(self.doc_table.viewport().mapToGlobal(position))
-
-    def set_merge_group_batch(self):
-        selected_rows = set()
-        for range_ in self.doc_table.selectedRanges():
-            for r in range(range_.topRow(), range_.bottomRow() + 1):
-                if not self.doc_table.isRowHidden(r):
-                    selected_rows.add(r)
-        
-        if not selected_rows:
-            return
-
-        group_name, ok = QInputDialog.getText(self, "Set Merge Group", "Enter Merge Group Name:")
-        if ok:
-            for row in selected_rows:
-                widget = self.doc_table.cellWidget(row, 1)
-                if isinstance(widget, QLineEdit):
-                    widget.setText(group_name)
-
-    def clear_merge_group_batch(self):
-        selected_rows = set()
-        for range_ in self.doc_table.selectedRanges():
-            for r in range(range_.topRow(), range_.bottomRow() + 1):
-                if not self.doc_table.isRowHidden(r):
-                    selected_rows.add(r)
-        
-        for row in selected_rows:
-            widget = self.doc_table.cellWidget(row, 1)
-            if isinstance(widget, QLineEdit):
-                widget.setText("")
-
-    def _parse_pages(self, pages_str):
-        """Parse a pages string like '5-7' or '8' into (start, end) tuple."""
-        pages_str = pages_str.strip()
-        if '-' in pages_str:
-            parts = pages_str.split('-')
-            try:
-                start = int(parts[0].strip())
-                end = int(parts[1].strip())
-                return start, end
-            except (ValueError, IndexError):
-                return None, None
-        else:
-            try:
-                page = int(pages_str)
-                return page, page
-            except ValueError:
-                return None, None
-
-    def on_doc_clicked(self, row, column):
-        """Single click: Navigate to first page of document."""
-        if not hasattr(self, 'pdf_viewer'):
-            return
-        pages_widget = self.doc_table.cellWidget(row, 4)
-        if pages_widget:
-            start, _ = self._parse_pages(pages_widget.text())
-            if start:
-                self.pdf_viewer.go_to_page(start)
-
-    def on_doc_double_clicked(self, row, column):
-        """Double click: Navigate to last page of document."""
-        if not hasattr(self, 'pdf_viewer'):
-            return
-        pages_widget = self.doc_table.cellWidget(row, 4)
-        if pages_widget:
-            _, end = self._parse_pages(pages_widget.text())
-            if end:
-                self.pdf_viewer.go_to_page(end)
-
-    def mark_start_page(self):
-        """Mark current page as start of new document range."""
-        if not hasattr(self, 'pdf_viewer'):
-            return
-        page = self.pdf_viewer.get_current_page()
-        if page:
-            self.marked_start_page = page
-            self.mark_status.setText(f"Range: {page} - ?")
-            self.mark_status.setStyleSheet("font-weight: bold; padding: 5px; background-color: #FFF3E0;")
-
-    def mark_end_and_add(self):
-        """Mark current page as end and add new document."""
-        if not hasattr(self, 'pdf_viewer'):
-            return
-
-        if not self.marked_start_page:
-            QMessageBox.warning(self, "Warning", "Please mark a start page first.")
-            return
-
-        end_page = self.pdf_viewer.get_current_page()
-        if not end_page:
-            QMessageBox.warning(self, "Warning", "Could not get current page.")
-            return
-
-        # Swap if end is before start
-        start_page = self.marked_start_page
-        if end_page < start_page:
-            start_page, end_page = end_page, start_page
-
-        # Create new document with marked range
-        new_doc = {
-            'id': str(self._get_next_doc_id()),
-            'title': 'New Document',
-            'date': '',
-            'start': start_page,
-            'end': end_page
-        }
-
-        self.doc_table.setSortingEnabled(False)
-        row = self._add_doc_to_table(new_doc, check_sep=True)
-        self.doc_table.setSortingEnabled(True)
-        self.doc_table.selectRow(row)
-        self.doc_table.scrollToItem(self.doc_table.item(row, 0))
-
-        # Focus on title for immediate editing
-        title_widget = self.doc_table.cellWidget(row, 5)
-        if title_widget:
-            title_widget.setFocus()
-            title_widget.selectAll()
-
-        # Reset marked range
-        self.clear_marked_range()
-
-    def clear_marked_range(self):
-        """Clear the marked page range."""
-        self.marked_start_page = None
-        if hasattr(self, 'mark_status'):
-            self.mark_status.setText("Range: Not set")
-            self.mark_status.setStyleSheet("font-weight: bold; padding: 5px;")
-
-    def _get_next_doc_id(self):
-        """Get next available document ID."""
-        max_id = 0
-        for row in range(self.doc_table.rowCount()):
-            id_item = self.doc_table.item(row, 2)
-            if id_item:
-                try:
-                    max_id = max(max_id, int(id_item.text()))
-                except ValueError:
-                    pass
-        return max_id + 1
-
-    def _get_doc_from_row(self, row):
-        """Extract document data from a table row, reading from the editable widgets."""
-        doc_id = self.doc_table.item(row, 2).text() if self.doc_table.item(row, 2) else ""
-
-        # Get pages from widget
-        pages_widget = self.doc_table.cellWidget(row, 4)
-        pages_str = pages_widget.text() if isinstance(pages_widget, QLineEdit) else ""
-        start, end = self._parse_pages(pages_str)
-
-        # Get title from widget
-        title_widget = self.doc_table.cellWidget(row, 5)
-        title = title_widget.text() if isinstance(title_widget, QLineEdit) else ""
-
-        # Get date from item
-        date_item = self.doc_table.item(row, 3)
-        date = date_item.text() if date_item else ""
-
-        return {
-            'id': doc_id,
-            'title': title,
-            'date': date,
-            'start': start,
-            'end': end
-        }
-
-    def process_documents(self):
-        current_item = self.pdf_list.currentItem()
-        if not current_item: return
-
-        pdf_path = current_item.text()
-        if not os.path.exists(pdf_path):
-            QMessageBox.warning(self, "Error", f"Source PDF not found: {pdf_path}")
-            return
-
-        # Check if table has any rows
-        if self.doc_table.rowCount() == 0:
-            QMessageBox.information(self, "Info", "No documents in the table.")
-            return
-
-        # 1. Collect Tasks - read directly from the table, not from self.index_data
-        separate_tasks = []  # List of doc dicts built from table data
-        merge_groups = {}    # { group_name: [doc_dicts] }
-
-        rows = self.doc_table.rowCount()
-        validation_errors = []
-
-        for row in range(rows):
-            if self.doc_table.isRowHidden(row): continue
-
-            # Build doc_obj from current table values (user edits)
-            doc_obj = self._get_doc_from_row(row)
-
-            # Check "Sep."
-            is_sep_checked = self.doc_table.item(row, 0).checkState() == Qt.CheckState.Checked
-
-            # Check "Merge Group"
-            merge_widget = self.doc_table.cellWidget(row, 1)
-            group_name = merge_widget.text().strip() if isinstance(merge_widget, QLineEdit) else ""
-
-            # Skip if neither sep nor merge group
-            if not is_sep_checked and not group_name:
-                continue
-
-            # Validate page range
-            if doc_obj['start'] is None or doc_obj['end'] is None:
-                validation_errors.append(f"Row {row + 1} (ID {doc_obj['id']}): Invalid page range")
-                continue
-
-            if not doc_obj['title'].strip():
-                validation_errors.append(f"Row {row + 1} (ID {doc_obj['id']}): Title is empty")
-                continue
-
-            if is_sep_checked:
-                separate_tasks.append(doc_obj)
-
-            if group_name:
-                if group_name not in merge_groups:
-                    merge_groups[group_name] = []
-                merge_groups[group_name].append(doc_obj)
-
-        # Show validation errors if any
-        if validation_errors:
-            error_msg = "The following rows have issues:\n\n" + "\n".join(validation_errors)
-            QMessageBox.warning(self, "Validation Errors", error_msg)
-
-        if not separate_tasks and not merge_groups:
-            QMessageBox.information(self, "Info", "No actions selected (Check 'Sep.' or enter a 'Merge Group').")
-            return
-
-        # 2. Setup Output
-        base_dir = os.path.dirname(pdf_path)
-        source_name = os.path.splitext(os.path.basename(pdf_path))[0]
-        output_folder = os.path.join(base_dir, f"PULLED-{source_name}")
-        
-        if not os.path.exists(output_folder):
-            os.makedirs(output_folder)
-
-        if not pypdf:
-             QMessageBox.critical(self, "Error", "pypdf library not found.")
-             return
-
-        created_files = []
-        errors = []
-
-        try:
-            reader = pypdf.PdfReader(pdf_path)
-            
-            # 3. Process Individual Extractions
-            for doc in separate_tasks:
-                try:
-                    writer = pypdf.PdfWriter()
-                    start = int(doc['start']) - 1
-                    end = int(doc['end'])
-                    
-                    if start < 0: start = 0
-                    if end > len(reader.pages): end = len(reader.pages)
-                    
-                    for i in range(start, end):
-                        writer.add_page(reader.pages[i])
-                    
-                    safe_title = sanitize_filename(doc['title'])
-                    if len(safe_title) > 50: safe_title = safe_title[:50]
-                    
-                    out_name = f"{doc['id']} - {safe_title}.pdf"
-                    out_path = os.path.join(output_folder, out_name)
-                    
-                    with open(out_path, "wb") as f:
-                        writer.write(f)
-                    created_files.append(os.path.basename(out_path))
-                except Exception as e:
-                    errors.append(f"Failed to separate '{doc['title']}': {e}")
-
-            # 4. Process Merged Groups
-            for group_name, group_docs in merge_groups.items():
-                try:
-                    writer = pypdf.PdfWriter()
-                    
-                    # Sort by ID or original order? Usually standard list order is fine.
-                    # group_docs is appended in row order, so it matches table order.
-                    
-                    for doc in group_docs:
-                        start = int(doc['start']) - 1
-                        end = int(doc['end'])
-                        
-                        if start < 0: start = 0
-                        if end > len(reader.pages): end = len(reader.pages)
-                        
-                        for i in range(start, end):
-                            writer.add_page(reader.pages[i])
-                    
-                    safe_title = sanitize_filename(group_name)
-                    if not safe_title.lower().endswith('.pdf'):
-                        safe_title += ".pdf"
-                        
-                    out_path = os.path.join(output_folder, safe_title)
-                    
-                    with open(out_path, "wb") as f:
-                        writer.write(f)
-                    created_files.append(f"{os.path.basename(out_path)} ({len(group_docs)} docs)")
-                except Exception as e:
-                    errors.append(f"Failed to merge group '{group_name}': {e}")
-
-            # 5. Report Results
-            msg = f"Processed {len(separate_tasks) + len(merge_groups)} tasks.\n\nFiles Created:\n" + "\n".join(created_files[:10])
-            if len(created_files) > 10:
-                msg += f"\n...and {len(created_files) - 10} more."
-            
-            if errors:
-                msg += "\n\nErrors:\n" + "\n".join(errors)
-                QMessageBox.warning(self, "Result with Errors", msg)
-            else:
-                QMessageBox.information(self, "Success", msg)
-
-        except Exception as e:
-            QMessageBox.critical(self, "Critical Error", f"Processing failed: {e}")

@@ -2211,9 +2211,8 @@ class MainWindow(QMainWindow):
             self.cleanup_runner(runner)
 
             # Re-enable sensitivity controls even on failure
-            if hasattr(self, 'index_tab') and hasattr(self.index_tab, 'reanalyze_btn'):
-                self.index_tab.reanalyze_btn.setEnabled(True)
-                self.index_tab.sensitivity_slider.setEnabled(True)
+            if hasattr(self, 'index_tab') and hasattr(self.index_tab, 'workbench'):
+                self.index_tab.workbench.set_busy(False)
 
         runner.finished.connect(on_finished)
         runner.start()
