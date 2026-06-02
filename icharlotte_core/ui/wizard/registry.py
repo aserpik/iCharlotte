@@ -203,6 +203,19 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         keywords=["motion", "opposition", "oppose", "MSJ", "brief", "memorandum", "demurrer"],
         default_folders=["MOTIONS", "PLEADINGS", "DISCOVERY"],
     ),
+    "generate_motion": TaskSpec(
+        task_id="generate_motion",
+        title="Generate a Motion",
+        description="Draft a California civil motion from scratch from your target documents.",
+        icon_glyph="⚖️",  # ⚖️
+        script_name="",  # in-process worker
+        category="Motions & Drafting",
+        keywords=[
+            "motion", "draft", "compel", "demurrer", "strike",
+            "memorandum", "points and authorities", "notice of motion",
+        ],
+        default_folders=["MOTIONS", "PLEADINGS", "DISCOVERY"],
+    ),
     "chat": TaskSpec(
         task_id="chat",
         title="Chat",

@@ -22,6 +22,7 @@ def test_initial_tasks_registered():
         "subpoena_tracker",
         "respond_to_discovery",
         "oppose_motion",
+        "generate_motion",
         "chat",
     }
 
