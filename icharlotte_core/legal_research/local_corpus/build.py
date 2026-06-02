@@ -209,6 +209,32 @@ def _download_cap_volumes(scratch_dir: str, reporters: dict | None = None) -> li
     return paths
 
 
+CL_BULK_BASE = "https://com-courtlistener-storage.s3-us-west-2.amazonaws.com/bulk-data"
+CL_BULK_DATE = "2026-03-31"   # newest quarterly snapshot (browse the bucket for current)
+
+
+def _stream_cl_bulk(name: str, date: str):  # pragma: no cover - network
+    """Open a CL bulk .csv.bz2 from S3 as a decompressed, streaming text reader."""
+    import bz2, io, urllib.request
+    url = f"{CL_BULK_BASE}/{name}-{date}.csv.bz2"
+    logger.info("CL stream: opening %s", url)
+    raw = urllib.request.urlopen(url, timeout=600)
+    return io.TextIOWrapper(bz2.BZ2File(raw), encoding="utf-8", errors="replace")
+
+
+def run_cl_append(*, db_path: str, vectors_path: str, embedder: Embedder,
+                  date: str = CL_BULK_DATE, cutoff_date: str = "2017-01-01",
+                  embed: bool = False) -> dict[str, Any]:  # pragma: no cover - network
+    """Stream the three CL bulk files from S3 and append recent CA cases."""
+    return append_cl_to_corpus(
+        citations_stream=_stream_cl_bulk("citations", date),
+        clusters_stream=_stream_cl_bulk("opinion-clusters", date),
+        opinions_stream=_stream_cl_bulk("opinions", date),   # ~50 GB, streamed
+        db_path=db_path, vectors_path=vectors_path, embedder=embedder,
+        cutoff_date=cutoff_date, embed=embed,
+    )
+
+
 def main() -> None:  # pragma: no cover - CLI wrapper
     ap = argparse.ArgumentParser(
         description="Build the local CA case-law corpus. Re-run after an "
@@ -220,6 +246,12 @@ def main() -> None:  # pragma: no cover - CLI wrapper
     ap.add_argument("--embed-since", type=int, default=None, metavar="YEAR",
                     help="Only embed cases decided in YEAR or later; older cases stay "
                          "keyword-searchable with a zero placeholder vector (cuts build time).")
+    ap.add_argument("--cl-date", default=CL_BULK_DATE,
+                    help="CourtListener bulk snapshot date (YYYY-MM-DD) for --source cl.")
+    ap.add_argument("--cl-cutoff", default="2017-01-01",
+                    help="Only ingest CL cases decided on/after this date (fills the gap above CAP).")
+    ap.add_argument("--cl-embed", action="store_true",
+                    help="Semantically embed the CL recent cases too (~hours). Default: keyword-only.")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -246,8 +278,13 @@ def main() -> None:  # pragma: no cover - CLI wrapper
                                       embed_year_cutoff=args.embed_since)
         logger.info("CAP ingest: %s cases", summary["cases"])
     if args.source in ("cl", "all"):
-        logger.info("CL bulk ingest: stream CourtListener bulk CSVs into "
-                    "build_from_cl_streams (see README for the exact stream wiring).")
+        logger.info("CL append: streaming bulk snapshot %s, cutoff %s, embed=%s",
+                    args.cl_date, args.cl_cutoff, args.cl_embed)
+        summary = run_cl_append(
+            db_path=db_path, vectors_path=vectors_path, embedder=embedder,
+            date=args.cl_date, cutoff_date=args.cl_cutoff, embed=args.cl_embed,
+        )
+        logger.info("CL append: %s new CA cases", summary["added"])
 
 
 if __name__ == "__main__":  # pragma: no cover
