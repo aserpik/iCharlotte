@@ -90,3 +90,38 @@ def test_extraction_failure_records_error_member_no_blob(tmp_path):
     entry = lib.add_entry("manual", [str(src)], {}, extractor=fail)
     assert entry.members[0].error == "boom"
     assert entry.members[0].blob is None
+
+
+def test_rename_and_reset(tmp_path):
+    src = tmp_path / "d.pdf"
+    src.write_bytes(b"b")
+    lib = DocumentLibrary(str(tmp_path))
+    e = lib.add_entry("summarize_depositions", [str(src)], {"party": "Plaintiff"},
+                      extractor=_fake_extractor())
+    lib.rename_entry(e.id, "My Custom Name")
+    assert lib.list_entries()[0].label == "My Custom Name"
+    lib.reset_label(e.id)
+    assert lib.list_entries()[0].label == "Plaintiff's Deposition Transcript"
+
+
+def test_delete_entry_gcs_unreferenced_blob(tmp_path):
+    src = tmp_path / "d.pdf"
+    src.write_bytes(b"b")
+    lib = DocumentLibrary(str(tmp_path))
+    e = lib.add_entry("manual", [str(src)], {}, extractor=_fake_extractor())
+    blob_path = os.path.join(lib.blobs_dir, e.members[0].blob)
+    assert os.path.isfile(blob_path)
+    lib.delete_entry(e.id)
+    assert lib.list_entries() == []
+    assert not os.path.isfile(blob_path)  # GC'd: no other entry referenced it
+
+
+def test_delete_keeps_blob_referenced_by_another_entry(tmp_path):
+    src = tmp_path / "d.pdf"
+    src.write_bytes(b"b")
+    lib = DocumentLibrary(str(tmp_path))
+    e1 = lib.add_entry("manual", [str(src)], {}, extractor=_fake_extractor())
+    e2 = lib.add_entry("summarize_documents", [str(src)], {}, extractor=_fake_extractor())
+    blob_path = os.path.join(lib.blobs_dir, e1.members[0].blob)
+    lib.delete_entry(e1.id)
+    assert os.path.isfile(blob_path)  # still referenced by e2

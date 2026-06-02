@@ -152,3 +152,42 @@ class DocumentLibrary:
         entries.append(entry)
         self._save_entries(entries)
         return entry
+
+    def _find(self, entries: list, entry_id: str):
+        for e in entries:
+            if e.id == entry_id:
+                return e
+        return None
+
+    def rename_entry(self, entry_id: str, new_label: str) -> None:
+        entries = self.list_entries()
+        e = self._find(entries, entry_id)
+        if e is None:
+            return
+        e.label = new_label
+        self._save_entries(entries)
+
+    def reset_label(self, entry_id: str) -> None:
+        entries = self.list_entries()
+        e = self._find(entries, entry_id)
+        if e is None:
+            return
+        e.label = e.auto_label
+        self._save_entries(entries)
+
+    def delete_entry(self, entry_id: str) -> None:
+        entries = self.list_entries()
+        victim = self._find(entries, entry_id)
+        if victim is None:
+            return
+        remaining = [e for e in entries if e.id != entry_id]
+        still_referenced = {
+            m.blob for e in remaining for m in e.members if m.blob
+        }
+        for m in victim.members:
+            if m.blob and m.blob not in still_referenced:
+                try:
+                    os.remove(os.path.join(self.blobs_dir, m.blob))
+                except OSError:
+                    pass
+        self._save_entries(remaining)
