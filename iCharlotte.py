@@ -1226,13 +1226,10 @@ class MainWindow(QMainWindow):
             )
 
             settings = dict(entry.get("settings") or {})
-            target_files = settings.get("target_files") or files
             task_tab = GenerateMotionTaskTab(
                 spec=spec,
                 case_path=self.case_path,
                 file_number=self.file_number,
-                motion_type_id=settings.get("motion_type_id", "generic"),
-                target_files=target_files,
                 parent=self,
             )
             task_tab.settings_page.from_dict(settings)
@@ -1320,13 +1317,10 @@ class MainWindow(QMainWindow):
                     TASK_PAGE_SETTINGS,
                 )
 
-                target_files = settings_dict.get("target_files") or files_abs
                 tab = GenerateMotionTaskTab(
                     spec=spec,
                     case_path=self.case_path,
                     file_number=self.file_number,
-                    motion_type_id=settings_dict.get("motion_type_id", "generic"),
-                    target_files=target_files,
                     parent=self,
                 )
                 output_page = TASK_PAGE_OUTPUT

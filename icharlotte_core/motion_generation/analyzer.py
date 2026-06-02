@@ -85,3 +85,37 @@ def outline_from_config(config: MotionTypeConfig) -> List[OutlineNode]:
     """Seed an editable section outline from the motion type's section plan."""
     nodes = [OutlineNode(text=heading, selected=True) for heading in config.section_plan]
     return normalize_outline(nodes)
+
+
+def merge_intake_with_analysis(
+    user_relief: str,
+    user_arguments: List[str],
+    ai_metadata: MotionMetadata,
+    motion_type_name: str,
+) -> MotionMetadata:
+    """Combine the user's typed relief/arguments with the AI-proposed grounds.
+
+    User-typed values take precedence: a non-empty ``user_relief`` overrides the
+    AI relief, and user arguments are listed first, with AI grounds appended
+    unless they duplicate a user argument (case-insensitive).
+    """
+    relief = (user_relief or "").strip() or (ai_metadata.relief_requested or "")
+
+    merged: List[str] = []
+    seen = set()
+    for arg in list(user_arguments or []) + list(ai_metadata.principal_arguments or []):
+        text = (arg or "").strip()
+        if not text:
+            continue
+        key = text.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        merged.append(text)
+
+    return MotionMetadata(
+        motion_type=motion_type_name,
+        moving_party=ai_metadata.moving_party,
+        relief_requested=relief,
+        principal_arguments=merged,
+    )

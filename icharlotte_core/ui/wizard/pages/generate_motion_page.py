@@ -1,10 +1,11 @@
 """Custom Wizard task page for generating motions from scratch.
 
-Sibling of oppose_motion_page.py. Instead of analyzing a motion being opposed,
-the user picks a motion type and target documents; an LLM proposes the grounds /
-relief and a section outline (both editable), then the motion is drafted,
-citation-verified, and assembled — reusing the opposition research/verify spine
-and the motion_generation drafter/assembler.
+Flow: an intake settings page collects the motion type (one of the configured
+types or a custom/"Other" type), context files, and the user's own
+arguments/relief. On Analyze & Continue, an LLM proposes additional grounds from
+the documents; these are merged with the user's typed grounds and shown in an
+editable review step, then an outline, then drafting. Reuses the opposition
+research/verify spine and the motion_generation drafter/assembler.
 """
 from __future__ import annotations
 
@@ -17,6 +18,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
@@ -52,7 +54,11 @@ from icharlotte_core.ui.wizard.pages.status_page import StatusPage
 from icharlotte_core.ui.wizard.task_scaffold import WizardTaskContainer
 from icharlotte_core.ui.context_files_dialog import ContextFilesDialog
 
-from icharlotte_core.motion_generation.analyzer import analyze_target, outline_from_config
+from icharlotte_core.motion_generation.analyzer import (
+    analyze_target,
+    merge_intake_with_analysis,
+    outline_from_config,
+)
 from icharlotte_core.motion_generation.assembler import assemble_motion_preview
 from icharlotte_core.motion_generation.config import (
     MOTION_TYPE_CONFIGS,
@@ -61,40 +67,95 @@ from icharlotte_core.motion_generation.config import (
 from icharlotte_core.motion_generation.drafter import draft_motion
 
 
-SETTINGS_PAGE_REVIEW = 0
-SETTINGS_PAGE_OUTLINE = 1
+SETTINGS_PAGE_INTAKE = 0
+SETTINGS_PAGE_REVIEW = 1
+SETTINGS_PAGE_OUTLINE = 2
 TASK_PAGE_SETTINGS = 0
 TASK_PAGE_STATUS = 1
 TASK_PAGE_OUTPUT = 2
 
-# Order of the type dropdown (configured types first, generic last).
-_TYPE_ORDER = ["compel", "demurrer", "strike", "generic"]
+# Configured types shown in the dropdown; "__other__" enables a custom name.
+_CONFIGURED_TYPES = ["compel", "demurrer", "strike"]
+_OTHER = "__other__"
 
 
 class GenerateMotionSettingsPage(QStackedWidget):
-    """Review (grounds/relief) + editable outline screens for motion generation."""
+    """Intake → editable review → outline screens for motion generation."""
 
+    analyze_requested = Signal(dict)
     run_requested = Signal(dict)
 
-    def __init__(
-        self,
-        case_root: str,
-        file_number: str,
-        motion_type_id: str,
-        target_files: list[str],
-        parent: QWidget | None = None,
-    ):
+    def __init__(self, case_root: str, file_number: str, parent: QWidget | None = None):
         super().__init__(parent)
         self.case_root = case_root
         self.file_number = file_number
-        self.motion_type_id = motion_type_id or "generic"
-        self.target_files = list(target_files)
-        self.metadata = MotionMetadata(motion_type=get_motion_config(self.motion_type_id).display_name)
+        self.metadata = MotionMetadata()
         self.outline: list[OutlineNode] = []
+        self._build_intake_page()
         self._build_review_page()
         self._build_outline_page()
+        self._on_type_changed()
 
-    # ---- Build ---------------------------------------------------------- #
+    # ---- Intake page ---------------------------------------------------- #
+
+    def _build_intake_page(self) -> None:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(8)
+
+        layout.addWidget(QLabel("Motion type"))
+        self.type_combo = QComboBox()
+        for type_id in _CONFIGURED_TYPES:
+            self.type_combo.addItem(MOTION_TYPE_CONFIGS[type_id].display_name, type_id)
+        self.type_combo.addItem("Other (specify…)", _OTHER)
+        self.type_combo.currentIndexChanged.connect(self._on_type_changed)
+        layout.addWidget(self.type_combo)
+
+        self.custom_name_edit = QLineEdit()
+        self.custom_name_edit.setPlaceholderText("Name the motion (e.g. Motion for Protective Order)")
+        layout.addWidget(self.custom_name_edit)
+
+        self.guidance_label = QLabel()
+        self.guidance_label.setWordWrap(True)
+        self.guidance_label.setStyleSheet("color: #6b7480;")
+        layout.addWidget(self.guidance_label)
+
+        files_row = QHBoxLayout()
+        files_row.addWidget(QLabel("Context documents"))
+        files_row.addStretch()
+        self.add_files_btn = QPushButton("Add Files…")
+        self.add_files_btn.clicked.connect(self._on_add_files)
+        files_row.addWidget(self.add_files_btn)
+        self.remove_files_btn = QPushButton("Remove")
+        self.remove_files_btn.clicked.connect(self._on_remove_files)
+        files_row.addWidget(self.remove_files_btn)
+        layout.addLayout(files_row)
+
+        self.files_list = QListWidget()
+        self.files_list.setMaximumHeight(110)
+        layout.addWidget(self.files_list)
+
+        layout.addWidget(QLabel("Relief requested"))
+        self.user_relief_edit = QLineEdit()
+        self.user_relief_edit.setPlaceholderText("What you are asking the court to order")
+        layout.addWidget(self.user_relief_edit)
+
+        layout.addWidget(QLabel("Arguments / grounds to include (one per line)"))
+        self.user_arguments_edit = QPlainTextEdit()
+        self.user_arguments_edit.setPlaceholderText(
+            "Type the specific arguments or grounds you want in the motion. The AI "
+            "will analyze your documents and propose additional grounds to merge."
+        )
+        layout.addWidget(self.user_arguments_edit, 1)
+
+        row = QHBoxLayout()
+        row.addStretch()
+        self.analyze_btn = QPushButton("Analyze & Continue")
+        self.analyze_btn.clicked.connect(self._on_analyze_continue)
+        row.addWidget(self.analyze_btn)
+        layout.addLayout(row)
+        self.addWidget(page)
 
     def _build_review_page(self) -> None:
         page = QWidget()
@@ -102,30 +163,21 @@ class GenerateMotionSettingsPage(QStackedWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(10)
 
-        self.files_label = QLabel()
-        layout.addWidget(self.files_label)
-        self._refresh_files_label()
-
-        layout.addWidget(QLabel("Motion type"))
-        self.type_combo = QComboBox()
-        for type_id in _TYPE_ORDER:
-            self.type_combo.addItem(MOTION_TYPE_CONFIGS[type_id].display_name, type_id)
-        idx = self.type_combo.findData(self.motion_type_id)
-        if idx >= 0:
-            self.type_combo.setCurrentIndex(idx)
-        layout.addWidget(self.type_combo)
+        self.review_type_label = QLabel()
+        layout.addWidget(self.review_type_label)
 
         layout.addWidget(QLabel("Relief requested (you can edit)"))
         self.relief_edit = QLineEdit()
-        self.relief_edit.setPlaceholderText("Relief requested")
         layout.addWidget(self.relief_edit)
 
-        layout.addWidget(QLabel("Grounds (one per line; add your own as needed)"))
+        layout.addWidget(QLabel("Grounds (merged; edit or add your own, one per line)"))
         self.arguments_edit = QPlainTextEdit()
-        self.arguments_edit.setPlaceholderText("Proposed grounds will appear here")
         layout.addWidget(self.arguments_edit, 1)
 
         row = QHBoxLayout()
+        self.back_btn = QPushButton("Back")
+        self.back_btn.clicked.connect(lambda: self.setCurrentIndex(SETTINGS_PAGE_INTAKE))
+        row.addWidget(self.back_btn)
         row.addStretch()
         self.continue_btn = QPushButton("Review Outline")
         self.continue_btn.clicked.connect(self._on_continue_to_outline)
@@ -155,20 +207,81 @@ class GenerateMotionSettingsPage(QStackedWidget):
         layout.addLayout(row)
         self.addWidget(page)
 
-    # ---- State ---------------------------------------------------------- #
+    # ---- Type / intake helpers ----------------------------------------- #
 
     def current_motion_type_id(self) -> str:
         data = self.type_combo.currentData()
-        return data or "generic"
+        return "generic" if data == _OTHER else (data or "generic")
+
+    def current_motion_type_name(self) -> str:
+        if self.type_combo.currentData() == _OTHER:
+            return self.custom_name_edit.text().strip() or "Motion"
+        return get_motion_config(self.current_motion_type_id()).display_name
+
+    def current_target_files(self) -> list[str]:
+        return [self.files_list.item(i).text() for i in range(self.files_list.count())]
+
+    def _on_type_changed(self, *_args) -> None:
+        is_other = self.type_combo.currentData() == _OTHER
+        self.custom_name_edit.setVisible(is_other)
+        cfg = get_motion_config(self.current_motion_type_id())
+        self.guidance_label.setText(cfg.target_doc_guidance)
+
+    def _on_add_files(self) -> None:
+        picked = ContextFilesDialog.get_files(
+            self,
+            title="Select context document(s) for the motion",
+            start_dir=self.case_root or "",
+            file_filter="Documents (*.pdf *.docx *.txt *.msg);;All files (*.*)",
+        )
+        existing = set(self.current_target_files())
+        for path in picked or []:
+            if is_supported_context_file(path) and path not in existing:
+                self.files_list.addItem(path)
+                existing.add(path)
+
+    def _on_remove_files(self) -> None:
+        for item in self.files_list.selectedItems():
+            self.files_list.takeItem(self.files_list.row(item))
+
+    def intake_settings(self) -> dict:
+        return {
+            "motion_type_id": self.current_motion_type_id(),
+            "motion_type_name": self.current_motion_type_name(),
+            "target_files": self.current_target_files(),
+            "user_relief": self.user_relief_edit.text().strip(),
+            "user_arguments": [
+                line.strip()
+                for line in self.user_arguments_edit.toPlainText().splitlines()
+                if line.strip()
+            ],
+        }
+
+    def _on_analyze_continue(self) -> None:
+        if self.type_combo.currentData() == _OTHER and not self.custom_name_edit.text().strip():
+            QMessageBox.warning(self, "Name the motion", "Enter a name for the motion type.")
+            return
+        settings = self.intake_settings()
+        if not settings["target_files"] and not settings["user_arguments"]:
+            QMessageBox.warning(
+                self,
+                "Add documents or arguments",
+                "Add at least one context document, or type at least one argument.",
+            )
+            return
+        self.analyze_requested.emit(settings)
+
+    # ---- Review / outline ---------------------------------------------- #
 
     def set_metadata(self, metadata: MotionMetadata) -> None:
         self.metadata = metadata
+        self.review_type_label.setText(f"<b>{metadata.motion_type or 'Motion'}</b>")
         self.relief_edit.setText(metadata.relief_requested)
         self.arguments_edit.setPlainText("\n".join(metadata.principal_arguments))
 
     def current_metadata(self) -> MotionMetadata:
         metadata = MotionMetadata.from_dict(self.metadata.to_dict())
-        metadata.motion_type = get_motion_config(self.current_motion_type_id()).display_name
+        metadata.motion_type = self.current_motion_type_name()
         metadata.relief_requested = self.relief_edit.text().strip()
         metadata.principal_arguments = [
             line.strip()
@@ -190,7 +303,8 @@ class GenerateMotionSettingsPage(QStackedWidget):
     def to_dict(self) -> dict:
         return {
             "motion_type_id": self.current_motion_type_id(),
-            "target_files": list(self.target_files),
+            "motion_type_name": self.current_motion_type_name(),
+            "target_files": self.current_target_files(),
             "metadata": self.current_metadata().to_dict(),
             "outline": [node.to_dict() for node in self._outline_from_tree()],
         }
@@ -198,12 +312,23 @@ class GenerateMotionSettingsPage(QStackedWidget):
     def from_dict(self, data: dict | None) -> None:
         if not isinstance(data, dict):
             data = {}
-        self.target_files = list(data.get("target_files", self.target_files))
-        self.motion_type_id = data.get("motion_type_id", self.motion_type_id)
-        self._refresh_files_label()
-        idx = self.type_combo.findData(self.motion_type_id)
-        if idx >= 0:
-            self.type_combo.setCurrentIndex(idx)
+        type_id = data.get("motion_type_id", "compel")
+        type_name = data.get("motion_type_name", "")
+        if type_id in _CONFIGURED_TYPES:
+            idx = self.type_combo.findData(type_id)
+            if idx >= 0:
+                self.type_combo.setCurrentIndex(idx)
+        else:
+            idx = self.type_combo.findData(_OTHER)
+            if idx >= 0:
+                self.type_combo.setCurrentIndex(idx)
+            self.custom_name_edit.setText(type_name)
+        self._on_type_changed()
+
+        self.files_list.clear()
+        for path in data.get("target_files", []) or []:
+            self.files_list.addItem(path)
+
         self.set_metadata(MotionMetadata.from_dict(data.get("metadata")))
         self.set_outline(
             [
@@ -212,8 +337,6 @@ class GenerateMotionSettingsPage(QStackedWidget):
                 if isinstance(item, dict)
             ]
         )
-
-    # ---- Handlers ------------------------------------------------------- #
 
     def _on_continue_to_outline(self) -> None:
         if not self.can_continue_to_outline():
@@ -224,13 +347,6 @@ class GenerateMotionSettingsPage(QStackedWidget):
             )
             return
         self.setCurrentIndex(SETTINGS_PAGE_OUTLINE)
-
-    def _refresh_files_label(self) -> None:
-        if not self.target_files:
-            self.files_label.setText("Target documents: (none selected)")
-            return
-        names = ", ".join(os.path.basename(f) for f in self.target_files)
-        self.files_label.setText(f"Target documents: {names}")
 
     def _emit_run_requested(self) -> None:
         self.run_requested.emit(self.to_dict())
@@ -271,8 +387,8 @@ class GenerateMotionSettingsPage(QStackedWidget):
 
 
 def _make_llms():
-    """Return (analysis_llm, draft_llm, query_llm_factory) reusing the
-    oppose_motion agent config so model selection is shared."""
+    """Return (analysis_llm, draft_llm, make_pass_llm) reusing the oppose_motion
+    agent config so model selection is shared."""
     from icharlotte_core.llm_config import call_llm
 
     def analysis_llm(system_prompt, user_prompt):
@@ -309,25 +425,34 @@ class GenerateMotionAnalysisWorker(QThread):
     def run(self) -> None:
         try:
             config = get_motion_config(self.settings.get("motion_type_id"))
-            self.progress.emit("Extracting target documents...")
+            name = self.settings.get("motion_type_name") or config.display_name
+            user_relief = self.settings.get("user_relief", "")
+            user_arguments = list(self.settings.get("user_arguments", []))
+
+            self.progress.emit("Extracting context documents...")
             target_text, warnings = extract_context_bundle(
                 self.settings.get("target_files", [])
             )
             for warning in warnings:
                 self.progress.emit(f"WARNING: {warning}")
-            if not target_text.strip():
+
+            if not target_text.strip() and not any(a.strip() for a in user_arguments):
                 self.finished_analysis.emit(
-                    False, "Could not read any text from the target documents."
+                    False, "Add at least one document or type at least one argument."
                 )
                 return
 
-            analysis_llm, _, _ = _make_llms()
-            self.progress.emit("Proposing grounds and relief...")
-            metadata = analyze_target(config, target_text, llm_callback=analysis_llm)
+            ai_metadata = MotionMetadata(motion_type=name)
+            if target_text.strip():
+                analysis_llm, _, _ = _make_llms()
+                self.progress.emit("Proposing additional grounds from documents...")
+                ai_metadata = analyze_target(config, target_text, llm_callback=analysis_llm)
+
+            merged = merge_intake_with_analysis(user_relief, user_arguments, ai_metadata, name)
             outline = outline_from_config(config)
             self.finished_analysis.emit(
                 True,
-                {"metadata": metadata, "outline": outline, "target_text": target_text},
+                {"metadata": merged, "outline": outline, "target_text": target_text},
             )
         except Exception as exc:  # noqa: BLE001
             self.finished_analysis.emit(False, str(exc))
@@ -346,7 +471,7 @@ class GenerateMotionWorker(QThread):
     def run(self) -> None:
         try:
             config = get_motion_config(self.settings.get("motion_type_id"))
-            self.progress.emit("Extracting target documents...")
+            self.progress.emit("Extracting context documents...")
             target_text, warnings = extract_context_bundle(
                 self.settings.get("target_files", [])
             )
@@ -363,7 +488,6 @@ class GenerateMotionWorker(QThread):
 
             _, draft_llm, make_pass_llm = _make_llms()
 
-            # Retrieval-first grounding (prefer local corpus; fall back to CL API).
             corpus = _make_local_corpus()
             token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
             retrieved = []
@@ -473,7 +597,6 @@ class GenerateMotionOutputPage(QWidget):
 
     @property
     def output_path(self) -> str:
-        """Path to the generated preview (consumed by the snapshot logic)."""
         return self._preview_path
 
     def show_result(self, draft: DraftDocument) -> None:
@@ -483,7 +606,6 @@ class GenerateMotionOutputPage(QWidget):
         self.open_btn.setEnabled(bool(self._preview_path) and os.path.isfile(self._preview_path))
 
     def load_output(self, path: str) -> None:
-        """Restore a previously-generated preview from disk (best-effort body text)."""
         self._preview_path = path or ""
         self.open_btn.setEnabled(bool(self._preview_path) and os.path.isfile(self._preview_path))
         try:
@@ -502,38 +624,25 @@ class GenerateMotionOutputPage(QWidget):
 class GenerateMotionTaskTab(WizardTaskContainer):
     task_completed = Signal(dict)
 
-    def __init__(
-        self,
-        spec,
-        case_path: str,
-        file_number: str,
-        motion_type_id: str,
-        target_files: list[str],
-        auto_analyze: bool = False,
-        parent: QWidget | None = None,
-    ):
+    def __init__(self, spec, case_path: str, file_number: str, parent: QWidget | None = None):
         super().__init__(spec, parent=parent)
         self._case_path = case_path
         self._file_number = file_number
-        self._files = list(target_files)
         self._worker = None
         self._last_settings: dict = {}
         self._finishing_worker = None
         self._analysis_worker = None
         self._finishing_analysis_worker = None
 
-        self.settings_page = GenerateMotionSettingsPage(
-            case_path, file_number, motion_type_id, target_files
-        )
+        self.settings_page = GenerateMotionSettingsPage(case_path, file_number)
         self.status_page = StatusPage()
         self.output_page = GenerateMotionOutputPage()
 
         self.addWidget(self.settings_page)
         self.addWidget(self.status_page)
         self.addWidget(self.output_page)
+        self.settings_page.analyze_requested.connect(self._start_analysis)
         self.settings_page.run_requested.connect(self._on_run)
-        if auto_analyze:
-            self._start_analysis()
 
     @property
     def spec(self):
@@ -541,22 +650,16 @@ class GenerateMotionTaskTab(WizardTaskContainer):
 
     @property
     def files(self) -> list[str]:
-        return list(self._files)
+        return list(self.settings_page.current_target_files())
 
-    def _start_analysis(self) -> None:
+    def _start_analysis(self, intake_settings: dict) -> None:
         if self._analysis_worker is not None or self._finishing_analysis_worker is not None:
             return
         self.status_page.reset()
-        self.status_page.on_status("Analyzing target documents...")
+        self.status_page.on_status("Analyzing context documents...")
         self.status_page.progress_bar.setRange(0, 0)
         self.setCurrentIndex(TASK_PAGE_STATUS)
-        worker = GenerateMotionAnalysisWorker(
-            settings={
-                "motion_type_id": self.settings_page.current_motion_type_id(),
-                "target_files": list(self.settings_page.target_files),
-            },
-            parent=None,
-        )
+        worker = GenerateMotionAnalysisWorker(settings=dict(intake_settings or {}), parent=None)
         worker.progress.connect(self.status_page.on_status)
         worker.finished_analysis.connect(self._on_analysis_finished)
         worker.finished.connect(lambda w=worker: self._on_analysis_thread_finished(w))
@@ -645,7 +748,7 @@ class GenerateMotionTaskTab(WizardTaskContainer):
             {
                 "task_id": self._spec.task_id,
                 "title": self._spec.title,
-                "files": list(self._files),
+                "files": list(self.settings_page.current_target_files()),
                 "settings": self.settings_page.to_dict(),
                 "output_path": draft.preview_path,
                 "completed_at": datetime.now().isoformat(timespec="seconds"),
@@ -676,44 +779,11 @@ class GenerateMotionTaskTab(WizardTaskContainer):
         super().closeEvent(event)
 
 
-def _pick_motion_type(parent) -> str | None:
-    """Small dialog to choose the motion type. Returns a type_id or None."""
-    from PySide6.QtWidgets import QInputDialog
-
-    labels = [MOTION_TYPE_CONFIGS[t].display_name for t in _TYPE_ORDER]
-    choice, ok = QInputDialog.getItem(
-        parent, "Motion type", "Which motion do you want to generate?", labels, 0, False
-    )
-    if not ok or not choice:
-        return None
-    for type_id in _TYPE_ORDER:
-        if MOTION_TYPE_CONFIGS[type_id].display_name == choice:
-            return type_id
-    return "generic"
-
-
 def build_generate_motion_tab(spec, case_path: str, file_number: str, parent: QWidget | None):
-    motion_type_id = _pick_motion_type(parent)
-    if motion_type_id is None:
-        return None
-
-    target_files = ContextFilesDialog.get_files(
-        parent,
-        title="Select target document(s) for the motion",
-        start_dir=case_path,
-        file_filter="Documents (*.pdf *.docx *.txt *.msg);;All files (*.*)",
-    )
-    target_files = [p for p in (target_files or []) if is_supported_context_file(p)]
-    if not target_files:
-        QMessageBox.warning(parent, "No documents", "Select at least one target document.")
-        return None
-
+    """Open the Generate Motion task directly on its intake settings page."""
     return GenerateMotionTaskTab(
         spec=spec,
         case_path=case_path,
         file_number=file_number,
-        motion_type_id=motion_type_id,
-        target_files=list(target_files),
-        auto_analyze=True,
         parent=parent,
     )
