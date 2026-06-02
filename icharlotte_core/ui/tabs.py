@@ -303,6 +303,22 @@ class ChatTab(QWidget):
         settings_layout.addWidget(QLabel("Model:"))
         self.model_combo = QComboBox()
         settings_layout.addWidget(self.model_combo)
+
+        # Seed the default provider/model from the Workbench (agent_chat). A loaded
+        # conversation or a live pick still overrides this; on_models_fetched
+        # consumes self._seed_model once when the model list first populates.
+        self._seed_model = None
+        try:
+            from ..llm_config import get_primary_model_for_agent
+            seed_provider, seed_model = get_primary_model_for_agent("agent_chat", default=(None, None))
+            if seed_provider:
+                self._seed_model = seed_model
+                self.provider_combo.blockSignals(True)
+                self.provider_combo.setCurrentText(seed_provider)
+                self.provider_combo.blockSignals(False)
+        except Exception:
+            pass
+
         self.update_models(self.provider_combo.currentText())
 
         # Buttons
@@ -367,6 +383,33 @@ class ChatTab(QWidget):
         file_btn_layout.addWidget(clear_files_btn)
         file_btn_layout.addWidget(import_reports_btn)
         settings_layout.addLayout(file_btn_layout)
+
+        # --- Saved Documents (document text library) ---
+        from PySide6.QtWidgets import QTreeWidget, QTreeWidgetItem
+        self._QTreeWidgetItem = QTreeWidgetItem
+        settings_layout.addWidget(QLabel("Saved Documents:"))
+        self.library_tree = QTreeWidget()
+        self.library_tree.setHeaderHidden(True)
+        self.library_tree.setMinimumHeight(60)
+        self.library_tree.setMaximumHeight(300)
+        settings_layout.addWidget(self.library_tree)
+        # Connect ONCE here (not in _refresh_library_tree, which runs repeatedly).
+        self.library_tree.itemChanged.connect(self._on_library_item_changed)
+
+        lib_btn_layout = QHBoxLayout()
+        add_lib_btn = QPushButton("Add to Library…")
+        add_lib_btn.clicked.connect(self.add_to_library)
+        lib_all_btn = QPushButton("All")
+        lib_all_btn.clicked.connect(lambda: self._set_all_library_checks(True))
+        lib_none_btn = QPushButton("None")
+        lib_none_btn.clicked.connect(lambda: self._set_all_library_checks(False))
+        lib_refresh_btn = QPushButton("Refresh")
+        lib_refresh_btn.clicked.connect(self._refresh_library_tree)
+        for b in (add_lib_btn, lib_all_btn, lib_none_btn, lib_refresh_btn):
+            lib_btn_layout.addWidget(b)
+        settings_layout.addLayout(lib_btn_layout)
+        self.library_selected_label = QLabel("Selected: 0 docs · ~0 tokens")
+        settings_layout.addWidget(self.library_selected_label)
 
         clear_chat_btn = QPushButton("Clear Chat")
         clear_chat_btn.setToolTip("Clear the current conversation and start a new one")
@@ -549,6 +592,82 @@ class ChatTab(QWidget):
         settings = self.persistence.get_settings()
         theme = settings.get('theme', 'light')
         self.theme_combo.setCurrentText(theme.capitalize())
+
+        # Repopulate the Saved Documents library tree for the new case
+        self._refresh_library_tree()
+
+    # ------------------------------------------------------------------
+    # Saved Documents (document text library)
+    # ------------------------------------------------------------------
+    def add_to_library(self):
+        """Manual add — implemented in Task 10."""
+        pass
+
+    def _library(self):
+        """Return a DocumentLibrary for the current case, or None."""
+        from ..doc_library.library import DocumentLibrary
+        root = getattr(self, "_case_root_for_library", None) \
+            or getattr(self.window(), "case_path", None)
+        return DocumentLibrary(root) if root else None
+
+    def _refresh_library_tree(self):
+        from PySide6.QtCore import Qt
+        self.library_tree.blockSignals(True)
+        try:
+            self.library_tree.clear()
+            lib = self._library()
+            entries = []
+            if lib is not None:
+                try:
+                    entries = lib.list_entries()
+                except Exception:
+                    entries = []
+            Item = self._QTreeWidgetItem
+            for e in entries:
+                top = Item([e.label])
+                top.setData(0, Qt.ItemDataRole.UserRole, {"kind": "entry", "id": e.id})
+                top.setFlags(top.flags() | Qt.ItemFlag.ItemIsUserCheckable
+                             | Qt.ItemFlag.ItemIsEditable
+                             | Qt.ItemFlag.ItemIsAutoTristate)
+                top.setCheckState(0, Qt.CheckState.Unchecked)
+                for m in e.members:
+                    label = m.source_name + (" [extract failed]" if m.error else "")
+                    child = Item([label])
+                    child.setData(0, Qt.ItemDataRole.UserRole,
+                                  {"kind": "member", "blob": m.blob,
+                                   "name": m.source_name, "tokens": m.est_tokens})
+                    child.setFlags(child.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+                    child.setCheckState(0, Qt.CheckState.Unchecked)
+                    top.addChild(child)
+                self.library_tree.addTopLevelItem(top)
+            self.library_tree.expandAll()
+        finally:
+            self.library_tree.blockSignals(False)
+        self._update_library_selected_label()
+
+    def _set_all_library_checks(self, checked: bool):
+        from PySide6.QtCore import Qt
+        state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
+        for i in range(self.library_tree.topLevelItemCount()):
+            self.library_tree.topLevelItem(i).setCheckState(0, state)
+
+    def _on_library_item_changed(self, item, column):
+        self._update_library_selected_label()
+
+    def _iter_checked_library_members(self):
+        from PySide6.QtCore import Qt
+        for i in range(self.library_tree.topLevelItemCount()):
+            top = self.library_tree.topLevelItem(i)
+            for j in range(top.childCount()):
+                child = top.child(j)
+                if child.checkState(0) == Qt.CheckState.Checked:
+                    yield child.data(0, Qt.ItemDataRole.UserRole)
+
+    def _update_library_selected_label(self):
+        members = list(self._iter_checked_library_members())
+        toks = sum(int(m.get("tokens", 0)) for m in members)
+        self.library_selected_label.setText(
+            f"Selected: {len(members)} docs · ~{toks} tokens")
 
     def refresh_conversation_list(self):
         """Refresh the conversation sidebar."""
@@ -837,7 +956,16 @@ class ChatTab(QWidget):
         # Update cache
         self.cached_models[provider] = models
         self.model_combo.addItems(models)
-        
+
+        # One-time seed of the Workbench-configured default model (agent_chat).
+        seed = getattr(self, "_seed_model", None)
+        if seed:
+            self._seed_model = None
+            idx = self.model_combo.findText(seed)
+            if idx != -1:
+                self.model_combo.setCurrentIndex(idx)
+                return
+
         # Set default model
         if provider == "Gemini":
             idx = self.model_combo.findText("gemini-3.1-flash-lite")
