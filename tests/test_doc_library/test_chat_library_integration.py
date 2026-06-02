@@ -47,3 +47,25 @@ def test_add_to_library_adds_entry(app, tmp_path, qtbot, monkeypatch):
     qtbot.waitUntil(lambda: bool(tab._library().list_entries()), timeout=5000)
     labels = [e.label for e in tab._library().list_entries()]
     assert "Traffic Collision Report" in labels
+
+
+def test_read_library_content_includes_checked_text(app, tmp_path):
+    from PySide6.QtCore import Qt
+    from icharlotte_core.ui.tabs import ChatTab
+    _seed_library(str(tmp_path))
+    tab = ChatTab()
+    tab._case_root_for_library = str(tmp_path)
+    tab._refresh_library_tree()
+    tab.library_tree.topLevelItem(0).setCheckState(0, Qt.CheckState.Checked)
+    out = tab.read_library_content()
+    assert "DEPO BODY TEXT" in out
+    assert "--- FILE:" in out
+
+
+def test_read_library_content_empty_when_nothing_checked(app, tmp_path):
+    from icharlotte_core.ui.tabs import ChatTab
+    _seed_library(str(tmp_path))
+    tab = ChatTab()
+    tab._case_root_for_library = str(tmp_path)
+    tab._refresh_library_tree()
+    assert tab.read_library_content() == ""

@@ -708,6 +708,22 @@ class ChatTab(QWidget):
                 if child.checkState(0) == Qt.CheckState.Checked:
                     yield child.data(0, Qt.ItemDataRole.UserRole)
 
+    def read_library_content(self) -> str:
+        lib = self._library()
+        if lib is None:
+            return ""
+        content = ""
+        for m in self._iter_checked_library_members():
+            blob = m.get("blob")
+            if not blob:
+                continue
+            text = lib.get_member_text(blob)
+            if not text:
+                content += f"\n--- FILE: {m.get('name', 'document')} ---\n[saved text unavailable]\n"
+                continue
+            content += f"\n--- FILE: {m.get('name', 'document')} ---\n{text}\n"
+        return content
+
     def _update_library_selected_label(self):
         members = list(self._iter_checked_library_members())
         toks = sum(int(m.get("tokens", 0)) for m in members)
@@ -1579,7 +1595,8 @@ class ChatTab(QWidget):
             if self.file_list.item(i).checkState() == Qt.CheckState.Checked:
                 checked_count += 1
 
-        if not user_text and checked_count == 0:
+        lib_checked = len(list(self._iter_checked_library_members()))
+        if not user_text and checked_count == 0 and lib_checked == 0:
             return
 
         # Display User Message
@@ -1592,7 +1609,7 @@ class ChatTab(QWidget):
         self.stop_btn.setEnabled(True)
 
         # Prepare Content
-        file_content = self.read_files_content()
+        file_content = self.read_files_content() + self.read_library_content()
         attachments = self.get_attachment_info()
 
         # Detect audio/video attachments
