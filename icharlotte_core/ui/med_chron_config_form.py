@@ -157,7 +157,7 @@ class ContextDropTextEdit(QPlainTextEdit):
 class CustomAnalysisRow(QWidget):
     """One row in the custom-analyses list: include-checkbox + label + instruction + remove btn + context-doc chip strip."""
 
-    def __init__(self, parent: QWidget, on_remove):
+    def __init__(self, parent: QWidget, on_remove, included: bool = True):
         super().__init__(parent)
         self._on_remove = on_remove
         self._context_files: list[str] = []
@@ -169,7 +169,7 @@ class CustomAnalysisRow(QWidget):
 
         top = QHBoxLayout()
         self.include_cb = QCheckBox()
-        self.include_cb.setChecked(True)
+        self.include_cb.setChecked(included)
         self.include_cb.setToolTip("Include this analysis in the current run")
         top.addWidget(self.include_cb)
         top.addWidget(QLabel("Label:"))
@@ -432,9 +432,11 @@ class MedChronConfigForm(QWidget):
         self.custom_rows: list[CustomAnalysisRow] = []
 
         # Pre-populate previously-saved custom analyses so the user does
-        # not have to re-type recurring requests.
+        # not have to re-type recurring requests. These load UNCHECKED — the
+        # user must opt each one into this run, so saved customs never run
+        # silently just because they exist in the global store.
         for saved in custom_analyses_store.load():
-            row = self.add_custom_row()
+            row = self.add_custom_row(included=False)
             row.label_edit.setText(saved.get("label", ""))
             row.instruction_edit.setPlainText(saved.get("instruction", ""))
 
@@ -474,8 +476,10 @@ class MedChronConfigForm(QWidget):
             _ANALYSES_SPLITTER_KEY, self._analyses_splitter.sizes()
         )
 
-    def add_custom_row(self) -> "CustomAnalysisRow":
-        row = CustomAnalysisRow(self._custom_container, self._remove_custom_row)
+    def add_custom_row(self, included: bool = True) -> "CustomAnalysisRow":
+        row = CustomAnalysisRow(
+            self._custom_container, self._remove_custom_row, included=included
+        )
         # Insert above the stretch at the end.
         idx = self._custom_container_layout.count() - 1
         self._custom_container_layout.insertWidget(idx, row)

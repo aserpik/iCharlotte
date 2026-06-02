@@ -395,12 +395,29 @@ WORKBENCH_TO_AGENT_ID = {
     "med_chron": "agent_med_chron",
     "separate": "agent_separate",
     "email_update": "func_email_compose",
-    "chat": "func_chat",
+    "chat": "agent_chat",
     "mediation_brief": "agent_mediation_brief",
     "oppose_motion": "agent_oppose_motion",
     "word_assistant": "func_word_assistant",
     "legal_research": "func_legal_research",
     "depo_prep": "DepoPrep",
+    "report_review": "agent_report_review",
+    "report_refine": "agent_report_refine",
+    "report_polish": "agent_report_polish",
+}
+
+# Agent namespaces that exist only as internal prompt passes of another task
+# (leftover registry entries). They are not standalone agents and must not
+# appear in the Workbench agent dropdown.
+HIDDEN_WORKBENCH_AGENTS = {"timeline", "contradiction"}
+
+# Agents whose prompt is not workbench-editable but whose model IS configurable.
+# They get a synthetic "main" pass so the Model Defaults tab can target them.
+MODEL_ONLY_MAIN_AGENTS = {
+    "separate",
+    "report_review",
+    "report_refine",
+    "report_polish",
 }
 
 WORKBENCH_PASS_TO_AGENT_ID = {
@@ -877,6 +894,15 @@ class PromptsDialog(QDialog):
 
         agent_id = self._current_model_agent_id()
         self.llm_config.update_pass_model_config(agent_id, self.current_pass, sequence)
+
+        # The synthetic "main" pass represents the agent's single, per-agent model
+        # choice. Mirror it to the agent-level config so it takes effect whether a
+        # runtime call passes pass_name="main" or just agent_id.
+        if self.current_pass == "main":
+            self.llm_config.update_agent_config(
+                agent_id, model_sequence=sequence, use_default=False
+            )
+
         QMessageBox.information(
             self,
             "Saved",
@@ -1715,8 +1741,12 @@ class PromptsDialog(QDialog):
                       'liability', 'exposure', 'med_record', 'med_chron', 'separate',
                       'email_update', 'chat',
                       'word_assistant', 'legal_research', 'mediation_brief',
-                      'oppose_motion', 'depo_prep']:
+                      'oppose_motion', 'depo_prep',
+                      'report_review', 'report_refine', 'report_polish']:
             agents.add(agent)
+
+        # Drop internal-only prompt namespaces that aren't real agents.
+        agents -= HIDDEN_WORKBENCH_AGENTS
 
         for agent in sorted(agents):
             self.agent_combo.addItem(agent)
@@ -1841,11 +1871,20 @@ class PromptsDialog(QDialog):
 
         passes = set()
 
-        # Special handling for email_update agent - its prompts are stored differently
+        # Special handling for email_update agent - its prompts are stored differently.
+        # It also gets a "main" model pass (its model is one per-agent choice, not
+        # per prompt-pass) so the Model Defaults tab can target func_email_compose.
         if agent == "email_update":
             passes.add("system_prompt")
             passes.add("topic_instruction")
             passes.add("handling_instruction")
+            passes.add("main")
+
+        # Model-only agents have hardcoded/non-editable prompts but a configurable
+        # model. Expose a synthetic "main" pass so the Model Defaults tab can target
+        # them; the runtime reads <agent>/main via LLMConfig (see Scripts/separate.py).
+        if agent in MODEL_ONLY_MAIN_AGENTS:
+            passes.add("main")
 
         # Get passes from legacy files for this agent
         for filename, (file_agent, file_pass) in LEGACY_PROMPT_MAP.items():

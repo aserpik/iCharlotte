@@ -188,6 +188,115 @@ class TestWorkbenchModelDefaults(unittest.TestCase):
         finally:
             dlg.deleteLater()
 
+    def test_separate_agent_exposes_main_pass_and_enables_model_defaults(self):
+        dlg = PromptsDialog()
+        try:
+            dlg.agent_combo.setCurrentText("separate")
+            passes = [dlg.pass_combo.itemText(i) for i in range(dlg.pass_combo.count())]
+            self.assertIn("main", passes)
+
+            dlg.pass_combo.setCurrentText("main")
+            primary = _child(dlg, QComboBox, "primary_default_model")
+            save_button = _child(dlg, QPushButton, "save_pass_model_defaults")
+            self.assertTrue(primary.isEnabled())
+            self.assertTrue(save_button.isEnabled())
+        finally:
+            dlg.deleteLater()
+
+    def test_separate_model_default_saves_to_agent_separate_main(self):
+        dlg = PromptsDialog()
+        try:
+            dlg.agent_combo.setCurrentText("separate")
+            dlg.pass_combo.setCurrentText("main")
+
+            primary = _child(dlg, QComboBox, "primary_default_model")
+            primary.setCurrentIndex(primary.findData("Gemini|gemini-3.5-flash"))
+            save_button = _child(dlg, QPushButton, "save_pass_model_defaults")
+
+            with patch.object(dialogs_module.QMessageBox, "information"):
+                save_button.click()
+
+            saved = dlg.llm_config.updated_passes[-1]
+            self.assertEqual(saved[0], "agent_separate")
+            self.assertEqual(saved[1], "main")
+            self.assertEqual(
+                [(m.provider, m.model) for m in saved[2]],
+                [("Gemini", "gemini-3.5-flash")],
+            )
+        finally:
+            dlg.deleteLater()
+
+    def test_internal_only_namespaces_hidden_from_dropdown(self):
+        dlg = PromptsDialog()
+        try:
+            agents = [dlg.agent_combo.itemText(i) for i in range(dlg.agent_combo.count())]
+            self.assertNotIn("timeline", agents)
+            self.assertNotIn("contradiction", agents)
+        finally:
+            dlg.deleteLater()
+
+    def test_report_agents_present_with_enabled_model_defaults(self):
+        dlg = PromptsDialog()
+        try:
+            agents = [dlg.agent_combo.itemText(i) for i in range(dlg.agent_combo.count())]
+            for a in ("report_review", "report_refine", "report_polish"):
+                self.assertIn(a, agents)
+
+            dlg.agent_combo.setCurrentText("report_refine")
+            passes = [dlg.pass_combo.itemText(i) for i in range(dlg.pass_combo.count())]
+            self.assertIn("main", passes)
+            primary = _child(dlg, QComboBox, "primary_default_model")
+            self.assertTrue(primary.isEnabled())
+        finally:
+            dlg.deleteLater()
+
+    def test_chat_maps_to_agent_chat(self):
+        self.assertEqual(dialogs_module.WORKBENCH_TO_AGENT_ID["chat"], "agent_chat")
+
+    def test_email_update_exposes_main_model_pass(self):
+        dlg = PromptsDialog()
+        try:
+            dlg.agent_combo.setCurrentText("email_update")
+            passes = [dlg.pass_combo.itemText(i) for i in range(dlg.pass_combo.count())]
+            self.assertIn("main", passes)
+            self.assertIn("system_prompt", passes)
+        finally:
+            dlg.deleteLater()
+
+    def test_main_pass_save_also_writes_agent_level_config(self):
+        dlg = PromptsDialog()
+        try:
+            dlg.agent_combo.setCurrentText("separate")
+            dlg.pass_combo.setCurrentText("main")
+            primary = _child(dlg, QComboBox, "primary_default_model")
+            primary.setCurrentIndex(primary.findData("Gemini|gemini-3.5-flash"))
+            save_button = _child(dlg, QPushButton, "save_pass_model_defaults")
+            with patch.object(dialogs_module.QMessageBox, "information"):
+                save_button.click()
+
+            # Saved to the pass config AND mirrored to the agent-level config.
+            self.assertEqual(dlg.llm_config.updated_passes[-1][0], "agent_separate")
+            agent_updates = dlg.llm_config.updated_agents
+            self.assertTrue(
+                any(u[0] == "agent_separate" and u[2] is False for u in agent_updates),
+                "main-pass save should also write agent-level config",
+            )
+        finally:
+            dlg.deleteLater()
+
+    def test_config_has_homes_for_all_mapped_agents(self):
+        import json
+
+        repo = Path(__file__).resolve().parents[1]
+        cfg = json.loads((repo / "config" / "llm_preferences.json").read_text(encoding="utf-8"))
+        agents = cfg["agents"]
+        for aid in (
+            "agent_oppose_motion", "agent_report_review", "agent_report_refine",
+            "agent_report_polish", "agent_chat", "func_legal_research",
+            "func_word_assistant",
+        ):
+            self.assertIn(aid, agents)
+
     def test_main_window_no_longer_references_llm_settings_dialog(self):
         repo_root = Path(__file__).resolve().parents[1]
         source_path = repo_root / "iCharlotte.py"

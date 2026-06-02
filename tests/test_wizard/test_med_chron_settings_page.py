@@ -360,9 +360,49 @@ def test_saved_custom_analyses_prepopulate_form(qtbot, tmp_path):
     assert form.custom_rows[0].label() == "Left-knee mentions"
     assert form.custom_rows[0].instruction() == "Find every entry about the left knee."
     assert form.custom_rows[1].label() == "Insurance gaps"
-    # Pre-populated rows are included by default.
-    assert form.custom_rows[0].is_included() is True
-    assert form.custom_rows[1].is_included() is True
+    # Pre-populated saved rows are NOT included by default — the user must
+    # explicitly opt them into this run (mirrors the curated list, which also
+    # defaults to off). Prevents saved customs silently running unselected.
+    assert form.custom_rows[0].is_included() is False
+    assert form.custom_rows[1].is_included() is False
+
+
+def test_prepopulated_saved_rows_do_not_run_unless_checked(qtbot, tmp_path):
+    from icharlotte_core.med_chron import custom_analyses_store, session_manager
+    from icharlotte_core.ui.med_chron_config_form import MedChronConfigForm
+
+    custom_analyses_store.save([
+        {"label": "Medications", "instruction": "Track medications."},
+        {"label": "Inconsistent Reporting", "instruction": "Find inconsistencies."},
+    ])
+
+    session_path = _write_session(tmp_path)
+    form = MedChronConfigForm(session_path)
+    qtbot.addWidget(form)
+
+    # User only selects a curated analysis; leaves the saved customs untouched.
+    form.catalog_checkboxes["rewrite_chronology"].setChecked(True)
+
+    assert form.commit_user_config() is True
+
+    session = session_manager.read_session(session_path)
+    user_config = session["user_config"]
+    assert user_config["selected_catalog_ids"] == ["rewrite_chronology"]
+    # No saved custom should run since none were checked.
+    assert user_config["custom_analyses"] == []
+
+
+def test_newly_typed_custom_row_defaults_to_included(qtbot, tmp_path):
+    from icharlotte_core.ui.med_chron_config_form import MedChronConfigForm
+
+    session_path = _write_session(tmp_path)
+    form = MedChronConfigForm(session_path)
+    qtbot.addWidget(form)
+
+    # A row the user adds fresh in this session is opted in by default —
+    # they just added it because they want it to run.
+    row = form.add_custom_row()
+    assert row.is_included() is True
 
 
 def test_typed_custom_analyses_save_to_global_store_on_commit(qtbot, tmp_path):
@@ -398,8 +438,10 @@ def test_unchecked_saved_row_persists_but_does_not_run(qtbot, tmp_path):
     form = MedChronConfigForm(session_path)
     qtbot.addWidget(form)
 
-    # Uncheck the first saved row.
-    form.custom_rows[0].include_cb.setChecked(False)
+    # Saved rows load unchecked; opt only the second one into this run.
+    assert form.custom_rows[0].is_included() is False
+    assert form.custom_rows[1].is_included() is False
+    form.custom_rows[1].include_cb.setChecked(True)
 
     assert form.commit_user_config() is True
 

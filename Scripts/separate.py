@@ -12,7 +12,6 @@ import tempfile
 import time
 import concurrent.futures
 import io
-from google import genai
 
 # Word Document Generation
 try:
@@ -71,6 +70,12 @@ except ImportError:
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LOG_FILE = os.path.join(PROJECT_ROOT, "separator_activity.log")
 
+# Make icharlotte_core importable when run as a standalone subprocess, then route
+# all LLM calls through the shared, provider-agnostic caller.
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+from icharlotte_core.llm_config import LLMCaller
+
 logging.basicConfig(
     level=logging.INFO,
     format='[%(asctime)s] %(levelname)s: %(message)s',
@@ -82,9 +87,19 @@ logging.basicConfig(
 logger = logging.getLogger("Separator")
 
 # --- Constants ---
-PRIMARY_MODEL = "gemini-3.5-flash"
-FALLBACK_MODEL = "gemini-3.1-flash-lite"
 BASE_PATH_WIN = r"Z:\\Shared\\Current Clients"
+
+# Shared provider-agnostic LLM caller (Gemini / Claude / OpenAI with automatic
+# fallback). Lazily built so the script logger is wired in for fallback messages.
+_llm_caller = None
+
+
+def _get_llm_caller():
+    """Return the shared LLMCaller, building it on first use."""
+    global _llm_caller
+    if _llm_caller is None:
+        _llm_caller = LLMCaller(logger=logger)
+    return _llm_caller
 
 # --- Functions ---
 
@@ -212,21 +227,6 @@ def extract_headers(pdf_path):
     sorted_headers = [headers_map[i] for i in sorted(headers_map.keys())]
     return sorted_headers
 
-def call_gemini(prompt, model):
-    """Calls Gemini API directly using the new Google GenAI SDK."""
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise Exception("GEMINI_API_KEY environment variable not set.")
-        
-    client = genai.Client(api_key=api_key)
-    
-    try:
-        # Run API call
-        response = client.models.generate_content(model=model, contents=prompt)
-        return response.text.strip()
-    except Exception as e:
-        raise Exception(f"Gemini API error: {e}")
-
 def analyze_headers_chunk(headers_subset, start_page_num, next_id, prev_doc_context=None, sensitivity=2):
     """Analyzes a chunk of headers."""
     context_instruction = ""
@@ -280,19 +280,23 @@ def analyze_headers_chunk(headers_subset, start_page_num, next_id, prev_doc_cont
         "Example:\n"
         "1|Plaintiff's Complaint|2023-01-01|1|5\n"
         "2|Exhibit A|2023-01-02|6|10\n"
-        "\nHEADERS:\n" + "\n".join(headers_subset)
+        "\nThe page headers to analyze are provided in the document content below."
     )
-    
-    response = ""
-    try:
-        response = call_gemini(prompt, PRIMARY_MODEL)
-    except Exception as e:
-        logger.warning(f"Primary model chunk analysis failed: {e}. Retrying with fallback...")
-        try:
-            response = call_gemini(prompt, FALLBACK_MODEL)
-        except Exception as e2:
-            logger.error(f"Fallback model failed for chunk {start_page_num}: {e2}")
-            return []
+
+    # Route through the shared caller: provider-agnostic with automatic fallback
+    # across the model sequence configured for agent_separate / "main" in the
+    # Prompt Engineering Workbench.
+    response = _get_llm_caller().call(
+        prompt,
+        "\n".join(headers_subset),
+        task_type="general",
+        agent_id="agent_separate",
+        pass_name="main",
+    )
+
+    if not response:
+        logger.error(f"Document analysis failed for chunk starting at page {start_page_num}")
+        return []
 
     docs = []
     lines = response.split('\n')

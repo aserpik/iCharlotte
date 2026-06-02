@@ -595,6 +595,8 @@ def _run_one_analysis(spec: RunSpec, llm_caller: LLMCaller,
             prompt=spec.prompt_text,
             text=spec.input_text,
             task_type="summary",
+            agent_id="agent_med_chron",
+            pass_name="main",
         )
         if not result:
             return RunResult(spec=spec, success=False, error="LLM returned empty result")
@@ -809,7 +811,13 @@ def process_legacy(input_path: str, *, output_dir_override: str | None = None) -
 
     prompt = load_prompt("rewrite_chronology.txt")
     llm = LLMCaller()
-    content = llm.call(prompt=prompt, text=narrative, task_type="summary")
+    content = llm.call(
+        prompt=prompt,
+        text=narrative,
+        task_type="summary",
+        agent_id="agent_med_chron",
+        pass_name="main",
+    )
     if not content:
         return 1
 

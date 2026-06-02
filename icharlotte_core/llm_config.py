@@ -990,6 +990,31 @@ def get_model_sequence_for_agent(agent_id: str, pass_name: str = None) -> List[M
     return LLMConfig().get_model_sequence_for_agent(agent_id, pass_name=pass_name)
 
 
+def get_primary_model_for_agent(
+    agent_id: str,
+    pass_name: str = None,
+    default: tuple = ("Gemini", "gemini-3.5-flash"),
+) -> tuple:
+    """Return ``(provider, model)`` for an agent's configured primary model.
+
+    For features that take an explicit provider/model (e.g. ``LLMHandler.generate``,
+    ``LLMWorker``, or a UI model picker) rather than going through ``LLMCaller``.
+    Prefers the first model in the agent's sequence whose provider has an API key,
+    then the first model, then ``default``.
+    """
+    config = LLMConfig()
+    sequence = config.get_model_sequence_for_agent(agent_id, pass_name=pass_name)
+    if sequence:
+        for spec in sequence:
+            try:
+                if config.is_provider_available(spec.provider):
+                    return (spec.provider, spec.model)
+            except Exception:
+                pass
+        return (sequence[0].provider, sequence[0].model)
+    return default
+
+
 def get_api_key(provider: str) -> Optional[str]:
     """Get API key for a provider (convenience function)."""
     return LLMConfig().get_api_key(provider)

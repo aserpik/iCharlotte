@@ -2477,8 +2477,16 @@ class WordLLMPopup(QDialog):
         self.outlook_prompts = []  # Outlook/email prompts
         self.custom_format_settings = {}  # Custom format settings
         self.selected_model_index = DEFAULT_MODEL_INDEX  # Selected model index
-        self.selected_model_provider = DEFAULT_MODEL_PROVIDER
-        self.selected_model_id = DEFAULT_MODEL_ID
+        # Seed the default model from the Workbench (func_word_assistant). A saved
+        # per-session choice (_load_model_settings) still overrides this default.
+        try:
+            from icharlotte_core.llm_config import get_primary_model_for_agent
+            self.selected_model_provider, self.selected_model_id = get_primary_model_for_agent(
+                "func_word_assistant", default=(DEFAULT_MODEL_PROVIDER, DEFAULT_MODEL_ID)
+            )
+        except Exception:
+            self.selected_model_provider = DEFAULT_MODEL_PROVIDER
+            self.selected_model_id = DEFAULT_MODEL_ID
         self.available_models = list(AVAILABLE_MODELS)
         self.model_fetchers = {}
         self._word_app = None  # Stored Word COM reference during execution

@@ -157,38 +157,22 @@ def extract_text(file_path):
         return None
 
 def call_gemini(prompt, text):
-    """Calls Gemini API with fallback logic."""
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        log_event("Error: GEMINI_API_KEY environment variable not set.", level="error")
-        return None
+    """Generate via the shared provider-agnostic caller.
 
-    client = genai.Client(api_key=api_key)
+    The model sequence comes from the Workbench-configurable ``agent_exposure``
+    config (Gemini/Claude/OpenAI with automatic fallback), instead of a hardcoded
+    Gemini-only list.
+    """
+    from icharlotte_core.llm_config import LLMCaller
 
-    full_prompt = f"{prompt}\n\nDOCUMENT CONTENT:\n{text}"
-    
-    # Updated model sequence for liability agent
-    model_sequence = [
-        "gemini-3.1-pro-preview",
-        "gemini-3.5-flash"
-    ]
-
-    for model_name in model_sequence:
-        log_event(f"Attempting to use model: {model_name}")
-        try:
-            response = client.models.generate_content(
-                model=model_name,
-                contents=full_prompt
-            )
-            if response and response.text:
-                log_event(f"Success with model: {model_name}")
-                return response.text
-        except BaseException as e: # Catch ALL exceptions including system exits
-            log_event(f"Failed with model {model_name}: {e}", level="warning")
-            continue
-    
-    log_event("Error: All model attempts failed.", level="error")
-    return None
+    caller = LLMCaller()
+    return caller.call(
+        prompt=prompt,
+        text=text,
+        task_type="summary",
+        agent_id="agent_exposure",
+        pass_name="main",
+    )
 
 def add_markdown_to_doc(doc, content):
     """Parses basic Markdown and adds it to the docx Document with specific formatting."""

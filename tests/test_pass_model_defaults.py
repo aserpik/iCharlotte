@@ -181,6 +181,26 @@ def test_discovery_runtime_calls_send_workbench_pass_names():
     )
 
 
+def test_med_chron_runtime_calls_send_workbench_agent_and_pass():
+    keyword_sets = _llm_call_keyword_sets(PROJECT_ROOT / "Scripts" / "med_chron.py")
+
+    assert _has_llm_call(
+        keyword_sets,
+        agent_id="agent_med_chron",
+        pass_name="main",
+        task_type="summary",
+    )
+
+
+def test_liability_and_exposure_route_through_config():
+    for script, agent_id in [("liability.py", "agent_liability"), ("exposure.py", "agent_exposure")]:
+        path = PROJECT_ROOT / "Scripts" / script
+        keyword_sets = _llm_call_keyword_sets(path)
+        assert _has_llm_call(keyword_sets, agent_id=agent_id, pass_name="main"), script
+        # call_gemini no longer talks to the Gemini SDK directly.
+        assert "client.models.generate_content" not in path.read_text(encoding="utf-8"), script
+
+
 def test_summarize_runtime_calls_send_workbench_pass_names():
     keyword_sets = _llm_call_keyword_sets(PROJECT_ROOT / "Scripts" / "summarize.py")
 

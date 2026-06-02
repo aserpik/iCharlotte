@@ -25,6 +25,7 @@ import datetime
 
 from ..config import GEMINI_DATA_DIR
 from ..llm import LLMHandler, LLMWorker
+from ..llm_config import get_primary_model_for_agent
 from ..email_manager import EmailSyncWorker, EmailDatabase
 from ..utils import format_date_to_mm_dd_yyyy
 
@@ -140,9 +141,14 @@ class EmailChatDialog(QDialog):
             "If the answer is not in the emails, state that clearly."
         )
 
-        # Start Cache Creation
+        # Start Cache Creation. Email Intelligence relies on Gemini context
+        # caching, so the configured model is used only when it's a Gemini model;
+        # otherwise fall back to the default Gemini flash model.
+        provider, model = get_primary_model_for_agent("func_email_intelligence")
+        if provider != "Gemini":
+            provider, model = "Gemini", "gemini-3.5-flash"
         self.cache_worker = CacheWorker(
-            "Gemini", "gemini-3.5-flash",
+            provider, model,
             self.context_string,
             system_instruction=self.system_prompt
         )

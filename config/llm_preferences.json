@@ -203,10 +203,19 @@
       "agent_id": "agent_separate",
       "display_name": "Separate",
       "description": "PDF separation and document indexing",
-      "model_sequence": [],
+      "model_sequence": [
+        {
+          "provider": "Claude",
+          "model": "claude-sonnet-4-6",
+          "max_tokens": -1,
+          "supports_thinking": false,
+          "supports_streaming": true,
+          "cost_tier": "standard"
+        }
+      ],
       "max_retries": 3,
       "timeout_seconds": 120,
-      "use_default": true
+      "use_default": false
     },
     "agent_summarize": {
       "agent_id": "agent_summarize",
@@ -525,6 +534,78 @@
       "max_retries": 3,
       "timeout_seconds": 300,
       "use_default": false
+    },
+    "agent_oppose_motion": {
+      "agent_id": "agent_oppose_motion",
+      "display_name": "Oppose Motion",
+      "description": "Draft oppositions to motions with grounded citation verification",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 300,
+      "use_default": true
+    },
+    "agent_report_refine": {
+      "agent_id": "agent_report_refine",
+      "display_name": "Report Refine",
+      "description": "Per-section LLM synthesis for litigation report generation",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 180,
+      "use_default": true
+    },
+    "agent_report_polish": {
+      "agent_id": "agent_report_polish",
+      "display_name": "Report Polish",
+      "description": "Final transitions and consistency pass for litigation reports",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 180,
+      "use_default": true
+    },
+    "agent_chat": {
+      "agent_id": "agent_chat",
+      "display_name": "Chat",
+      "description": "Interactive chat and document tagging/context generation",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 120,
+      "use_default": true
+    },
+    "func_legal_research": {
+      "agent_id": "func_legal_research",
+      "display_name": "Legal Research",
+      "description": "Multi-phase legal research (planning, ranking, synthesis, verification)",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 180,
+      "use_default": true
+    },
+    "func_word_assistant": {
+      "agent_id": "func_word_assistant",
+      "display_name": "Word Assistant",
+      "description": "In-Word AI editing, redlining, and email drafting",
+      "model_sequence": [],
+      "max_retries": 3,
+      "timeout_seconds": 180,
+      "use_default": true
+    }
+  },
+  "pass_defaults": {
+    "agent_separate": {
+      "main": {
+        "agent_id": "agent_separate",
+        "pass_name": "main",
+        "model_sequence": [
+          {
+            "provider": "Claude",
+            "model": "claude-sonnet-4-6",
+            "max_tokens": -1,
+            "supports_thinking": false,
+            "supports_streaming": true,
+            "cost_tier": "standard"
+          }
+        ]
+      }
     }
   }
 }

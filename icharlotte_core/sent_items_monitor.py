@@ -12,6 +12,7 @@ from PySide6.QtCore import QThread, Signal
 from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.ui.logs_tab import LogManager
 from icharlotte_core.llm import LLMHandler
+from icharlotte_core.llm_config import get_primary_model_for_agent
 from icharlotte_core.config import API_KEYS
 from icharlotte_core.document_processor import DocumentProcessor
 
@@ -766,9 +767,10 @@ Output ONLY the todo text, no explanation or quotes."""
             user_prompt += f"\n\nAvailable context:\n{context_str}"
 
         try:
+            provider, model = get_primary_model_for_agent("func_sent_monitor")
             result = LLMHandler.generate(
-                provider="Gemini",
-                model="gemini-3.5-flash",
+                provider=provider,
+                model=model,
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 file_contents="",
@@ -793,9 +795,10 @@ Output ONLY the todo text, no explanation or quotes."""
 Use imperative form. Output ONLY the action, no explanation."""
 
         try:
+            provider, model = get_primary_model_for_agent("func_sent_monitor")
             result = LLMHandler.generate(
-                provider="Gemini",
-                model="gemini-3.5-flash",
+                provider=provider,
+                model=model,
                 system_prompt=system_prompt,
                 user_prompt=f"Extract action: {text}",
                 file_contents="",
