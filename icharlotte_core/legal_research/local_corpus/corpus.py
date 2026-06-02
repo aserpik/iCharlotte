@@ -10,6 +10,7 @@ import logging
 import os
 import re
 import sqlite3
+import threading
 from typing import Any
 
 import numpy as np
@@ -35,14 +36,22 @@ class LocalCaseCorpus:
         self.db_path = db_path
         self.vectors_path = vectors_path
         self.embedder = embedder or OnnxEmbedder()
-        self._con: sqlite3.Connection | None = None
+        # SQLite connections are not shareable across threads. The opposition
+        # research/verify steps fan arguments out over a ThreadPoolExecutor, so
+        # each thread must open its own connection — a single shared one raises
+        # "SQLite objects created in a thread can only be used in that same
+        # thread" and silently sinks every search to zero results. WAL mode
+        # (set in schema.connect) makes concurrent readers safe.
+        self._local = threading.local()
         self._vectors: np.ndarray | None = None
 
     # ---- lazy resources -------------------------------------------------
     def _conn(self) -> sqlite3.Connection:
-        if self._con is None:
-            self._con = schema.connect(self.db_path)
-        return self._con
+        con = getattr(self._local, "con", None)
+        if con is None:
+            con = schema.connect(self.db_path)
+            self._local.con = con
+        return con
 
     def _vecs(self) -> np.ndarray:
         if self._vectors is None:

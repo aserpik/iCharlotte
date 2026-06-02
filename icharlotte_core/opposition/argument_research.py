@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import re
+import time
 from typing import Any, Callable
 
 from icharlotte_core.opposition.models import RetrievedAuthority
@@ -20,6 +21,13 @@ from icharlotte_core.opposition.models import RetrievedAuthority
 logger = logging.getLogger(__name__)
 
 LLMCallback = Callable[[str, str], str]
+
+# Rerank resilience: with the loosened prompt a genuine empty selection is rare,
+# so a blank reply almost always means the LLM provider was throttled (429) and
+# returned nothing. Retry with backoff so a transient rate limit doesn't surface
+# as "no on-point authority" when the local retrieval already found candidates.
+_RERANK_ATTEMPTS = 3
+_RERANK_BACKOFF = 2.0  # seconds, scaled by attempt number
 
 
 def _loads_json(text: str) -> dict[str, Any]:
@@ -116,7 +124,7 @@ def _relevant_excerpt(text: str, proposition: str, *, max_chars: int = 6000) -> 
 
 
 def _format_candidates(candidates: list[dict], *, proposition: str = "",
-                       excerpt_chars: int = 6000) -> str:
+                       excerpt_chars: int = 3500) -> str:
     blocks: list[str] = []
     for c in candidates:
         excerpt = _relevant_excerpt(c.get("text") or "", proposition, max_chars=excerpt_chars)
@@ -148,11 +156,17 @@ def select_authorities(
         proposition=proposition or "",
         candidates=_format_candidates(candidates, proposition=proposition or ""),
     )
-    try:
-        response = llm_callback("", user_prompt) or ""
-    except Exception:
-        logger.warning("rerank/select failed", exc_info=True)
-        return []
+    response = ""
+    for attempt in range(_RERANK_ATTEMPTS):
+        try:
+            response = llm_callback("", user_prompt) or ""
+        except Exception:
+            logger.warning("rerank/select failed", exc_info=True)
+            response = ""
+        if response.strip():
+            break  # a non-empty reply (even "{selections: []}") is a real answer
+        if attempt < _RERANK_ATTEMPTS - 1:
+            time.sleep(_RERANK_BACKOFF * (attempt + 1))  # let a throttled provider recover
 
     data = _loads_json(response)
     selections = data.get("selections") if isinstance(data, dict) else None
@@ -225,13 +239,30 @@ def _opinion_text(cl_client, cache_dir: str | None, cluster_id: str) -> str:
     return text
 
 
+def _strip_boolean_ops(query: str) -> str:
+    """Strip Elasticsearch/boolean operators for the local semantic pass.
+
+    ``generate_search_queries`` emits CourtListener syntax (quoted phrases,
+    ``OR``/``AND``, parentheses). Those characters and operator words are right
+    for CL's keyword engine but never appear in opinion prose, so embedding the
+    raw string dilutes the semantic signal and retrieves off-topic cases. FTS5
+    keeps the raw query; only the embedded form is cleaned.
+    """
+    q = re.sub(r'["()]+', " ", query or "")
+    q = re.sub(r"\b(?:OR|AND|NOT)\b", " ", q)
+    q = re.sub(r"\s+", " ", q).strip()
+    return q or (query or "")
+
+
 def _hybrid_search(cl_client, query: str, max_results: int) -> list:
     """Union semantic + keyword results by cluster_id, semantic first."""
     found: dict[str, Any] = {}
+    semantic_query = _strip_boolean_ops(query)
     for semantic in (True, False):
+        q = semantic_query if semantic else query
         try:
             results = cl_client.search_opinions(
-                query, semantic=semantic, max_results=max_results, published_only=True
+                q, semantic=semantic, max_results=max_results, published_only=True
             ) or []
         except Exception:
             logger.warning("search failed (semantic=%s)", semantic, exc_info=True)
@@ -261,16 +292,32 @@ def research_argument(
 ) -> list[RetrievedAuthority]:
     """Research one argument end-to-end; returns selected RetrievedAuthority."""
     queries = generate_search_queries(argument, llm_callback=query_llm)
+    # Always lead with the plain argument text. The local corpus's semantic
+    # search retrieves far better on-point authority from natural-language prose
+    # than from the LLM's CourtListener boolean syntax (quoted phrases + OR),
+    # which surfaces off-topic matches when embedded. Keyword queries still help
+    # FTS5, so keep them after the natural-language lead.
+    nl = (argument or "").strip()
+    if nl:
+        queries = [nl] + [q for q in queries if q.strip() != nl]
     if not queries:
         queries = [argument]
 
     def _run(query_list: list[str]) -> list[RetrievedAuthority]:
+        # Round-robin merge per-query hits so every query contributes its
+        # strongest results to the fetched set — the natural-language lead and
+        # the targeted keyword queries each get a say, rather than the first
+        # query monopolizing all fetch_top slots.
+        per_query = [_hybrid_search(cl_client, q, max_candidates) for q in query_list]
         candidates: dict[str, Any] = {}
-        for q in query_list:
-            for r in _hybrid_search(cl_client, q, max_candidates):
-                key = str(getattr(r, "cluster_id", "") or "")
-                if key and key not in candidates:
-                    candidates[key] = r
+        depth = max((len(lst) for lst in per_query), default=0)
+        for tier in range(depth):
+            for lst in per_query:
+                if tier < len(lst):
+                    r = lst[tier]
+                    key = str(getattr(r, "cluster_id", "") or "")
+                    if key and key not in candidates:
+                        candidates[key] = r
         ordered = list(candidates.values())[:fetch_top]
         cand_dicts: list[dict] = []
         for r in ordered:
