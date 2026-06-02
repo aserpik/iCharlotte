@@ -131,6 +131,53 @@ def build_from_cl_streams(*, courts_stream, clusters_stream, opinions_stream,
     return {"cases": n_cases}
 
 
+def append_cl_to_corpus(*, citations_stream, clusters_stream, opinions_stream,
+                        db_path: str, vectors_path: str, embedder: Embedder,
+                        cutoff_date: str = "2017-01-01", published_only: bool = True,
+                        embed: bool = False) -> dict[str, Any]:
+    """Append recent CA cases from CourtListener bulk into an EXISTING published
+    corpus, IN PLACE.
+
+    Additive only — never modifies/deletes existing CAP rows (build_signals only
+    updates the soft citation_count). CL cases dedup against existing cases by
+    citation. With ``embed=False`` (keyword-only) each CL passage gets a zero
+    placeholder vector, preserving vec_row<->passage alignment with the existing
+    embedded corpus; semantic can be backfilled later. Periodic commits make the
+    long ~50 GB stream durable + re-runnable (a re-run skips already-added cases).
+    """
+    import os
+    if not (os.path.exists(db_path) and os.path.exists(vectors_path)):
+        raise FileNotFoundError(
+            "append_cl_to_corpus requires an existing published corpus "
+            f"({db_path} + {vectors_path}); build CAP first.")
+    con = schema.connect(db_path)
+    schema.create_schema(con)  # idempotent (ensures ingested_volumes etc. exist)
+    # embed=False -> high cutoff so every CL case gets a zero placeholder vector;
+    # embed=True -> embed all CL cases (None cutoff). Either way indexer.embed=True
+    # so a vector row is written per passage (real or zero), keeping alignment.
+    cutoff_year = None if embed else 9999
+    idx = CorpusIndexer(con, vectors_path=vectors_path, embedder=embedder,
+                        embed=True, embed_year_cutoff=cutoff_year, resume=True)
+    pre_cases = con.execute("SELECT COUNT(*) FROM cases").fetchone()[0]
+    n = 0
+    for case, passages in cl_bulk_loader.iter_recent_ca_cases(
+        citations_stream=citations_stream, clusters_stream=clusters_stream,
+        opinions_stream=opinions_stream, cutoff_date=cutoff_date,
+        published_only=published_only,
+    ):
+        if idx.add(case, passages):
+            n += 1
+            if n % 1000 == 0:
+                idx.commit_volume(f"cl-batch-{n}")   # durable checkpoint (fsync + commit)
+                logger.info("CL append: %d new CA cases added", n)
+    idx.finalize()
+    build_signals(con)
+    con.commit()
+    con.close()
+    logger.info("CL append: DONE — %d new cases (corpus now %d cases)", n, pre_cases + n)
+    return {"added": n}
+
+
 def _download_cap_volumes(scratch_dir: str, reporters: dict | None = None) -> list[str]:
     """Download every CA reporter volume ZIP to scratch_dir; skip existing.
 
