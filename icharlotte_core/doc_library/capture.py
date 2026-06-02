@@ -10,6 +10,7 @@ from typing import Callable, Optional
 
 from .extract import extract_any
 from .library import DocumentLibrary
+from .models import LibraryEntry
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,7 @@ def _metadata_from_settings(settings: dict) -> dict:
 
 
 def capture_from_task_entry(case_root: str, entry: dict,
-                            extractor: Callable = extract_any) -> Optional[object]:
+                            extractor: Callable = extract_any) -> Optional[LibraryEntry]:
     if not case_root:
         return None
     task_id = entry.get("task_id")
@@ -54,5 +55,5 @@ def capture_from_task_entry(case_root: str, entry: dict,
                              _metadata_from_settings(entry.get("settings", {})),
                              extractor=extractor)
     except Exception:  # never break task completion
-        logger.exception("doc_library capture failed for task %s", task_id)
+        logger.exception("doc_library capture failed for task %s (%d files)", task_id, len(files))
         return None
