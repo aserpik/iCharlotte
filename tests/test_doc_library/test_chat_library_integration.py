@@ -32,3 +32,18 @@ def test_tree_populates_from_library(app, tmp_path):
     top = tab.library_tree.topLevelItem(0)
     assert top.text(0) == "Plaintiff's Deposition Transcript"
     assert top.childCount() == 1  # one member
+
+
+def test_add_to_library_adds_entry(app, tmp_path, qtbot, monkeypatch):
+    from icharlotte_core.ui.tabs import ChatTab
+    src = tmp_path / "Traffic Collision Report.txt"
+    src.write_text("Officer responded to a two-vehicle collision.", encoding="utf-8")
+    tab = ChatTab()
+    tab._case_root_for_library = str(tmp_path)
+    # Stub the file picker so no dialog opens.
+    monkeypatch.setattr(tab, "_pick_files_for_library", lambda: [str(src)])
+    tab.add_to_library()
+    # Wait for the background QThread to finish the add.
+    qtbot.waitUntil(lambda: bool(tab._library().list_entries()), timeout=5000)
+    labels = [e.label for e in tab._library().list_entries()]
+    assert "Traffic Collision Report" in labels

@@ -599,9 +599,45 @@ class ChatTab(QWidget):
     # ------------------------------------------------------------------
     # Saved Documents (document text library)
     # ------------------------------------------------------------------
+    def _pick_files_for_library(self):
+        from PySide6.QtWidgets import QFileDialog
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Add documents to library", "",
+            "Documents (*.pdf *.docx *.doc *.txt *.msg);;All files (*.*)")
+        return list(paths)
+
     def add_to_library(self):
-        """Manual add — implemented in Task 10."""
-        pass
+        lib = self._library()
+        if lib is None:
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.information(self, "No Case Loaded",
+                                    "Load a case before adding to its library.")
+            return
+        paths = self._pick_files_for_library()
+        if not paths:
+            return
+        from PySide6.QtCore import QThread, Signal, QObject
+
+        class _Worker(QObject):
+            done = Signal()
+
+            def __init__(self, lib, paths):
+                super().__init__()
+                self._lib, self._paths = lib, paths
+
+            def run(self):
+                try:
+                    self._lib.add_entry("manual", self._paths, {})
+                finally:
+                    self.done.emit()
+
+        self._lib_thread = QThread()
+        self._lib_worker = _Worker(lib, paths)
+        self._lib_worker.moveToThread(self._lib_thread)
+        self._lib_thread.started.connect(self._lib_worker.run)
+        self._lib_worker.done.connect(self._lib_thread.quit)
+        self._lib_worker.done.connect(self._refresh_library_tree)
+        self._lib_thread.start()
 
     def _library(self):
         """Return a DocumentLibrary for the current case, or None."""
