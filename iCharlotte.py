@@ -2,6 +2,7 @@ import sys
 import os
 import argparse
 import ctypes
+import copy
 
 # Workaround: WMI queries hang indefinitely on some Windows machines.
 # platform.system(), platform.platform(), etc. all call _wmi_query internally.
@@ -1155,10 +1156,10 @@ class MainWindow(QMainWindow):
         # Best-effort: capture the finished task's source text into the
         # document library (off the UI thread). Uses the original entry with
         # absolute file paths, before they are rewritten case-relative below.
-        if self.case_path:
-            QThreadPool.globalInstance().start(
-                _LibraryCaptureJob(self.case_path, dict(entry))
-            )
+        # Capture original absolute-path entry into the document library (off-UI-thread, best-effort).
+        QThreadPool.globalInstance().start(
+            _LibraryCaptureJob(self.case_path, copy.deepcopy(entry))
+        )
         from icharlotte_core.ui.wizard.persistence import WizardStatePersistence
         # Store files & output_path as case-relative.
         entry = dict(entry)
