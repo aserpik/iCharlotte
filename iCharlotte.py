@@ -51,7 +51,7 @@ try:
         QFileIconProvider, QToolButton, QGroupBox, QCheckBox, QComboBox,
         QInputDialog
     )
-    from PySide6.QtCore import Qt, QThread, Signal, QFileInfo, QMetaObject, Q_ARG, QSettings, QTimer
+    from PySide6.QtCore import Qt, QThread, Signal, QFileInfo, QMetaObject, Q_ARG, QSettings, QTimer, QThreadPool, QRunnable
     from PySide6.QtGui import QAction, QShortcut, QKeySequence, QIcon, QCursor
     from PySide6.QtWebEngineCore import QWebEngineUrlScheme
 except ImportError:
@@ -373,6 +373,20 @@ class DirectoryTreeWorker(QThread):
 
     def stop(self):
         self.running = False
+
+
+class _LibraryCaptureJob(QRunnable):
+    """Best-effort, off-UI-thread capture of a finished task's source text
+    into the document library. Never raises (capture_from_task_entry swallows)."""
+
+    def __init__(self, case_root, entry):
+        super().__init__()
+        self._case_root, self._entry = case_root, entry
+
+    def run(self):
+        from icharlotte_core.doc_library.capture import capture_from_task_entry
+        capture_from_task_entry(self._case_root, self._entry)
+
 
 class MainWindow(QMainWindow):
     # Signals for thread-safe hotkey callbacks
@@ -1138,6 +1152,13 @@ class MainWindow(QMainWindow):
     def _on_task_completed(self, entry: dict) -> None:
         if not self.case_path:
             return
+        # Best-effort: capture the finished task's source text into the
+        # document library (off the UI thread). Uses the original entry with
+        # absolute file paths, before they are rewritten case-relative below.
+        if self.case_path:
+            QThreadPool.globalInstance().start(
+                _LibraryCaptureJob(self.case_path, dict(entry))
+            )
         from icharlotte_core.ui.wizard.persistence import WizardStatePersistence
         # Store files & output_path as case-relative.
         entry = dict(entry)
