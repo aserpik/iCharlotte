@@ -17,6 +17,9 @@ from datetime import datetime
 from typing import Callable, Optional
 
 from .models import LibraryEntry, MemberFile
+from .extract import extract_any as _default_extractor
+from .labels import auto_label
+from ..chat.token_counter import TokenCounter
 
 SCHEMA_VERSION = 1
 
@@ -70,3 +73,82 @@ class DocumentLibrary:
     # ---- read ----
     def list_entries(self) -> list:
         return [LibraryEntry.from_dict(d) for d in self._load().get("entries", [])]
+
+    # ---- hashing / blobs ----
+    @staticmethod
+    def _hash_file(path: str) -> str:
+        h = hashlib.sha1()
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+        return h.hexdigest()
+
+    def get_member_text(self, blob: Optional[str]) -> str:
+        if not blob:
+            return ""
+        path = os.path.join(self.blobs_dir, blob)
+        if not os.path.isfile(path):
+            return ""
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            return f.read()
+
+    # ---- write ----
+    def add_entry(self, task_type: str, source_paths: list,
+                  metadata: Optional[dict] = None,
+                  extractor: Callable = _default_extractor) -> LibraryEntry:
+        os.makedirs(self.blobs_dir, exist_ok=True)
+        entries = self.list_entries()
+
+        # Idempotency: drop any prior entry with the same task_type + file set.
+        target_set = {os.path.normcase(os.path.abspath(p)) for p in source_paths}
+        kept = []
+        for e in entries:
+            e_set = {os.path.normcase(os.path.abspath(m.source_path)) for m in e.members}
+            if not (e.task_type == task_type and e_set == target_set):
+                kept.append(e)
+        entries = kept
+
+        members = []
+        for path in source_paths:
+            name = os.path.basename(path)
+            try:
+                digest = self._hash_file(path)
+            except OSError as ex:
+                members.append(MemberFile(path, name, None, 0, 0, "failed", str(ex)))
+                continue
+            blob_name = f"{digest}.txt"
+            blob_path = os.path.join(self.blobs_dir, blob_name)
+            if os.path.isfile(blob_path):
+                text = self.get_member_text(blob_name)
+                members.append(MemberFile(
+                    path, name, blob_name, len(text),
+                    TokenCounter.estimate_tokens(text), "cached", None))
+                continue
+            result = extractor(path)
+            if result.error or not result.text:
+                members.append(MemberFile(
+                    path, name, None, 0, 0, result.extract_method,
+                    result.error or "empty extraction"))
+                continue
+            tmp = blob_path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write(result.text)
+            os.replace(tmp, blob_path)
+            members.append(MemberFile(
+                path, name, blob_name, len(result.text),
+                TokenCounter.estimate_tokens(result.text),
+                result.extract_method, None))
+
+        existing_labels = [e.label for e in entries]
+        label = auto_label(task_type, source_paths, metadata or {}, existing_labels)
+        entry = LibraryEntry(
+            id=uuid.uuid4().hex,
+            label=label,
+            auto_label=label,
+            task_type=task_type,
+            created_at=datetime.now().isoformat(timespec="seconds"),
+            members=members,
+        )
+        entries.append(entry)
+        self._save_entries(entries)
+        return entry

@@ -31,3 +31,62 @@ def test_corrupt_index_is_recovered_not_raised(tmp_path):
         f.write("{ this is not valid json")
     assert lib.list_entries() == []  # backed up + reinitialized
     assert os.path.exists(lib.index_path + ".corrupt")
+
+
+from icharlotte_core.doc_library.extract import Extracted
+
+
+def _fake_extractor(text="DEPO TEXT"):
+    return lambda path: Extracted(text=text, page_count=2,
+                                  extract_method="pdf_native", error=None)
+
+
+def test_add_entry_creates_blob_and_entry(tmp_path):
+    src = tmp_path / "depo.pdf"
+    src.write_bytes(b"%PDF-1.4 fake bytes")
+    lib = DocumentLibrary(str(tmp_path))
+    entry = lib.add_entry("summarize_depositions", [str(src)],
+                          {"party": "Plaintiff"}, extractor=_fake_extractor())
+    assert entry.label == "Plaintiff's Deposition Transcript"
+    assert entry.members[0].char_count == len("DEPO TEXT")
+    assert entry.members[0].est_tokens > 0
+    blob = os.path.join(lib.blobs_dir, entry.members[0].blob)
+    assert os.path.isfile(blob)
+    assert lib.get_member_text(entry.members[0].blob) == "DEPO TEXT"
+    assert len(lib.list_entries()) == 1
+
+
+def test_same_file_in_two_entries_extracts_once(tmp_path):
+    src = tmp_path / "depo.pdf"
+    src.write_bytes(b"same bytes")
+    calls = {"n": 0}
+
+    def counting_extractor(path):
+        calls["n"] += 1
+        return Extracted("X", 1, "pdf_native", None)
+
+    lib = DocumentLibrary(str(tmp_path))
+    lib.add_entry("manual", [str(src)], {}, extractor=counting_extractor)
+    lib.add_entry("summarize_documents", [str(src)], {}, extractor=counting_extractor)
+    assert calls["n"] == 1  # second add reused the blob
+
+
+def test_rerun_same_task_same_files_replaces_entry(tmp_path):
+    src = tmp_path / "depo.pdf"
+    src.write_bytes(b"bytes")
+    lib = DocumentLibrary(str(tmp_path))
+    lib.add_entry("summarize_depositions", [str(src)], {"party": "Plaintiff"},
+                  extractor=_fake_extractor())
+    lib.add_entry("summarize_depositions", [str(src)], {"party": "Plaintiff"},
+                  extractor=_fake_extractor())
+    assert len(lib.list_entries()) == 1  # replaced, not duplicated
+
+
+def test_extraction_failure_records_error_member_no_blob(tmp_path):
+    src = tmp_path / "bad.pdf"
+    src.write_bytes(b"bytes")
+    lib = DocumentLibrary(str(tmp_path))
+    fail = lambda path: Extracted("", 0, "failed", "boom")
+    entry = lib.add_entry("manual", [str(src)], {}, extractor=fail)
+    assert entry.members[0].error == "boom"
+    assert entry.members[0].blob is None
