@@ -132,9 +132,28 @@ Then write one entry referencing those blobs and return it.
 **Caller A — task completion (automatic).** In the wizard task's
 completion/success handler (where the input file list, `task_type`, and
 settings-page metadata are in hand), call `add_entry(...)`. Fires only on success,
-and only for **opted-in task types** (a small registry, so non-source-doc tasks
-like "oppose motion" don't create noise). *The exact handler per task is confirmed
-during implementation planning.*
+and only for **opted-in task types** — a small allow-list so non-source-doc tasks
+don't create noise. *The exact handler per task is confirmed during implementation
+planning.*
+
+**Opt-in task IDs** (from `icharlotte_core/ui/wizard/registry.py`):
+
+| Auto-populate | Task ID | Why |
+|:---:|---|---|
+| ✅ | `summarize_documents` | summarizes arbitrary case documents |
+| ✅ | `summarize_discovery` | discovery responses |
+| ✅ | `summarize_depositions` | deposition transcripts |
+| ✅ | `medical_records` | medical records |
+| ✅ | `med_chron_analysis` | medical records / chronology source |
+| ✅ | `med_record_extractor` | medical records |
+| ❌ | `depo_prep` | prep workproduct, not a captured source doc |
+| ❌ | `subpoena_tracker` | tracking, no source-text to query |
+| ❌ | `respond_to_discovery` | generates responses, not source capture |
+| ❌ | `oppose_motion` | motion workproduct |
+| ❌ | `chat` | the chat tab itself |
+
+The non-opted tasks remain available via **manual add** if their inputs are ever
+worth querying.
 
 **Caller B — manual add.** A button on the Chat "Saved Documents" panel opens a
 file picker → `add_entry("manual", picked_files, …)`.
@@ -154,8 +173,14 @@ piling up duplicates.
 |------|-------------------|---------|
 | `summarize_depositions` | `{Party}'s Deposition Transcript` | "Plaintiff's Deposition Transcript" |
 | `summarize_discovery` | `{Party}'s Discovery Responses` | "Defendant's Discovery Responses" |
-| `med_chron` / `med_record` | `Medical Records — {name}` | "Medical Records — Brier Buchalter" |
+| `medical_records` / `med_chron_analysis` / `med_record_extractor` | `Medical Records — {name}` | "Medical Records — Brier Buchalter" |
+| `summarize_documents` | cleaned filename, title-cased | "Traffic Collision Report" |
 | `manual` | cleaned filename, title-cased | "Traffic Collision Report" |
+
+`summarize_documents` processes arbitrary documents with no inherent role/party, so
+its auto-label falls back to the cleaned source filename (same as `manual`). When
+an entry bundles several files, the label uses the first file's cleaned name with a
+"+N more" suffix (e.g. "Traffic Collision Report +2 more") — renameable as always.
 
 - **`{Party}` / `{name}`** come from metadata the task already collects (deponent
   name on the depo settings page; propounding/responding party in discovery). When
