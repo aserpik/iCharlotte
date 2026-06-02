@@ -1204,7 +1204,7 @@ def validate_index_docx(doc_path: str, expected_doc_count: Optional[int] = None)
     try:
         doc = Document(doc_path)
     except Exception as e:
-        result.findings.append(Finding("ERROR", "open", f"Could not open .docx: {e}"))
+        result.findings.append(Finding("ERROR", "open_docx", f"Could not open .docx: {e}"))
         return result
 
     if not doc.tables:
