@@ -60,6 +60,27 @@ def test_process_splits_checked_rows(qtbot, tmp_path):
     assert len(captured.get("created", [])) == 2
 
 
+def test_split_page_ranges_are_correct(qtbot, tmp_path):
+    """Guard the 1-based->0-based page math: 1-3 yields 3 pages, 4-6 yields 3."""
+    pdf = tmp_path / "src.pdf"
+    _make_pdf(pdf, 6)
+    wb = SeparatorWorkbench()
+    qtbot.addWidget(wb)
+    docs = [
+        {"id": "1", "title": "First", "date": "", "start": 1, "end": 3},
+        {"id": "2", "title": "Second", "date": "", "start": 4, "end": 6},
+    ]
+    wb.load_docs(str(pdf), docs)
+    for row in range(wb.doc_table.rowCount()):
+        wb.doc_table.item(row, 0).setCheckState(Qt.CheckState.Checked)
+    wb.process_documents()
+    out_dir = tmp_path / "PULLED-src"
+    first = pypdf.PdfReader(str(out_dir / "1 - First.pdf"))
+    second = pypdf.PdfReader(str(out_dir / "2 - Second.pdf"))
+    assert len(first.pages) == 3
+    assert len(second.pages) == 3
+
+
 def test_process_merges_group(qtbot, tmp_path):
     pdf = tmp_path / "src.pdf"
     _make_pdf(pdf, 6)
