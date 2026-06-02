@@ -616,6 +616,13 @@ class ChatTab(QWidget):
         paths = self._pick_files_for_library()
         if not paths:
             return
+        prior = getattr(self, "_lib_thread", None)
+        if prior is not None:
+            try:
+                if prior.isRunning():
+                    return
+            except RuntimeError:
+                pass  # prior C++ object already deleted; safe to proceed
         from PySide6.QtCore import QThread, Signal, QObject
 
         class _Worker(QObject):
@@ -637,6 +644,8 @@ class ChatTab(QWidget):
         self._lib_thread.started.connect(self._lib_worker.run)
         self._lib_worker.done.connect(self._lib_thread.quit)
         self._lib_worker.done.connect(self._refresh_library_tree)
+        self._lib_thread.finished.connect(self._lib_worker.deleteLater)
+        self._lib_thread.finished.connect(self._lib_thread.deleteLater)
         self._lib_thread.start()
 
     def _library(self):
