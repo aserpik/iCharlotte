@@ -611,6 +611,18 @@ def create_index_word(pdf_path, docs):
         logger.info(f"Index saved to: {docx_path}")
         print(f"\n[SUCCESS] Index created: {docx_filename} in INDEXES folder.")
 
+        # Mandatory Word-output validation (CLAUDE.md). Non-fatal: log only.
+        try:
+            from icharlotte_core.word_validator import validate_index_docx
+            vres = validate_index_docx(docx_path, expected_doc_count=len(docs))
+            if vres.has_errors:
+                logger.error(f"Index validation FAILED: {docx_path}")
+                vres.print_summary()
+            elif vres.has_warnings:
+                logger.warning(f"Index validation warnings for: {docx_path}")
+        except Exception as ve:
+            logger.warning(f"Index validation skipped: {ve}")
+
     except Exception as e:
         logger.error(f"Error creating index: {e}")
         print(f"\n[ERROR] Failed to create index document: {e}")

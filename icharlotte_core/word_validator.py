@@ -1186,6 +1186,49 @@ def validate_report(doc_path: str, profile: Dict = None) -> ValidationResult:
     return result
 
 
+def validate_index_docx(doc_path: str, expected_doc_count: Optional[int] = None) -> ValidationResult:
+    """Lightweight offline validation for the separator INDEX .docx.
+
+    Verifies the file exists, opens with python-docx, contains a table with a
+    header row plus at least one data row, and (optionally) that the number of
+    data rows matches the number of identified documents.
+    """
+    from docx import Document
+
+    result = ValidationResult(context=f"Separator index: {os.path.basename(doc_path)}")
+
+    if not os.path.exists(doc_path):
+        result.findings.append(Finding("ERROR", "file", f"File not found: {doc_path}"))
+        return result
+
+    try:
+        doc = Document(doc_path)
+    except Exception as e:
+        result.findings.append(Finding("ERROR", "open", f"Could not open .docx: {e}"))
+        return result
+
+    if not doc.tables:
+        result.findings.append(Finding("ERROR", "table", "Index has no table"))
+        return result
+
+    table = doc.tables[0]
+    data_rows = max(0, len(table.rows) - 1)  # minus header
+    if data_rows == 0:
+        result.findings.append(Finding("ERROR", "rows", "Index table has no data rows"))
+        return result
+
+    if expected_doc_count is not None and data_rows != expected_doc_count:
+        result.findings.append(Finding(
+            "WARN", "row_count",
+            f"Index data rows ({data_rows}) != identified documents ({expected_doc_count})",
+            expected=expected_doc_count, actual=data_rows,
+        ))
+    else:
+        result.findings.append(Finding("PASS", "row_count", f"{data_rows} document rows"))
+
+    return result
+
+
 def validate_discovery_response_docx(doc_path: str) -> ValidationResult:
     """Lightweight offline validation for generated discovery-response .docx files.
 
