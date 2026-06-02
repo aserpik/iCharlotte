@@ -676,7 +676,7 @@ class ChatTab(QWidget):
             Item = self._QTreeWidgetItem
             for e in entries:
                 top = Item([e.label])
-                top.setData(0, Qt.ItemDataRole.UserRole, {"kind": "entry", "id": e.id})
+                top.setData(0, Qt.ItemDataRole.UserRole, {"kind": "entry", "id": e.id, "label": e.label})
                 top.setFlags(top.flags() | Qt.ItemFlag.ItemIsUserCheckable
                              | Qt.ItemFlag.ItemIsEditable
                              | Qt.ItemFlag.ItemIsAutoTristate)
@@ -705,15 +705,18 @@ class ChatTab(QWidget):
     def _on_library_item_changed(self, item, column):
         from PySide6.QtCore import Qt
         data = item.data(0, Qt.ItemDataRole.UserRole) or {}
-        # Inline rename of an entry (top-level item, text changed).
+        # Inline rename of an entry (top-level item, text actually changed).
         if data.get("kind") == "entry" and column == 0:
-            lib = self._library()
             new_label = item.text(0).strip()
-            if lib and new_label:
-                try:
-                    lib.rename_entry(data["id"], new_label)
-                except Exception:
-                    pass
+            if new_label and new_label != data.get("label"):
+                lib = self._library()
+                if lib:
+                    try:
+                        lib.rename_entry(data["id"], new_label)
+                        data["label"] = new_label
+                        item.setData(0, Qt.ItemDataRole.UserRole, data)
+                    except Exception:
+                        pass
         self._update_library_selected_label()
         self._persist_library_selection()
 
@@ -732,11 +735,16 @@ class ChatTab(QWidget):
     def _restore_checked_entry_ids(self, ids):
         from PySide6.QtCore import Qt
         wanted = set(ids or [])
-        for i in range(self.library_tree.topLevelItemCount()):
-            top = self.library_tree.topLevelItem(i)
-            data = top.data(0, Qt.ItemDataRole.UserRole) or {}
-            if data.get("id") in wanted:
-                top.setCheckState(0, Qt.CheckState.Checked)
+        self.library_tree.blockSignals(True)
+        try:
+            for i in range(self.library_tree.topLevelItemCount()):
+                top = self.library_tree.topLevelItem(i)
+                data = top.data(0, Qt.ItemDataRole.UserRole) or {}
+                if data.get("id") in wanted:
+                    top.setCheckState(0, Qt.CheckState.Checked)
+        finally:
+            self.library_tree.blockSignals(False)
+        self._update_library_selected_label()
 
     def _persist_library_selection(self):
         if not getattr(self, "persistence", None):
