@@ -60,10 +60,66 @@ def _normalize_ws(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "")).strip().lower()
 
 
-def _format_candidates(candidates: list[dict], *, excerpt_chars: int = 6000) -> str:
+# Generic, high-frequency words that carry no topical signal for locating the
+# on-point part of an opinion (legal boilerplate + stopwords).
+_EXCERPT_STOP = {
+    "the", "and", "that", "this", "with", "from", "have", "has", "was", "were",
+    "for", "are", "not", "but", "its", "his", "her", "their", "which", "such",
+    "court", "courts", "case", "cases", "opinion", "plaintiff", "plaintiffs",
+    "defendant", "defendants", "appellant", "respondent", "petitioner", "motion",
+    "appeal", "trial", "order", "judgment", "party", "parties", "argues", "here",
+    "under", "would", "should", "because", "exists", "proper", "subject",
+}
+
+
+def _relevant_excerpt(text: str, proposition: str, *, max_chars: int = 6000) -> str:
+    """Return the ~max_chars window of ``text`` most relevant to ``proposition``.
+
+    Opinion text starts with caption/procedural/factual material; the on-point
+    holding is usually thousands of chars deep. Showing a reranker only the
+    first N chars hides the very content that made the case match in retrieval,
+    so it selects nothing. This slides a window over the opinion and picks the
+    densest cluster of proposition key-terms.
+    """
+    text = text or ""
+    if len(text) <= max_chars:
+        return text
+    terms = {t for t in re.findall(r"[a-z]{4,}", (proposition or "").lower())
+             if t not in _EXCERPT_STOP}
+    if not terms:
+        return text[:max_chars]
+    low = text.lower()
+    hits: list[int] = []
+    for t in terms:
+        start = 0
+        while True:
+            i = low.find(t, start)
+            if i < 0:
+                break
+            hits.append(i)
+            start = i + len(t)
+    if not hits:
+        return text[:max_chars]
+    hits.sort()
+    import bisect
+    best_start, best_score = 0, -1
+    for h in hits:
+        ws = max(0, h - 250)            # small lead-in for context
+        we = ws + max_chars
+        score = bisect.bisect_right(hits, we) - bisect.bisect_left(hits, ws)
+        if score > best_score:
+            best_score, best_start = score, ws
+    end = min(len(text), best_start + max_chars)
+    prefix = "…" if best_start > 0 else ""
+    suffix = "…" if end < len(text) else ""
+    return f"{prefix}{text[best_start:end]}{suffix}"
+
+
+def _format_candidates(candidates: list[dict], *, proposition: str = "",
+                       excerpt_chars: int = 6000) -> str:
     blocks: list[str] = []
     for c in candidates:
-        excerpt = (c.get("text") or "")[:excerpt_chars]
+        excerpt = _relevant_excerpt(c.get("text") or "", proposition, max_chars=excerpt_chars)
         blocks.append(
             f"[{c.get('cluster_id')}] {c.get('case_name', '')}, {c.get('citation', '')}\n{excerpt}"
         )
@@ -90,7 +146,7 @@ def select_authorities(
     template = get_prompt("oppose_motion", "rerank_select") or default_prompts.RERANK_SELECT_PROMPT
     user_prompt = template.format(
         proposition=proposition or "",
-        candidates=_format_candidates(candidates),
+        candidates=_format_candidates(candidates, proposition=proposition or ""),
     )
     try:
         response = llm_callback("", user_prompt) or ""
