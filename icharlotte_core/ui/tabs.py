@@ -393,6 +393,8 @@ class ChatTab(QWidget):
         self.library_tree.setMinimumHeight(60)
         self.library_tree.setMaximumHeight(300)
         settings_layout.addWidget(self.library_tree)
+        self.library_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.library_tree.customContextMenuRequested.connect(self._show_library_context_menu)
         # Connect ONCE here (not in _refresh_library_tree, which runs repeatedly).
         self.library_tree.itemChanged.connect(self._on_library_item_changed)
 
@@ -661,8 +663,69 @@ class ChatTab(QWidget):
             or getattr(self.window(), "case_path", None)
         return DocumentLibrary(root) if root else None
 
+    def _show_library_context_menu(self, pos):
+        from PySide6.QtCore import Qt
+        from PySide6.QtWidgets import QMenu
+        item = self.library_tree.itemAt(pos)
+        if item is None:
+            return
+        data = item.data(0, Qt.ItemDataRole.UserRole) or {}
+        if data.get("kind") != "entry":
+            item = item.parent()
+            data = item.data(0, Qt.ItemDataRole.UserRole) or {} if item else {}
+        if data.get("kind") != "entry":
+            return
+        entry_id = data.get("id")
+        menu = QMenu(self)
+        rename_act = menu.addAction("Rename")
+        reset_act = menu.addAction("Reset to auto name")
+        menu.addSeparator()
+        remove_act = menu.addAction("Remove from library")
+        chosen = menu.exec(self.library_tree.viewport().mapToGlobal(pos))
+        if chosen is None:
+            return
+        if chosen == rename_act:
+            self.library_tree.editItem(item, 0)
+        elif chosen == reset_act:
+            self._reset_library_entry(entry_id)
+        elif chosen == remove_act:
+            self._delete_library_entry(entry_id, confirm=True)
+
+    def _reset_library_entry(self, entry_id):
+        lib = self._library()
+        if lib is None:
+            return
+        try:
+            lib.reset_label(entry_id)
+        except Exception:
+            pass
+        self._refresh_library_tree()
+
+    def _delete_library_entry(self, entry_id, confirm=True):
+        lib = self._library()
+        if lib is None:
+            return
+        if confirm:
+            from PySide6.QtWidgets import QMessageBox
+            reply = QMessageBox.question(
+                self, "Remove from library",
+                "Remove this document from the library? The saved text will be deleted.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No)
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+        try:
+            lib.delete_entry(entry_id)
+        except Exception:
+            pass
+        self._refresh_library_tree()
+
     def _refresh_library_tree(self):
         from PySide6.QtCore import Qt
+        try:
+            _preserve_ids = self._collect_checked_entry_ids()
+        except Exception:
+            _preserve_ids = []
         self.library_tree.blockSignals(True)
         try:
             self.library_tree.clear()
@@ -694,7 +757,10 @@ class ChatTab(QWidget):
             self.library_tree.expandAll()
         finally:
             self.library_tree.blockSignals(False)
-        self._update_library_selected_label()
+        # Re-apply the checked selection captured before the rebuild.
+        # _restore_checked_entry_ids handles blockSignals and calls
+        # _update_library_selected_label() once at the end.
+        self._restore_checked_entry_ids(_preserve_ids)
 
     def _set_all_library_checks(self, checked: bool):
         from PySide6.QtCore import Qt

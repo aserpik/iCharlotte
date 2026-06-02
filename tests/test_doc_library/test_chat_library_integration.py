@@ -120,3 +120,43 @@ def test_selection_roundtrip(app, tmp_path):
     tab2._refresh_library_tree()
     tab2._restore_checked_entry_ids(saved)
     assert tab2.library_tree.topLevelItem(0).checkState(0) == Qt.CheckState.Checked
+
+
+def test_reset_library_entry_action(app, tmp_path):
+    from PySide6.QtCore import Qt
+    from icharlotte_core.ui.tabs import ChatTab
+    lib = _seed_library(str(tmp_path))
+    entry_id = lib.list_entries()[0].id
+    lib.rename_entry(entry_id, "Custom Name")
+    tab = ChatTab()
+    tab._case_root_for_library = str(tmp_path)
+    tab._refresh_library_tree()
+    tab._reset_library_entry(entry_id)
+    assert lib.list_entries()[0].label == "Plaintiff's Deposition Transcript"
+    # tree reflects the reset
+    assert tab.library_tree.topLevelItem(0).text(0) == "Plaintiff's Deposition Transcript"
+
+
+def test_delete_library_entry_action(app, tmp_path):
+    from icharlotte_core.ui.tabs import ChatTab
+    lib = _seed_library(str(tmp_path))
+    entry_id = lib.list_entries()[0].id
+    tab = ChatTab()
+    tab._case_root_for_library = str(tmp_path)
+    tab._refresh_library_tree()
+    tab._delete_library_entry(entry_id, confirm=False)
+    assert lib.list_entries() == []
+    assert tab.library_tree.topLevelItemCount() == 0
+
+
+def test_refresh_preserves_checked_selection(app, tmp_path):
+    from PySide6.QtCore import Qt
+    from icharlotte_core.ui.tabs import ChatTab
+    lib = _seed_library(str(tmp_path))
+    tab = ChatTab()
+    tab._case_root_for_library = str(tmp_path)
+    tab._refresh_library_tree()
+    tab.library_tree.topLevelItem(0).setCheckState(0, Qt.CheckState.Checked)
+    checked_before = tab._collect_checked_entry_ids()
+    tab._refresh_library_tree()  # rebuild
+    assert tab._collect_checked_entry_ids() == checked_before  # still checked
