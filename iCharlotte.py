@@ -1218,6 +1218,26 @@ class MainWindow(QMainWindow):
             task_tab.settings_page.from_dict(settings)
             output_page = TASK_PAGE_OUTPUT
             settings_page = TASK_PAGE_SETTINGS
+        elif get_in_process_task_builder_name(task_id) == "build_generate_motion_tab":
+            from icharlotte_core.ui.wizard.pages.generate_motion_page import (
+                GenerateMotionTaskTab,
+                TASK_PAGE_OUTPUT,
+                TASK_PAGE_SETTINGS,
+            )
+
+            settings = dict(entry.get("settings") or {})
+            target_files = settings.get("target_files") or files
+            task_tab = GenerateMotionTaskTab(
+                spec=spec,
+                case_path=self.case_path,
+                file_number=self.file_number,
+                motion_type_id=settings.get("motion_type_id", "generic"),
+                target_files=target_files,
+                parent=self,
+            )
+            task_tab.settings_page.from_dict(settings)
+            output_page = TASK_PAGE_OUTPUT
+            settings_page = TASK_PAGE_SETTINGS
         else:
             task_tab = TaskTab(
                 spec=spec,
@@ -1289,6 +1309,24 @@ class MainWindow(QMainWindow):
                     file_number=self.file_number,
                     motion_file=motion_file,
                     context_files=context_files,
+                    parent=self,
+                )
+                output_page = TASK_PAGE_OUTPUT
+                settings_page = TASK_PAGE_SETTINGS
+            elif get_in_process_task_builder_name(task_id) == "build_generate_motion_tab":
+                from icharlotte_core.ui.wizard.pages.generate_motion_page import (
+                    GenerateMotionTaskTab,
+                    TASK_PAGE_OUTPUT,
+                    TASK_PAGE_SETTINGS,
+                )
+
+                target_files = settings_dict.get("target_files") or files_abs
+                tab = GenerateMotionTaskTab(
+                    spec=spec,
+                    case_path=self.case_path,
+                    file_number=self.file_number,
+                    motion_type_id=settings_dict.get("motion_type_id", "generic"),
+                    target_files=target_files,
                     parent=self,
                 )
                 output_page = TASK_PAGE_OUTPUT
@@ -1646,11 +1684,11 @@ class MainWindow(QMainWindow):
         # Cancel any running worker before removing the tab.
         worker = getattr(widget, "_worker", None)
         if worker is not None:
-            if widget.__class__.__name__ == "OpposeMotionTaskTab" and worker.isRunning():
+            if widget.__class__.__name__ in ("OpposeMotionTaskTab", "GenerateMotionTaskTab") and worker.isRunning():
                 QMessageBox.information(
                     self,
                     "Task running",
-                    "The opposition draft is still running. Wait for it to finish before closing this tab.",
+                    "The draft is still running. Wait for it to finish before closing this tab.",
                 )
                 return
             try:
