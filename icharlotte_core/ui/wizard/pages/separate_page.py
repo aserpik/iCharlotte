@@ -14,7 +14,7 @@ import sys
 
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtWidgets import (
-    QFileDialog, QHBoxLayout, QLabel, QMessageBox, QPushButton, QSlider,
+    QFileDialog, QHBoxLayout, QLabel, QMessageBox, QSlider,
     QVBoxLayout, QWidget,
 )
 
@@ -217,6 +217,10 @@ class SeparateTaskTab(WizardTaskContainer):
     def _start_analysis(self, sensitivity: int):
         if self._worker is not None and self._worker.isRunning():
             return
+        # Keep the settings-page slider in sync with whatever value triggered
+        # this run (settings Analyze OR workbench Re-analyze) so the recorded
+        # task settings reflect the sensitivity actually used.
+        self.settings_page.sensitivity_slider.setValue(sensitivity)
         self.status_page.reset()
         self.status_page.progress_bar.setRange(0, 0)
         self.status_page.on_status("Analyzing...")
@@ -232,14 +236,13 @@ class SeparateTaskTab(WizardTaskContainer):
         self._worker = None
         if not success:
             self.status_page.on_status(f"FAILED: {payload}")
+            # Re-enable the workbench controls if this was a re-analyze attempt.
+            self.workbench.set_busy(False)
+            # Do NOT disconnect StatusPage's own cancel slot — the existing
+            # cancel_requested -> _on_cancel wiring already returns to Settings.
+            # Just relabel the button; reset() restores it on the next run.
             self.status_page.cancel_btn.setText("Back to Settings")
             self.status_page.cancel_btn.setEnabled(True)
-            try:
-                self.status_page.cancel_btn.clicked.disconnect()
-            except RuntimeError:
-                pass
-            self.status_page.cancel_btn.clicked.connect(
-                lambda: self.setCurrentIndex(PAGE_SETTINGS))
             return
         docs = payload if isinstance(payload, list) else []
         self.workbench.set_busy(False)

@@ -19,6 +19,7 @@ def test_initial_tasks_registered():
         "medical_records",
         "med_chron_analysis",
         "med_record_extractor",
+        "separate",
         "subpoena_tracker",
         "respond_to_discovery",
         "oppose_motion",

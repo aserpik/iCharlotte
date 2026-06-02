@@ -48,3 +48,25 @@ def test_analysis_success_loads_workbench(qtbot, tmp_path):
     tab._on_analysis_finished(True, docs)
     assert tab.currentIndex() == PAGE_WORKBENCH
     assert tab.workbench.doc_table.rowCount() == 1
+
+
+def test_analysis_failure_keeps_cancel_working(qtbot):
+    from icharlotte_core.ui.wizard.registry import get_task
+    from icharlotte_core.ui.wizard.pages.separate_page import (
+        SeparateTaskTab, PAGE_SETTINGS, PAGE_STATUS,
+    )
+    spec = get_task("separate")
+    tab = SeparateTaskTab(spec, case_path="C:/case", file_number="1234.001",
+                          pdf_path="C:/x.pdf")
+    qtbot.addWidget(tab)
+    tab.setCurrentIndex(PAGE_STATUS)
+    tab._on_analysis_finished(False, "boom")
+    # Still on status, cancel re-enabled and relabeled.
+    assert tab.currentIndex() == PAGE_STATUS
+    assert tab.status_page.cancel_btn.isEnabled()
+    assert tab.status_page.cancel_btn.text() == "Back to Settings"
+    # StatusPage's own cancel slot is intact: emitting cancel_requested
+    # (via _on_cancel) still routes back to Settings.
+    with qtbot.waitSignal(tab.status_page.cancel_requested, timeout=500):
+        tab.status_page._on_cancel()
+    assert tab.currentIndex() == PAGE_SETTINGS

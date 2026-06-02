@@ -1646,11 +1646,11 @@ class MainWindow(QMainWindow):
         # Cancel any running worker before removing the tab.
         worker = getattr(widget, "_worker", None)
         if worker is not None:
-            if widget.__class__.__name__ == "OpposeMotionTaskTab" and worker.isRunning():
+            if widget.__class__.__name__ in ("OpposeMotionTaskTab", "SeparateTaskTab") and worker.isRunning():
                 QMessageBox.information(
                     self,
                     "Task running",
-                    "The opposition draft is still running. Wait for it to finish before closing this tab.",
+                    "This task is still running. Wait for it to finish before closing this tab.",
                 )
                 return
             try:
