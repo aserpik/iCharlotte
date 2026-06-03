@@ -1197,6 +1197,26 @@ class MainWindow(QMainWindow):
         suffix = next_instance_suffix(spec.title, existing_titles)
         title = f"{spec.title} {suffix}".strip()
 
+        builder_name = get_in_process_task_builder_name(task_id)
+        if builder_name and builder_name != "build_oppose_motion_tab":
+            # In-process custom tabs (e.g. Separate) own their source selection;
+            # reopening re-runs the builder's picker. Analysis output is
+            # ephemeral, so there's nothing to restore beyond the tab itself.
+            from icharlotte_core.ui.wizard import in_process_task_tab
+            builder = getattr(in_process_task_tab, builder_name)
+            task_tab = builder(
+                spec=spec, case_path=self.case_path,
+                file_number=self.file_number, parent=self)
+            if task_tab is None:
+                return
+            task_tab.setProperty("wizard_task_id", spec.task_id)
+            task_tab.setProperty("wizard_instance_suffix", suffix)
+            task_tab.task_completed.connect(self._on_task_completed)
+            new_index = self.tabs.addTab(task_tab, title)
+            self.tabs.setCurrentIndex(new_index)
+            self._hide_fixed_close_buttons()
+            return
+
         if get_in_process_task_builder_name(task_id) == "build_oppose_motion_tab":
             from icharlotte_core.ui.wizard.pages.oppose_motion_page import (
                 OpposeMotionTaskTab,
@@ -1272,6 +1292,24 @@ class MainWindow(QMainWindow):
                 for f in entry.get("files", [])
             ]
             settings_dict = entry.get("settings") or {}
+            builder_name = get_in_process_task_builder_name(task_id)
+            if builder_name and builder_name != "build_oppose_motion_tab":
+                # In-process custom tabs (e.g. Separate) re-pick their source on
+                # restore; skip silently if the user cancels the picker.
+                from icharlotte_core.ui.wizard import in_process_task_tab
+                builder = getattr(in_process_task_tab, builder_name)
+                tab = builder(
+                    spec=spec, case_path=self.case_path,
+                    file_number=self.file_number, parent=self)
+                if tab is None:
+                    continue
+                suffix = entry.get("instance_suffix", "") or ""
+                tab.setProperty("wizard_task_id", spec.task_id)
+                tab.setProperty("wizard_instance_suffix", suffix)
+                tab.task_completed.connect(self._on_task_completed)
+                self.tabs.addTab(tab, f"{spec.title} {suffix}".strip())
+                continue
+
             if get_in_process_task_builder_name(task_id) == "build_oppose_motion_tab":
                 from icharlotte_core.ui.wizard.pages.oppose_motion_page import (
                     OpposeMotionTaskTab,
