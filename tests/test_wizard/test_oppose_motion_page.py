@@ -9,6 +9,7 @@ from icharlotte_core.opposition.models import (
     DraftDocument,
     MotionMetadata,
     OutlineNode,
+    SectionPlanItem,
 )
 from icharlotte_core.ui.wizard.pages.oppose_motion_page import (
     OpposeMotionOutputPage,
@@ -19,8 +20,31 @@ from icharlotte_core.ui.wizard.pages.oppose_motion_page import (
     SETTINGS_PAGE_OUTLINE,
     TASK_PAGE_SETTINGS,
     TASK_PAGE_OUTPUT,
+    _research_targets,
     build_oppose_motion_tab,
 )
+
+
+def test_research_targets_unions_args_and_section_leaves_skipping_structural():
+    """Research must cover every subsection proposition, not just the top-level
+    arguments — otherwise sub-points (meet-and-confer, cutoff, ...) get no
+    authority and the drafter emits '[no case authority retrieved for this
+    point]'. Structural sections are skipped; duplicates collapse."""
+    md = MotionMetadata(principal_arguments=["Forensic imaging is irrelevant"])
+    plan = [
+        SectionPlanItem(id="i", path=["I"], text="Introduction"),
+        SectionPlanItem(id="a", path=["II", "A"], text="Discovery on the privacy claims is closed"),
+        SectionPlanItem(id="b", path=["II", "B"], text="Plaintiff failed to meet and confer"),
+        SectionPlanItem(id="b2", path=["II", "B"], text="Plaintiff failed to meet and confer"),  # dup
+        SectionPlanItem(id="c", path=["VIII"], text="Conclusion"),
+    ]
+    targets = _research_targets(md, plan)
+    assert "Forensic imaging is irrelevant" in targets       # principal argument kept
+    assert "Discovery on the privacy claims is closed" in targets  # subsection leaf added
+    assert "Plaintiff failed to meet and confer" in targets
+    assert "Introduction" not in targets and "Conclusion" not in targets  # structural skipped
+    assert len(targets) == 3                                   # deduped
+    assert len(targets) <= 24                                  # capped
 
 
 def test_confirmation_blocks_missing_required_fields(qtbot):

@@ -73,6 +73,44 @@ def _corpus_embedder():
     return OnnxEmbedder()
 
 
+def _research_targets(metadata, plan) -> list[str]:
+    """Propositions to research, deduped: the union of the principal arguments
+    and every selected section-plan leaf.
+
+    The drafter expands the brief into one subsection per section-plan leaf, and
+    each subsection makes its own legal proposition (meet-and-confer, discovery
+    cutoff, cumulative discovery, ...). Researching only the top-level arguments
+    left those sub-points ungrounded — the drafter then emitted "[no case
+    authority retrieved for this point]". Researching each leaf gives every
+    subsection its own on-point authority. Purely structural sections are
+    skipped; the count is capped to bound LLM calls under provider rate limits.
+    """
+    targets: list[str] = []
+    seen: set[str] = set()
+
+    def _add(text: str) -> None:
+        t = (text or "").strip()
+        if not t:
+            return
+        key = re.sub(r"\s+", " ", t.lower())
+        if key in seen:
+            return
+        seen.add(key)
+        targets.append(t)
+
+    for arg in (getattr(metadata, "principal_arguments", None) or []):
+        _add(arg)
+    # Structural sections that argue no legal point and need no case authority.
+    _skip = ("introduction", "conclusion", "statement of facts",
+             "factual background", "preliminary statement", "prayer")
+    for item in (plan or []):
+        text = (getattr(item, "text", "") or "").strip()
+        if not text or any(s in text.lower() for s in _skip):
+            continue
+        _add(text)
+    return targets[:24]
+
+
 def _make_local_corpus():
     if not _corpus_available():
         return None
@@ -1151,31 +1189,40 @@ class OpposeMotionWorker(QThread):
             opinion_cache = os.path.join(
                 os.path.dirname(registry_path), ".cache", "opinions"
             )
-            if corpus is not None and metadata.principal_arguments:
+            # Research at SUBSECTION granularity, not just the top-level
+            # arguments. The drafter expands each principal argument into several
+            # subsections, each making its own legal proposition (meet-and-confer,
+            # discovery cutoff, cumulative discovery, etc.). Researching only the
+            # top-level arguments left those sub-points with no authority, so the
+            # drafter emitted "[no case authority retrieved for this point]".
+            # Researching every selected section-plan leaf gives each subsection
+            # its own on-point authority.
+            research_targets = _research_targets(metadata, plan)
+            if corpus is not None and research_targets:
                 self.progress.emit(
-                    f"Researching authorities locally ({len(metadata.principal_arguments)} arguments)..."
+                    f"Researching authorities locally ({len(research_targets)} points)..."
                 )
                 retrieved = research_arguments(
-                    metadata.principal_arguments,
+                    research_targets,
                     cl_client=corpus,
                     query_llm=make_llm("research_queries"),
                     rerank_llm=make_llm("rerank_select"),
                     # Keep concurrency low: the local corpus search is fast, so a
                     # higher worker count just bursts the LLM rate limit (429s)
-                    # on the per-argument query-gen + rerank calls.
+                    # on the per-point query-gen + rerank calls.
                     max_workers=2,
                     on_progress=self.progress.emit,
                     cache_dir=opinion_cache,
                 )
                 self.progress.emit(f"Retrieved {len(retrieved)} grounded authorities.")
-            elif corpus is None and token and metadata.principal_arguments:
+            elif corpus is None and token and research_targets:
                 from icharlotte_core.legal_research.sources.courtlistener import CourtListenerClient
                 self.progress.emit(
                     "Local corpus not built; falling back to CourtListener API "
-                    f"({len(metadata.principal_arguments)} arguments)..."
+                    f"({len(research_targets)} points)..."
                 )
                 retrieved = research_arguments(
-                    metadata.principal_arguments,
+                    research_targets,
                     cl_client=CourtListenerClient(token),
                     query_llm=make_llm("research_queries"),
                     rerank_llm=make_llm("rerank_select"),
