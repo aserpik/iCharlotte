@@ -771,7 +771,9 @@ class ChatTab(QWidget):
                     child.setCheckState(0, Qt.CheckState.Unchecked)
                     top.addChild(child)
                 self.library_tree.addTopLevelItem(top)
-            self.library_tree.expandAll()
+            # Default to collapsed: show entries, hide member files until the
+            # user expands an entry.
+            self.library_tree.collapseAll()
         finally:
             self.library_tree.blockSignals(False)
         # Re-apply the checked selection captured before the rebuild.

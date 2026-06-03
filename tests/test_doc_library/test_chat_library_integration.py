@@ -162,6 +162,17 @@ def test_refresh_preserves_checked_selection(app, tmp_path):
     assert tab._collect_checked_entry_ids() == checked_before  # still checked
 
 
+def test_entries_default_to_collapsed(app, tmp_path):
+    from icharlotte_core.ui.tabs import ChatTab
+    _seed_library(str(tmp_path))
+    tab = ChatTab()
+    tab._case_root_for_library = str(tmp_path)
+    tab._refresh_library_tree()
+    top = tab.library_tree.topLevelItem(0)
+    assert top.childCount() == 1            # member exists
+    assert top.isExpanded() is False        # but collapsed: not shown until expanded
+
+
 def test_refresh_open_library_trees_updates_already_open_tab(app, tmp_path):
     # Simulates a background task-completion capture landing while the Chat tab
     # is already open: the tree must refresh to show the newly-captured entry.
