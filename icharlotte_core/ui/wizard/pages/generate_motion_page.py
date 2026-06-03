@@ -515,6 +515,12 @@ class GenerateMotionWorker(QThread):
                     "WARNING: no grounded research available; drafting from statutes only."
                 )
 
+            from icharlotte_core.motion_generation.samples import load_exemplars
+
+            exemplars = load_exemplars(self.settings.get("motion_type_id") or "")
+            if exemplars:
+                self.progress.emit(f"Using {len(exemplars)} style sample(s) for this motion type.")
+
             self.progress.emit("Drafting motion memorandum...")
             draft = draft_motion(
                 config,
@@ -522,7 +528,7 @@ class GenerateMotionWorker(QThread):
                 plan,
                 target_text,
                 "",
-                style_exemplars=[],
+                style_exemplars=exemplars,
                 retrieved_authorities=retrieved,
                 llm_callback=draft_llm,
             )
