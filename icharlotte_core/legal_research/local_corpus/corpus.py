@@ -122,13 +122,20 @@ class LocalCaseCorpus:
         con = self._conn()
         c = con.execute("SELECT * FROM cases WHERE case_uid=?", (case_uid,)).fetchone()
         snippet = ""
+        display_name = ""
         if c:
             p = con.execute(
                 "SELECT text FROM passages WHERE case_uid=? ORDER BY ordinal LIMIT 1", (case_uid,)
             ).fetchone()
             snippet = (p["text"][:400] if p else (c["full_text"] or "")[:400])
+            # Prefer the Bluebook short name (CAP name_abbreviation, e.g.
+            # "Engalla v. Permanente Medical Group, Inc.") over the full party
+            # caption stored in `name`. The caption is hundreds of chars long,
+            # reads badly in a brief, and is unparseable by the citation parser
+            # (so the output panel can't make it a selectable/verifiable cite).
+            display_name = (c["name_abbreviation"] or c["name"] or "")
         return CaseResult(
-            name=c["name"] if c else "", citation=c["citation"] if c else "",
+            name=display_name, citation=c["citation"] if c else "",
             date=c["decision_date"] if c else "", court=c["court"] if c else "",
             snippet=snippet, url=c["url"] if c else "", cluster_id=case_uid,
         )

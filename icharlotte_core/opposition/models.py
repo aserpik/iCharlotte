@@ -131,6 +131,7 @@ class RetrievedAuthority:
     cluster_id: str = ""
     case_name: str = ""
     citation: str = ""             # from CourtListener metadata, not generated
+    year: str = ""                 # decision year, for "Name (year) cite" form
     supports: str = ""             # one-sentence proposition this case supports
     passage: str = ""              # verbatim opinion quote
     opinion_url: str = ""
@@ -149,6 +150,7 @@ class RetrievedAuthority:
             cluster_id=str(data.get("cluster_id", "") or ""),
             case_name=data.get("case_name", ""),
             citation=data.get("citation", ""),
+            year=data.get("year", ""),
             supports=data.get("supports", ""),
             passage=data.get("passage", ""),
             opinion_url=data.get("opinion_url", ""),

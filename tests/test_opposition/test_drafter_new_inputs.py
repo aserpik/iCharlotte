@@ -96,6 +96,36 @@ def test_drafter_injects_labeled_authority_pool():
     assert "The court held discretion is broad." in user
 
 
+def test_authority_pool_uses_year_parenthetical_and_is_parseable():
+    """The pool must render "Name (year) cite" (no comma before the year) so the
+    drafter copies a citation the parser can recognize — otherwise the output
+    panel can't make cites selectable/verifiable."""
+    from icharlotte_core.opposition.drafter import _format_authority_pool
+    from icharlotte_core.opposition.citation_parser import extract_citations
+
+    pool = _format_authority_pool([
+        RetrievedAuthority(argument_text="Forensic imaging",
+                           case_name="Ellis v. Toshiba America Information Systems, Inc.",
+                           citation="218 Cal. App. 4th 853", year="2013",
+                           supports="s", passage="p"),
+    ])
+    assert "Ellis v. Toshiba America Information Systems, Inc. (2013) 218 Cal. App. 4th 853" in pool
+    # A body that copies that line verbatim (italicized) must parse to one cite.
+    body = ("The point is settled. *Ellis v. Toshiba America Information Systems, Inc.* "
+            "(2013) 218 Cal. App. 4th 853.")
+    cites = extract_citations(body)
+    assert len(cites) == 1 and cites[0].year == "2013"
+    assert cites[0].reporter_citation == "218 Cal. App. 4th 853"
+
+
+def test_authority_pool_omits_year_parenthetical_when_year_missing():
+    from icharlotte_core.opposition.drafter import _format_authority_pool
+    pool = _format_authority_pool([
+        RetrievedAuthority(argument_text="x", case_name="A v. B", citation="2 Cal.5th 2"),
+    ])
+    assert "A v. B 2 Cal.5th 2" in pool and "()" not in pool
+
+
 def test_drafter_pool_empty_message_when_no_authorities():
     llm, captures = _captured_prompts()
     draft_memorandum(

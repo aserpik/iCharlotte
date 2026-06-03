@@ -68,6 +68,12 @@ def _normalize_ws(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "")).strip().lower()
 
 
+def _year_of(date_str: str) -> str:
+    """First 4-digit year in an ISO date ("2002-02-22" -> "2002")."""
+    m = re.search(r"\b(\d{4})\b", date_str or "")
+    return m.group(1) if m else ""
+
+
 # Generic, high-frequency words that carry no topical signal for locating the
 # on-point part of an opinion (legal boilerplate + stopwords).
 _EXCERPT_STOP = {
@@ -190,6 +196,7 @@ def select_authorities(
                 cluster_id=str(cand.get("cluster_id") or ""),
                 case_name=cand.get("case_name", ""),
                 citation=cand.get("citation", ""),
+                year=str(cand.get("year", "") or ""),
                 supports=str(sel.get("supports", "")).strip(),
                 passage=passage,
                 opinion_url=cand.get("opinion_url", ""),
@@ -329,6 +336,7 @@ def research_argument(
                 "cluster_id": cid,
                 "case_name": getattr(r, "name", ""),
                 "citation": getattr(r, "citation", ""),
+                "year": _year_of(getattr(r, "date", "")),
                 "text": text,
                 "opinion_url": getattr(r, "url", ""),
             })

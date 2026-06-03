@@ -55,6 +55,33 @@ def test_get_opinion_text_and_lookup(tmp_path):
     assert "negligence" in hit["full_text"]
 
 
+def test_search_result_uses_short_name_abbreviation(tmp_path):
+    """The corpus must return the Bluebook short name (name_abbreviation), not
+    the full party caption — the caption reads badly in a brief and is
+    unparseable by the citation parser (breaks the output panel's selectable
+    cites)."""
+    db = str(tmp_path / "c.db"); vec = str(tmp_path / "v.f16")
+    con = schema.connect(db); schema.create_schema(con)
+    emb = FakeEmbedder(dim=64)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb)
+    idx.add(
+        CaseRecord(
+            case_uid="cap:9", source="cap",
+            name="NIDA ENGALLA et al., Plaintiffs and Respondents, v. PERMANENTE "
+                 "MEDICAL GROUP, INC., et al., Defendants and Appellants",
+            name_abbreviation="Engalla v. Permanente Medical Group, Inc.",
+            citation="15 Cal. 4th 951", decision_date="1997-06-30", year="1997",
+            full_text="Arbitration agreement and discovery scheduling cooperation."),
+        [PassageRecord(passage_uid="cap:9#0", case_uid="cap:9", ordinal=0, page_label="951",
+                       text="Arbitration agreement and discovery scheduling cooperation.")],
+    )
+    idx.finalize(); con.close()
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    res = corpus.search_opinions("arbitration discovery cooperation", semantic=False, max_results=3)
+    assert res and res[0].name == "Engalla v. Permanente Medical Group, Inc."
+    assert "Plaintiffs and Respondents" not in res[0].name  # not the full caption
+
+
 def test_search_works_across_threads(tmp_path):
     """Opposition research/verify fan out over a ThreadPoolExecutor. A single
     shared SQLite connection raises 'created in a thread can only be used in that

@@ -121,7 +121,16 @@ def _format_authority_pool(authorities: list[RetrievedAuthority]) -> str:
     for label in order:
         lines = [f'For "{label}":']
         for a in grouped[label]:
-            lines.append(f"  - {a.case_name}, {a.citation}")
+            # California citation form: "Name (year) Vol Reporter Page" — no
+            # comma before the year parenthetical. The drafter is told to copy
+            # this verbatim, so it must already be parser-ready (the citation
+            # parser keys on the "(year)" before the reporter).
+            header = a.case_name
+            if getattr(a, "year", ""):
+                header = f"{header} ({a.year})"
+            if a.citation:
+                header = f"{header} {a.citation}"
+            lines.append(f"  - {header}")
             if a.supports:
                 lines.append(f"    Supports: {a.supports}")
             if a.passage:
