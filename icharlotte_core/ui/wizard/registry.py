@@ -170,6 +170,15 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         keywords=["extract", "pages", "PDF", "records", "Bates", "exhibit"],
         default_folders=[],
     ),
+    "separate": TaskSpec(
+        task_id="separate",
+        title="Separate Documents",
+        description="Split a combined PDF into individually-named documents using AI.",
+        icon_glyph="\U0001F4D1",  # 📑
+        script_name="separate.py",
+        default_folders=[],
+        category="General",
+    ),
     "subpoena_tracker": TaskSpec(
         task_id="subpoena_tracker",
         title="Subpoena Tracker",

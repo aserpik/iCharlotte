@@ -38,3 +38,10 @@ def test_row_count_mismatch_warns(tmp_path):
     _make_index(p, 2)
     result = validate_index_docx(str(p), expected_doc_count=5)
     assert result.has_warnings
+
+
+def test_header_only_table_is_error(tmp_path):
+    p = tmp_path / "Index_test.docx"
+    _make_index(p, 0)  # header row only, no data rows
+    result = validate_index_docx(str(p))
+    assert result.has_errors

@@ -5,6 +5,7 @@ _IN_PROCESS_TASK_BUILDERS = {
     "subpoena_tracker": "build_subpoena_tab",
     "respond_to_discovery": "build_respond_to_discovery_tab",
     "oppose_motion": "build_oppose_motion_tab",
+    "separate": "build_separate_tab",
     "generate_motion": "build_generate_motion_tab",
 }
 
