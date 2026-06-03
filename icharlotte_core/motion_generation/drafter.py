@@ -20,6 +20,7 @@ from icharlotte_core.opposition.models import (
     RetrievedAuthority,
     SectionPlanItem,
 )
+from icharlotte_core.prompt_manager import get_prompt
 
 from .config import MotionTypeConfig
 from .prompts import MOTION_DRAFT_PROMPT
@@ -53,7 +54,8 @@ def draft_motion(
     )
 
     grounds = "\n".join(f"- {g}" for g in metadata.principal_arguments) or "(none provided)"
-    user_prompt = MOTION_DRAFT_PROMPT.format(
+    template = get_prompt("generate_motion", "draft_motion") or MOTION_DRAFT_PROMPT
+    user_prompt = template.format(
         motion_type=metadata.motion_type or config.display_name,
         legal_standard=config.legal_standard_hint or "(none specified)",
         relief=metadata.relief_requested or "(none specified)",
