@@ -39,3 +39,42 @@ def test_build_mediation_brief_tab_attribute_exists():
     from icharlotte_core.ui.wizard import in_process_task_tab
 
     assert hasattr(in_process_task_tab, "build_mediation_brief_tab")
+
+
+# ---- Document reader ----
+
+pytestqt = pytest.importorskip("pytestqt")  # ensures PySide6/Qt present for module import
+
+
+def test_read_documents_txt_and_docx(tmp_path):
+    from docx import Document
+
+    from icharlotte_core.ui.wizard.pages.mediation_brief_page import _read_documents
+
+    txt = tmp_path / "note.txt"
+    txt.write_text("Plain text body", encoding="utf-8")
+
+    docx_path = tmp_path / "summary.docx"
+    doc = Document()
+    doc.add_paragraph("Intro paragraph text")
+    table = doc.add_table(rows=1, cols=2)
+    table.rows[0].cells[0].text = "CellA"
+    table.rows[0].cells[1].text = "CellB"
+    doc.save(str(docx_path))
+
+    content, warnings = _read_documents([str(txt), str(docx_path)])
+
+    assert "Plain text body" in content
+    assert "Intro paragraph text" in content
+    # Table-aware extraction must surface cell text (no silent data loss).
+    assert "CellA" in content and "CellB" in content
+    assert warnings == []
+
+
+def test_read_documents_reports_missing_file(tmp_path):
+    from icharlotte_core.ui.wizard.pages.mediation_brief_page import _read_documents
+
+    content, warnings = _read_documents([str(tmp_path / "nope.pdf")])
+
+    assert content == ""
+    assert any("not found" in w.lower() for w in warnings)
