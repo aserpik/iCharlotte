@@ -23,6 +23,13 @@ class TestResponseRules(unittest.TestCase):
         self.assertFalse(rules.fi_17_1_auto_refresh)
         self.assertIn("Subject to and without waiving", rules.waiver_language)
         self.assertIn("Discovery and investigation are ongoing", rules.reservation_clause)
+        # Firm-standard reservation wording (used at the end of every response).
+        self.assertIn(
+            "amend, modify and/or supplement this response in the future in the event "
+            "that additional documents, facts and/or information are discovered, or their "
+            "relevance becomes apparent.",
+            rules.reservation_clause,
+        )
         self.assertEqual(rules.custom_instructions, "")
 
     def test_to_dict_roundtrip(self):

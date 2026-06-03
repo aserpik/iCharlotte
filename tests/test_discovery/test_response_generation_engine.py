@@ -3,6 +3,9 @@ import unittest
 from icharlotte_core.discovery.response_generation_engine import (
     ConditionalRuleDecision,
     DraftCallbacks,
+    StructuredProposal,
+    _apply_proposal_to_review_state,
+    _build_pending_review_state,
     build_structured_proposal_prompt,
     generate_review_state,
     parse_structured_proposal_response,
@@ -586,6 +589,42 @@ class PendingReviewStateTests(unittest.TestCase):
             fi_mode="custom",
         )
         self.assertIsNone(result)
+
+    def test_apply_proposal_applies_canned_fi_objections_in_fixed_mode(self):
+        # FI numbers like 12.1 have a canned objection but no fixed response, so
+        # they flow through the pending/LLM path. In fixed mode the rule engine
+        # has no selected rules, so the canned objection must be applied here or
+        # the row would show a substantive response with no objections.
+        parsed = ParsedDiscovery(
+            discovery_type="FI",
+            propounding_party="P",
+            responding_party="D",
+            set_number=1,
+            set_word="ONE",
+            case_number="1",
+            requests=[ParsedRequest(number="12.1", text="State the witnesses ...")],
+        )
+        rules = ResponseRules()
+        state = _build_pending_review_state(parsed, rules, "fixed")
+        self.assertTrue(state.requests[0].is_pending)  # 12.1 has no fixed response
+
+        _apply_proposal_to_review_state(
+            review_state=state,
+            req_number="12.1",
+            proposal=StructuredProposal(
+                request_number="12.1",
+                proposed_substantive_response="The witnesses are A and B.",
+            ),
+            parsed=parsed,
+            selected_rules=[],
+            response_rules=rules,
+            fi_mode="fixed",
+        )
+
+        row = state.requests[0]
+        self.assertFalse(row.is_pending)
+        self.assertIn("compound", row.proposed_objections.lower())
+        self.assertIn("witnesses are", row.proposed_substantive_response)
 
 
 if __name__ == "__main__":

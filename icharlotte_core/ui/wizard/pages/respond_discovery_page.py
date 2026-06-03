@@ -5,6 +5,7 @@ import os
 from dataclasses import asdict
 
 from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtGui import QTextCursor
 from PySide6.QtWidgets import (
     QCheckBox,
     QGroupBox,
@@ -34,6 +35,7 @@ from icharlotte_core.llm_config import LLMConfig
 from icharlotte_core.discovery.form_interrogatory_selection import (
     complete_selected_form_interrogatories,
     extract_selected_form_interrogatory_numbers,
+    scan_form_interrogatories,
 )
 from icharlotte_core.discovery.response_parser import (
     ParsedDiscovery,
@@ -58,8 +60,12 @@ from icharlotte_core.discovery.response_rules import ResponseRules
 from icharlotte_core.discovery.response_type_detector import normalize_discovery_type
 from icharlotte_core.discovery._io import (
     read_document_text,
+    read_first_page_text,
 )
 from icharlotte_core.ui.context_files_dialog import ContextFilesDialog
+from icharlotte_core.ui.form_interrogatory_dialog import (
+    FormInterrogatorySelectionDialog,
+)
 
 
 def parsed_discovery_to_dict(parsed: ParsedDiscovery | None) -> dict | None:
@@ -209,6 +215,10 @@ class RespondDiscoverySettingsPage(QWidget):
         self.context_files: list[str] = []
         self.parsed_discovery = parsed_discovery
         self.review_state = review_state
+        # FI only: the attorney-confirmed set of propounded interrogatories.
+        # None until confirmed (or for non-FI types); drives response filtering.
+        self._fi_selected_numbers: list[str] | None = None
+        self._fi_selection_confirmed = False
         self._rules: list[ResponseRule] = []
         self._rule_checks: dict[str, QCheckBox] = {}
         self._quick_checks: dict[str, QCheckBox] = {}
@@ -455,6 +465,13 @@ class RespondDiscoverySettingsPage(QWidget):
     # ------------------------------------------------------------------
 
     def _on_select_context_files(self) -> None:
+        # For Form Interrogatories, confirm which interrogatories were
+        # propounded before anything else — auto-detection of flattened-PDF
+        # checkboxes is best-effort, so the attorney is the source of truth.
+        if self.detected_type == "FI" and not self._fi_selection_confirmed:
+            if not self._confirm_fi_selection():
+                return  # cancelled — stay on the rules screen
+
         paths = ContextFilesDialog.get_files(
             self,
             title="Select context file(s)",
@@ -465,6 +482,52 @@ class RespondDiscoverySettingsPage(QWidget):
             return  # user cancelled — stay on the rules screen, do not generate
         self.context_files = list(paths)
         self._generate_proposals()
+
+    def _confirm_fi_selection(self) -> bool:
+        """Let the attorney confirm the propounded interrogatories.
+
+        Returns True to proceed, False to stay on the rules screen. Sets
+        ``self._fi_selected_numbers`` (the confirmed set) on success.
+        """
+        scanned = scan_form_interrogatories(self.discovery_file)
+        if not scanned:
+            # No checkboxes found on the form — let the LLM/auto path handle it.
+            self._fi_selected_numbers = None
+            self._fi_selection_confirmed = True
+            return True
+
+        # Open the FROG PDF in the default viewer so the attorney can cross-
+        # reference the actual checked boxes while confirming the selection.
+        self._open_reference_pdf()
+
+        confirmed = FormInterrogatorySelectionDialog.get_selected_numbers(
+            scanned,
+            self,
+            title="Confirm propounded Form Interrogatories",
+        )
+        if confirmed is None:
+            return False  # cancelled
+        if not confirmed:
+            QMessageBox.warning(
+                self,
+                "No interrogatories selected",
+                "Select at least one Form Interrogatory to respond to.",
+            )
+            return False
+        self._fi_selected_numbers = confirmed
+        self._fi_selection_confirmed = True
+        return True
+
+    def _open_reference_pdf(self) -> None:
+        """Open the discovery PDF in the default viewer for side-by-side review."""
+        path = self.discovery_file
+        if not path or not os.path.isfile(path):
+            return
+        try:
+            os.startfile(path)  # Windows: open in the default PDF viewer
+        except Exception:
+            # Never block confirmation if the viewer can't be launched.
+            pass
 
     def _generate_proposals(self) -> None:
         self.next_btn.setEnabled(False)
@@ -477,6 +540,7 @@ class RespondDiscoverySettingsPage(QWidget):
             discovery_file=self.discovery_file,
             detected_type=self.detected_type,
             parent=self,
+            selected_fi_numbers=self._fi_selected_numbers,
         )
         self._parse_worker.parse_finished.connect(self._on_parse_finished)
         self._parse_worker.start()
@@ -921,9 +985,15 @@ class RespondDiscoverySettingsPage(QWidget):
 
     def _insert_quick_response(self, response_text: str) -> None:
         review = self._current_review()
+        existing = self.response_edit.toPlainText().rstrip()
+        if existing:
+            self.response_edit.setPlainText(f"{existing}\n\n{response_text}")
+        else:
+            self.response_edit.setPlainText(response_text)
+        self.response_edit.moveCursor(QTextCursor.End)
+        self.response_edit.ensureCursorVisible()
         if review:
-            review.proposed_substantive_response = response_text
-        self.response_edit.setPlainText(response_text)
+            review.proposed_substantive_response = self.response_edit.toPlainText().strip()
 
     def _parsed_request_for_review(self, review: RequestReview) -> ParsedRequest | None:
         if not self.parsed_discovery:
@@ -947,6 +1017,11 @@ class RespondDiscoverySettingsPage(QWidget):
             "selected_rule_ids": self.selected_rule_ids(),
             "parsed_discovery": parsed_discovery_to_dict(self.parsed_discovery),
             "review_state": self.review_state.to_dict() if self.review_state else None,
+            "fi_selected_numbers": (
+                list(self._fi_selected_numbers)
+                if self._fi_selected_numbers is not None
+                else None
+            ),
             "save_default_dir": response_save_default_dir(self.case_root),
             "suggested_filename": suggested_response_filename(self.parsed_discovery),
         }
@@ -957,6 +1032,9 @@ class RespondDiscoverySettingsPage(QWidget):
         self.fi_mode = "fixed" if data.get("fi_mode", self.fi_mode) == "fixed" else "custom"
         self.context_files = list(data.get("context_files", []))
         self.parsed_discovery = parsed_discovery_from_dict(data.get("parsed_discovery"))
+        if data.get("fi_selected_numbers") is not None:
+            self._fi_selected_numbers = list(data["fi_selected_numbers"])
+            self._fi_selection_confirmed = True
         if data.get("review_state"):
             self.review_state = ReviewState.from_dict(data["review_state"])
         self._sync_fi_mode_controls()

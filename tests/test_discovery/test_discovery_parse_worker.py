@@ -55,6 +55,44 @@ class DiscoveryParseWorkerTests(unittest.TestCase):
         self.assertIsInstance(parsed, ParsedDiscovery)
         self.assertEqual(parsed.discovery_type, "SI")
 
+    def test_passes_confirmed_fi_numbers_to_filter(self):
+        captured = {}
+
+        def fake_normalize(parsed, detected_type, discovery_file, selected_fi_numbers=None):
+            captured["selected"] = selected_fi_numbers
+            return parsed
+
+        with patch(
+            "icharlotte_core.discovery.discovery_parse_worker.read_document_text",
+            return_value="FORM INTERROGATORIES text",
+        ), patch(
+            "icharlotte_core.discovery.discovery_parse_worker.call_llm",
+            return_value="ignored",
+        ), patch(
+            "icharlotte_core.discovery.discovery_parse_worker.parse_llm_response",
+            return_value=ParsedDiscovery(
+                discovery_type="FI",
+                propounding_party="P",
+                responding_party="D",
+                set_number=1,
+                set_word="ONE",
+                case_number="1",
+                requests=[],
+            ),
+        ), patch(
+            "icharlotte_core.discovery.discovery_parse_worker.normalize_and_filter_parsed_discovery",
+            side_effect=fake_normalize,
+        ):
+            worker = DiscoveryParseWorker(
+                discovery_file="frog.pdf",
+                detected_type="FI",
+                selected_fi_numbers=["1.1", "2.4"],
+            )
+            worker.parse_finished.connect(lambda *_: None)
+            self._run_synchronously(worker)
+
+        self.assertEqual(captured["selected"], ["1.1", "2.4"])
+
     def test_emits_error_when_file_is_empty(self):
         emitted = []
         with patch(

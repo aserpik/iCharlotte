@@ -662,8 +662,17 @@ def _apply_proposal_to_review_state(
     ):
         from icharlotte_core.discovery.response_drafter import (
             detect_inapplicable_fi,
+            get_fi_fixed_objections,
             get_fi_fixed_response,
         )
+        # In fixed mode the rule engine has no selected rules, so objections
+        # come from the firm's canned per-number FI objections. Apply them for
+        # rows that took the pending/LLM path — numbers with a canned objection
+        # but no fixed response (e.g. 12.x/13.x/14.x/20.x) would otherwise show
+        # a substantive response with no objections.
+        fixed_objections = get_fi_fixed_objections(parsed_request.number, response_rules)
+        if fixed_objections:
+            new_review.proposed_objections = fixed_objections
         if not detect_inapplicable_fi(parsed_request.number) and (
             get_fi_fixed_response(parsed_request.number, response_rules) is None
         ):

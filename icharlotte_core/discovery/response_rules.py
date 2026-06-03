@@ -16,8 +16,8 @@ _DEFAULT_WAIVER = (
 
 _DEFAULT_RESERVATION = (
     "Discovery and investigation are ongoing and Responding Party reserves the right to amend, "
-    "modify and/or supplement this response as additional facts and further information is obtained, "
-    "new analyses are made, and legal research is completed."
+    "modify and/or supplement this response in the future in the event that additional documents, "
+    "facts and/or information are discovered, or their relevance becomes apparent."
 )
 
 _DEFAULT_PRELIMINARY_FI = (

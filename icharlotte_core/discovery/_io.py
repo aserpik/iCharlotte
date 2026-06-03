@@ -58,15 +58,25 @@ def normalize_and_filter_parsed_discovery(
     parsed: ParsedDiscovery,
     detected_type: str,
     discovery_file: str,
+    selected_fi_numbers: list[str] | None = None,
 ) -> ParsedDiscovery:
-    """Canonicalize discovery type and keep only checked FROG items."""
+    """Canonicalize discovery type and keep only checked FROG items.
+
+    ``selected_fi_numbers`` overrides automatic checkbox detection — pass the
+    attorney-confirmed selection here so FI responses cover exactly those
+    interrogatories regardless of how reliably the checkboxes auto-detected.
+    """
     normalized_detected = normalize_discovery_type(detected_type)
     parsed.discovery_type = normalized_detected or normalize_discovery_type(
         parsed.discovery_type
     )
     if parsed.discovery_type != "FI":
         return parsed
-    selected_numbers = extract_selected_form_interrogatory_numbers(discovery_file)
+    selected_numbers = (
+        list(selected_fi_numbers)
+        if selected_fi_numbers is not None
+        else extract_selected_form_interrogatory_numbers(discovery_file)
+    )
     return complete_selected_form_interrogatories(
         parsed, discovery_file, selected_numbers,
     )

@@ -21,6 +21,22 @@ from icharlotte_core.ui.wizard.pages.respond_discovery_page import (
 )
 
 
+class RespondDiscoveryReexportTests(unittest.TestCase):
+    """The _io extraction must keep the page-level re-exports other modules import."""
+
+    def test_read_first_page_text_reexported_from_page(self):
+        # in_process_task_tab.build_respond_to_discovery_tab imports
+        # read_first_page_text from this page module (lazily, when the user
+        # picks the task). The _io refactor must preserve that re-export, or
+        # launching "Respond to Discovery" raises ImportError.
+        from icharlotte_core.discovery import _io
+        from icharlotte_core.ui.wizard.pages.respond_discovery_page import (
+            read_first_page_text,
+        )
+
+        self.assertIs(read_first_page_text, _io.read_first_page_text)
+
+
 class RespondDiscoverySettingsPageTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -110,6 +126,107 @@ class RespondDiscoverySettingsPageTests(unittest.TestCase):
         review = page.review_state.requests[0]
         self.assertEqual(review.proposed_objections, "Saved 15.1 objections.")
         self.assertEqual(review.proposed_substantive_response, "Saved 15.1 response.")
+
+    def test_confirm_fi_selection_uses_dialog_result(self):
+        from icharlotte_core.discovery.form_interrogatory_selection import (
+            ScannedInterrogatory,
+        )
+
+        page = RespondDiscoverySettingsPage(
+            case_root="",
+            file_number="1234.001",
+            discovery_file=r"C:\case\frogg.pdf",
+            detected_type="FI",
+        )
+        scanned = [ScannedInterrogatory("1.1", True), ScannedInterrogatory("2.4", False)]
+        with patch.object(
+            respond_discovery_page, "scan_form_interrogatories", return_value=scanned
+        ), patch.object(
+            respond_discovery_page.FormInterrogatorySelectionDialog,
+            "get_selected_numbers",
+            return_value=["1.1", "2.4"],
+        ):
+            proceed = page._confirm_fi_selection()
+
+        self.assertTrue(proceed)
+        self.assertTrue(page._fi_selection_confirmed)
+        self.assertEqual(page._fi_selected_numbers, ["1.1", "2.4"])
+
+    def test_confirm_fi_selection_opens_reference_pdf(self):
+        from icharlotte_core.discovery.form_interrogatory_selection import (
+            ScannedInterrogatory,
+        )
+
+        page = RespondDiscoverySettingsPage(
+            case_root="",
+            file_number="1234.001",
+            discovery_file=r"C:\case\frogg.pdf",
+            detected_type="FI",
+        )
+        with patch.object(
+            respond_discovery_page,
+            "scan_form_interrogatories",
+            return_value=[ScannedInterrogatory("1.1", True)],
+        ), patch.object(
+            respond_discovery_page.FormInterrogatorySelectionDialog,
+            "get_selected_numbers",
+            return_value=["1.1"],
+        ), patch.object(
+            respond_discovery_page.os.path, "isfile", return_value=True
+        ), patch.object(
+            respond_discovery_page.os, "startfile", create=True
+        ) as mock_startfile:
+            page._confirm_fi_selection()
+
+        mock_startfile.assert_called_once_with(r"C:\case\frogg.pdf")
+
+    def test_confirm_fi_selection_cancel_stays_on_screen(self):
+        from icharlotte_core.discovery.form_interrogatory_selection import (
+            ScannedInterrogatory,
+        )
+
+        page = RespondDiscoverySettingsPage(
+            case_root="",
+            file_number="1234.001",
+            discovery_file=r"C:\case\frogg.pdf",
+            detected_type="FI",
+        )
+        with patch.object(
+            respond_discovery_page,
+            "scan_form_interrogatories",
+            return_value=[ScannedInterrogatory("1.1", True)],
+        ), patch.object(
+            respond_discovery_page.FormInterrogatorySelectionDialog,
+            "get_selected_numbers",
+            return_value=None,
+        ):
+            proceed = page._confirm_fi_selection()
+
+        self.assertFalse(proceed)
+        self.assertFalse(page._fi_selection_confirmed)
+
+    def test_fi_selected_numbers_persist_round_trip(self):
+        page = RespondDiscoverySettingsPage(
+            case_root="",
+            file_number="1234.001",
+            discovery_file=r"C:\case\frogg.pdf",
+            detected_type="FI",
+        )
+        page._fi_selected_numbers = ["1.1", "2.4"]
+        page._fi_selection_confirmed = True
+
+        data = page.to_dict()
+        self.assertEqual(data["fi_selected_numbers"], ["1.1", "2.4"])
+
+        restored = RespondDiscoverySettingsPage(
+            case_root="",
+            file_number="1234.001",
+            discovery_file=r"C:\case\frogg.pdf",
+            detected_type="FI",
+        )
+        restored.from_dict(data)
+        self.assertEqual(restored._fi_selected_numbers, ["1.1", "2.4"])
+        self.assertTrue(restored._fi_selection_confirmed)
 
     def test_to_dict_includes_review_state_when_loaded(self):
         parsed = ParsedDiscovery(
@@ -512,11 +629,33 @@ class RespondDiscoverySettingsPageTests(unittest.TestCase):
         page.quick_response_button("Admit").click()
         self.assertEqual(page.response_edit.toPlainText(), "Admit.")
 
+        # Clicking another quick response appends after the existing text
+        # instead of replacing it.
         page.quick_response_button("Deny").click()
-        self.assertEqual(page.response_edit.toPlainText(), "Deny.")
+        self.assertEqual(page.response_edit.toPlainText(), "Admit.\n\nDeny.")
 
         page.quick_response_button("Cant Admit/Deny").click()
-        self.assertIn("insufficient to enable Responding Party to admit", page.response_edit.toPlainText())
+        text = page.response_edit.toPlainText()
+        self.assertIn("insufficient to enable Responding Party to admit", text)
+        # Earlier responses are preserved.
+        self.assertIn("Admit.", text)
+        self.assertIn("Deny.", text)
+
+    def test_quick_response_appends_after_existing_text(self):
+        page = self._review_page_for_type("RPD")
+        page.response_edit.setPlainText("Existing substantive response.")
+
+        page.quick_response_button("Will produce").click()
+
+        text = page.response_edit.toPlainText()
+        # Existing text is preserved at the top, quick response added below it.
+        self.assertTrue(text.startswith("Existing substantive response."))
+        self.assertIn("will comply with this request", text)
+        # The current review's stored response is updated to match the box.
+        self.assertEqual(
+            page._current_review().proposed_substantive_response,
+            text.strip(),
+        )
 
     def _review_page_for_type(self, discovery_type: str) -> RespondDiscoverySettingsPage:
         parsed = ParsedDiscovery(

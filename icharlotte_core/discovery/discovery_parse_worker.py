@@ -26,10 +26,12 @@ class DiscoveryParseWorker(QThread):
         discovery_file: str,
         detected_type: str,
         parent=None,
+        selected_fi_numbers: list[str] | None = None,
     ):
         super().__init__(parent)
         self.discovery_file = discovery_file
         self.detected_type = detected_type
+        self.selected_fi_numbers = selected_fi_numbers
 
     def run(self) -> None:
         try:
@@ -50,7 +52,10 @@ class DiscoveryParseWorker(QThread):
 
             parsed = parse_llm_response(raw)
             parsed = normalize_and_filter_parsed_discovery(
-                parsed, self.detected_type, self.discovery_file,
+                parsed,
+                self.detected_type,
+                self.discovery_file,
+                self.selected_fi_numbers,
             )
             self.parse_finished.emit(True, parsed)
         except Exception as exc:

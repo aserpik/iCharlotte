@@ -555,12 +555,20 @@ class ResponseAssembler:
                 resp_text, waiver, reservation
             )
 
-            # Objections + waiver on the same paragraph only when both exist.
-            # A response with no objections should not get waiver language.
-            if obj_part and subst_part:
-                _add_para(doc, f"{obj_part} {waiver}", STYLE_BODY_DOUBLE)
-            elif obj_part:
-                _add_para(doc, obj_part, STYLE_BODY_DOUBLE)
+            # Objections — each block (quick objections are joined with blank
+            # lines) becomes its own double-spaced paragraph. Emitting the
+            # blank-line-separated text in a single run would render an extra
+            # blank line, because python-docx turns each "\n" into a line break.
+            # The waiver attaches to the LAST objection paragraph, and only when
+            # a substantive response follows (no waiver on objection-only rows).
+            if obj_part:
+                obj_blocks = [o.strip() for o in obj_part.split("\n\n") if o.strip()]
+                for i, block in enumerate(obj_blocks):
+                    is_last = i == len(obj_blocks) - 1
+                    if is_last and subst_part and waiver:
+                        _add_para(doc, f"{block} {waiver}", STYLE_BODY_DOUBLE)
+                    else:
+                        _add_para(doc, block, STYLE_BODY_DOUBLE)
 
             # Substantive response — new paragraph with explicit 0.5" first-line indent
             if subst_part:
@@ -662,40 +670,42 @@ class ResponseAssembler:
         return "", text
 
     def _set_footer(self, doc, title: str):
-        """Set the document title in the footer of all sections.
+        """Set the document title in the footer of every section.
 
-        Removes ALL existing footer content (including [PLEADING TITLE]
-        or any other placeholder text) by deleting paragraph XML elements,
-        then inserts a single centered paragraph with the title.
+        Pleading-paper templates use a separate first-page footer, so the
+        ``[PLEADING TITLE]`` placeholder can live in ``first_page_footer``
+        (page 1) as well as the default ``footer`` (pages 2+) and the
+        even-page footer. Clear and set every footer variant so no placeholder
+        survives on any page.
         """
-        W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-        W_P = f"{{{W_NS}}}p"
-
         for section in doc.sections:
-            footer = section.footer
-            footer.is_linked_to_previous = False
+            for footer in (
+                section.first_page_footer,
+                section.footer,
+                section.even_page_footer,
+            ):
+                self._write_footer_title(footer, title)
 
-            # Clear all text from every paragraph in the footer
-            # (handles [PLEADING TITLE] and any other placeholder text)
-            for para in footer.paragraphs:
-                for run in para.runs:
-                    run.text = ""
-                # Also clear any direct text nodes in the paragraph XML
-                for t_elem in list(para._element.iter(f"{{{W_NS}}}t")):
-                    t_elem.text = ""
+    @staticmethod
+    def _write_footer_title(footer, title: str):
+        """Strip any existing footer text and write a centered title."""
+        W_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 
-            # Use the first paragraph if it exists, otherwise add one
-            if footer.paragraphs:
-                para = footer.paragraphs[0]
-                # Clear any leftover runs
-                for run in list(para.runs):
-                    run._element.getparent().remove(run._element)
-            else:
-                para = footer.add_paragraph()
-            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            run = para.add_run(title)
-            run.font.name = "Times New Roman"
-            run.font.size = Pt(10)
+        footer.is_linked_to_previous = False
+
+        # Clear all text from every paragraph (handles [PLEADING TITLE] and any
+        # other placeholder text) before writing the title.
+        for para in footer.paragraphs:
+            for t_elem in list(para._element.iter(f"{{{W_NS}}}t")):
+                t_elem.text = ""
+
+        para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+        for run in list(para.runs):
+            run._element.getparent().remove(run._element)
+        para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = para.add_run(title)
+        run.font.name = "Times New Roman"
+        run.font.size = Pt(10)
 
 
 # ---------------------------------------------------------------------------
