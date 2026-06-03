@@ -398,6 +398,7 @@ WORKBENCH_TO_AGENT_ID = {
     "chat": "agent_chat",
     "mediation_brief": "agent_mediation_brief",
     "oppose_motion": "agent_oppose_motion",
+    "generate_motion": "agent_oppose_motion",
     "word_assistant": "func_word_assistant",
     "legal_research": "func_legal_research",
     "depo_prep": "DepoPrep",
@@ -621,6 +622,7 @@ class PromptsDialog(QDialog):
         self._ab_model_b = None
 
         self._setup_ui()
+        self._seed_generate_motion_prompts()
         self._populate_agents()
         self._migrate_if_needed()
 
@@ -658,8 +660,10 @@ class PromptsDialog(QDialog):
         self.tabs.addTab(self.model_defaults_widget, "Model Defaults")
         layout.addWidget(self.tabs)
 
-        # Style Examples tab (only shown when oppose_motion is selected agent).
+        # Style Examples tab (oppose_motion / generate_motion) and Motion Types
+        # tab (generate_motion) are added/removed per selected agent.
         self._style_examples_tab = None
+        self._motion_types_tab = None
 
         # Bottom buttons
         btn_layout = QHBoxLayout()
@@ -1741,7 +1745,7 @@ class PromptsDialog(QDialog):
                       'liability', 'exposure', 'med_record', 'med_chron', 'separate',
                       'email_update', 'chat',
                       'word_assistant', 'legal_research', 'mediation_brief',
-                      'oppose_motion', 'depo_prep',
+                      'oppose_motion', 'generate_motion', 'depo_prep',
                       'report_review', 'report_refine', 'report_polish']:
             agents.add(agent)
 
@@ -1823,6 +1827,30 @@ class PromptsDialog(QDialog):
             if combo.itemData(i) == data:
                 combo.setCurrentIndex(i)
                 return
+
+    def _seed_generate_motion_prompts(self) -> None:
+        """Register the Generate Motion draft/analyzer prompts so they are
+        editable in the Workbench. Idempotent: seeds a pass only if absent."""
+        try:
+            from icharlotte_core.motion_generation.prompts import (
+                DEFAULT_ANALYZE_TEMPLATE,
+                MOTION_DRAFT_PROMPT,
+            )
+        except Exception:
+            return
+        registry = self.prompt_manager._registry.get("prompts", {})
+        seeds = [
+            ("draft_motion", MOTION_DRAFT_PROMPT,
+             "Generate Motion: moving-party points & authorities draft"),
+            ("analyze_target", DEFAULT_ANALYZE_TEMPLATE,
+             "Generate Motion: propose grounds/relief from documents"),
+        ]
+        for pass_name, content, desc in seeds:
+            if f"generate_motion:{pass_name}" not in registry:
+                self.prompt_manager.create_version(
+                    "generate_motion", pass_name, content,
+                    description=desc, author="system", set_as_current=True,
+                )
 
     def _migrate_if_needed(self):
         """Run migration if the registry doesn't exist."""
@@ -1913,11 +1941,12 @@ class PromptsDialog(QDialog):
             self.current_pass = None
             self._load_pass_model_defaults()
 
-        # Show/hide the Style Examples tab based on the selected agent.
+        # Show/hide the Style Examples + Motion Types tabs based on the agent.
         self._refresh_style_examples_tab()
+        self._refresh_motion_types_tab()
 
     def _refresh_style_examples_tab(self) -> None:
-        """Show the Style Examples tab only when oppose_motion is selected."""
+        """Show the Style Examples tab for agents that use style exemplars."""
         from icharlotte_core.ui.dialogs_style_examples import StyleExamplesTab
 
         tabs = getattr(self, "tabs", None)
@@ -1930,16 +1959,52 @@ class PromptsDialog(QDialog):
                 existing_index = i
                 break
 
-        if self.current_agent == "oppose_motion":
+        # Each agent has its own style_examples.json next to its prompt files.
+        if self.current_agent in ("oppose_motion", "generate_motion"):
             if existing_index < 0:
-                # Resolve the registry path next to the seeded prompt files.
-                registry_path = os.path.join(PROMPTS_DIR, "oppose_motion", "style_examples.json")
+                registry_path = os.path.join(
+                    PROMPTS_DIR, self.current_agent, "style_examples.json"
+                )
+                self._style_examples_tab = StyleExamplesTab(registry_path=registry_path)
+                tabs.addTab(self._style_examples_tab, "Style Examples")
+            else:
+                # Rebuild so the registry path follows the selected agent.
+                tabs.removeTab(existing_index)
+                registry_path = os.path.join(
+                    PROMPTS_DIR, self.current_agent, "style_examples.json"
+                )
                 self._style_examples_tab = StyleExamplesTab(registry_path=registry_path)
                 tabs.addTab(self._style_examples_tab, "Style Examples")
         else:
             if existing_index >= 0:
                 tabs.removeTab(existing_index)
                 self._style_examples_tab = None
+
+    def _refresh_motion_types_tab(self) -> None:
+        """Show the Motion Types tab only when generate_motion is selected."""
+        from icharlotte_core.ui.dialogs_motion_types import MotionTypesTab
+
+        tabs = getattr(self, "tabs", None)
+        if tabs is None:
+            return
+
+        existing_index = -1
+        for i in range(tabs.count()):
+            if tabs.tabText(i) == "Motion Types":
+                existing_index = i
+                break
+
+        if self.current_agent == "generate_motion":
+            if existing_index < 0:
+                registry_path = os.path.join(
+                    PROMPTS_DIR, "generate_motion", "motion_types.json"
+                )
+                self._motion_types_tab = MotionTypesTab(registry_path=registry_path)
+                tabs.addTab(self._motion_types_tab, "Motion Types")
+        else:
+            if existing_index >= 0:
+                tabs.removeTab(existing_index)
+                self._motion_types_tab = None
 
     def _on_pass_changed(self, pass_name: str):
         """Handle pass selection change."""

@@ -61,8 +61,8 @@ from icharlotte_core.motion_generation.analyzer import (
 )
 from icharlotte_core.motion_generation.assembler import assemble_motion_preview
 from icharlotte_core.motion_generation.config import (
-    MOTION_TYPE_CONFIGS,
     get_motion_config,
+    list_motion_types,
 )
 from icharlotte_core.motion_generation.drafter import draft_motion
 
@@ -74,8 +74,7 @@ TASK_PAGE_SETTINGS = 0
 TASK_PAGE_STATUS = 1
 TASK_PAGE_OUTPUT = 2
 
-# Configured types shown in the dropdown; "__other__" enables a custom name.
-_CONFIGURED_TYPES = ["compel", "demurrer", "strike"]
+# Sentinel combo entry that enables a custom motion-type name.
 _OTHER = "__other__"
 
 
@@ -106,8 +105,10 @@ class GenerateMotionSettingsPage(QStackedWidget):
 
         layout.addWidget(QLabel("Motion type"))
         self.type_combo = QComboBox()
-        for type_id in _CONFIGURED_TYPES:
-            self.type_combo.addItem(MOTION_TYPE_CONFIGS[type_id].display_name, type_id)
+        for cfg in list_motion_types():
+            if cfg.type_id == "generic":
+                continue  # the generic engine is reached via "Other (specify…)"
+            self.type_combo.addItem(cfg.display_name, cfg.type_id)
         self.type_combo.addItem("Other (specify…)", _OTHER)
         self.type_combo.currentIndexChanged.connect(self._on_type_changed)
         layout.addWidget(self.type_combo)
@@ -312,16 +313,15 @@ class GenerateMotionSettingsPage(QStackedWidget):
     def from_dict(self, data: dict | None) -> None:
         if not isinstance(data, dict):
             data = {}
-        type_id = data.get("motion_type_id", "compel")
+        type_id = data.get("motion_type_id", "")
         type_name = data.get("motion_type_name", "")
-        if type_id in _CONFIGURED_TYPES:
-            idx = self.type_combo.findData(type_id)
-            if idx >= 0:
-                self.type_combo.setCurrentIndex(idx)
+        combo_idx = self.type_combo.findData(type_id) if type_id and type_id != "generic" else -1
+        if combo_idx >= 0:
+            self.type_combo.setCurrentIndex(combo_idx)
         else:
-            idx = self.type_combo.findData(_OTHER)
-            if idx >= 0:
-                self.type_combo.setCurrentIndex(idx)
+            other_idx = self.type_combo.findData(_OTHER)
+            if other_idx >= 0:
+                self.type_combo.setCurrentIndex(other_idx)
             self.custom_name_edit.setText(type_name)
         self._on_type_changed()
 

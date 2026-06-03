@@ -206,3 +206,8 @@ def get_motion_config(type_id: Optional[str]) -> MotionTypeConfig:
     """Return the config for ``type_id`` from the editable registry; unknown or
     empty ids fall back to the generic type."""
     return _registry().get(type_id)
+
+
+def list_motion_types() -> List[MotionTypeConfig]:
+    """All motion types from the editable registry, in registry order."""
+    return _registry().list_types()

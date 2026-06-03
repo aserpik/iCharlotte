@@ -789,6 +789,38 @@
           "usage_count": 0
         }
       ]
+    },
+    "generate_motion:draft_motion": {
+      "agent": "generate_motion",
+      "pass_name": "draft_motion",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-06-02T19:19:53.294377",
+          "description": "Generate Motion: moving-party points & authorities draft",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
+    },
+    "generate_motion:analyze_target": {
+      "agent": "generate_motion",
+      "pass_name": "analyze_target",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-06-02T19:19:53.299818",
+          "description": "Generate Motion: propose grounds/relief from documents",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
     }
   }
 }

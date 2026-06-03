@@ -60,6 +60,32 @@ def test_configured_type_name_from_config(qtbot):
     assert "Demurrer" in page.current_motion_type_name()
 
 
+def test_intake_dropdown_includes_user_added_type(qtbot, tmp_path, monkeypatch):
+    from icharlotte_core.motion_generation import config as cfgmod
+    from icharlotte_core.motion_generation.config import MotionTypeConfig, reload_motion_types
+    from icharlotte_core.motion_generation.types_registry import MotionTypeRegistry
+
+    path = str(tmp_path / "mt.json")
+    monkeypatch.setattr(cfgmod, "motion_types_path", lambda: path)
+    reload_motion_types()
+    reg = MotionTypeRegistry.load(path)
+    reg.add(MotionTypeConfig(
+        type_id="protective_order",
+        display_name="Motion for Protective Order",
+        target_doc_guidance="",
+        legal_standard_hint="",
+    ))
+    reg.save()
+    reload_motion_types()
+
+    page = GenerateMotionSettingsPage("/case", "123")
+    qtbot.addWidget(page)
+    assert page.type_combo.findData("protective_order") >= 0
+
+    monkeypatch.undo()
+    reload_motion_types()
+
+
 def test_intake_settings_collects_all_fields(qtbot):
     page = _page(qtbot)
     page.type_combo.setCurrentIndex(page.type_combo.findData("compel"))
