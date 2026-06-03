@@ -176,3 +176,84 @@ def _save_brief(generator, caption_path: str, dest_dir: str, filename: str) -> s
             last_error = exc
             continue
     raise last_error or PermissionError("Could not save the mediation brief.")
+
+
+# -------------------------------- worker ----------------------------------
+
+class MediationBriefWizardWorker(QThread):
+    progress = Signal(str)
+    finished_result = Signal(bool, object)  # (success, output_path | error_msg)
+
+    def __init__(self, case_path: str, file_number: str, settings: dict, parent=None):
+        super().__init__(parent)
+        self.case_path = case_path or ""
+        self.file_number = file_number or ""
+        self.settings = dict(settings or {})
+        self._cancelled = False
+
+    def cancel(self) -> None:
+        self._cancelled = True
+
+    def _emit_cancelled(self) -> bool:
+        if self._cancelled:
+            self.finished_result.emit(False, "Generation cancelled.")
+            return True
+        return False
+
+    def run(self) -> None:
+        try:
+            files = list(self.settings.get("files", []))
+            caption_path = self.settings.get("caption_path", "")
+
+            self.progress.emit("Reading source documents…")
+            content, warnings = _read_documents(files)
+            for warning in warnings:
+                self.progress.emit(f"WARNING: {warning}")
+            if not content.strip():
+                self.finished_result.emit(
+                    False, "Could not read any text from the selected documents."
+                )
+                return
+            if not caption_path or not os.path.isfile(caption_path):
+                self.finished_result.emit(
+                    False, "No caption template selected (or it no longer exists)."
+                )
+                return
+            if self._emit_cancelled():
+                return
+
+            generator = MediationBriefGenerator()
+            generator.caption_template_path = caption_path
+            generator.document_content = content
+
+            self.progress.emit("Loading style reference…")
+            generator.get_style_excerpts()
+
+            if self._emit_cancelled():
+                return
+            self.progress.emit("Analyzing documents…")
+            generator.run_planning_pass()
+
+            total = len(GENERATION_ORDER)
+            for index, section_name in enumerate(GENERATION_ORDER, start=1):
+                if self._emit_cancelled():
+                    return
+                _, title = SECTION_HEADINGS.get(section_name, ("", section_name))
+                label = title or section_name
+                self.progress.emit(f"Generating {label} ({index} of {total})…")
+                result = generator.generate_section(section_name)
+                if result:
+                    generator.sections[section_name] = result
+            generator.is_active = True
+
+            if self._emit_cancelled():
+                return
+            self.progress.emit("Assembling document…")
+            dest_dir = os.path.join(self.case_path, *MEDIATION_SUBDIR)
+            filename = self.settings.get("suggested_filename") or DEFAULT_BRIEF_FILENAME
+            saved_path = _save_brief(generator, caption_path, dest_dir, filename)
+            self.progress.emit(f"Saved to {saved_path}")
+            self.finished_result.emit(True, saved_path)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("MediationBriefWizardWorker failed")
+            self.finished_result.emit(False, str(exc))

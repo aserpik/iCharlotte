@@ -112,3 +112,116 @@ def test_save_brief_falls_back_when_destination_locked(tmp_path):
 
     assert os.path.basename(path) == "Brief (2).docx"
     assert os.path.isfile(path)
+
+
+# ---- Worker ----
+
+class _FakeGen:
+    """Stand-in for MediationBriefGenerator that records the pipeline calls."""
+
+    def __init__(self):
+        self.sections = {}
+        self.is_active = False
+        self.caption_template_path = None
+        self.document_content = ""
+        self.calls = []
+
+    def get_style_excerpts(self):
+        self.calls.append("style")
+        return {}
+
+    def run_planning_pass(self):
+        self.calls.append("planning")
+        return "plan"
+
+    def generate_section(self, name):
+        self.calls.append(f"section:{name}")
+        return f"{name} body"
+
+    def assemble_document(self, caption, out):
+        self.calls.append("assemble")
+        with open(out, "w", encoding="utf-8") as fh:
+            fh.write("brief")
+
+
+def _run_worker(qtbot, monkeypatch, tmp_path, *, cancel_before=False, gen=None):
+    from icharlotte_core.ui.wizard.pages import mediation_brief_page as mod
+    from icharlotte_core.mediation_brief import GENERATION_ORDER
+
+    fake = gen or _FakeGen()
+    monkeypatch.setattr(mod, "MediationBriefGenerator", lambda: fake)
+    monkeypatch.setattr(mod, "_read_documents", lambda paths: ("document text", []))
+
+    caption = tmp_path / "Caption.docx"
+    caption.write_text("caption", encoding="utf-8")
+    case_path = str(tmp_path)
+    settings = {"files": ["x.pdf"], "caption_path": str(caption)}
+
+    worker = mod.MediationBriefWizardWorker(case_path, "001", settings)
+    progress = []
+    results = []
+    worker.progress.connect(progress.append)
+    worker.finished_result.connect(lambda ok, payload: results.append((ok, payload)))
+    if cancel_before:
+        worker.cancel()
+    worker.run()  # run synchronously in the test thread
+    return fake, progress, results, GENERATION_ORDER
+
+
+def test_worker_success_runs_full_pipeline(qtbot, monkeypatch, tmp_path):
+    fake, progress, results, order = _run_worker(qtbot, monkeypatch, tmp_path)
+
+    assert fake.calls[0] == "style"
+    assert fake.calls[1] == "planning"
+    for name in order:
+        assert f"section:{name}" in fake.calls
+    assert fake.is_active is True
+    assert len(results) == 1
+    ok, path = results[0]
+    assert ok is True
+    assert os.path.join("NOTES", "AI OUTPUT", "MEDIATION") in path
+    assert os.path.isfile(path)
+
+
+def test_worker_cancel_stops_before_sections(qtbot, monkeypatch, tmp_path):
+    fake, progress, results, order = _run_worker(
+        qtbot, monkeypatch, tmp_path, cancel_before=True
+    )
+
+    assert results == [(False, "Generation cancelled.")]
+    assert not any(c.startswith("section:") for c in fake.calls)
+
+
+def test_worker_reports_engine_error(qtbot, monkeypatch, tmp_path):
+    class BoomGen(_FakeGen):
+        def run_planning_pass(self):
+            raise RuntimeError("boom")
+
+    fake, progress, results, order = _run_worker(
+        qtbot, monkeypatch, tmp_path, gen=BoomGen()
+    )
+
+    assert len(results) == 1
+    ok, payload = results[0]
+    assert ok is False
+    assert "boom" in payload
+
+
+def test_worker_fails_on_empty_content(qtbot, monkeypatch, tmp_path):
+    from icharlotte_core.ui.wizard.pages import mediation_brief_page as mod
+
+    monkeypatch.setattr(mod, "MediationBriefGenerator", lambda: _FakeGen())
+    monkeypatch.setattr(mod, "_read_documents", lambda paths: ("", ["nothing"]))
+    caption = tmp_path / "Caption.docx"
+    caption.write_text("caption", encoding="utf-8")
+
+    worker = mod.MediationBriefWizardWorker(
+        str(tmp_path), "001",
+        {"files": ["x.pdf"], "caption_path": str(caption)},
+    )
+    results = []
+    worker.finished_result.connect(lambda ok, payload: results.append((ok, payload)))
+    worker.run()
+
+    assert results and results[0][0] is False
+    assert "could not read" in results[0][1].lower()
