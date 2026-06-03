@@ -719,6 +719,24 @@ class ChatTab(QWidget):
             pass
         self._refresh_library_tree()
 
+    @staticmethod
+    def refresh_open_library_trees(tabs_widget):
+        """Refresh the Saved Documents tree on every ChatTab in a QTabWidget.
+
+        Called when a background task-completion capture finishes, so an
+        already-open Chat tab shows the newly-saved document without the user
+        having to click Refresh. Best-effort and signal-safe (runs on GUI thread).
+        """
+        if tabs_widget is None:
+            return
+        for i in range(tabs_widget.count()):
+            w = tabs_widget.widget(i)
+            if isinstance(w, ChatTab):
+                try:
+                    w._refresh_library_tree()
+                except Exception:
+                    pass
+
     def _refresh_library_tree(self):
         from PySide6.QtCore import Qt
         try:

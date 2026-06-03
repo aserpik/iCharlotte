@@ -378,15 +378,27 @@ class DirectoryTreeWorker(QThread):
 
 class _LibraryCaptureJob(QRunnable):
     """Best-effort, off-UI-thread capture of a finished task's source text
-    into the document library. Never raises (capture_from_task_entry swallows)."""
+    into the document library. Never raises (capture_from_task_entry swallows).
 
-    def __init__(self, case_root, entry):
+    Emits ``done_signal(case_root)`` after capture so any open Chat tab can
+    refresh its Saved Documents list without the user clicking Refresh.
+    """
+
+    def __init__(self, case_root, entry, done_signal=None):
         super().__init__()
         self._case_root, self._entry = case_root, entry
+        self._done_signal = done_signal
 
     def run(self):
         from icharlotte_core.doc_library.capture import capture_from_task_entry
-        capture_from_task_entry(self._case_root, self._entry)
+        try:
+            capture_from_task_entry(self._case_root, self._entry)
+        finally:
+            if self._done_signal is not None:
+                try:
+                    self._done_signal.emit(self._case_root)
+                except Exception:
+                    pass
 
 
 class MainWindow(QMainWindow):
@@ -396,6 +408,7 @@ class MainWindow(QMainWindow):
     quick_open_signal = Signal()  # For double-Ctrl quick open
     ctrl_press_signal = Signal()  # For thread-safe Ctrl press handling
     ctrl_release_signal = Signal()  # For thread-safe Ctrl release handling
+    library_captured = Signal(str)  # case_root; emitted after a task's source text is captured into the doc library
 
     def __init__(self, file_number=None, case_path=None, initial_tab=None):
         super().__init__()
@@ -597,6 +610,8 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.tabs)
         self.tabs.setTabsClosable(True)
         self.tabs.tabCloseRequested.connect(self._on_tab_close_requested)
+        # Refresh open Chat tabs' Saved Documents when a background capture lands.
+        self.library_captured.connect(self._on_library_captured)
         # Hide close buttons on the fixed Master List / Wizard / Advanced tabs.
         # (We'll re-hide after every addTab via _hide_fixed_close_buttons.)
 
@@ -1150,6 +1165,18 @@ class MainWindow(QMainWindow):
         p.set_open_tabs(self._snapshot_open_task_tabs())
         p.save()
 
+    def _on_library_captured(self, case_root: str) -> None:
+        """A background capture finished — refresh any open Chat tab's library tree.
+
+        Runs on the GUI thread (queued from the capture worker thread), so it is
+        safe to touch the Chat tab's QTreeWidget here.
+        """
+        try:
+            from icharlotte_core.ui.tabs import ChatTab
+            ChatTab.refresh_open_library_trees(self.tabs)
+        except Exception:
+            pass
+
     def _on_task_completed(self, entry: dict) -> None:
         if not self.case_path:
             return
@@ -1158,7 +1185,7 @@ class MainWindow(QMainWindow):
         # absolute file paths, before they are rewritten case-relative below.
         # Capture original absolute-path entry into the document library (off-UI-thread, best-effort).
         QThreadPool.globalInstance().start(
-            _LibraryCaptureJob(self.case_path, copy.deepcopy(entry))
+            _LibraryCaptureJob(self.case_path, copy.deepcopy(entry), self.library_captured)
         )
         from icharlotte_core.ui.wizard.persistence import WizardStatePersistence
         # Store files & output_path as case-relative.

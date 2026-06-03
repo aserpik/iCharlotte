@@ -160,3 +160,19 @@ def test_refresh_preserves_checked_selection(app, tmp_path):
     checked_before = tab._collect_checked_entry_ids()
     tab._refresh_library_tree()  # rebuild
     assert tab._collect_checked_entry_ids() == checked_before  # still checked
+
+
+def test_refresh_open_library_trees_updates_already_open_tab(app, tmp_path):
+    # Simulates a background task-completion capture landing while the Chat tab
+    # is already open: the tree must refresh to show the newly-captured entry.
+    from PySide6.QtWidgets import QTabWidget
+    from icharlotte_core.ui.tabs import ChatTab
+    tab = ChatTab()
+    tab._case_root_for_library = str(tmp_path)
+    tab._refresh_library_tree()
+    assert tab.library_tree.topLevelItemCount() == 0  # empty: no captures yet
+    container = QTabWidget()
+    container.addTab(tab, "Chat")
+    _seed_library(str(tmp_path))  # capture writes an entry in the background
+    ChatTab.refresh_open_library_trees(container)
+    assert tab.library_tree.topLevelItemCount() == 1  # now visible without manual Refresh
