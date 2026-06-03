@@ -4,7 +4,7 @@ from PySide6.QtCore import QIODevice
 from PySide6.QtWebEngineCore import QWebEngineUrlSchemeHandler, QWebEngineUrlRequestJob, QWebEngineUrlScheme
 
 from .utils import log_event
-from .ui.logs_tab import LogManager
+from .log_manager import LogManager
 
 
 class LocalFileSchemeHandler(QWebEngineUrlSchemeHandler):

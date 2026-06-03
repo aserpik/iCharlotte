@@ -27,7 +27,7 @@ except ImportError:
             time.sleep(ms / 1000.0)
     Signal = lambda *args: property(lambda self: None)
 
-from icharlotte_core.ui.logs_tab import LogManager
+from icharlotte_core.log_manager import LogManager
 from icharlotte_core.calendar.deadline_calculator import DeadlineCalculator
 from icharlotte_core.calendar.attachment_classifier import AttachmentClassifier
 

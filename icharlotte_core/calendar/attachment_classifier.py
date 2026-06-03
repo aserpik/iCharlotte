@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional, Tuple, Any
 
-from icharlotte_core.ui.logs_tab import LogManager
+from icharlotte_core.log_manager import LogManager
 from icharlotte_core.llm import LLMHandler
 from icharlotte_core.config import API_KEYS
 

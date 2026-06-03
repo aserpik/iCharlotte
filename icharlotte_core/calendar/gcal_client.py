@@ -15,7 +15,7 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from icharlotte_core.ui.logs_tab import LogManager
+from icharlotte_core.log_manager import LogManager
 
 
 # OAuth scopes for calendar access

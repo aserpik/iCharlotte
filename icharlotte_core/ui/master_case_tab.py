@@ -15,7 +15,6 @@ from PySide6.QtGui import QColor, QAction, QFont, QShortcut, QKeySequence
 
 from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.utils import log_event, get_case_path, BASE_PATH_WIN, parse_hearing_data
-from icharlotte_core.sent_items_monitor import SentItemsMonitorWorker
 from icharlotte_core.docket_refresh_worker import DocketRefreshWorker
 from icharlotte_core.ui.wizard.mode_toggle import ModeToggle
 from icharlotte_core.ui.wizard.mode_controller import ModeController
@@ -400,17 +399,12 @@ class MasterCaseTab(QWidget):
         self.save_timer.setInterval(500) # 500ms debounce
         self.save_timer.timeout.connect(self._perform_save_settings)
 
-        # Email monitor worker (initialized when started)
-        self.email_monitor_worker = None
-
         # Docket refresh worker (auto-downloads new dockets when hearings pass)
         self.docket_refresh_worker = None
 
         self.setup_ui()
         self.refresh_data()
 
-        # Auto-start email monitor
-        QTimer.singleShot(1000, self._auto_start_email_monitor)
         # Auto-start docket refresh worker (delayed to let app settle)
         QTimer.singleShot(3000, self._auto_start_docket_refresh)
 
@@ -440,9 +434,8 @@ class MasterCaseTab(QWidget):
 
         main_layout.addLayout(top_bar)
 
-        # email_monitor_action and docket_refresh_action are set by the main
-        # window after construction (they live in the global Settings menu).
-        self.email_monitor_action = None
+        # docket_refresh_action is set by the main window after construction
+        # (it lives in the global Settings menu).
         self.docket_refresh_action = None
         
         # Progress Bar for scan
@@ -1761,79 +1754,6 @@ class MasterCaseTab(QWidget):
             if ok:
                 self.db.update_last_report_text(file_number, new_val)
                 self.refresh_data_row(file_number)
-
-    # --- Email Monitor Methods ---
-
-    def _auto_start_email_monitor(self):
-        """Auto-start the email monitor on app launch."""
-        if self.email_monitor_action:
-            self.email_monitor_action.setChecked(True)
-        self.start_email_monitor()
-
-    def toggle_email_monitor(self, checked):
-        """Toggle the email monitor on/off."""
-        if checked:
-            self.start_email_monitor()
-        else:
-            self.stop_email_monitor()
-
-    def start_email_monitor(self):
-        """Start the sent items monitor worker."""
-        if self.email_monitor_worker is not None and self.email_monitor_worker.isRunning():
-            return  # Already running
-
-        self.email_monitor_worker = SentItemsMonitorWorker(self.db)
-        self.email_monitor_worker.todo_created.connect(self.on_email_todo_created)
-        self.email_monitor_worker.history_created.connect(self.on_email_history_created)
-        self.email_monitor_worker.error.connect(self.on_email_monitor_error)
-        self.email_monitor_worker.status.connect(self.on_email_monitor_status)
-        self.email_monitor_worker.finished.connect(self.on_email_monitor_finished)
-        self.email_monitor_worker.start()
-
-        if self.email_monitor_action:
-            self.email_monitor_action.setText("Stop Email Monitor")
-
-    def stop_email_monitor(self):
-        """Stop the sent items monitor worker."""
-        if self.email_monitor_worker is None:
-            return
-
-        self.email_monitor_worker.request_stop()
-
-    def on_email_todo_created(self, file_number, todo_text):
-        """Handle todo created signal from email monitor."""
-        # Refresh the UI
-        self.refresh_data()
-
-        # If currently viewing this case, refresh details
-        if hasattr(self, 'current_file_number') and self.current_file_number == file_number:
-            self.refresh_details()
-            self.restore_selection()
-
-    def on_email_history_created(self, file_number, history_type):
-        """Handle history created signal from email monitor (status reports)."""
-        # Refresh the UI
-        self.refresh_data()
-
-        # If currently viewing this case, refresh details
-        if hasattr(self, 'current_file_number') and self.current_file_number == file_number:
-            self.refresh_details()
-            self.restore_selection()
-
-    def on_email_monitor_error(self, message):
-        """Handle error signal from email monitor."""
-        log_event(f"Email monitor error: {message}", "error")
-
-    def on_email_monitor_status(self, message):
-        """Handle status signal from email monitor."""
-        pass  # Status logged in logs tab
-
-    def on_email_monitor_finished(self):
-        """Handle worker finished signal."""
-        if self.email_monitor_action:
-            self.email_monitor_action.setChecked(False)
-            self.email_monitor_action.setText("Start Email Monitor")
-        self.email_monitor_worker = None
 
     # --- Docket Refresh Methods ---
 

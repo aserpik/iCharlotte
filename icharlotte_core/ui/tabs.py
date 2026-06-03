@@ -2159,7 +2159,7 @@ class ChatTab(QWidget):
 
     def update_context_indicator(self):
         """Update the context usage indicator."""
-        # Skip if indicator not present (e.g., LiabilityExposureTab overrides setup_ui)
+        # Skip if indicator not present (e.g., a subclass overrides setup_ui)
         if not hasattr(self, 'context_indicator'):
             return
 

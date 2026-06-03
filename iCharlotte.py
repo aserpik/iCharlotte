@@ -84,14 +84,9 @@ from icharlotte_core.ui.dialogs import FileNumberDialog, VariablesDialog, Prompt
 from icharlotte_core.ui.report_generator_dialog import ReportGeneratorDialog, ReportPipelineWorker
 from icharlotte_core.subpoena_tracker import SubpoenaTrackerWorker
 from icharlotte_core.ui.tabs import ChatTab, IndexTab
-from icharlotte_core.ui.email_tab import EmailTab
-from icharlotte_core.ui.email_update_tab import EmailUpdateTab
-from icharlotte_core.ui.logs_tab import LogsTab
-from icharlotte_core.ui.liability_tab import LiabilityExposureTab
 from icharlotte_core.ui.master_case_tab import MasterCaseTab
 from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.ui.templates_resources_tab import TemplatesResourcesTab
-from icharlotte_core.ui.deposition_tab import DepositionTab
 from icharlotte_core.ui.discovery_tab import DiscoveryTab
 from icharlotte_core.word_hotkey import init_word_hotkey, stop_word_hotkey
 from icharlotte_core.ui.zoom_handler import ZoomEventFilter
@@ -890,44 +885,15 @@ class MainWindow(QMainWindow):
         if self.file_number:
             self.chat_tab.load_case(self.file_number)
 
-        # --- Tab 6: Email ---
-        self.email_tab = EmailTab()
-        self.tabs.addTab(self.email_tab, "Email")
-        if self.file_number:
-            # Force initialization now that it's part of the window hierarchy
-            # (check_db_init relies on self.window().file_number which works now)
-            self.email_tab.check_db_init() 
-            self.email_tab.perform_search()
-
-        # --- Tab: Email Update ---
-        self.email_update_tab = EmailUpdateTab()
-        self.tabs.addTab(self.email_update_tab, "Email Update")
-        if self.file_number:
-            self.email_update_tab.on_case_changed(self.file_number)
-
-        # --- Tab: Depositions ---
-        self.deposition_tab = DepositionTab()
-        self.tabs.addTab(self.deposition_tab, "Depositions")
-        if self.file_number:
-            self.deposition_tab.load_case(self.file_number)
-
         # --- Tab: Discovery ---
         self.discovery_tab = DiscoveryTab()
         self.tabs.addTab(self.discovery_tab, "Discovery")
         if self.file_number:
             self.discovery_tab.load_case(self.file_number)
 
-        # --- Tab: Liability & Exposure ---
-        self.liability_tab = LiabilityExposureTab()
-        self.tabs.addTab(self.liability_tab, "Liability & Exposure")
-
         # --- Tab: Templates / Resources ---
         self.templates_tab = TemplatesResourcesTab(main_window=self)
         self.tabs.addTab(self.templates_tab, "Templates / Resources")
-
-        # --- Tab 8: Logs ---
-        self.logs_tab = LogsTab(self)
-        self.tabs.addTab(self.logs_tab, "Logs")
 
         # --- Lazy tab loading ---------------------------------------------
         # On a case switch the active tab becomes "Case View", so none of the
@@ -1015,17 +981,13 @@ class MainWindow(QMainWindow):
             QToolButton::menu-indicator { image: none; }
         """)
         self.settings_menu = QMenu(self)
-        self.email_monitor_action = self.settings_menu.addAction("Email Monitor")
-        self.email_monitor_action.setCheckable(True)
         self.docket_refresh_action = self.settings_menu.addAction("Auto Docket Refresh")
         self.docket_refresh_action.setCheckable(True)
         self.settings_btn.setMenu(self.settings_menu)
         self.corner_layout.addWidget(self.settings_btn)
 
         # Wire settings actions to master_case_tab's toggle methods
-        self.master_tab.email_monitor_action = self.email_monitor_action
         self.master_tab.docket_refresh_action = self.docket_refresh_action
-        self.email_monitor_action.toggled.connect(self.master_tab.toggle_email_monitor)
         self.docket_refresh_action.toggled.connect(self.master_tab.toggle_docket_refresh)
 
         # Restart button (red - danger)
@@ -1055,13 +1017,8 @@ class MainWindow(QMainWindow):
         "Status",
         "Index",
         "Chat",
-        "Email",
-        "Email Update",
-        "Depositions",
         "Discovery",
-        "Liability & Exposure",
         "Templates / Resources",
-        "Logs",
     }
 
     def _apply_mode_visibility(self, mode: str) -> None:
@@ -1997,14 +1954,6 @@ class MainWindow(QMainWindow):
                 # Reset Tabs for new case isolation
                 if hasattr(self, 'index_tab'):
                     self.index_tab.load_data(self.file_number)
-                if hasattr(self, 'liability_tab'):
-                    self.liability_tab.reset_state()
-                if hasattr(self, 'email_tab'):
-                    self.email_tab.search_bar.clear()
-                    self.email_tab.check_db_init()
-                    self.email_tab.perform_search()
-                if hasattr(self, 'email_update_tab'):
-                    self.email_update_tab.on_case_changed(new_file_num)
                 if hasattr(self, 'discovery_tab'):
                     self.discovery_tab.load_case(new_file_num)
 
@@ -2035,18 +1984,9 @@ class MainWindow(QMainWindow):
         self._lazy_loaders = {}          # widget -> loader(file_number)
         self._tabs_pending_reload = set()  # widgets awaiting reload for self.file_number
 
-        def _load_email(fn):
-            self.email_tab.search_bar.clear()
-            self.email_tab.check_db_init()
-            self.email_tab.perform_search()
-
         candidates = [
             ('index_tab', lambda fn: self.index_tab.load_data(fn)),
             ('chat_tab', lambda fn: self.chat_tab.load_case(fn)),
-            ('liability_tab', lambda fn: self.liability_tab.reset_state()),
-            ('email_tab', _load_email),
-            ('email_update_tab', lambda fn: self.email_update_tab.on_case_changed(fn)),
-            ('deposition_tab', lambda fn: self.deposition_tab.load_case(fn)),
             ('discovery_tab', lambda fn: self.discovery_tab.load_case(fn)),
         ]
         for attr, loader in candidates:
@@ -2131,10 +2071,9 @@ class MainWindow(QMainWindow):
         # A loaded case always defaults to Wizard mode on the Wizard tab.
         self._default_to_wizard_mode()
 
-        # Defer Index/Chat/Email/Email Update/Depositions/Discovery/Liability
-        # reloads until their tab is actually shown (none are visible right
-        # after the switch). Loads whichever lazy tab is currently active, if
-        # any, immediately.
+        # Defer Index/Chat/Discovery reloads until their tab is actually shown
+        # (none are visible right after the switch). Loads whichever lazy tab
+        # is currently active, if any, immediately.
         self._schedule_lazy_tab_reloads()
         _t = _lap("schedule lazy tab reloads", _t)
 
@@ -3050,9 +2989,6 @@ class MainWindow(QMainWindow):
                     tab.save_current_state()
                 except Exception as e:
                     log_event(f"[wizard] chat save_current_state failed on close: {e}")
-        # Save email update tab state before closing
-        if hasattr(self, 'email_update_tab') and self.email_update_tab:
-            self.email_update_tab.save_state()
         # Save discovery tab state before closing
         if hasattr(self, 'discovery_tab') and self.discovery_tab:
             self.discovery_tab.save_state()

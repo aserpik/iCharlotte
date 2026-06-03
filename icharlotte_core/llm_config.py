@@ -64,16 +64,10 @@ AGENT_DEFINITIONS = [
     # Case Agents
     ("agent_docket", "Docket", "Docket download and processing", "extraction"),
     ("agent_complaint", "Complaint", "Complaint document analysis", "extraction"),
-    ("agent_liability", "Liability Script", "Liability analysis script", "extraction"),
-    ("agent_exposure", "Exposure", "Exposure calculation and analysis", "extraction"),
     ("agent_oppose_motion", "Oppose Motion", "Opposition memorandum drafting + citation verification", "general"),
 
     # UI Functions
     ("func_chat", "Chat Tab", "Interactive AI chat", "general"),
-    ("func_email_intelligence", "Email Intelligence", "AI-powered email analysis", "general"),
-    ("func_email_compose", "Email Compose", "AI-powered email composition", "general"),
-    ("func_liability_tab", "Liability Tab", "Liability and exposure analysis tab", "general"),
-    ("func_sent_monitor", "Sent Items Monitor", "Monitor sent emails for todos", "quick"),
     ("func_attachment_classifier", "Attachment Classifier", "Classify legal document attachments", "classification"),
 ]
 

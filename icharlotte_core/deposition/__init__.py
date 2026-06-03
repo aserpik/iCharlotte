@@ -9,5 +9,3 @@ Three-stage pipeline:
 
 from .models import QAExchange, TranscriptIndex, DeponentInfo
 from .transcript_parser import TranscriptParser
-from .testimony_selector import TestimonySelector
-from .testimony_formatter import TestimonyFormatter

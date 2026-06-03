@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 
-from icharlotte_core.ui.logs_tab import LogManager
+from icharlotte_core.log_manager import LogManager
 
 
 # Path to the rules manifest

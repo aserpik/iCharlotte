@@ -88,12 +88,12 @@ class TestLogsTabImport:
     """Test that logs_tab module can be imported."""
 
     def test_import_log_manager(self):
-        from icharlotte_core.ui.logs_tab import LogManager
+        from icharlotte_core.log_manager import LogManager
         log_manager = LogManager()
         assert log_manager is not None
 
     def test_log_manager_add_log(self):
-        from icharlotte_core.ui.logs_tab import LogManager
+        from icharlotte_core.log_manager import LogManager
         log_manager = LogManager()
         log_manager.add_log("Test", "Test message")
         logs = log_manager.get_logs("Test")

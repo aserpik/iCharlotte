@@ -389,12 +389,9 @@ WORKBENCH_TO_AGENT_ID = {
     "summarize": "agent_summarize",
     "discovery": "agent_sum_disc",
     "deposition": "agent_sum_depo",
-    "liability": "agent_liability",
-    "exposure": "agent_exposure",
     "med_record": "agent_med_rec",
     "med_chron": "agent_med_chron",
     "separate": "agent_separate",
-    "email_update": "func_email_compose",
     "chat": "agent_chat",
     "mediation_brief": "agent_mediation_brief",
     "oppose_motion": "agent_oppose_motion",
@@ -2771,12 +2768,10 @@ AGENT_CATEGORIES = [
         "agent_med_rec", "agent_med_chron"
     ]),
     ("Case Agents", [
-        "agent_docket", "agent_complaint",
-        "agent_liability", "agent_exposure"
+        "agent_docket", "agent_complaint"
     ]),
     ("UI Functions", [
-        "func_chat", "func_email_intelligence", "func_email_compose",
-        "func_liability_tab", "func_sent_monitor", "func_attachment_classifier"
+        "func_chat", "func_attachment_classifier"
     ]),
 ]
 
@@ -3335,109 +3330,6 @@ class LLMSettingsDialog(QDialog):
     @property
     def task_widgets(self):
         return self.settings_widget.task_widgets
-
-
-class CaseContextDialog(QDialog):
-    """Dialog for editing case context (text + file attachment) for deposition extraction."""
-
-    def __init__(self, context_text: str = "", context_file_path: str = "",
-                 context_file_text: str = "", parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Case Context")
-        self.setMinimumWidth(600)
-        self.setMinimumHeight(400)
-
-        self._context_file_path = context_file_path
-        self._context_file_text = context_file_text
-
-        layout = QVBoxLayout(self)
-
-        # Text area
-        layout.addWidget(QLabel("Case background, party names, key issues:"))
-        self.text_edit = QPlainTextEdit()
-        self.text_edit.setPlainText(context_text)
-        self.text_edit.setPlaceholderText(
-            "e.g., Plaintiff John Smith alleges he was rear-ended by Defendant Jane Doe "
-            "on 01/15/2024. Plaintiff claims neck and back injuries. Defense argues "
-            "pre-existing conditions and low-speed impact..."
-        )
-        layout.addWidget(self.text_edit)
-
-        # File attachment row
-        file_layout = QHBoxLayout()
-        file_layout.addWidget(QLabel("Context file:"))
-        self.file_label = QLabel(
-            os.path.basename(context_file_path) if context_file_path else "None"
-        )
-        self.file_label.setStyleSheet("color: #888; font-style: italic;")
-        file_layout.addWidget(self.file_label, stretch=1)
-
-        browse_btn = QPushButton("Browse...")
-        browse_btn.clicked.connect(self._on_browse)
-        file_layout.addWidget(browse_btn)
-
-        clear_btn = QPushButton("Clear")
-        clear_btn.clicked.connect(self._on_clear_file)
-        file_layout.addWidget(clear_btn)
-        layout.addLayout(file_layout)
-
-        # Char count label
-        self.char_label = QLabel()
-        self.char_label.setStyleSheet("color: #888;")
-        layout.addWidget(self.char_label)
-        self._update_char_label()
-
-        # Buttons
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
-
-    def _update_char_label(self):
-        file_chars = len(self._context_file_text) if self._context_file_text else 0
-        if file_chars:
-            self.char_label.setText(f"File: ~{file_chars:,} chars extracted")
-        else:
-            self.char_label.setText("")
-
-    def _on_browse(self):
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Select Context Document", "",
-            "Documents (*.pdf *.docx *.doc *.txt *.msg);;All Files (*)"
-        )
-        if not path:
-            return
-        # Extract text
-        try:
-            from icharlotte_core.document_processor import DocumentProcessor
-            dp = DocumentProcessor()
-            text = dp.extract_text(path)
-            if not text or not text.strip():
-                QMessageBox.warning(self, "Empty", f"Could not extract text from:\n{path}")
-                return
-            self._context_file_path = path
-            self._context_file_text = text.strip()
-            self.file_label.setText(os.path.basename(path))
-            self.file_label.setStyleSheet("color: #333;")
-            self._update_char_label()
-        except Exception as e:
-            QMessageBox.warning(self, "Error", f"Failed to read file:\n{e}")
-
-    def _on_clear_file(self):
-        self._context_file_path = ""
-        self._context_file_text = ""
-        self.file_label.setText("None")
-        self.file_label.setStyleSheet("color: #888; font-style: italic;")
-        self._update_char_label()
-
-    def get_context_text(self) -> str:
-        return self.text_edit.toPlainText().strip()
-
-    def get_context_file_path(self) -> str:
-        return self._context_file_path
-
-    def get_context_file_text(self) -> str:
-        return self._context_file_text
 
 
 # ─────────────────────────────────────────────────────────────────────────────
