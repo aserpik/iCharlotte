@@ -18,7 +18,7 @@ def test_card_click_emits_task_requested(qtbot):
     tab = WizardTab()
     qtbot.addWidget(tab)
     # Pick the first card and click it.
-    first_card = tab.cards[0]
+    first_card = next(iter(tab.cards.values()))
     with qtbot.waitSignal(tab.task_requested, timeout=500) as blocker:
         qtbot.mouseClick(first_card, Qt.MouseButton.LeftButton)
     assert blocker.args[0] == first_card.task_id
@@ -27,9 +27,8 @@ def test_card_click_emits_task_requested(qtbot):
 def test_chat_card_emits_chat_task_id(qtbot):
     tab = WizardTab()
     qtbot.addWidget(tab)
-    chat_cards = [c for c in tab.cards if c.task_id == "chat"]
-    assert len(chat_cards) == 1
-    chat_card = chat_cards[0]
+    assert "chat" in tab.cards
+    chat_card = tab.cards["chat"]
     with qtbot.waitSignal(tab.task_requested, timeout=500) as blocker:
         qtbot.mouseClick(chat_card, Qt.MouseButton.LeftButton)
     assert blocker.args[0] == "chat"

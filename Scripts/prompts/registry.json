@@ -661,12 +661,21 @@
     "oppose_motion:rerank_select": {
       "agent": "oppose_motion",
       "pass_name": "rerank_select",
-      "current_version": "v1",
+      "current_version": "v2",
       "versions": [
         {
           "version": "v1",
           "created": "2026-05-27T23:38:57.896834",
           "description": "Re-rank + select best authorities with verbatim passage",
+          "author": "system",
+          "is_current": false,
+          "performance_score": 0.0,
+          "usage_count": 0
+        },
+        {
+          "version": "v2",
+          "created": "2026-06-02T15:34:01.186319",
+          "description": "Loosen rerank: pre-screened candidates, support by close analogy, empty only if unrelated",
           "author": "system",
           "is_current": true,
           "performance_score": 0.0,

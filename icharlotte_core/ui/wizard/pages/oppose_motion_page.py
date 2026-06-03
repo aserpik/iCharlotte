@@ -1160,7 +1160,10 @@ class OpposeMotionWorker(QThread):
                     cl_client=corpus,
                     query_llm=make_llm("research_queries"),
                     rerank_llm=make_llm("rerank_select"),
-                    max_workers=4,
+                    # Keep concurrency low: the local corpus search is fast, so a
+                    # higher worker count just bursts the LLM rate limit (429s)
+                    # on the per-argument query-gen + rerank calls.
+                    max_workers=2,
                     on_progress=self.progress.emit,
                     cache_dir=opinion_cache,
                 )
@@ -1176,7 +1179,7 @@ class OpposeMotionWorker(QThread):
                     cl_client=CourtListenerClient(token),
                     query_llm=make_llm("research_queries"),
                     rerank_llm=make_llm("rerank_select"),
-                    max_workers=4,
+                    max_workers=2,  # avoid bursting provider rate limits
                     on_progress=self.progress.emit,
                     cache_dir=opinion_cache,
                 )

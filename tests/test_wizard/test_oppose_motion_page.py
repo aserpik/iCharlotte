@@ -301,6 +301,13 @@ def test_worker_drafts_then_verifies_parsed_citations(monkeypatch, tmp_path):
     results = []
     draft_calls = []
 
+    # Exercise the CourtListener-API verifier path deterministically; the local
+    # corpus path is covered by test_oppose_motion_local_corpus.py. Without this
+    # the test's outcome depends on whether corpus.db exists on the machine.
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page._corpus_available",
+        lambda: False,
+    )
     monkeypatch.setenv("COURTLISTENER_API_TOKEN", "tok")
     monkeypatch.setattr(
         "icharlotte_core.ui.wizard.pages.oppose_motion_page.extract_document_text",
@@ -877,6 +884,12 @@ def test_worker_calls_verifier_with_parsed_citations(tmp_path, monkeypatch):
     from icharlotte_core.opposition.models import DraftDocument, MotionMetadata
 
     monkeypatch.setenv("COURTLISTENER_API_TOKEN", "dummy-token")
+    # Exercise the CourtListener-API verifier path deterministically; the local
+    # corpus path is covered by test_oppose_motion_local_corpus.py.
+    monkeypatch.setattr(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page._corpus_available",
+        lambda: False,
+    )
 
     motion_pdf = tmp_path / "motion.pdf"
     motion_pdf.write_bytes(b"%PDF-1.4 dummy")

@@ -12,7 +12,16 @@ Each task contributes:
                          Defaults to base SettingsPage (placeholder).
 """
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Dict, List, Optional
+
+
+# Fixed display order for launcher category sections.
+CATEGORY_ORDER: List[str] = [
+    "Discovery",
+    "Medical",
+    "Motions & Drafting",
+    "General",
+]
 
 
 def _default_settings_page_cls():
@@ -52,6 +61,8 @@ class TaskSpec:
     description: str
     icon_glyph: str
     script_name: str
+    category: str = "General"
+    keywords: List[str] = field(default_factory=list)
     default_folders: List[str] = field(default_factory=list)
     phase1_args: List[str] = field(default_factory=list)
     phase2_flag: str = "--phase=summary"
@@ -82,6 +93,8 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Produce a concise summary of one or more case documents.",
         icon_glyph="\U0001F4C4",  # 📄
         script_name="summarize.py",
+        category="General",
+        keywords=["summary", "summarize", "document", "general"],
         default_folders=[],
     ),
     "summarize_discovery": TaskSpec(
@@ -90,6 +103,11 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Summarize discovery responses with structure and citations.",
         icon_glyph="\U0001F4CB",  # 📋
         script_name="summarize_discovery.py",
+        category="Discovery",
+        keywords=[
+            "responses", "RFP", "RFA", "interrogatory",
+            "form interrogatories", "special interrogatories", "production",
+        ],
         default_folders=["DISCOVERY/RESPONSES", "DISCOVERY"],
     ),
     "summarize_depositions": TaskSpec(
@@ -98,6 +116,8 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Generate a structured summary of one or more depositions.",
         icon_glyph="\U0001F399",  # 🎙
         script_name="summarize_deposition.py",
+        category="Discovery",
+        keywords=["depo", "transcript", "testimony", "witness"],
         default_folders=["DISCOVERY/TRANSCRIPTS", "DISCOVERY"],
         _settings_page_cls_factory=_deposition_settings_page_cls,
     ),
@@ -107,6 +127,8 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Generate a deposition outline with questions grounded in case sources.",
         icon_glyph="❔",  # ❔ white question mark ornament
         script_name="depo_prep.py",
+        category="Discovery",
+        keywords=["depo", "outline", "questions", "examination", "prepare"],
         default_folders=["DISCOVERY", "PLEADINGS", "RECORDS"],
         phase1_args=["--phase=analyze"],
         phase2_flag="--phase=generate",
@@ -119,6 +141,8 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Extract and summarize medical records into a chronology.",
         icon_glyph="\U0001F3E5",  # 🏥
         script_name="med_record.py",
+        category="Medical",
+        keywords=["medical", "records", "chronology", "IME", "billing", "MRI", "treatment"],
         default_folders=["RECORDS"],
     ),
     "med_chron_analysis": TaskSpec(
@@ -127,6 +151,8 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Run selectable analyses on a medical chronology.",
         icon_glyph="\U0001FA7A",  # 🩺
         script_name="med_chron.py",
+        category="Medical",
+        keywords=["chronology", "chron", "analysis", "medical", "gaps", "billing"],
         # Picker prefers RECORDS/<medical summary subfolder> via find_medical_summary_folder()
         # in iCharlotte._open_task_tab; this list is the fallback if no such subfolder exists.
         default_folders=["RECORDS"],
@@ -140,6 +166,8 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Pull pages from medical record PDFs based on pasted chronology entries.",
         icon_glyph="\U0001F4D1",  # 📑
         script_name="",  # in-process QThread worker
+        category="Medical",
+        keywords=["extract", "pages", "PDF", "records", "Bates", "exhibit"],
         default_folders=[],
     ),
     "separate": TaskSpec(
@@ -149,6 +177,7 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         icon_glyph="\U0001F4D1",  # 📑
         script_name="separate.py",
         default_folders=[],
+        category="General",
     ),
     "subpoena_tracker": TaskSpec(
         task_id="subpoena_tracker",
@@ -156,6 +185,8 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Cross-reference issued subpoenas with received records and chronologies.",
         icon_glyph="\U0001F4DC",  # 📜
         script_name="",  # in-process QThread worker
+        category="Discovery",
+        keywords=["subpoena", "SDT", "records", "deposition subpoena", "tracker"],
         default_folders=[],
     ),
     "respond_to_discovery": TaskSpec(
@@ -164,6 +195,11 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Draft objections and responses to incoming written discovery.",
         icon_glyph="\U0001F4DD",  # 📝
         script_name="",  # in-process QThread worker
+        category="Discovery",
+        keywords=[
+            "RFP", "RFA", "interrogatory", "form interrogatories",
+            "objections", "propounded", "responses",
+        ],
         default_folders=["DISCOVERY/PROPOUNDED", "DISCOVERY"],
     ),
     "oppose_motion": TaskSpec(
@@ -172,6 +208,21 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Draft and verify an opposition memorandum for a California civil motion.",
         icon_glyph="\U0001F4DD",  # 📝
         script_name="",
+        category="Motions & Drafting",
+        keywords=["motion", "opposition", "oppose", "MSJ", "brief", "memorandum", "demurrer"],
+        default_folders=["MOTIONS", "PLEADINGS", "DISCOVERY"],
+    ),
+    "generate_motion": TaskSpec(
+        task_id="generate_motion",
+        title="Generate a Motion",
+        description="Draft a California civil motion from scratch from your target documents.",
+        icon_glyph="⚖️",  # ⚖️
+        script_name="",  # in-process worker
+        category="Motions & Drafting",
+        keywords=[
+            "motion", "draft", "compel", "demurrer", "strike",
+            "memorandum", "points and authorities", "notice of motion",
+        ],
         default_folders=["MOTIONS", "PLEADINGS", "DISCOVERY"],
     ),
     "chat": TaskSpec(
@@ -180,9 +231,39 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Open an AI chat session for this case.",
         icon_glyph="\U0001F4AC",  # 💬
         script_name="",  # no script — opens an interactive ChatTab
+        category="General",
+        keywords=["chat", "ask", "assistant", "question"],
         default_folders=[],
     ),
 }
+
+
+def _matches(spec: TaskSpec, query_lower: str) -> bool:
+    """True if the (already-lowercased) query is a substring of the task's
+    searchable text: title + description + keyword aliases."""
+    haystack = " ".join(
+        [spec.title, spec.description, *spec.keywords]
+    ).lower()
+    return query_lower in haystack
+
+
+def filter_tasks(specs: List[TaskSpec], query: str) -> "Dict[str, List[TaskSpec]]":
+    """Group `specs` by category (in CATEGORY_ORDER), optionally filtered by
+    `query`. Empty/whitespace query returns every task. Categories with no
+    matching tasks are omitted. Task order within a category follows the order
+    of `specs`.
+    """
+    q = (query or "").strip().lower()
+    grouped: Dict[str, List[TaskSpec]] = {}
+    for category in CATEGORY_ORDER:
+        matched = [
+            spec
+            for spec in specs
+            if spec.category == category and (not q or _matches(spec, q))
+        ]
+        if matched:
+            grouped[category] = matched
+    return grouped
 
 
 def get_task(task_id: str) -> TaskSpec:

@@ -477,3 +477,21 @@ def build_separate_tab(
         file_number=file_number,
         parent=parent,
     )
+
+
+def build_generate_motion_tab(
+    spec,
+    case_path: str,
+    file_number: str,
+    parent: QWidget | None,
+):
+    from icharlotte_core.ui.wizard.pages.generate_motion_page import (
+        build_generate_motion_tab as _build,
+    )
+
+    return _build(
+        spec=spec,
+        case_path=case_path,
+        file_number=file_number,
+        parent=parent,
+    )

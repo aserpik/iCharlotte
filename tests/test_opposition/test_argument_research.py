@@ -91,18 +91,18 @@ def test_research_argument_happy_path(tmp_path):
 
 def test_research_argument_unions_semantic_and_keyword(tmp_path):
     cl = MagicMock()
-    # semantic call returns 111; keyword returns 111 (dup) + 222
-    cl.search_opinions.side_effect = [[_case(111)], [_case(111), _case(222)]]
+    cl.search_opinions.return_value = [_case(111), _case(222)]
     cl.get_opinion_text.return_value = "text"
     query_llm = MagicMock(return_value='{"queries": ["q1"]}')
     rerank_llm = MagicMock(return_value='{"selections": []}')
 
     research_argument("arg", cl_client=cl, query_llm=query_llm, rerank_llm=rerank_llm, cache_dir=str(tmp_path))
 
-    # First call semantic=True, second semantic default(False); both fired for one query.
-    assert cl.search_opinions.call_count == 2
+    # The plain argument is prepended as a natural-language query, so two queries
+    # run ("arg" + "q1"), each firing a semantic and a keyword pass = 4 calls.
+    assert cl.search_opinions.call_count == 4
     first_kwargs = cl.search_opinions.call_args_list[0].kwargs
-    assert first_kwargs.get("semantic") is True
+    assert first_kwargs.get("semantic") is True  # semantic pass fires first
 
 
 def test_research_argument_empty_retries_once(tmp_path):
@@ -111,10 +111,14 @@ def test_research_argument_empty_retries_once(tmp_path):
     query_llm = MagicMock(return_value='{"queries": ["alpha beta gamma"]}')
     rerank_llm = MagicMock(return_value='{"selections": []}')
 
-    out = research_argument("arg", cl_client=cl, query_llm=query_llm, rerank_llm=rerank_llm, cache_dir=str(tmp_path))
+    # Multi-word argument so the broaden-retry on the (prepended) natural-language
+    # lead query actually fires.
+    out = research_argument("the motion is untimely", cl_client=cl, query_llm=query_llm,
+                            rerank_llm=rerank_llm, cache_dir=str(tmp_path))
     assert out == []
-    # Original query (semantic+keyword = 2 calls) + one broadened retry (2 calls) = 4.
-    assert cl.search_opinions.call_count == 4
+    # Two queries ("the motion is untimely" + "alpha beta gamma") x (semantic+keyword)
+    # = 4 calls, plus one broadened retry of the lead query (2 calls) = 6.
+    assert cl.search_opinions.call_count == 6
 
 
 def test_research_argument_stamps_goodlaw_signals(tmp_path):

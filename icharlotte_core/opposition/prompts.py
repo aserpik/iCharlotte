@@ -65,15 +65,16 @@ ARGUMENT THE OPPOSITION MUST ANSWER:
 
 RERANK_SELECT_PROMPT = """You are selecting the best California authorities to support one point in an opposition brief.
 
-You are given the PROPOSITION the opposition must support, and a numbered list of CANDIDATE opinions. Each candidate has an id and an excerpt of its ACTUAL opinion text. Choose the 3-5 candidates whose text most directly supports the proposition.
+You are given the PROPOSITION the opposition must support, and a numbered list of CANDIDATE opinions that a retrieval system has ALREADY identified as topically relevant. Each candidate has an id and an excerpt of its ACTUAL opinion text.
+
+Select the 2-4 candidates whose text best supports the proposition. A candidate supports the proposition if it backs it directly OR by close analogy — for example, a case applying the same legal standard, discovery rule, statute, or principle in a comparable context. Because the candidates were pre-screened for relevance, you should almost always be able to select at least one usable authority. Return an empty list ONLY in the rare case where every candidate is plainly about an unrelated area of law.
 
 For each chosen candidate return:
 - id: the candidate id exactly as given
-- supports: one sentence stating the proposition this opinion supports
-- passage: a VERBATIM quote copied exactly from THAT candidate's text that establishes the point. Copy it character-for-character; do not paraphrase, summarize, or combine.
+- supports: one sentence stating how this opinion supports the proposition
+- passage: a VERBATIM quote copied exactly from THAT candidate's excerpt that establishes or illustrates the point. Copy it character-for-character; do not paraphrase, summarize, or combine. Choose the most on-point sentence available even if it supports the proposition only in part.
 
-Return strict JSON only: {{"selections": [{{"id": "...", "supports": "...", "passage": "..."}}]}}.
-Choose only candidates whose text genuinely supports the proposition. If none do, return {{"selections": []}}. Never invent text that is not present in a candidate.
+Return strict JSON only: {{"selections": [{{"id": "...", "supports": "...", "passage": "..."}}]}}. Never invent text that is not present in a candidate.
 
 PROPOSITION:
 {proposition}

@@ -53,3 +53,24 @@ def test_get_opinion_text_and_lookup(tmp_path):
     hit = corpus.lookup_by_citation("30 Cal. 4th 43")
     assert hit is not None and hit["case_uid"] == "cap:1"
     assert "negligence" in hit["full_text"]
+
+
+def test_search_works_across_threads(tmp_path):
+    """Opposition research/verify fan out over a ThreadPoolExecutor. A single
+    shared SQLite connection raises 'created in a thread can only be used in that
+    same thread' and sinks every search to zero results — regression guard for
+    thread-local connections."""
+    import concurrent.futures
+
+    db, vec, emb = _build(tmp_path)
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    # Prime the connection on the main thread (as the wizard does before fan-out).
+    assert corpus.search_opinions("privacy discovery", semantic=True, max_results=5)
+
+    def _worker(_i):
+        res = corpus.search_opinions("privacy discovery", semantic=True, max_results=5)
+        return bool(res) and res[0].cluster_id == "cap:2"
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
+        outcomes = list(pool.map(_worker, range(8)))
+    assert all(outcomes)  # every worker thread retrieved, none hit the cross-thread error
