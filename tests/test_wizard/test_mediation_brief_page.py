@@ -342,3 +342,48 @@ def test_output_page_save_a_copy(qtbot, tmp_path, monkeypatch):
     assert target.is_file()
     # Original stays in place.
     assert out.is_file()
+
+
+# ---- Task tab ----
+
+def test_build_tab_returns_tab_with_three_pages(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.mediation_brief_page import (
+        MediationBriefTaskTab,
+        build_mediation_brief_tab,
+    )
+    from icharlotte_core.ui.wizard.registry import get_task
+
+    spec = get_task("mediation_brief")
+    tab = build_mediation_brief_tab(spec, str(tmp_path), "001", None)
+    qtbot.addWidget(tab)
+
+    assert isinstance(tab, MediationBriefTaskTab)
+    assert tab.count() == 3
+    assert tab.spec.task_id == "mediation_brief"
+    assert tab.files == []
+
+
+def test_tab_run_switches_to_status_and_starts_worker(qtbot, tmp_path, monkeypatch):
+    from icharlotte_core.ui.wizard.pages import mediation_brief_page as mod
+    from icharlotte_core.ui.wizard.registry import get_task
+
+    spec = get_task("mediation_brief")
+    tab = mod.MediationBriefTaskTab(spec, str(tmp_path), "001", None)
+    qtbot.addWidget(tab)
+
+    started = {}
+
+    # Subclass the real worker so signals exist, but don't actually launch the
+    # thread — we only verify the tab wires up and switches to the status page.
+    class _Recording(mod.MediationBriefWizardWorker):
+        def start(self):
+            started["started"] = True
+
+    monkeypatch.setattr(mod, "MediationBriefWizardWorker", _Recording)
+
+    tab._on_run({"files": ["x.pdf"], "caption_path": str(tmp_path / "c.docx")})
+
+    assert tab.currentIndex() == mod.TASK_PAGE_STATUS
+    assert started.get("started") is True
+    # The worker was never launched; drop the reference so teardown is clean.
+    tab._worker = None

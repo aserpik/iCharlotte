@@ -507,3 +507,132 @@ class MediationBriefOutputPage(QWidget):
             QMessageBox.information(self, "Saved", f"Saved a copy to:\n{target}")
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Save failed", f"Could not save a copy:\n{exc}")
+
+
+# --------------------------------- tab ------------------------------------
+
+class MediationBriefTaskTab(WizardTaskContainer):
+    """Settings → Status → Output container for the Mediation Brief task."""
+
+    task_completed = Signal(dict)
+
+    def __init__(self, spec, case_path: str, file_number: str, parent: QWidget | None = None):
+        super().__init__(spec, parent=parent)
+        self._case_path = case_path
+        self._file_number = file_number
+        self._worker = None
+        self._finishing_worker = None
+        self._last_settings: dict = {}
+
+        self.settings_page = MediationBriefSettingsPage(case_path, file_number)
+        self.status_page = StatusPage()
+        self.output_page = MediationBriefOutputPage()
+
+        self.addWidget(self.settings_page)   # TASK_PAGE_SETTINGS
+        self.addWidget(self.status_page)     # TASK_PAGE_STATUS
+        self.addWidget(self.output_page)     # TASK_PAGE_OUTPUT
+
+        self.settings_page.run_requested.connect(self._on_run)
+        self.status_page.cancel_requested.connect(self._on_cancel)
+        self.output_page.rerun_requested.connect(self._on_rerun)
+        self.output_page.edit_settings_requested.connect(
+            lambda: self.setCurrentIndex(TASK_PAGE_SETTINGS)
+        )
+
+    @property
+    def spec(self):
+        return self._spec
+
+    @property
+    def files(self) -> list[str]:
+        return list(self.settings_page.current_files())
+
+    def _on_run(self, settings: dict) -> None:
+        if self._worker is not None or self._finishing_worker is not None:
+            self.status_page.on_status("A mediation brief is already generating.")
+            self.setCurrentIndex(TASK_PAGE_STATUS)
+            return
+        self._last_settings = dict(settings or {})
+        self.status_page.reset()
+        self.status_page.on_status("Starting mediation brief…")
+        self.status_page.progress_bar.setRange(0, 0)  # indeterminate
+        self.setCurrentIndex(TASK_PAGE_STATUS)
+
+        worker = MediationBriefWizardWorker(
+            self._case_path, self._file_number, self._last_settings, parent=None
+        )
+        worker.progress.connect(self.status_page.on_status)
+        worker.finished_result.connect(self._on_worker_finished)
+        worker.finished.connect(lambda w=worker: self._on_worker_thread_finished(w))
+        worker.finished.connect(worker.deleteLater)
+        self._worker = worker
+        worker.start()
+
+    def _on_cancel(self) -> None:
+        if self._worker is not None:
+            self.status_page.on_status("Cancelling… (finishing the current section)")
+            try:
+                self._worker.cancel()
+            except Exception:  # noqa: BLE001
+                pass
+        else:
+            self.setCurrentIndex(TASK_PAGE_SETTINGS)
+
+    def _on_rerun(self) -> None:
+        self._on_run(self._last_settings)
+
+    def _on_worker_finished(self, success: bool, payload: object) -> None:
+        from datetime import datetime
+
+        if self.sender() is not None and self.sender() is not self._worker:
+            return
+        if self.sender() is self._worker:
+            self._finishing_worker = self._worker
+            self._worker = None
+
+        if not success:
+            self.status_page.on_status(f"FAILED: {payload}")
+            # Re-enable the status button so the user can go back (routes through
+            # cancel_requested → _on_cancel, which returns to Settings when no
+            # worker is running). No disconnect/reconnect — keeps cancel wiring
+            # intact across re-runs.
+            self.status_page.cancel_btn.setEnabled(True)
+            self.status_page.cancel_btn.setText("Back to Settings")
+            return
+
+        path = payload if isinstance(payload, str) else ""
+        self.output_page.show_result(path)
+        self.setCurrentIndex(TASK_PAGE_OUTPUT)
+        self.task_completed.emit({
+            "task_id": self._spec.task_id,
+            "title": self._spec.title,
+            "files": list(self.settings_page.current_files()),
+            "settings": self.settings_page.to_dict(),
+            "output_path": path,
+            "completed_at": datetime.now().isoformat(timespec="seconds"),
+        })
+
+    def _on_worker_thread_finished(self, worker) -> None:
+        if self._worker is worker:
+            self._worker = None
+        if self._finishing_worker is worker:
+            self._finishing_worker = None
+
+    def closeEvent(self, event) -> None:
+        for worker in (self._worker, self._finishing_worker):
+            if worker is not None and worker.isRunning():
+                QMessageBox.information(
+                    self, "Task running",
+                    "The mediation brief is still generating. Wait for it to "
+                    "finish before closing this tab.",
+                )
+                event.ignore()
+                return
+        super().closeEvent(event)
+
+
+def build_mediation_brief_tab(spec, case_path: str, file_number: str, parent: QWidget | None):
+    """Open the Mediation Brief task on its Settings page."""
+    return MediationBriefTaskTab(
+        spec=spec, case_path=case_path, file_number=file_number, parent=parent
+    )
