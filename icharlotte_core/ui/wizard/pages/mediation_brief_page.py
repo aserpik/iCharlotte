@@ -257,3 +257,153 @@ class MediationBriefWizardWorker(QThread):
         except Exception as exc:  # noqa: BLE001
             logger.exception("MediationBriefWizardWorker failed")
             self.finished_result.emit(False, str(exc))
+
+
+# ----------------------------- settings page ------------------------------
+
+class MediationBriefSettingsPage(QWidget):
+    """Source documents + caption template + Generate."""
+
+    run_requested = Signal(dict)
+
+    def __init__(self, case_path: str, file_number: str, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.case_path = case_path or ""
+        self.file_number = file_number or ""
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(
+            theme.SPACE_XL, theme.SPACE_XL, theme.SPACE_XL, theme.SPACE_XL
+        )
+        layout.setSpacing(theme.SPACE_MD)
+
+        layout.addWidget(theme.helper_text(
+            "Generate a defense-side mediation brief from the selected case "
+            "documents. The brief is built section by section and saved to "
+            "NOTES/AI OUTPUT/MEDIATION. Refine sections or add deposition quotes "
+            "afterward in Word (Win+V → Mediation Brief)."
+        ))
+
+        files_row = QHBoxLayout()
+        files_row.addWidget(theme.section_header("Source documents"))
+        files_row.addStretch()
+        self.add_files_btn = theme.secondary_button("Add Files…")
+        self.add_files_btn.clicked.connect(self._on_add_files)
+        files_row.addWidget(self.add_files_btn)
+        self.remove_files_btn = theme.secondary_button("Remove")
+        self.remove_files_btn.clicked.connect(self._on_remove_files)
+        files_row.addWidget(self.remove_files_btn)
+        layout.addLayout(files_row)
+
+        self.files_list = QListWidget()
+        self.files_list.setSelectionMode(
+            QAbstractItemView.SelectionMode.ExtendedSelection
+        )
+        layout.addWidget(self.files_list, 1)
+
+        layout.addWidget(theme.section_header("Caption template"))
+        caption_row = QHBoxLayout()
+        self.caption_edit = QLineEdit()
+        self.caption_edit.setPlaceholderText("Path to the case caption .docx…")
+        self.caption_edit.textChanged.connect(self._update_caption_hint)
+        caption_row.addWidget(self.caption_edit, 1)
+        self.browse_caption_btn = theme.secondary_button("Browse…")
+        self.browse_caption_btn.clicked.connect(self._on_browse_caption)
+        caption_row.addWidget(self.browse_caption_btn)
+        layout.addLayout(caption_row)
+        self.caption_hint = theme.error_text("")
+        layout.addWidget(self.caption_hint)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        self.generate_btn = theme.primary_button("Generate Mediation Brief")
+        self.generate_btn.clicked.connect(self._on_generate)
+        btn_row.addWidget(self.generate_btn)
+        layout.addLayout(btn_row)
+
+        self._autodetect_caption()
+
+    # ---- helpers ----
+
+    def _autodetect_caption(self) -> None:
+        if self.case_path:
+            try:
+                found = MediationBriefGenerator().find_caption_template(self.case_path)
+            except Exception:  # noqa: BLE001
+                found = None
+            if found:
+                self.caption_edit.setText(found)
+        self._update_caption_hint()
+
+    def _update_caption_hint(self, *_args) -> None:
+        path = self.caption_edit.text().strip()
+        if not path:
+            self.caption_hint.setText(
+                "No caption template found — click Browse… to select one."
+            )
+        elif not os.path.isfile(path):
+            self.caption_hint.setText("Caption template not found at that path.")
+        else:
+            self.caption_hint.setText("")
+
+    def current_files(self) -> list[str]:
+        return [self.files_list.item(i).text() for i in range(self.files_list.count())]
+
+    def _on_add_files(self) -> None:
+        picked = ContextFilesDialog.get_files(
+            self,
+            title="Select source document(s) for the mediation brief",
+            start_dir=self.case_path or "",
+            file_filter="Documents (*.pdf *.docx *.doc *.txt *.msg);;All files (*.*)",
+        )
+        existing = set(self.current_files())
+        for path in picked or []:
+            if path not in existing:
+                self.files_list.addItem(path)
+                existing.add(path)
+
+    def _on_remove_files(self) -> None:
+        for item in self.files_list.selectedItems():
+            self.files_list.takeItem(self.files_list.row(item))
+
+    def _on_browse_caption(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Select caption template", self.case_path or "",
+            "Word Documents (*.docx)",
+        )
+        if path:
+            self.caption_edit.setText(path)
+
+    def to_dict(self) -> dict:
+        return {
+            "files": self.current_files(),
+            "caption_path": self.caption_edit.text().strip(),
+        }
+
+    def from_dict(self, data: dict | None) -> None:
+        data = data or {}
+        self.files_list.clear()
+        for path in data.get("files", []) or []:
+            self.files_list.addItem(path)
+        caption = data.get("caption_path", "")
+        if caption:
+            self.caption_edit.setText(caption)
+        self._update_caption_hint()
+
+    def _on_generate(self) -> None:
+        files = self.current_files()
+        caption_path = self.caption_edit.text().strip()
+        if not files:
+            QMessageBox.warning(self, "No documents", "Add at least one source document.")
+            return
+        if not caption_path or not os.path.isfile(caption_path):
+            QMessageBox.warning(
+                self, "No caption template", "Select a caption template (.docx)."
+            )
+            return
+        self.run_requested.emit({
+            "files": files,
+            "caption_path": caption_path,
+            "save_default_dir": os.path.join(self.case_path, *MEDIATION_SUBDIR),
+            "suggested_filename": DEFAULT_BRIEF_FILENAME,
+        })

@@ -225,3 +225,69 @@ def test_worker_fails_on_empty_content(qtbot, monkeypatch, tmp_path):
 
     assert results and results[0][0] is False
     assert "could not read" in results[0][1].lower()
+
+
+# ---- Settings page ----
+
+def test_settings_page_autodetects_caption(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.mediation_brief_page import (
+        MediationBriefSettingsPage,
+    )
+
+    (tmp_path / "Caption Page.docx").write_text("x", encoding="utf-8")
+    page = MediationBriefSettingsPage(str(tmp_path), "001")
+    qtbot.addWidget(page)
+
+    assert page.caption_edit.text().endswith("Caption Page.docx")
+
+
+def test_settings_page_add_dedupes_and_roundtrips(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.mediation_brief_page import (
+        MediationBriefSettingsPage,
+    )
+
+    page = MediationBriefSettingsPage(str(tmp_path), "001")
+    qtbot.addWidget(page)
+
+    page.files_list.addItem("a.pdf")
+    page.files_list.addItem("a.pdf")  # duplicate added manually
+    page.from_dict({"files": ["b.pdf", "c.pdf"], "caption_path": "cap.docx"})
+
+    assert page.current_files() == ["b.pdf", "c.pdf"]
+    assert page.to_dict() == {"files": ["b.pdf", "c.pdf"], "caption_path": "cap.docx"}
+
+
+def test_settings_page_validation_blocks_without_files(qtbot, tmp_path, monkeypatch):
+    from icharlotte_core.ui.wizard.pages import mediation_brief_page as mod
+
+    page = mod.MediationBriefSettingsPage(str(tmp_path), "001")
+    qtbot.addWidget(page)
+    monkeypatch.setattr(mod.QMessageBox, "warning", lambda *a, **k: None)
+
+    emitted = []
+    page.run_requested.connect(emitted.append)
+    page._on_generate()  # no files, no caption
+
+    assert emitted == []
+
+
+def test_settings_page_emits_run_requested(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.mediation_brief_page import (
+        MediationBriefSettingsPage,
+    )
+
+    caption = tmp_path / "Caption.docx"
+    caption.write_text("x", encoding="utf-8")
+    page = MediationBriefSettingsPage(str(tmp_path), "001")
+    qtbot.addWidget(page)
+    page.files_list.addItem("doc1.pdf")
+    page.caption_edit.setText(str(caption))
+
+    with qtbot.waitSignal(page.run_requested, timeout=500) as blocker:
+        page._on_generate()
+
+    payload = blocker.args[0]
+    assert payload["files"] == ["doc1.pdf"]
+    assert payload["caption_path"] == str(caption)
+    assert payload["suggested_filename"].endswith(".docx")
+    assert payload["save_default_dir"].endswith(os.path.join("AI OUTPUT", "MEDIATION"))
