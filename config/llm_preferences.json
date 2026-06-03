@@ -205,8 +205,8 @@
       "description": "PDF separation and document indexing",
       "model_sequence": [
         {
-          "provider": "Claude",
-          "model": "claude-sonnet-4-6",
+          "provider": "Gemini",
+          "model": "gemini-3.1-flash-lite",
           "max_tokens": -1,
           "supports_thinking": false,
           "supports_streaming": true,
@@ -597,8 +597,8 @@
         "pass_name": "main",
         "model_sequence": [
           {
-            "provider": "Claude",
-            "model": "claude-sonnet-4-6",
+            "provider": "Gemini",
+            "model": "gemini-3.1-flash-lite",
             "max_tokens": -1,
             "supports_thinking": false,
             "supports_streaming": true,

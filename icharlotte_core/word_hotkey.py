@@ -1534,7 +1534,18 @@ class TaskManager(QObject):
             return
 
         td = self._tasks[task_id]
-        self._workers.pop(task_id, None)
+        worker = self._workers.pop(task_id, None)
+        if worker is not None:
+            # The worker emits its result as the last line of run(), but the
+            # underlying OS thread is not yet marked finished at that instant.
+            # Dropping the QThread's last reference here (immediate refcount
+            # destruction) while isFinished() is still False triggers Qt's fatal
+            # "QThread: Destroyed while thread is still running" abort, which
+            # exits the process with 0xC0000409 and NO error output — the
+            # "randomly closes for no reason" crash. wait() blocks until run()
+            # has fully returned (near-instant, since the result is already
+            # emitted) so the object is only destroyed once the thread is dead.
+            worker.wait(5000)
 
         if error:
             td.status = "error"

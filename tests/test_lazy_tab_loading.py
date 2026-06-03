@@ -150,6 +150,61 @@ def test_loader_exception_does_not_propagate(qtbot):
     assert widgets["Boom"] not in stub._tabs_pending_reload
 
 
+# --- Non-blocking detach of the old directory-scan worker -------------------
+
+class _FakeWorker:
+    """Mimics just enough of DirectoryTreeWorker for the reaper under test."""
+
+    def __init__(self):
+        self.deleted = False
+
+    def deleteLater(self):
+        self.deleted = True
+
+
+class _ReapStub:
+    _reap_detached_worker = iCharlotte.MainWindow._reap_detached_worker
+
+
+def test_reap_removes_reference_and_deletes():
+    """A finished detached worker is dropped from the list and deleteLater'd,
+    so it can be garbage-collected after the case switch."""
+    stub = _ReapStub()
+    w = _FakeWorker()
+    stub._detached_workers = [w]
+
+    stub._reap_detached_worker(w)
+
+    assert w not in stub._detached_workers
+    assert w.deleted is True
+
+
+def test_reap_is_safe_when_worker_already_gone():
+    """Reaping a worker that isn't tracked (double-fire / cleared list) does
+    not raise and still requests deletion."""
+    stub = _ReapStub()
+    stub._detached_workers = []
+    w = _FakeWorker()
+
+    stub._reap_detached_worker(w)  # should not raise
+
+    assert w.deleted is True
+
+
+def test_reap_only_removes_the_finished_worker():
+    """Other in-flight detached workers are left tracked (not GC'd) so a rapid
+    series of case switches doesn't free a still-running QThread."""
+    stub = _ReapStub()
+    done, still_running = _FakeWorker(), _FakeWorker()
+    stub._detached_workers = [done, still_running]
+
+    stub._reap_detached_worker(done)
+
+    assert stub._detached_workers == [still_running]
+    assert done.deleted is True
+    assert still_running.deleted is False
+
+
 # --- Wizard-mode default on case load --------------------------------------
 
 class _FakeModeController:

@@ -411,7 +411,7 @@ class MainWindow(QMainWindow):
         # Double-Ctrl tap detection state
         self._last_ctrl_tap_time = None  # Time of last valid tap (quick press+release), None = no recent tap
         self._ctrl_press_time = 0  # When Ctrl was pressed
-        self._ctrl_tap_threshold = 0.5  # Max seconds between taps for double-tap
+        self._ctrl_tap_threshold = 0.3  # Max seconds between taps for double-tap (tightened to avoid accidental triggers)
         self._ctrl_hold_threshold = 0.2  # Max seconds Ctrl can be held to count as tap
         self.file_number = file_number
         self.case_path = case_path
@@ -3340,21 +3340,31 @@ class MainWindow(QMainWindow):
              self.status_label.setText(f"Loaded from cache. Verifying...")
 
         if hasattr(self, 'worker') and self.worker is not None:
-            self.worker.stop()
+            old_worker = self.worker
+            old_worker.stop()
             try:
-                self.worker.disconnect()
-            except:
+                old_worker.disconnect()
+            except Exception:
                 pass
-            # CRITICAL: wait for the thread to actually finish before
-            # replacing self.worker.  Without this, the old QThread can be
-            # GC'd while its thread is still inside os.walk/emit, causing a
-            # C++ segfault ("QThread: Destroyed while thread is still running").
-            if self.worker.isRunning():
-                if not self.worker.wait(5000):  # 5 s max; Z: walk is I/O-bound
-                    log_warning("populate_tree: old worker did not stop within 5 s — detaching")
-                    # Keep a reference so it isn't destroyed while running
-                    self._old_worker = self.worker
-                    self._old_worker.finished.connect(self._old_worker.deleteLater)
+            # Do NOT block the UI thread waiting for the old scan to unwind.
+            # The old worker may be parked inside os.walk on the Z:\ network
+            # drive, where it can't observe the stop flag for several seconds;
+            # the former self.worker.wait(5000) here was the cause of the
+            # multi-second freeze on case switch.  Instead, detach it: keep a
+            # reference so the QThread isn't GC'd while still running (the
+            # documented segfault guard) and let it self-terminate.  Its late
+            # data_ready/finished emissions are already ignored by the
+            # _tree_generation guard in _on_tree_batch/_on_scan_complete, so
+            # blocking is not needed for correctness.
+            if old_worker.isRunning():
+                if not hasattr(self, '_detached_workers'):
+                    self._detached_workers = []
+                self._detached_workers.append(old_worker)
+                old_worker.finished.connect(
+                    lambda w=old_worker: self._reap_detached_worker(w)
+                )
+            else:
+                old_worker.deleteLater()
 
         self.worker = DirectoryTreeWorker(self.case_path)
         # Use lambdas that capture generation to ignore stale callbacks after file switch
@@ -3362,6 +3372,21 @@ class MainWindow(QMainWindow):
         self.worker.finished.connect(lambda gen=current_gen: self._on_scan_complete(gen))
         self.worker.start()
         log_debug(f"populate_tree: worker started for gen={current_gen}")
+
+    def _reap_detached_worker(self, worker):
+        """Drop our reference to a detached DirectoryTreeWorker once it has
+        finished so it can be garbage-collected. Invoked via the worker's
+        finished signal (queued to the UI thread). Replaces the old blocking
+        wait()-based teardown that froze the UI on case switch."""
+        try:
+            if hasattr(self, '_detached_workers') and worker in self._detached_workers:
+                self._detached_workers.remove(worker)
+        except ValueError:
+            pass
+        try:
+            worker.deleteLater()
+        except Exception:
+            pass
 
     def _on_tree_batch(self, generation, batch):
         """Wrapper that ignores stale worker callbacks from a previous file."""

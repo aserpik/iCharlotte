@@ -224,7 +224,14 @@ class EmailSyncWorker(QThread):
             current_sync_start = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
             log_event(f"EmailSync: Starting AdvancedSearch (Server-Side) for {self.case_number}")
-            outlook = win32com.client.Dispatch("Outlook.Application")
+            # Early-binding (gencache) to avoid _LazyAddAttr_ fatal crashes
+            # (0x8001010e / RPC_E_WRONGTHREAD) from late-binding COM dispatch on
+            # this worker-thread STA. See sent_items_monitor._poll_sent_items for
+            # the full explanation. Fallback to dynamic Dispatch if unavailable.
+            try:
+                outlook = win32com.client.gencache.EnsureDispatch("Outlook.Application")
+            except Exception:
+                outlook = win32com.client.Dispatch("Outlook.Application")
             mapi = outlook.GetNamespace("MAPI")
             
             self.total_processed = 0

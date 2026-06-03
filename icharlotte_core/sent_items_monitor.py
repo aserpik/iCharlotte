@@ -7,7 +7,7 @@ import os
 import re
 import tempfile
 from datetime import datetime, timedelta
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QObject, QTimer, Signal
 
 from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.ui.logs_tab import LogManager
@@ -17,11 +17,22 @@ from icharlotte_core.config import API_KEYS
 from icharlotte_core.document_processor import DocumentProcessor
 
 
-class SentItemsMonitorWorker(QThread):
+class SentItemsMonitorWorker(QObject):
     """
-    Background worker that polls Outlook Sent Items every 2 minutes,
-    detects emails to serpiklaw@gmail.com with body starting with "AS -",
-    extracts the file number from the subject, and creates a todo.
+    Monitors Outlook Sent Items on a recurring timer, detects emails to the
+    TARGETS addresses (body prefix -> todo) and to STATUS_REPORT_EMAIL
+    (reportstatusagent@gmail.com -> history entry), extracts the file number
+    from the subject, and creates the corresponding record.
+
+    IMPORTANT — runs on the MAIN THREAD via QTimer, NOT a background QThread.
+    Outlook (and Word) are single-threaded-apartment COM servers. Polling them
+    from a background QThread made intermittent cross-apartment calls that
+    failed with RPC_E_WRONGTHREAD (0x8001010e), corrupted the heap, and killed
+    the whole process with a silent access violation (the "randomly closes"
+    crash). The main thread is the app's primary STA with a Qt message pump,
+    where win32com COM automation is safe — the same place TaskManager performs
+    its Word insertions. A QTimer on the main thread eliminates the entire
+    cross-thread COM hazard class. Keep all COM access on this thread.
     """
 
     # Signals
@@ -29,6 +40,7 @@ class SentItemsMonitorWorker(QThread):
     history_created = Signal(str, str)  # (file_number, history_type) - for status reports
     error = Signal(str)  # error message
     status = Signal(str)  # status message
+    finished = Signal()  # emitted when the monitor stops
 
     # Configuration
     POLL_INTERVAL = 30  # seconds
@@ -302,98 +314,92 @@ class SentItemsMonitorWorker(QThread):
         super().__init__()
         self.db = db or MasterCaseDatabase()
         self.stop_requested = False
+        self._timer = None
+        self._polling = False  # guard against overlapping polls
+
+    # ── Lifecycle (main-thread, QTimer-driven — see class docstring) ──────────
+    # Keeps the same public API the rest of the app already uses:
+    #   start(), isRunning(), request_stop(), and the finished signal.
+
+    def start(self):
+        """Begin polling on the main thread. Safe to call repeatedly."""
+        if self.isRunning():
+            return
+        self.stop_requested = False
+        self._timer = QTimer(self)
+        self._timer.setInterval(self.POLL_INTERVAL * 1000)
+        self._timer.timeout.connect(self._on_tick)
+        self._timer.start()
+        self.status.emit("Email monitor started")
+        # Run the first poll shortly after startup (lets the UI finish painting
+        # first) instead of waiting a full interval.
+        QTimer.singleShot(1500, self._on_tick)
+
+    def isRunning(self) -> bool:
+        return self._timer is not None and self._timer.isActive()
 
     def request_stop(self):
-        """Signal the worker to stop on the next iteration."""
+        """Stop polling. Emits finished()."""
         self.stop_requested = True
+        if self._timer is not None:
+            self._timer.stop()
+            self._timer.deleteLater()
+            self._timer = None
+        self.status.emit("Email monitor stopped")
+        self.finished.emit()
 
-    def run(self):
-        """Main worker loop."""
-        import pythoncom
-
+    def _on_tick(self):
+        """One poll cycle, invoked on the main thread by the QTimer."""
+        if self.stop_requested or self._polling:
+            return
+        self._polling = True
         try:
-            pythoncom.CoInitialize()
-            self.status.emit("Email monitor started")
-
-            while not self.stop_requested:
-                try:
-                    self._poll_sent_items()
-                except Exception as e:
-                    self.error.emit(f"Poll error: {e}")
-
-                # Sleep in small increments to allow quick stop
-                for _ in range(self.POLL_INTERVAL):
-                    if self.stop_requested:
-                        break
-                    self.msleep(1000)  # 1 second
-
+            self._poll_sent_items()
         except Exception as e:
-            self.error.emit(f"Monitor error: {e}")
+            self.error.emit(f"Poll error: {e}")
         finally:
-            pythoncom.CoUninitialize()
-            self.status.emit("Email monitor stopped")
+            self._polling = False
 
     def _poll_sent_items(self):
-        """Check Sent Items for matching emails."""
+        """Check Sent Items for matching emails. Runs on the MAIN THREAD.
+
+        All Outlook COM access happens here on the app's primary STA (the same
+        apartment Qt/OLE initialized and that TaskManager uses for Word), so
+        there is no cross-apartment marshalling and none of the RPC_E_WRONGTHREAD
+        (0x8001010e) heap corruption that the old background-thread version hit.
+        The previous gc.disable()/per-item gc.collect() and CoInitialize dance
+        existed only to work around running on a worker thread; on the main
+        thread it is unnecessary and intentionally removed.
+        """
         import win32com.client
-        import gc
 
-        # COM objects MUST be released on the same thread that created them.
-        # If they leak to the main thread's GC, we get 0x8001010e (RPC_E_WRONG_THREAD),
-        # which corrupts the heap and crashes the next Qt event dispatch with an
-        # access violation in python313.dll. Per-email `del` + an outer gc.collect()
-        # alone aren't enough: pythoncom CDispatch proxies hold cycles, so if the
-        # main thread's generational GC fires while any of our proxies are live,
-        # it will finalize them on the wrong apartment. We protect against that by:
-        #   1. Disabling automatic GC for the duration of the COM critical section
-        #      so no other thread can collect our proxies.
-        #   2. Calling gc.collect() ON THIS thread after each email, which runs
-        #      synchronously here and releases any cycles while CoInitialize holds.
-        items = None
-        sent_folder = None
-        mapi = None
-        outlook = None
-        gc_was_enabled = gc.isenabled()
-        if gc_was_enabled:
-            gc.disable()
+        # Early-binding (gencache) is still preferred: it parses the type library
+        # once and is faster/steadier than re-resolving dispids on every access.
+        # Fallback to dynamic Dispatch if makepy generation is unavailable.
         try:
+            outlook = win32com.client.gencache.EnsureDispatch("Outlook.Application")
+        except Exception:
             outlook = win32com.client.Dispatch("Outlook.Application")
-            mapi = outlook.GetNamespace("MAPI")
+        mapi = outlook.GetNamespace("MAPI")
 
-            # Get Sent Items folder (olFolderSentMail = 5)
-            sent_folder = mapi.GetDefaultFolder(5)
+        # Get Sent Items folder (olFolderSentMail = 5)
+        sent_folder = mapi.GetDefaultFolder(5)
 
-            # Filter items from last 24 hours for performance
-            cutoff_time = datetime.now() - timedelta(hours=24)
-            cutoff_str = cutoff_time.strftime("%m/%d/%Y %H:%M %p")
+        # Filter items from last 24 hours for performance
+        cutoff_time = datetime.now() - timedelta(hours=24)
+        cutoff_str = cutoff_time.strftime("%m/%d/%Y %H:%M %p")
 
-            # Use Restrict to filter by sent time
-            restriction = f"[SentOn] >= '{cutoff_str}'"
-            items = sent_folder.Items.Restrict(restriction)
+        # Use Restrict to filter by sent time
+        restriction = f"[SentOn] >= '{cutoff_str}'"
+        items = sent_folder.Items.Restrict(restriction)
 
-            for item in items:
-                if self.stop_requested:
-                    break
-
-                try:
-                    self._process_email(item)
-                except Exception:
-                    pass  # Continue processing other emails
-                finally:
-                    del item  # Release COM ref on this thread
-                    # Collect any cycles created while processing the email,
-                    # synchronously on this thread, before the next iteration.
-                    gc.collect()
-
-        except Exception as e:
-            self.error.emit(f"Outlook access error: {e}")
-        finally:
-            # Explicitly release all COM objects on THIS thread to prevent
-            # cross-thread GC releasing them on the main thread (crash 0x8001010e)
-            del items, sent_folder, mapi, outlook
-            gc.collect()  # Force GC on this thread while COM apartment is active
-            if gc_was_enabled:
-                gc.enable()
+        for item in items:
+            if self.stop_requested:
+                break
+            try:
+                self._process_email(item)
+            except Exception:
+                pass  # Continue processing other emails
 
     def _process_email(self, item):
         """Process a single email item."""
