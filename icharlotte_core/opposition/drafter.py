@@ -132,9 +132,13 @@ def _format_authority_pool(authorities: list[RetrievedAuthority]) -> str:
                 header = f"{header} {a.citation}"
             lines.append(f"  - {header}")
             if a.supports:
-                lines.append(f"    Supports: {a.supports}")
+                # The rule to STATE in the brief (paraphrase this in your prose).
+                lines.append(f"    Holding: {a.supports}")
             if a.passage:
-                lines.append(f'    Holding (verbatim): "{a.passage}"')
+                # Verbatim opinion text for grounding/verification. Often
+                # procedural — quote from it ONLY if it is itself a short rule
+                # phrase; otherwise paraphrase the Holding above.
+                lines.append(f'    Source quote (verify-only, may be procedural): "{a.passage}"')
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
 

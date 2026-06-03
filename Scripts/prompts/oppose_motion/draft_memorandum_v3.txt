@@ -9,7 +9,7 @@ Side and scope:
 Depth and substance - each substantive legal argument section MUST:
 - Be at least two and ideally three to four paragraphs long. One-paragraph sections are not acceptable for substantive argument.
 - Open with the controlling legal standard (statute or case rule) before applying it.
-- Integrate every case with a clean signal phrase and a PARAPHRASE of its holding. Write "In *Case Name*, the court held that [rule, in your own words]," or state the rule and append "(*Case Name* (year) cite)." Use the "Holding" line from the pool as the rule to paraphrase. Vary the verb (held, explained, recognized, concluded); do not use "demonstrated," "illustrates," or "shows that."
+- Integrate every case with a clean signal phrase and a PARAPHRASE of its holding. Write "In *Case Name*, the court held that [rule, in your own words]," or state the rule and append "(*Case Name* (year) cite)." Use the "Supports" line from the pool as the holding to paraphrase. Vary the verb (held, explained, recognized, concluded); do not use "demonstrated," "illustrates," or "shows that."
 - Quote a case's actual words only when the quoted phrase is the holding or rule itself, and keep any quote to a short clause — never a full sentence of procedural history, a party's request, or a string of rhetorical questions. If the pool's verbatim passage is procedural, a party contention, or a question, PARAPHRASE the legal point instead of quoting it; do not write constructions like "such as where '…'", ": '[party] requested …'", or "(asking if '…')".
 - Apply the legal standard to the specific facts from the moving papers - quote or paraphrase the motion's own admissions, dates, demands, or factual claims and tie them back to the rule.
 - Directly answer the moving party's principal arguments. Quote the moving party's own framing where helpful, then explain why it fails as a matter of law or fact.
@@ -21,7 +21,7 @@ AUTHORITY POOL (verified California cases retrieved for this brief):
 
 Citation rules (STRICT - cite ONLY from the AUTHORITY POOL above):
 - You may cite a CASE only if it appears in the AUTHORITY POOL. Use the case name and citation EXACTLY as written there; do not alter, abbreviate, or add reporter cites. Format case names with single asterisks: *Case Name* (the assembler converts these to italics).
-- State each case's holding as a paraphrase grounded in its "Holding" line in the pool. Do not assert a holding it does not support. If you include a direct quotation, it must appear verbatim in that case's "Source quote" — and quote only a short rule-stating phrase, never the procedural sentence wholesale.
+- State each case's holding as a paraphrase grounded in its "Supports" line and "Holding (verbatim)" passage in the pool. Do not assert a holding those do not support. If you include a direct quotation, it must appear verbatim in that case's pooled passage.
 - NEVER cite a case that is not in the AUTHORITY POOL. Do not cite cases from memory.
 - If no pooled case supports a proposition you need to make, argue it from the controlling statute and the motion's own admissions, and append the exact marker "[no case authority retrieved for this point]" at the end of that sentence. Never invent a case to fill the gap.
 - Cite California statutes in the standard form: "Code Civ. Proc., § 2024.020(a)" or "Evid. Code, § 352". Statutes need not be in the pool; they are verified separately.

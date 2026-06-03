@@ -588,7 +588,7 @@
     "oppose_motion:draft_memorandum": {
       "agent": "oppose_motion",
       "pass_name": "draft_memorandum",
-      "current_version": "v2",
+      "current_version": "v4",
       "versions": [
         {
           "version": "v1",
@@ -603,6 +603,24 @@
           "version": "v2",
           "created": "2026-05-27T22:33:21.830377",
           "description": "Cite-only-from-authority-pool: add {authority_pool} placeholder + strict pool citation rules",
+          "author": "system",
+          "is_current": false,
+          "performance_score": 0.0,
+          "usage_count": 0
+        },
+        {
+          "version": "v3",
+          "created": "2026-06-02T19:02:27.368282",
+          "description": "Clean citation integration: paraphrase holdings, signal phrases, short quotes",
+          "author": "system",
+          "is_current": false,
+          "performance_score": 0.0,
+          "usage_count": 0
+        },
+        {
+          "version": "v4",
+          "created": "2026-06-02T19:07:19.840283",
+          "description": "Relabel pool: Holding=paraphrase, Source quote=verify-only",
           "author": "system",
           "is_current": true,
           "performance_score": 0.0,
@@ -661,7 +679,7 @@
     "oppose_motion:rerank_select": {
       "agent": "oppose_motion",
       "pass_name": "rerank_select",
-      "current_version": "v2",
+      "current_version": "v3",
       "versions": [
         {
           "version": "v1",
@@ -676,6 +694,15 @@
           "version": "v2",
           "created": "2026-06-02T15:34:01.186319",
           "description": "Loosen rerank: pre-screened candidates, support by close analogy, empty only if unrelated",
+          "author": "system",
+          "is_current": false,
+          "performance_score": 0.0,
+          "usage_count": 0
+        },
+        {
+          "version": "v3",
+          "created": "2026-06-02T19:02:27.364141",
+          "description": "Extract holding/rule passages, clean supports",
           "author": "system",
           "is_current": true,
           "performance_score": 0.0,
