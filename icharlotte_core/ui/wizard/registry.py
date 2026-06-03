@@ -225,6 +225,19 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         ],
         default_folders=["MOTIONS", "PLEADINGS", "DISCOVERY"],
     ),
+    "mediation_brief": TaskSpec(
+        task_id="mediation_brief",
+        title="Mediation Brief",
+        description="Generate a defense-side mediation brief from case documents.",
+        icon_glyph="\U0001F91D",  # 🤝
+        script_name="",  # in-process worker
+        category="Motions & Drafting",
+        keywords=[
+            "mediation", "brief", "settlement", "mediator",
+            "defense", "confidential",
+        ],
+        default_folders=[],
+    ),
     "chat": TaskSpec(
         task_id="chat",
         title="Chat",
