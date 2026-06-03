@@ -24,6 +24,7 @@ def test_initial_tasks_registered():
         "respond_to_discovery",
         "oppose_motion",
         "generate_motion",
+        "mediation_brief",
         "chat",
     }
 

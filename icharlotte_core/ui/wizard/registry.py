@@ -17,10 +17,11 @@ from typing import Dict, List, Optional
 
 # Fixed display order for launcher category sections.
 CATEGORY_ORDER: List[str] = [
+    "General",
+    "Summarize",
     "Discovery",
     "Medical",
-    "Motions & Drafting",
-    "General",
+    "Motions",
 ]
 
 
@@ -93,7 +94,7 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Produce a concise summary of one or more case documents.",
         icon_glyph="\U0001F4C4",  # 📄
         script_name="summarize.py",
-        category="General",
+        category="Summarize",
         keywords=["summary", "summarize", "document", "general"],
         default_folders=[],
     ),
@@ -103,7 +104,7 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Summarize discovery responses with structure and citations.",
         icon_glyph="\U0001F4CB",  # 📋
         script_name="summarize_discovery.py",
-        category="Discovery",
+        category="Summarize",
         keywords=[
             "responses", "RFP", "RFA", "interrogatory",
             "form interrogatories", "special interrogatories", "production",
@@ -116,7 +117,7 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Generate a structured summary of one or more depositions.",
         icon_glyph="\U0001F399",  # 🎙
         script_name="summarize_deposition.py",
-        category="Discovery",
+        category="Summarize",
         keywords=["depo", "transcript", "testimony", "witness"],
         default_folders=["DISCOVERY/TRANSCRIPTS", "DISCOVERY"],
         _settings_page_cls_factory=_deposition_settings_page_cls,
@@ -185,7 +186,7 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Cross-reference issued subpoenas with received records and chronologies.",
         icon_glyph="\U0001F4DC",  # 📜
         script_name="",  # in-process QThread worker
-        category="Discovery",
+        category="Medical",
         keywords=["subpoena", "SDT", "records", "deposition subpoena", "tracker"],
         default_folders=[],
     ),
@@ -208,7 +209,7 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Draft and verify an opposition memorandum for a California civil motion.",
         icon_glyph="\U0001F4DD",  # 📝
         script_name="",
-        category="Motions & Drafting",
+        category="Motions",
         keywords=["motion", "opposition", "oppose", "MSJ", "brief", "memorandum", "demurrer"],
         default_folders=["MOTIONS", "PLEADINGS", "DISCOVERY"],
     ),
@@ -218,7 +219,7 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Draft a California civil motion from scratch from your target documents.",
         icon_glyph="⚖️",  # ⚖️
         script_name="",  # in-process worker
-        category="Motions & Drafting",
+        category="Motions",
         keywords=[
             "motion", "draft", "compel", "demurrer", "strike",
             "memorandum", "points and authorities", "notice of motion",
@@ -231,7 +232,7 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         description="Generate a defense-side mediation brief from case documents.",
         icon_glyph="\U0001F91D",  # 🤝
         script_name="",  # in-process worker
-        category="Motions & Drafting",
+        category="Motions",
         keywords=[
             "mediation", "brief", "settlement", "mediator",
             "defense", "confidential",

@@ -57,5 +57,5 @@ def test_escape_clears_search(qtbot):
 def test_category_header_shows_count(qtbot):
     w = WizardTab()
     qtbot.addWidget(w)
-    # Discovery has 5 tasks; its header text should include the count.
-    assert "5" in w.category_header_text("Discovery")
+    # Medical has 4 tasks; its header text should include the count.
+    assert "4" in w.category_header_text("Medical")

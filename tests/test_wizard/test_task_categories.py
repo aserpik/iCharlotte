@@ -13,10 +13,11 @@ from icharlotte_core.ui.wizard.registry import (
 
 def test_category_order_constant():
     assert CATEGORY_ORDER == [
+        "General",
+        "Summarize",
         "Discovery",
         "Medical",
-        "Motions & Drafting",
-        "General",
+        "Motions",
     ]
 
 
@@ -28,14 +29,25 @@ def test_every_task_has_a_valid_category():
 
 
 def test_expected_category_assignments():
-    assert TASK_REGISTRY["summarize_discovery"].category == "Discovery"
-    assert TASK_REGISTRY["respond_to_discovery"].category == "Discovery"
-    assert TASK_REGISTRY["subpoena_tracker"].category == "Discovery"
-    assert TASK_REGISTRY["medical_records"].category == "Medical"
-    assert TASK_REGISTRY["med_record_extractor"].category == "Medical"
-    assert TASK_REGISTRY["oppose_motion"].category == "Motions & Drafting"
-    assert TASK_REGISTRY["summarize_documents"].category == "General"
+    # General
     assert TASK_REGISTRY["chat"].category == "General"
+    assert TASK_REGISTRY["separate"].category == "General"
+    # Summarize
+    assert TASK_REGISTRY["summarize_documents"].category == "Summarize"
+    assert TASK_REGISTRY["summarize_discovery"].category == "Summarize"
+    assert TASK_REGISTRY["summarize_depositions"].category == "Summarize"
+    # Discovery
+    assert TASK_REGISTRY["respond_to_discovery"].category == "Discovery"
+    assert TASK_REGISTRY["depo_prep"].category == "Discovery"
+    # Medical
+    assert TASK_REGISTRY["medical_records"].category == "Medical"
+    assert TASK_REGISTRY["med_chron_analysis"].category == "Medical"
+    assert TASK_REGISTRY["med_record_extractor"].category == "Medical"
+    assert TASK_REGISTRY["subpoena_tracker"].category == "Medical"
+    # Motions
+    assert TASK_REGISTRY["oppose_motion"].category == "Motions"
+    assert TASK_REGISTRY["generate_motion"].category == "Motions"
+    assert TASK_REGISTRY["mediation_brief"].category == "Motions"
 
 
 def test_empty_query_returns_all_tasks_grouped_in_category_order():
@@ -44,8 +56,12 @@ def test_empty_query_returns_all_tasks_grouped_in_category_order():
     assert list(grouped.keys()) == CATEGORY_ORDER
     total = sum(len(v) for v in grouped.values())
     assert total == len(list_tasks())
-    # Discovery has 5 tasks per the spec.
-    assert len(grouped["Discovery"]) == 5
+    # Per-category counts per the spec.
+    assert len(grouped["General"]) == 2
+    assert len(grouped["Summarize"]) == 3
+    assert len(grouped["Discovery"]) == 2
+    assert len(grouped["Medical"]) == 4
+    assert len(grouped["Motions"]) == 3
 
 
 def test_whitespace_query_is_treated_as_empty():
@@ -76,9 +92,10 @@ def test_no_match_returns_empty_mapping():
 
 
 def test_filtered_result_preserves_category_order():
-    # A query that hits Medical + Discovery should still order Discovery first.
-    grouped = filter_tasks(list_tasks(), "records")
+    # A query that hits Summarize + Discovery should still order Summarize first.
+    grouped = filter_tasks(list_tasks(), "depo")
     keys = list(grouped.keys())
+    assert "Summarize" in keys and "Discovery" in keys
     # keys must be a subsequence of CATEGORY_ORDER
     assert keys == [c for c in CATEGORY_ORDER if c in keys]
 

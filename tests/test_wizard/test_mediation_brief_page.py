@@ -11,7 +11,7 @@ def test_mediation_brief_registered():
 
     spec = TASK_REGISTRY["mediation_brief"]
     assert spec.title == "Mediation Brief"
-    assert spec.category == "Motions & Drafting"
+    assert spec.category == "Motions"
     assert spec.script_name == ""
     assert "mediation" in spec.keywords
 

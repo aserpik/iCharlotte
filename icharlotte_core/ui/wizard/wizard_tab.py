@@ -18,7 +18,7 @@ from .registry import CATEGORY_ORDER, filter_tasks, list_tasks
 from .task_card import TaskCard
 
 
-_CARDS_PER_ROW = 3
+_CARDS_PER_ROW = 6
 _SPLITTER_SETTINGS_KEY = "wizard_tab/recent_splitter_sizes"
 
 

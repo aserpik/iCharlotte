@@ -8,7 +8,7 @@ def test_generate_motion_is_registered():
 
 def test_generate_motion_in_motions_category():
     spec = get_task("generate_motion")
-    assert spec.category == "Motions & Drafting"
+    assert spec.category == "Motions"
 
 
 def test_generate_motion_is_in_process_task():
