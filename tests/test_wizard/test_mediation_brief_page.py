@@ -291,3 +291,54 @@ def test_settings_page_emits_run_requested(qtbot, tmp_path):
     assert payload["caption_path"] == str(caption)
     assert payload["suggested_filename"].endswith(".docx")
     assert payload["save_default_dir"].endswith(os.path.join("AI OUTPUT", "MEDIATION"))
+
+
+# ---- Output page ----
+
+def _make_real_docx(path):
+    from docx import Document
+
+    doc = Document()
+    doc.add_paragraph("Brief preview body")
+    doc.save(str(path))
+
+
+def test_output_page_show_result_enables_actions(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.mediation_brief_page import (
+        MediationBriefOutputPage,
+    )
+
+    out = tmp_path / "Brief.docx"
+    _make_real_docx(out)
+    page = MediationBriefOutputPage()
+    qtbot.addWidget(page)
+    page.show_result(str(out))
+
+    assert page.output_path == str(out)
+    assert page.open_btn.isEnabled() is True
+    assert page.save_as_btn.isEnabled() is True
+    assert "Saved to" in page.saved_banner.text()
+
+
+def test_output_page_save_a_copy(qtbot, tmp_path, monkeypatch):
+    from icharlotte_core.ui.wizard.pages import mediation_brief_page as mod
+
+    out = tmp_path / "Brief.docx"
+    _make_real_docx(out)
+    target = tmp_path / "copy" / "MyBrief.docx"
+    target.parent.mkdir()
+
+    page = mod.MediationBriefOutputPage()
+    qtbot.addWidget(page)
+    page.show_result(str(out))
+
+    monkeypatch.setattr(
+        mod.QFileDialog, "getSaveFileName",
+        staticmethod(lambda *a, **k: (str(target), "")),
+    )
+    monkeypatch.setattr(mod.QMessageBox, "information", lambda *a, **k: None)
+    page._on_save_as()
+
+    assert target.is_file()
+    # Original stays in place.
+    assert out.is_file()

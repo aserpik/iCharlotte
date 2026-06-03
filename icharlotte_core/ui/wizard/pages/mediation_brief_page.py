@@ -407,3 +407,103 @@ class MediationBriefSettingsPage(QWidget):
             "save_default_dir": os.path.join(self.case_path, *MEDIATION_SUBDIR),
             "suggested_filename": DEFAULT_BRIEF_FILENAME,
         })
+
+
+# ------------------------------ output page -------------------------------
+
+class MediationBriefOutputPage(QWidget):
+    """Read-only preview + Open in Word + Save a Copy As…."""
+
+    rerun_requested = Signal()
+    edit_settings_requested = Signal()
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self._output_path = ""
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(
+            theme.SPACE_XL, theme.SPACE_XL, theme.SPACE_XL, theme.SPACE_XL
+        )
+        layout.setSpacing(theme.SPACE_MD)
+
+        self.saved_banner = QLabel("")
+        self.saved_banner.setWordWrap(True)
+        self.saved_banner.setStyleSheet(
+            f"background-color: {theme.SUCCESS_BG}; color: {theme.SUCCESS};"
+            f" border-radius: {theme.RADIUS_SM}px; padding: 8px 12px;"
+            f" font-weight: 600;"
+        )
+        self.saved_banner.setVisible(False)
+        layout.addWidget(self.saved_banner)
+
+        self.preview = QTextBrowser()
+        layout.addWidget(self.preview, 1)
+
+        btn_row = QHBoxLayout()
+        self.open_btn = theme.secondary_button("Open in Word")
+        self.open_btn.clicked.connect(self._on_open)
+        self.open_btn.setEnabled(False)
+        btn_row.addWidget(self.open_btn)
+        self.save_as_btn = theme.secondary_button("Save a Copy As…")
+        self.save_as_btn.clicked.connect(self._on_save_as)
+        self.save_as_btn.setEnabled(False)
+        btn_row.addWidget(self.save_as_btn)
+        btn_row.addStretch()
+        self.rerun_btn = theme.secondary_button("Re-run")
+        self.rerun_btn.clicked.connect(self.rerun_requested.emit)
+        btn_row.addWidget(self.rerun_btn)
+        self.edit_btn = theme.secondary_button("Edit Settings & Re-run")
+        self.edit_btn.clicked.connect(self.edit_settings_requested.emit)
+        btn_row.addWidget(self.edit_btn)
+        layout.addLayout(btn_row)
+
+    @property
+    def output_path(self) -> str:
+        return self._output_path
+
+    def show_result(self, path: str) -> None:
+        self._output_path = path or ""
+        ok = bool(self._output_path) and os.path.isfile(self._output_path)
+        self.open_btn.setEnabled(ok)
+        self.save_as_btn.setEnabled(ok)
+        if ok:
+            self.saved_banner.setText(f"Saved to: {self._output_path}")
+            self.saved_banner.setVisible(True)
+            try:
+                self.preview.setHtml(load_docx_as_html(self._output_path))
+            except Exception as exc:  # noqa: BLE001
+                self.preview.setPlainText(f"(Could not render preview: {exc})")
+        else:
+            self.saved_banner.setVisible(False)
+            self.preview.setPlainText("(No output produced.)")
+
+    def load_output(self, path: str) -> None:
+        self.show_result(path)
+
+    def _on_open(self) -> None:
+        if self._output_path and os.path.isfile(self._output_path):
+            try:
+                os.startfile(self._output_path)  # Windows
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.critical(self, "Open failed", f"Could not open in Word:\n{exc}")
+
+    def _on_save_as(self) -> None:
+        if not self._output_path or not os.path.isfile(self._output_path):
+            return
+        default = os.path.join(
+            os.path.dirname(self._output_path), os.path.basename(self._output_path)
+        )
+        target, _ = QFileDialog.getSaveFileName(
+            self, "Save a copy of the mediation brief", default,
+            "Word Documents (*.docx);;All files (*.*)",
+        )
+        if not target:
+            return
+        if not target.lower().endswith(".docx"):
+            target += ".docx"
+        try:
+            shutil.copyfile(self._output_path, target)
+            QMessageBox.information(self, "Saved", f"Saved a copy to:\n{target}")
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Save failed", f"Could not save a copy:\n{exc}")
