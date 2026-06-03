@@ -7,6 +7,7 @@ _IN_PROCESS_TASK_BUILDERS = {
     "oppose_motion": "build_oppose_motion_tab",
     "separate": "build_separate_tab",
     "generate_motion": "build_generate_motion_tab",
+    "mediation_brief": "build_mediation_brief_tab",
 }
 
 
