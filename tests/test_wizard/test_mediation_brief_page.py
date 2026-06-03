@@ -78,3 +78,37 @@ def test_read_documents_reports_missing_file(tmp_path):
 
     assert content == ""
     assert any("not found" in w.lower() for w in warnings)
+
+
+# ---- Save helper ----
+
+def test_save_brief_writes_to_target(tmp_path):
+    from icharlotte_core.ui.wizard.pages.mediation_brief_page import _save_brief
+
+    class FakeGen:
+        def assemble_document(self, caption, out):
+            with open(out, "w", encoding="utf-8") as fh:
+                fh.write("brief")
+
+    dest = str(tmp_path / "MEDIATION")
+    path = _save_brief(FakeGen(), "caption.docx", dest, "Brief.docx")
+
+    assert os.path.basename(path) == "Brief.docx"
+    assert os.path.isfile(path)
+
+
+def test_save_brief_falls_back_when_destination_locked(tmp_path):
+    from icharlotte_core.ui.wizard.pages.mediation_brief_page import _save_brief
+
+    class LockGen:
+        def assemble_document(self, caption, out):
+            if os.path.basename(out) == "Brief.docx":
+                raise PermissionError("file is open in Word")
+            with open(out, "w", encoding="utf-8") as fh:
+                fh.write("brief")
+
+    dest = str(tmp_path / "MEDIATION")
+    path = _save_brief(LockGen(), "caption.docx", dest, "Brief.docx")
+
+    assert os.path.basename(path) == "Brief (2).docx"
+    assert os.path.isfile(path)
