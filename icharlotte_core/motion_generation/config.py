@@ -8,7 +8,8 @@ placeholders, and prompt guidance for the target-document analyzer.
 Three California civil motion types ship fully configured (compel, demurrer,
 strike). Any other ``type_id`` falls back to the generic config.
 """
-from dataclasses import dataclass, field
+import os
+from dataclasses import asdict, dataclass, field
 from typing import Dict, List, Optional
 
 
@@ -22,6 +23,23 @@ class MotionTypeConfig:
     placeholder_attachments: List[str] = field(default_factory=list)
     analyzer_prompt: str = ""
     grounds_prompt: str = ""
+
+    def to_dict(self) -> Dict:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Optional[Dict]) -> "MotionTypeConfig":
+        data = data or {}
+        return cls(
+            type_id=data.get("type_id", ""),
+            display_name=data.get("display_name", ""),
+            target_doc_guidance=data.get("target_doc_guidance", ""),
+            legal_standard_hint=data.get("legal_standard_hint", ""),
+            section_plan=list(data.get("section_plan", []) or []),
+            placeholder_attachments=list(data.get("placeholder_attachments", []) or []),
+            analyzer_prompt=data.get("analyzer_prompt", ""),
+            grounds_prompt=data.get("grounds_prompt", ""),
+        )
 
 
 # Standard memorandum spine shared by every motion type.
@@ -146,8 +164,45 @@ MOTION_TYPE_CONFIGS: Dict[str, MotionTypeConfig] = {
 }
 
 
+# The hardcoded built-ins are the seed for the editable registry; the registry
+# (Scripts/prompts/generate_motion/motion_types.json) is the source of truth at
+# runtime once it exists. `BUILTIN_SEED` always lives in code as the fallback
+# and the target of "Restore Defaults".
+BUILTIN_SEED: Dict[str, MotionTypeConfig] = dict(MOTION_TYPE_CONFIGS)
+
+
+def motion_types_path() -> str:
+    """Canonical path of the editable motion-types registry JSON.
+
+    Resolved relative to the project root (this file lives at
+    <root>/icharlotte_core/motion_generation/config.py). Patchable in tests.
+    """
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    return os.path.join(root, "Scripts", "prompts", "generate_motion", "motion_types.json")
+
+
+_registry_singleton = None
+
+
+def _registry():
+    global _registry_singleton
+    if _registry_singleton is None:
+        from .types_registry import MotionTypeRegistry
+
+        _registry_singleton = MotionTypeRegistry.load(motion_types_path())
+    return _registry_singleton
+
+
+def reload_motion_types() -> None:
+    """Drop the cached registry so the next access reloads from disk/seed.
+
+    Called after the Workbench saves edits so running code sees the new types.
+    """
+    global _registry_singleton
+    _registry_singleton = None
+
+
 def get_motion_config(type_id: Optional[str]) -> MotionTypeConfig:
-    """Return the config for ``type_id``; unknown/empty ids fall back to generic."""
-    if not type_id:
-        return MOTION_TYPE_CONFIGS["generic"]
-    return MOTION_TYPE_CONFIGS.get(type_id, MOTION_TYPE_CONFIGS["generic"])
+    """Return the config for ``type_id`` from the editable registry; unknown or
+    empty ids fall back to the generic type."""
+    return _registry().get(type_id)
