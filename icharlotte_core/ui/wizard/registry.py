@@ -66,6 +66,12 @@ class TaskSpec:
     default_folders: List[str] = field(default_factory=list)
     phase1_args: List[str] = field(default_factory=list)
     phase2_flag: str = "--phase=summary"
+    # Optional launcher-card corner button (e.g. Separate → open the Index).
+    # When card_action_id is set, TaskCard renders a small QToolButton that
+    # emits action_requested(card_action_id). None = no button (default).
+    card_action_id: Optional[str] = None
+    card_action_glyph: Optional[str] = None
+    card_action_tooltip: Optional[str] = None
     # None means "use default SettingsPage"; resolved lazily in TaskTab.
     # Set to a factory callable that returns the class to avoid circular imports.
     _settings_page_cls_factory: Optional[object] = field(default=None, repr=False, compare=False)
@@ -178,6 +184,9 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         script_name="separate.py",
         default_folders=[],
         category="General",
+        card_action_id="open_separate_index",
+        card_action_glyph="\U0001F5C2",  # 🗂 card index dividers
+        card_action_tooltip="Open the document Index for this case",
     ),
     "subpoena_tracker": TaskSpec(
         task_id="subpoena_tracker",
