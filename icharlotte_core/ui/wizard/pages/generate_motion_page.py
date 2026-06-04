@@ -72,6 +72,7 @@ from icharlotte_core.motion_generation.config import (
 )
 from icharlotte_core.motion_generation.drafter import draft_motion
 from icharlotte_core.firm_briefs.motion_taxonomy import normalize_motion_type
+from icharlotte_core.firm_briefs.provenance import attach_firm_provenance
 
 
 SETTINGS_PAGE_INTAKE = 0
@@ -608,6 +609,10 @@ class GenerateMotionWorker(QThread):
                     key=lambda cv: cv.body_offset if cv.body_offset is not None else 0,
                 )
                 enrich_with_pool_signals(draft.citations, retrieved)
+                try:
+                    attach_firm_provenance(draft.citations, retrieved)
+                except Exception:
+                    pass
             else:
                 self.progress.emit("WARNING: No citations detected in the draft.")
                 draft.citations = []

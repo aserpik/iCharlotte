@@ -45,6 +45,7 @@ from icharlotte_core.opposition.verifier import (
     pool_membership_check,
 )
 from icharlotte_core.firm_briefs.motion_taxonomy import normalize_motion_type
+from icharlotte_core.firm_briefs.provenance import attach_firm_provenance
 from icharlotte_core.ui.wizard.pages._motion_research_support import (
     _corpus_available,
     _corpus_embedder,
@@ -681,6 +682,10 @@ class OpposeMotionWorker(QThread):
                     key=lambda cv: cv.body_offset if cv.body_offset is not None else 0,
                 )
                 enrich_with_pool_signals(draft.citations, retrieved)
+                try:
+                    attach_firm_provenance(draft.citations, retrieved)
+                except Exception:
+                    pass
                 verdict_counts: dict[str, int] = {}
                 for cv in draft.citations:
                     verdict_counts[cv.verdict] = verdict_counts.get(cv.verdict, 0) + 1
