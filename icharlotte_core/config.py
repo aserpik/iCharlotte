@@ -56,6 +56,22 @@ CASELAW_DATA_DIR = os.environ.get(
     "CASELAW_DATA_DIR", os.path.join(os.getcwd(), ".gemini", "caselaw")
 )
 
+# Firm brief sample library (sorted PDF folders) — authority reuse + style.
+# Relocatable via FIRM_BRIEFS_DATA_DIR. Roots are firm-wide brief libraries.
+FIRM_BRIEFS_DATA_DIR = os.environ.get(
+    "FIRM_BRIEFS_DATA_DIR", os.path.join(os.getcwd(), ".gemini", "firm_briefs")
+)
+
+
+def _default_firm_briefs_roots() -> list:
+    candidates = [
+        os.path.join(os.getcwd(), "5800_AMTRUST_Pleadings_PDFs"),
+    ]
+    return [p for p in candidates if os.path.isdir(p)]
+
+
+FIRM_BRIEFS_ROOTS = _default_firm_briefs_roots()
+
 # Templates & Resources
 TEMPLATES_DIR = os.path.join(os.getcwd(), "Templates")
 RESOURCES_DIR = r"C:\geminiterminal2\LLM Resources"
