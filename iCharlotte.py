@@ -1225,7 +1225,7 @@ class MainWindow(QMainWindow):
         title = f"{spec.title} {suffix}".strip()
 
         builder_name = get_in_process_task_builder_name(task_id)
-        if builder_name and builder_name not in ("build_oppose_motion_tab", "build_mediation_brief_tab"):
+        if builder_name and builder_name not in ("build_oppose_motion_tab", "build_mediation_brief_tab", "build_generate_motion_tab"):
             # In-process custom tabs (e.g. Separate) own their source selection;
             # reopening re-runs the builder's picker. Analysis output is
             # ephemeral, so there's nothing to restore beyond the tab itself.
@@ -1353,7 +1353,7 @@ class MainWindow(QMainWindow):
             ]
             settings_dict = entry.get("settings") or {}
             builder_name = get_in_process_task_builder_name(task_id)
-            if builder_name and builder_name not in ("build_oppose_motion_tab", "build_mediation_brief_tab"):
+            if builder_name and builder_name not in ("build_oppose_motion_tab", "build_mediation_brief_tab", "build_generate_motion_tab"):
                 # In-process custom tabs (e.g. Separate) re-pick their source on
                 # restore; skip silently if the user cancels the picker.
                 # (Mediation Brief is excluded above so its saved brief is reloaded.)
