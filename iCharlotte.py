@@ -660,6 +660,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.wizard_tab, "Wizard")
         self.wizard_tab.task_requested.connect(self._open_task_tab)
         self.wizard_tab.reopen_requested.connect(self._on_reopen_recent_task)
+        self.wizard_tab.card_action_requested.connect(self._on_card_action)
 
         # --- Tab 2: Case View ---
         case_view_widget = QWidget()
@@ -1076,6 +1077,7 @@ class MainWindow(QMainWindow):
             # Master List + task tabs (managed separately) stay visible.
         if not self.tabs.isTabVisible(self.tabs.currentIndex()):
             self.tabs.setCurrentIndex(0)
+        self._hide_fixed_close_buttons()
 
     def _default_to_wizard_mode(self) -> None:
         """A freshly loaded case always opens in Wizard mode on the Wizard tab.
@@ -1733,10 +1735,45 @@ class MainWindow(QMainWindow):
         log_event(f"[wizard] opened task tab '{title}' with {len(files)} file(s)")
         self._hide_fixed_close_buttons()
 
+    def _on_card_action(self, action_id: str) -> None:
+        """Dispatch a launcher-card corner-button action."""
+        if action_id == "open_separate_index":
+            self._reveal_index_tab()
+
+    def _reveal_index_tab(self) -> None:
+        """Wizard Mode: reveal the hidden Index singleton, reloaded from disk so
+        it reflects the latest Separate runs (wizard or advanced)."""
+        if not self.case_path:
+            QMessageBox.information(
+                self, "No case loaded",
+                "Open a case from the Master List first.",
+            )
+            return
+        idx = self._index_of_tab("Index")
+        if idx < 0:
+            return
+        if self.file_number and hasattr(self, "index_tab"):
+            self.index_tab.load_data(self.file_number)
+        self.tabs.setTabVisible(idx, True)
+        self.tabs.setCurrentIndex(idx)
+        self._hide_fixed_close_buttons()
+
     def _on_tab_close_requested(self, index: int) -> None:
         """Only TaskTabs are closeable (they carry a 'wizard_task_id' property)."""
         widget = self.tabs.widget(index)
         if widget is None:
+            return
+        # Wizard Mode: the Index tab is the shared singleton — its "x" hides it,
+        # never destroys it.
+        if (
+            widget is getattr(self, "index_tab", None)
+            and getattr(self, "mode_controller", None) is not None
+            and self.mode_controller.is_wizard
+        ):
+            self.tabs.setTabVisible(index, False)
+            wiz = self._index_of_tab("Wizard")
+            if wiz >= 0:
+                self.tabs.setCurrentIndex(wiz)
             return
         if widget.property("wizard_task_id") is None:
             return  # not a task tab; ignore
@@ -1760,16 +1797,30 @@ class MainWindow(QMainWindow):
         widget.deleteLater()
 
     def _hide_fixed_close_buttons(self) -> None:
-        """Hide close buttons on tabs that are not TaskTabs."""
+        """Hide close buttons on non-TaskTabs.
+
+        Exception: in Wizard Mode the revealed Index singleton gets a visible
+        "x" that re-hides (not destroys) it — see _on_tab_close_requested.
+        """
         from PySide6.QtWidgets import QTabBar
         bar = self.tabs.tabBar()
+        index_tab = getattr(self, "index_tab", None)
+        mc = getattr(self, "mode_controller", None)
+        is_wizard = bool(mc is not None and mc.is_wizard)
         for i in range(self.tabs.count()):
             widget = self.tabs.widget(i)
             is_task_tab = widget is not None and widget.property("wizard_task_id") is not None
+            is_rehideable_index = (
+                index_tab is not None
+                and widget is index_tab
+                and is_wizard
+                and self.tabs.isTabVisible(i)
+            )
+            show_close = is_task_tab or is_rehideable_index
             for side in (QTabBar.ButtonPosition.RightSide, QTabBar.ButtonPosition.LeftSide):
                 btn = bar.tabButton(i, side)
                 if btn is not None:
-                    btn.setVisible(is_task_tab)
+                    btn.setVisible(show_close)
 
     def on_tree_item_clicked(self, item, column):
         if column == 1:  # Queued Tasks column (index 1)
