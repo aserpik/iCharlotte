@@ -13,7 +13,7 @@ import os
 import re
 import shutil
 
-from PySide6.QtCore import QUrl, Qt
+from PySide6.QtCore import QUrl, Qt, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QDialog,
@@ -323,12 +323,40 @@ def _run_find_replacement(parent_widget, citation):
     QMessageBox.information(parent_widget, "Replacement candidates", "\n\n".join(lines))
 
 
+def apply_alternative_to_body(body_text: str, old_cite: str, alternative: dict) -> str:
+    """Replace the firm authority's reporter cite (and the case name preceding it)
+    in the draft body with the chosen corpus alternative. Best-effort string swap:
+    replaces the reporter cite, and if the case name + cite appear together as
+    'Name ... old_cite', swaps the whole 'Name (year) cite' phrase."""
+    import re
+    if not old_cite or old_cite not in (body_text or ""):
+        return body_text
+    name = (alternative.get("case_name") or "").strip()
+    cite = (alternative.get("citation") or "").strip()
+    year = (alternative.get("year") or "").strip()
+    new_phrase = name
+    if year:
+        new_phrase = f"{name} ({year})" if name else f"({year})"
+    new_phrase = f"{new_phrase} {cite}".strip() if new_phrase else cite
+    # Swap "<Name up to ~10 words> <old_cite>" if a name precedes the cite; else just the cite.
+    pat = re.compile(r"([A-Z][\w.,'&\- ]{0,80}?)\s*\(?\d{0,4}\)?\s*" + re.escape(old_cite))
+    if pat.search(body_text):
+        return pat.sub(new_phrase, body_text, count=1)
+    return body_text.replace(old_cite, cite, 1)
+
+
 class CitationDetailPanel(QWidget):
     """Right-side panel showing verdict-aware citation detail.
 
     Replaces the popup dialog: anchor clicks in the draft body update this
     panel in-place. Exposes ``set_citation()`` and ``clear()``.
+
+    ``swap_requested(citation, alt_index)`` is emitted when the user clicks
+    a "Use this instead" link for one of the corpus alternatives.
     """
+
+    #: Emitted as (citation_object, alt_index: int) when an altswap link is clicked.
+    swap_requested = Signal(object, int)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -345,6 +373,8 @@ class CitationDetailPanel(QWidget):
 
         self.body_browser = QTextBrowser()
         self.body_browser.setOpenExternalLinks(False)
+        self.body_browser.setOpenLinks(False)
+        self.body_browser.anchorClicked.connect(self._on_body_anchor_clicked)
         self.body_browser.setStyleSheet("QTextBrowser { background: transparent; }")
         layout.addWidget(self.body_browser, 1)
 
@@ -408,6 +438,18 @@ class CitationDetailPanel(QWidget):
     def _on_find_replacement(self) -> None:
         if self.citation is not None:
             _run_find_replacement(self, self.citation)
+
+    def _on_body_anchor_clicked(self, url: QUrl) -> None:
+        scheme = url.scheme()
+        if scheme == "altswap":
+            try:
+                alt_index = int(url.path().lstrip("/") or url.host() or "0")
+            except (TypeError, ValueError):
+                return
+            if self.citation is not None:
+                self.swap_requested.emit(self.citation, alt_index)
+            return
+        QDesktopServices.openUrl(url)
 
 
 class CitationDetailDialog(QDialog):
@@ -504,6 +546,7 @@ class CitationReviewOutputPage(QWidget):
         layout.addWidget(self.editor, 2)
 
         self.detail_panel = CitationDetailPanel()
+        self.detail_panel.swap_requested.connect(self._on_swap_requested)
         layout.addWidget(self.detail_panel, 1)
         outer.addLayout(layout, 1)
 
@@ -585,6 +628,26 @@ class CitationReviewOutputPage(QWidget):
             self.show_citation(index)
             return
         QDesktopServices.openUrl(url)
+
+    def _on_swap_requested(self, citation, alt_index: int) -> None:
+        """Handle a 'Use this instead' click from CitationDetailPanel.
+
+        Replaces the old cite in the draft body with the chosen corpus
+        alternative, re-renders the editor, and refreshes the panel to show
+        the updated citation state.
+        """
+        alts = getattr(citation, "alternatives", []) or []
+        if alt_index < 0 or alt_index >= len(alts):
+            return
+        alt = alts[alt_index]
+        old_cite = (
+            getattr(citation, "normalized_citation", "") or citation.citation_text or ""
+        ).strip()
+        if not old_cite:
+            return
+        new_body = apply_alternative_to_body(self.draft.body_text, old_cite, alt)
+        self.draft.body_text = new_body
+        self.editor.setHtml(_render_draft_html(self.draft))
 
     @property
     def output_path(self) -> str:
