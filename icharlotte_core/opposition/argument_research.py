@@ -296,6 +296,9 @@ def research_argument(
     max_candidates: int = 20,
     fetch_top: int = 8,
     cache_dir: str | None = None,
+    firm_provider=None,
+    motion_type: str = "",
+    side: str = "",
 ) -> list[RetrievedAuthority]:
     """Research one argument end-to-end; returns selected RetrievedAuthority."""
     queries = generate_search_queries(argument, llm_callback=query_llm)
@@ -309,6 +312,19 @@ def research_argument(
         queries = [nl] + [q for q in queries if q.strip() != nl]
     if not queries:
         queries = [argument]
+
+    # Fetch firm candidates once (before _run so _run can prepend them).
+    firm_cands: list[dict] = []
+    if firm_provider is not None and (motion_type or side):
+        try:
+            firm_cands = firm_provider.candidates_for(
+                argument, motion_type=motion_type, side=side) or []
+        except Exception:
+            logger.warning("firm provider failed", exc_info=True)
+            firm_cands = []
+    firm_with_text = [c for c in firm_cands if c.get("text")]
+    firm_unverified = [c for c in firm_cands if not c.get("text")]
+    firm_by_id = {str(c.get("cluster_id")): c for c in firm_with_text}
 
     def _run(query_list: list[str]) -> list[RetrievedAuthority]:
         # Round-robin merge per-query hits so every query contributes its
@@ -340,6 +356,16 @@ def research_argument(
                 "text": text,
                 "opinion_url": getattr(r, "url", ""),
             })
+        # Prepend firm candidates (with opinion text) so the reranker sees them
+        # first and they are preferred over corpus-only results.
+        cand_dicts = [
+            {
+                "cluster_id": c.get("cluster_id"), "case_name": c.get("case_name", ""),
+                "citation": c.get("citation", ""), "year": c.get("year", ""),
+                "text": c.get("text", ""), "opinion_url": c.get("opinion_url", ""),
+            }
+            for c in firm_with_text
+        ] + cand_dicts
         return select_authorities(
             argument, cand_dicts, argument_text=argument,
             argument_id=argument_id, llm_callback=rerank_llm,
@@ -350,6 +376,35 @@ def research_argument(
         broadened = _broaden(queries[0])
         if broadened and broadened != queries[0]:
             selected = _run([broadened])
+
+    # Tag provenance and attach alternatives — BEFORE the signals stamping loop.
+    # firm_by_id maps cluster_id -> firm candidate dict for verified firm cites.
+    if firm_by_id or firm_unverified:
+        firm_selected: list[RetrievedAuthority] = []
+        corpus_selected: list[RetrievedAuthority] = []
+        for ra in selected:
+            fc = firm_by_id.get(ra.cluster_id)
+            if fc:
+                ra.source = "firm"
+                ra.verification = fc.get("verification", "local")
+                ra.source_brief = fc.get("source_brief", "")
+                firm_selected.append(ra)
+            else:
+                corpus_selected.append(ra)
+        # prefer-firm + flag-both: firm leads; corpus picks become alternatives.
+        for ra in firm_selected:
+            ra.alternatives = list(corpus_selected)
+        # Append unverified firm cites (no opinion text → bypass the verbatim gate).
+        for c in firm_unverified:
+            firm_selected.append(RetrievedAuthority(
+                argument_id=argument_id, argument_text=argument,
+                cluster_id=str(c.get("cluster_id", "")), case_name=c.get("case_name", ""),
+                citation=c.get("citation", ""), year=str(c.get("year", "")),
+                supports=c.get("proposition", ""), passage=c.get("passage", ""),
+                opinion_url="", source="firm", verification="unverified_firm",
+                source_brief=c.get("source_brief", ""),
+            ))
+        selected = firm_selected + corpus_selected
 
     # Stamp the soft good-law hint (citation count + latest citing year) on the
     # final selected authorities only — a bounded number of extra calls. Guarded
@@ -377,6 +432,9 @@ def research_arguments(
     max_workers: int = 4,
     on_progress: ProgressCallback | None = None,
     cache_dir: str | None = None,
+    firm_provider=None,
+    motion_type: str = "",
+    side: str = "",
 ) -> list[RetrievedAuthority]:
     """Research every argument in parallel; flatten the RetrievedAuthority list."""
     args = [a.strip() for a in (arguments or []) if a and a.strip()]
@@ -388,6 +446,7 @@ def research_arguments(
         result = research_argument(
             arg, cl_client=cl_client, query_llm=query_llm, rerank_llm=rerank_llm,
             argument_id=f"arg-{idx}", cache_dir=cache_dir,
+            firm_provider=firm_provider, motion_type=motion_type, side=side,
         )
         if on_progress:
             if result:
