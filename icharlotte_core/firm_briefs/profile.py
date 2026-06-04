@@ -46,3 +46,15 @@ def compose_profile(relief: str, headings: List[str], propositions: List[str]) -
 
 def profile_from_text(text: str, *, propositions: List[str] | None = None) -> str:
     return compose_profile("", extract_headings(text), propositions or [])
+
+
+def profile_from_metadata(meta) -> str:
+    """Compose the same shape of issue-profile string used at ingest, but from a
+    live motion's analyzer metadata (duck-typed: relief_requested + principal_arguments)."""
+    if meta is None:
+        return ""
+    relief = getattr(meta, "relief_requested", "") or ""
+    args = getattr(meta, "principal_arguments", None) or []
+    parts = [relief] + [str(a) for a in args]
+    text = " \n".join(p for p in parts if p and str(p).strip())
+    return re.sub(r"\s+", " ", text).strip()
