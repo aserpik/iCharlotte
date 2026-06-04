@@ -49,11 +49,11 @@ from icharlotte_core.opposition.verifier import (
     pool_membership_check,
 )
 from icharlotte_core.ui.wizard.pages.citation_review import CitationReviewOutputPage
-from icharlotte_core.ui.wizard.pages.oppose_motion_page import (
-    _firm_style_exemplars,
-    _make_firm_provider,
-    _make_local_corpus,
-    _research_targets,
+from icharlotte_core.ui.wizard.pages._motion_research_support import (
+    firm_style_exemplars as _firm_style_exemplars,
+    make_firm_provider as _make_firm_provider,
+    make_local_corpus as _make_local_corpus,
+    research_targets as _research_targets,
 )
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
 from icharlotte_core.ui.wizard.task_scaffold import WizardTaskContainer
