@@ -50,6 +50,7 @@ from icharlotte_core.opposition.verifier import (
 )
 from icharlotte_core.ui.wizard.pages.citation_review import CitationReviewOutputPage
 from icharlotte_core.ui.wizard.pages.oppose_motion_page import (
+    _make_firm_provider,
     _make_local_corpus,
     _research_targets,
 )
@@ -517,10 +518,14 @@ class GenerateMotionWorker(QThread):
                         "Local corpus not built; using CourtListener API "
                         f"({len(research_targets)} points)..."
                     )
+                    firm_provider = None
                 else:
                     self.progress.emit(
                         f"Researching authorities locally ({len(research_targets)} points)..."
                     )
+                    firm_provider = _make_firm_provider(corpus)
+                    if firm_provider is not None:
+                        self.progress.emit("  Firm brief library active (preferring your prior authorities).")
                 retrieved = research_arguments(
                     research_targets,
                     cl_client=client,
@@ -532,6 +537,9 @@ class GenerateMotionWorker(QThread):
                     max_workers=2,
                     on_progress=self.progress.emit,
                     cache_dir=opinion_cache,
+                    firm_provider=firm_provider,
+                    motion_type=metadata.motion_type,
+                    side="moving",
                 )
                 self.progress.emit(f"Retrieved {len(retrieved)} grounded authorities.")
             else:
