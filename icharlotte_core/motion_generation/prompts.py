@@ -38,7 +38,13 @@ Return valid JSON only with keys:
 """
 
 
-DEFAULT_ANALYZE_TEMPLATE = """Motion type: {motion_type}
+DEFAULT_ANALYZE_TEMPLATE = """Motion to be brought: {motion_type}
+
+The motion to be brought is a {motion_type}. Your proposed grounds and relief \
+MUST fit this specific motion vehicle; do NOT propose grounds for a different \
+motion (e.g., do not turn a motion in limine into a motion for summary \
+judgment). Use the documents below only as context/source material for the \
+content of THIS motion.
 
 Analysis task: {analyzer_prompt}
 

@@ -44,10 +44,12 @@ def _loads_json_safe(text: str) -> Dict[str, Any]:
     return {}
 
 
-def _build_user_prompt(config: MotionTypeConfig, target_text: str, context_text: str) -> str:
+def _build_user_prompt(
+    config: MotionTypeConfig, target_text: str, context_text: str, motion_name: str = ""
+) -> str:
     template = get_prompt("generate_motion", "analyze_target") or DEFAULT_ANALYZE_TEMPLATE
     return template.format(
-        motion_type=config.display_name,
+        motion_type=(motion_name or config.display_name),
         analyzer_prompt=config.analyzer_prompt,
         grounds_prompt=config.grounds_prompt,
         legal_standard=config.legal_standard_hint or "(none specified)",
@@ -62,22 +64,27 @@ def analyze_target(
     *,
     llm_callback: LLMCallback,
     context_text: str = "",
+    motion_name: str = "",
 ) -> MotionMetadata:
     """Analyze the target document(s) and propose grounds/relief for the motion.
 
-    Returns a ``MotionMetadata`` whose ``motion_type`` is the config display
-    name, ``relief_requested`` is the proposed relief, and
-    ``principal_arguments`` are the proposed grounds.
+    ``motion_name`` (when provided, e.g. a custom "Other" motion name) is the
+    SOURCE OF TRUTH for the motion vehicle and overrides the config display name
+    in the prompts, so the analysis proposes grounds for the motion the user
+    named rather than one inferred from the documents.
     """
+    motion = motion_name or config.display_name
     system_prompt = (
         "You are a California civil litigation attorney preparing to bring a "
-        f"{config.display_name}. Analyze the target documents and propose the "
-        "grounds and relief. Return valid JSON only."
+        f"{motion}. Propose ONLY the grounds and relief appropriate to a "
+        f"{motion}. Do NOT reframe it as a different motion vehicle (e.g., do "
+        "not turn a motion in limine into a motion for summary judgment, or "
+        "vice versa). Return valid JSON only."
     )
-    user_prompt = _build_user_prompt(config, target_text, context_text)
+    user_prompt = _build_user_prompt(config, target_text, context_text, motion_name=motion)
     response = llm_callback(system_prompt, user_prompt)
     data = _loads_json_safe(response)
-    data["motion_type"] = config.display_name
+    data["motion_type"] = motion
     return MotionMetadata.from_dict(data)
 
 
