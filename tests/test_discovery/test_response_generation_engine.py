@@ -3,11 +3,16 @@ import unittest
 from icharlotte_core.discovery.response_generation_engine import (
     ConditionalRuleDecision,
     DraftCallbacks,
+    RPD_UNABLE_TO_COMPLY_RESPONSE,
+    RPD_WILL_COMPLY_RESPONSE,
     StructuredProposal,
     _apply_proposal_to_review_state,
     _build_pending_review_state,
+    apply_structured_proposal,
+    build_fallback_structured_proposal,
     build_structured_proposal_prompt,
     generate_review_state,
+    normalize_rpd_substantive_response,
     parse_structured_proposal_response,
 )
 from icharlotte_core.discovery.response_parser import ParsedDiscovery, ParsedRequest
@@ -437,6 +442,29 @@ class StructuredProposalPromptTests(unittest.TestCase):
         prompt = self._build_prompt()
         self.assertIn("Do not draft objection text.", prompt)
 
+    def test_prompt_names_the_responding_party(self):
+        # The drafting LLM must know it answers on behalf of the responding
+        # (answering) party — otherwise it guesses the perspective from the
+        # context packet and can answer as the propounding party.
+        prompt = self._build_prompt()
+        self.assertIn("Defendant Jones", prompt)
+
+    def test_prompt_names_the_propounding_party(self):
+        prompt = self._build_prompt()
+        self.assertIn("Plaintiff Smith", prompt)
+
+    def test_prompt_instructs_to_draft_on_behalf_of_responding_party(self):
+        prompt = self._build_prompt().lower()
+        self.assertIn("on behalf of the responding party", prompt)
+
+    def test_prompt_clarifies_you_refers_to_responding_party(self):
+        # FI/SI use "you"/"your" to mean the answering party. Without this the
+        # model fills personal-background interrogatories (e.g. "state your
+        # name") with whatever party dominates the context packet.
+        prompt = self._build_prompt().lower()
+        self.assertIn('"you"', prompt)
+        self.assertIn("responding party", prompt)
+
     def test_parse_handles_payload_without_proposed_objections(self):
         # Old clients won't send the field. The parser must tolerate that.
         proposal = parse_structured_proposal_response(
@@ -625,6 +653,138 @@ class PendingReviewStateTests(unittest.TestCase):
         self.assertFalse(row.is_pending)
         self.assertIn("compound", row.proposed_objections.lower())
         self.assertIn("witnesses are", row.proposed_substantive_response)
+
+
+class NormalizeRpdSubstantiveTests(unittest.TestCase):
+    """The auto-generated RPD substantive response must be exactly one of the
+    two canonical statements, or empty."""
+
+    def test_empty_or_whitespace_stays_empty(self):
+        self.assertEqual(normalize_rpd_substantive_response(""), "")
+        self.assertEqual(normalize_rpd_substantive_response("   \n\t "), "")
+        self.assertEqual(normalize_rpd_substantive_response(None), "")
+
+    def test_exact_will_comply_is_preserved(self):
+        self.assertEqual(
+            normalize_rpd_substantive_response(RPD_WILL_COMPLY_RESPONSE),
+            RPD_WILL_COMPLY_RESPONSE,
+        )
+
+    def test_exact_unable_is_preserved(self):
+        self.assertEqual(
+            normalize_rpd_substantive_response(RPD_UNABLE_TO_COMPLY_RESPONSE),
+            RPD_UNABLE_TO_COMPLY_RESPONSE,
+        )
+
+    def test_compliance_paraphrase_snaps_to_will_comply(self):
+        draft = "Responding Party will produce all responsive documents in its custody."
+        self.assertEqual(
+            normalize_rpd_substantive_response(draft),
+            RPD_WILL_COMPLY_RESPONSE,
+        )
+
+    def test_inability_paraphrase_snaps_to_unable(self):
+        draft = (
+            "Responding Party is unable to comply because no responsive documents "
+            "exist within its possession, custody, or control."
+        )
+        self.assertEqual(
+            normalize_rpd_substantive_response(draft),
+            RPD_UNABLE_TO_COMPLY_RESPONSE,
+        )
+
+    def test_inability_markers_win_over_compliance_markers(self):
+        # A hedged draft mentioning both intents resolves to the conservative
+        # "unable" statement.
+        draft = (
+            "Responding Party will comply in part, but is otherwise unable to "
+            "comply with this request."
+        )
+        self.assertEqual(
+            normalize_rpd_substantive_response(draft),
+            RPD_UNABLE_TO_COMPLY_RESPONSE,
+        )
+
+    def test_ambiguous_nonempty_defaults_to_will_comply(self):
+        self.assertEqual(
+            normalize_rpd_substantive_response("See documents attached hereto."),
+            RPD_WILL_COMPLY_RESPONSE,
+        )
+
+    def test_result_is_always_canonical_or_empty(self):
+        drafts = [
+            "",
+            "   ",
+            "will produce everything responsive",
+            "nothing exists; unable to locate any such document",
+            "completely unrelated text",
+            RPD_WILL_COMPLY_RESPONSE,
+            RPD_UNABLE_TO_COMPLY_RESPONSE,
+        ]
+        allowed = {"", RPD_WILL_COMPLY_RESPONSE, RPD_UNABLE_TO_COMPLY_RESPONSE}
+        for draft in drafts:
+            self.assertIn(normalize_rpd_substantive_response(draft), allowed)
+
+
+class ApplyStructuredProposalRpdSnapTests(unittest.TestCase):
+    """apply_structured_proposal is the choke point; for RPD it must snap the
+    substantive text to a canonical statement (and leave other types alone)."""
+
+    def _apply(self, substantive, discovery_type="RPD"):
+        parsed = _parsed(discovery_type)
+        request = parsed.requests[0]
+        proposal = StructuredProposal(
+            request_number=request.number,
+            proposed_substantive_response=substantive,
+        )
+        return apply_structured_proposal(request, parsed, [], proposal)
+
+    def test_rpd_compliance_paraphrase_is_snapped(self):
+        review = self._apply("We will produce all responsive documents.")
+        self.assertEqual(review.proposed_substantive_response, RPD_WILL_COMPLY_RESPONSE)
+
+    def test_rpd_inability_paraphrase_is_snapped(self):
+        review = self._apply("No responsive documents exist; unable to comply.")
+        self.assertEqual(
+            review.proposed_substantive_response, RPD_UNABLE_TO_COMPLY_RESPONSE,
+        )
+
+    def test_rpd_empty_substantive_left_empty_for_objection_only(self):
+        review = self._apply("")
+        self.assertEqual(review.proposed_substantive_response, "")
+
+    def test_non_rpd_substantive_passes_through_unchanged(self):
+        answer = "Plaintiff was traveling north on Main Street."
+        review = self._apply(answer, discovery_type="SI")
+        self.assertEqual(review.proposed_substantive_response, answer)
+
+    def test_rpd_detected_even_from_unnormalized_type_label(self):
+        # A document tagged "RFP" must still be treated as RPD and snapped.
+        review = self._apply("We will produce responsive documents.", discovery_type="RFP")
+        self.assertEqual(review.proposed_substantive_response, RPD_WILL_COMPLY_RESPONSE)
+
+
+class RpdCanonicalResponsePromptAndFallbackTests(unittest.TestCase):
+    def test_rpd_prompt_includes_both_verbatim_statements(self):
+        parsed = _parsed("RPD")
+        prompt = build_structured_proposal_prompt(
+            request=parsed.requests[0],
+            parsed=parsed,
+            context_packet="",
+            selected_rules=[],
+            response_rules=ResponseRules(),
+        )
+        self.assertIn(RPD_WILL_COMPLY_RESPONSE, prompt)
+        self.assertIn(RPD_UNABLE_TO_COMPLY_RESPONSE, prompt)
+
+    def test_rpd_fallback_is_exactly_the_canonical_unable_statement(self):
+        parsed = _parsed("RPD")
+        proposal = build_fallback_structured_proposal(
+            parsed.requests[0], parsed, context_packet="",
+        )
+        self.assertEqual(
+            proposal.proposed_substantive_response, RPD_UNABLE_TO_COMPLY_RESPONSE,
+        )
 
 
 if __name__ == "__main__":

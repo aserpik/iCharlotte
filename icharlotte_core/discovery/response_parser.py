@@ -89,14 +89,20 @@ def build_parse_prompt(document_text: str) -> str:
 
 Return a JSON object with these fields:
 - "discovery_type": the discovery type — one of "FI" (Form Interrogatories), "SI" (Special Interrogatories), "RFA" (Requests for Admission), "RPD" (Requests for Production)
-- "propounding_party": the full name of the propounding party (e.g., "Plaintiff JOHN DOE")
-- "responding_party": the full name of the responding party / party the discovery is directed to (e.g., "Defendant ACME CORP")
+- "propounding_party": the full name of the propounding party — the party who SERVED these requests (e.g., "Plaintiff JOHN DOE")
+- "responding_party": the full name of the responding party — the party who must ANSWER these requests (e.g., "Defendant ACME CORP")
 - "set_number": integer (1, 2, etc.)
 - "case_number": the case number (e.g., "23STCV12345")
 - "requests": array of objects, each with:
   - "number": string (e.g., "1.1" for form interrogatories, "1" for others)
   - "text": the full text of the request/interrogatory
   - "definitions": array of any inline definition footnotes associated with this request
+
+Party identification rules (IMPORTANT):
+- On Judicial Council Form Interrogatories (DISC-001/DISC-005) the caption labels the propounding party as "Asking Party" and the responding party as "Answering Party". Map "Asking Party" -> propounding_party and "Answering Party" -> responding_party.
+- PDF text extraction frequently SEPARATES these caption labels from their values, so the value next to a label may appear elsewhere in the text. Match each party to its label by role, not by position.
+- The "Attorney For" line names the attorney's own client (the propounding side); do NOT use it as the responding_party.
+- The short title / case caption (e.g. "DUDASH VS. MATTHEWS") lists both sides; do not assume the first-named party is the responding party.
 
 For Form Interrogatories, include only interrogatories whose checkbox is visibly
 selected or marked. Do not include every preprinted interrogatory on the form.

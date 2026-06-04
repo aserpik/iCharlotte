@@ -25,6 +25,8 @@ from PySide6.QtWidgets import (
 from icharlotte_core.discovery.response_generation_engine import (
     _apply_proposal_to_review_state,
     _build_pending_review_state,
+    RPD_UNABLE_TO_COMPLY_RESPONSE,
+    RPD_WILL_COMPLY_RESPONSE,
 )
 from icharlotte_core.discovery.response_context_index import (
     build_context_chunks,
@@ -138,8 +140,12 @@ def suggested_response_filename(parsed: ParsedDiscovery | None) -> str:
 
 def preview_response_output_path(case_root: str, parsed: ParsedDiscovery | None) -> str:
     """Return an internal preview path; final user save happens via Save As."""
+    # `.icharlotte` MUST live under NOTES/AI OUTPUT alongside the other AI
+    # artifacts, never at the case root (see WizardStatePersistence.folder).
     preview_dir = os.path.join(
         case_root or "",
+        "NOTES",
+        "AI OUTPUT",
         ".icharlotte",
         "wizard_previews",
         "respond_to_discovery",
@@ -169,20 +175,11 @@ REFER_TO_DOCUMENT_RESPONSE = (
     "produced concurrently herewith.."
 )
 
-WILL_PRODUCE_RESPONSE = (
-    "Responding Party will comply with this request and produce all "
-    "non-privileged documents in Responding Party's possession, custody and "
-    "control that Responding Party understands to be responsive to this Request. "
-    "Responding Party identifies and refers to the documents produced "
-    "concurrently herewith."
-)
-
-WONT_PRODUCE_RESPONSE = (
-    "Upon a diligent search and reasonable inquiry made in an effort to locate "
-    "the item(s) requested, Responding Party is unable to comply with this "
-    "request at this time because the documents responsive to this request, if "
-    "they exist, are not in the possession, custody or control of Responding Party."
-)
+# Canonical RPD quick-insert responses. The single source of truth lives in the
+# engine (response_generation_engine) so the quick buttons and the auto-drafting
+# path use identical, character-for-character text.
+WILL_PRODUCE_RESPONSE = RPD_WILL_COMPLY_RESPONSE
+WONT_PRODUCE_RESPONSE = RPD_UNABLE_TO_COMPLY_RESPONSE
 
 CANT_ADMIT_DENY_RESPONSE = (
     "After a reasonable inquiry concerning the matter in this request, the "

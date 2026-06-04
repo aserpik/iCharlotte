@@ -12,7 +12,11 @@ from icharlotte_core.discovery.proposal_coordinator import (
     ProposalTask,
     WorkerSignals,
 )
-from icharlotte_core.discovery.response_generation_engine import StructuredProposal
+from icharlotte_core.discovery.response_generation_engine import (
+    RPD_UNABLE_TO_COMPLY_RESPONSE,
+    RPD_WILL_COMPLY_RESPONSE,
+    StructuredProposal,
+)
 from icharlotte_core.discovery.response_parser import ParsedDiscovery, ParsedRequest
 from icharlotte_core.discovery.response_rules import ResponseRules
 
@@ -162,6 +166,65 @@ class ProposalTaskTests(unittest.TestCase):
         _, proposal = emitted[0]
         self.assertTrue(proposal.needs_review)
         self.assertIn("No specific context found", proposal.review_reason)
+
+
+class ProposalTaskRpdSnapTests(unittest.TestCase):
+    """RPD substantive text must already be canonical on the emitted proposal,
+    so the conflict-banner preview matches what apply will store."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls._app = QApplication.instance() or QApplication([])
+
+    def _run_rpd_task(self, llm_substantive):
+        import json
+
+        parsed = ParsedDiscovery(
+            discovery_type="RPD",
+            propounding_party="P",
+            responding_party="D",
+            set_number=1,
+            set_word="ONE",
+            case_number="1",
+            requests=[ParsedRequest(number="1", text="All documents re the incident.")],
+        )
+        emitted = []
+        signals = WorkerSignals()
+        signals.proposal_ready.connect(lambda num, prop: emitted.append((num, prop)))
+        call_llm = MagicMock(
+            return_value=json.dumps(
+                {
+                    "request_number": "1",
+                    "proposed_substantive_response": llm_substantive,
+                }
+            )
+        )
+        task = ProposalTask(
+            signals=signals,
+            request=parsed.requests[0],
+            parsed=parsed,
+            context_packet="Some context.",
+            selected_rules=[],
+            response_rules=ResponseRules(),
+            fi_mode="custom",
+            call_llm=call_llm,
+        )
+        task.run()
+        return emitted[0][1]
+
+    def test_rpd_compliance_paraphrase_snapped_on_emit(self):
+        proposal = self._run_rpd_task("We will produce all responsive documents.")
+        self.assertEqual(
+            proposal.proposed_substantive_response, RPD_WILL_COMPLY_RESPONSE,
+        )
+
+    def test_rpd_inability_paraphrase_snapped_on_emit(self):
+        proposal = self._run_rpd_task(
+            "No responsive documents exist; Responding Party is unable to comply."
+        )
+        self.assertEqual(
+            proposal.proposed_substantive_response, RPD_UNABLE_TO_COMPLY_RESPONSE,
+        )
 
 
 # ---------------------------------------------------------------------------

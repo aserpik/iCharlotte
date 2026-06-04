@@ -1,3 +1,4 @@
+import os
 import unittest
 import tempfile
 from dataclasses import asdict
@@ -18,6 +19,7 @@ from icharlotte_core.ui.wizard.pages.respond_discovery_page import (
     RespondDiscoveryWorker,
     _normalize_and_filter_parsed_discovery,
     load_respond_response_rules,
+    preview_response_output_path,
 )
 
 
@@ -35,6 +37,29 @@ class RespondDiscoveryReexportTests(unittest.TestCase):
         )
 
         self.assertIs(read_first_page_text, _io.read_first_page_text)
+
+
+class PreviewResponseOutputPathTests(unittest.TestCase):
+    """The internal preview .docx must live under NOTES/AI OUTPUT/.icharlotte,
+    never directly at the case root (which pollutes the user's case folder)."""
+
+    def test_preview_path_under_notes_ai_output_not_case_root(self):
+        case_root = os.path.join(os.sep, "tmp", "case")
+        result = preview_response_output_path(case_root, None)
+        rel = os.path.relpath(result, case_root)
+        # `.icharlotte` must NOT be a direct child of the case root.
+        self.assertFalse(
+            rel.startswith(".icharlotte" + os.sep),
+            f".icharlotte must not be at case root; got {rel}",
+        )
+        # It must be nested under NOTES/AI OUTPUT, with the other AI artifacts.
+        expected_prefix = os.path.join(
+            "NOTES", "AI OUTPUT", ".icharlotte", "wizard_previews", "respond_to_discovery"
+        )
+        self.assertTrue(
+            rel.startswith(expected_prefix),
+            f"expected preview under {expected_prefix}; got {rel}",
+        )
 
 
 class RespondDiscoverySettingsPageTests(unittest.TestCase):
@@ -757,6 +782,8 @@ class RespondDiscoveryWorkerTests(unittest.TestCase):
 
         self.assertTrue(results[0][0], results)
         self.assertIn(".icharlotte", results[0][1])
+        # The preview folder must be nested under NOTES/AI OUTPUT, not the case root.
+        self.assertIn(os.path.join("NOTES", "AI OUTPUT", ".icharlotte"), results[0][1])
         self.assertNotIn("DISCOVERY\\RESPONSES", results[0][1])
         assembled_text = mock_assembler_cls.return_value.assemble.call_args.kwargs["response_text"]
         self.assertIn("Objection.", assembled_text)

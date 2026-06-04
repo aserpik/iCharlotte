@@ -82,6 +82,21 @@ class TestBuildParsePrompt(unittest.TestCase):
         prompt = build_parse_prompt("SPECIAL INTERROGATORY NO. 1: Describe...")
         self.assertIn("SPECIAL INTERROGATORY NO. 1", prompt)
 
+    def test_prompt_maps_judicial_council_caption_labels(self):
+        # Judicial Council form interrogatories (DISC-001/005) label the
+        # caption "Asking Party" (= propounding) and "Answering Party"
+        # (= responding). PDF extraction often separates these labels from
+        # their values, so the prompt must define the mapping explicitly.
+        prompt = build_parse_prompt("Some discovery text here").lower()
+        self.assertIn("asking party", prompt)
+        self.assertIn("answering party", prompt)
+
+    def test_prompt_excludes_attorney_for_line_from_responding_party(self):
+        # The "Attorney For" line names the propounding side's client; it must
+        # not be mistaken for the responding party.
+        prompt = build_parse_prompt("Some discovery text here").lower()
+        self.assertIn("attorney for", prompt)
+
 
 class TestParseLlmResponse(unittest.TestCase):
     def test_valid_json_response(self):

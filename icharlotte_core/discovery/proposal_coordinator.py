@@ -34,6 +34,7 @@ from icharlotte_core.discovery.response_generation_engine import (
     StructuredProposal,
     build_fallback_structured_proposal,
     build_structured_proposal_prompt,
+    normalize_rpd_substantive_response,
     parse_structured_proposal_response,
 )
 from icharlotte_core.discovery.response_parser import ParsedDiscovery, ParsedRequest
@@ -140,7 +141,22 @@ class ProposalTask(QRunnable):
                 )
             proposal = repaired
 
-        return self._ensure_context_warning(proposal)
+        return self._ensure_context_warning(self._normalize_proposal(proposal))
+
+    def _normalize_proposal(self, proposal: StructuredProposal) -> StructuredProposal:
+        """Snap RPD substantive text to a canonical statement at creation time.
+
+        Keeps the conflict-banner preview consistent with what apply will store.
+        Idempotent; a no-op for non-RPD discovery types.
+        """
+        if normalize_discovery_type(self.parsed.discovery_type) != "RPD":
+            return proposal
+        snapped = normalize_rpd_substantive_response(
+            proposal.proposed_substantive_response,
+        )
+        if snapped == proposal.proposed_substantive_response:
+            return proposal
+        return replace(proposal, proposed_substantive_response=snapped)
 
     def _call_repair(self, call_llm: CallLLMFn, raw_text: str) -> StructuredProposal | None:
         repair_prompt = (

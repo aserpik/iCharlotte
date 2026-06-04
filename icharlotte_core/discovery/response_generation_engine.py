@@ -16,6 +16,83 @@ from icharlotte_core.discovery.response_rule_library import (
 from icharlotte_core.discovery.response_rules import ResponseRules
 
 
+# ---------------------------------------------------------------------------
+# Canonical Request-for-Production substantive responses
+# ---------------------------------------------------------------------------
+# Firm policy: an auto-generated RPD substantive response must be EXACTLY one of
+# these two statements (or empty, for an objection-only response). These are the
+# single source of truth -- the wizard UI imports them so the quick-insert
+# buttons and the auto-drafting path stay identical, character-for-character.
+
+RPD_WILL_COMPLY_RESPONSE = (
+    "Responding Party will comply with this request and produce all "
+    "non-privileged documents in Responding Party's possession, custody and "
+    "control that Responding Party understands to be responsive to this Request. "
+    "Responding Party identifies and refers to the documents produced "
+    "concurrently herewith."
+)
+
+RPD_UNABLE_TO_COMPLY_RESPONSE = (
+    "Upon a diligent search and reasonable inquiry made in an effort to locate "
+    "the item(s) requested, Responding Party is unable to comply with this "
+    "request at this time because the documents responsive to this request, if "
+    "they exist, are not in the possession, custody or control of Responding Party."
+)
+
+# Distinctive markers used to classify a paraphrased draft. Inability markers are
+# checked first, so a hedged draft mentioning both intents resolves to "unable".
+_RPD_UNABLE_MARKERS = (
+    "unable to comply",
+    "cannot comply",
+    "can not comply",
+    "unable to produce",
+    "not in the possession",
+    "no responsive document",
+    "no documents",
+    "do not exist",
+    "does not exist",
+    "diligent search",
+    "unable to locate",
+    "no such document",
+)
+
+_RPD_COMPLY_MARKERS = (
+    "will comply",
+    "will produce",
+    "agrees to produce",
+    "agree to produce",
+    "produce all",
+    "produce responsive",
+    "produce the responsive",
+    "identifies and refers",
+)
+
+
+def normalize_rpd_substantive_response(text: str) -> str:
+    """Snap an RPD substantive response to one of the two canonical statements.
+
+    - Empty/whitespace input returns ``""`` (an objection-only response is
+      permitted; we do not fabricate a substantive statement).
+    - Text already equal to a canonical statement is returned unchanged.
+    - Otherwise the draft is classified by intent and replaced with the verbatim
+      canonical statement: inability markers win, then compliance markers, and a
+      genuinely ambiguous non-empty draft defaults to the will-comply statement.
+    """
+    stripped = (text or "").strip()
+    if not stripped:
+        return ""
+    if stripped == RPD_WILL_COMPLY_RESPONSE:
+        return RPD_WILL_COMPLY_RESPONSE
+    if stripped == RPD_UNABLE_TO_COMPLY_RESPONSE:
+        return RPD_UNABLE_TO_COMPLY_RESPONSE
+    lowered = stripped.lower()
+    if any(marker in lowered for marker in _RPD_UNABLE_MARKERS):
+        return RPD_UNABLE_TO_COMPLY_RESPONSE
+    if any(marker in lowered for marker in _RPD_COMPLY_MARKERS):
+        return RPD_WILL_COMPLY_RESPONSE
+    return RPD_WILL_COMPLY_RESPONSE
+
+
 @dataclass(frozen=True)
 class ConditionalRuleDecision:
     applies: bool
@@ -217,11 +294,19 @@ def apply_structured_proposal(
         )
         review_reason = f"{review_reason} {mismatch_message}".strip()
 
+    from icharlotte_core.discovery.response_type_detector import (
+        normalize_discovery_type,
+    )
+
+    substantive_response = proposal.proposed_substantive_response.strip()
+    if normalize_discovery_type(parsed.discovery_type) == "RPD":
+        substantive_response = normalize_rpd_substantive_response(substantive_response)
+
     return RequestReview(
         number=request.number,
         request_text=request.text,
         proposed_objections=_join_objections(objections),
-        proposed_substantive_response=proposal.proposed_substantive_response.strip(),
+        proposed_substantive_response=substantive_response,
         selected_rule_ids=selected_rule_ids,
         approved=False,
         needs_review=needs_review,
@@ -257,10 +342,16 @@ def build_structured_proposal_prompt(
         rule for rule in selected_rules
         if rule.category == RuleCategory.SUBSTANTIVE
     ]
+    responding_party = (parsed.responding_party or "").strip() or "[responding party not identified]"
+    propounding_party = (parsed.propounding_party or "").strip() or "[propounding party not identified]"
     return "\n".join(
         [
             "You are a California civil litigation attorney drafting proposed discovery responses.",
             "Return ONLY a JSON object matching the requested schema.",
+            "",
+            "PARTIES:",
+            f"- RESPONDING PARTY (your client; draft every response on behalf of the responding party): {responding_party}",
+            f"- PROPOUNDING PARTY (the opposing party who served these requests; never answer on their behalf): {propounding_party}",
             "",
             f"DISCOVERY TYPE: {(parsed.discovery_type or '').upper()}",
             f"REQUEST NUMBER: {request.number}",
@@ -280,6 +371,9 @@ def build_structured_proposal_prompt(
             f"REQUEST-SPECIFIC CONTEXT PACKET:\n{context_packet or '[NO SPECIFIC CONTEXT FOUND]'}",
             "",
             "Hard requirements:",
+            "- Draft every response on behalf of the responding party identified above. Never answer from the propounding party's perspective.",
+            '- In interrogatories, the words "you" and "your" refer to the responding party. Supply the responding party\'s own information, not the propounding party\'s.',
+            "- The context packet may contain documents authored by, or describing, the propounding party (e.g. their complaint or claims). Treat those as the opposing party's material, not the responding party's own statements.",
             "- Do not include objections in proposed_substantive_response.",
             "- Do not include waiver or reservation language.",
             "- Do not invent facts not supported by the context packet.",
@@ -317,11 +411,7 @@ def build_fallback_structured_proposal(
             "insufficient to enable Responding Party to admit the matter."
         )
     elif dtype == "RPD":
-        substantive = (
-            "Upon a diligent search and reasonable inquiry, Responding Party is "
-            "unable to comply with this request at this time because responsive "
-            "documents, if they exist, have not been identified in the available context."
-        )
+        substantive = RPD_UNABLE_TO_COMPLY_RESPONSE
     elif dtype in {"FI", "SI"}:
         substantive = "Responding Party lacks sufficient information to provide a further substantive response at this time."
     else:
@@ -355,9 +445,16 @@ def _response_posture(parsed: ParsedDiscovery, response_rules: ResponseRules) ->
         )
     if dtype == "RPD":
         return (
-            "Say will comply only when context indicates responsive non-privileged "
-            "documents exist or will be produced. Otherwise use unable-to-comply "
-            "or cautious default language."
+            "Set proposed_substantive_response to EXACTLY one of these two "
+            "verbatim statements (copy character-for-character; do not paraphrase, "
+            "shorten, or add words):\n"
+            f'(A) "{RPD_WILL_COMPLY_RESPONSE}"\n'
+            f'(B) "{RPD_UNABLE_TO_COMPLY_RESPONSE}"\n'
+            "Use (A) when responsive, non-privileged documents exist or will be "
+            "produced. Use (B) when no responsive documents are in the responding "
+            "party's possession, custody, or control. If you are only objecting "
+            "and will neither produce nor withhold documents, leave "
+            "proposed_substantive_response empty."
         )
     if dtype == "FI":
         return "Draft only the substantive factual response. Answer narrowly."
