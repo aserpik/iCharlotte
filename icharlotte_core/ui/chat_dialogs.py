@@ -15,9 +15,11 @@ from ..chat.models import QuickPrompt, BUILTIN_PROMPTS
 class PromptTemplateDialog(QDialog):
     """Dialog for managing quick prompt templates."""
 
-    def __init__(self, persistence, parent=None):
+    def __init__(self, persistence=None, parent=None):
         super().__init__(parent)
-        self.persistence = persistence
+        self.persistence = persistence  # kept for backward compatibility; not used for templates
+        from ..chat.global_prompts import get_global_quick_prompt_store
+        self.store = get_global_quick_prompt_store()
         self.setWindowTitle("Manage Quick Prompts")
         self.setMinimumSize(600, 500)
         self.setup_ui()
@@ -112,11 +114,9 @@ class PromptTemplateDialog(QDialog):
         for prompt in BUILTIN_PROMPTS:
             self.all_prompts.append(prompt)
 
-        # Add custom prompts from persistence
-        if self.persistence:
-            for prompt in self.persistence.get_quick_prompts():
-                if not prompt.is_builtin:
-                    self.all_prompts.append(prompt)
+        # Add custom prompts from the global store (shared across all cases)
+        for prompt in self.store.get_quick_prompts():
+            self.all_prompts.append(prompt)
 
         self.filter_prompts(self.category_filter.currentText())
 
@@ -201,13 +201,9 @@ class PromptTemplateDialog(QDialog):
             QMessageBox.warning(self, "Error", "Please enter the prompt text.")
             return
 
-        if not self.persistence:
-            QMessageBox.warning(self, "Error", "No case loaded. Cannot save prompts.")
-            return
-
         if self.current_prompt_id and not self.is_builtin:
             # Update existing
-            self.persistence.update_quick_prompt(
+            self.store.update_quick_prompt(
                 self.current_prompt_id,
                 name=name,
                 prompt=prompt_text,
@@ -215,7 +211,7 @@ class PromptTemplateDialog(QDialog):
             )
         else:
             # Create new
-            self.persistence.add_quick_prompt(name, prompt_text, category)
+            self.store.add_quick_prompt(name, prompt_text, category)
 
         self.load_prompts()
         QMessageBox.information(self, "Saved", "Prompt saved successfully.")
@@ -232,8 +228,7 @@ class PromptTemplateDialog(QDialog):
         )
 
         if reply == QMessageBox.StandardButton.Yes:
-            if self.persistence:
-                self.persistence.delete_quick_prompt(self.current_prompt_id)
+            self.store.delete_quick_prompt(self.current_prompt_id)
             self.load_prompts()
             self.clear_editor()
 
