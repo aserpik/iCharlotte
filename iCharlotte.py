@@ -1182,10 +1182,11 @@ class MainWindow(QMainWindow):
         title = f"{spec.title} {suffix}".strip()
 
         builder_name = get_in_process_task_builder_name(task_id)
-        if builder_name and builder_name != "build_oppose_motion_tab":
+        if builder_name and builder_name not in ("build_oppose_motion_tab", "build_mediation_brief_tab"):
             # In-process custom tabs (e.g. Separate) own their source selection;
             # reopening re-runs the builder's picker. Analysis output is
             # ephemeral, so there's nothing to restore beyond the tab itself.
+            # (Mediation Brief is excluded above so its saved brief is reloaded.)
             from icharlotte_core.ui.wizard import in_process_task_tab
             builder = getattr(in_process_task_tab, builder_name)
             task_tab = builder(
@@ -1237,6 +1238,21 @@ class MainWindow(QMainWindow):
                 parent=self,
             )
             task_tab.settings_page.from_dict(settings)
+            output_page = TASK_PAGE_OUTPUT
+            settings_page = TASK_PAGE_SETTINGS
+        elif get_in_process_task_builder_name(task_id) == "build_mediation_brief_tab":
+            from icharlotte_core.ui.wizard.pages.mediation_brief_page import (
+                MediationBriefTaskTab,
+                TASK_PAGE_OUTPUT,
+                TASK_PAGE_SETTINGS,
+            )
+
+            task_tab = MediationBriefTaskTab(
+                spec=spec,
+                case_path=self.case_path,
+                file_number=self.file_number,
+                parent=self,
+            )
             output_page = TASK_PAGE_OUTPUT
             settings_page = TASK_PAGE_SETTINGS
         else:
@@ -1294,9 +1310,10 @@ class MainWindow(QMainWindow):
             ]
             settings_dict = entry.get("settings") or {}
             builder_name = get_in_process_task_builder_name(task_id)
-            if builder_name and builder_name != "build_oppose_motion_tab":
+            if builder_name and builder_name not in ("build_oppose_motion_tab", "build_mediation_brief_tab"):
                 # In-process custom tabs (e.g. Separate) re-pick their source on
                 # restore; skip silently if the user cancels the picker.
+                # (Mediation Brief is excluded above so its saved brief is reloaded.)
                 from icharlotte_core.ui.wizard import in_process_task_tab
                 builder = getattr(in_process_task_tab, builder_name)
                 tab = builder(
@@ -1340,6 +1357,21 @@ class MainWindow(QMainWindow):
                 )
 
                 tab = GenerateMotionTaskTab(
+                    spec=spec,
+                    case_path=self.case_path,
+                    file_number=self.file_number,
+                    parent=self,
+                )
+                output_page = TASK_PAGE_OUTPUT
+                settings_page = TASK_PAGE_SETTINGS
+            elif get_in_process_task_builder_name(task_id) == "build_mediation_brief_tab":
+                from icharlotte_core.ui.wizard.pages.mediation_brief_page import (
+                    MediationBriefTaskTab,
+                    TASK_PAGE_OUTPUT,
+                    TASK_PAGE_SETTINGS,
+                )
+
+                tab = MediationBriefTaskTab(
                     spec=spec,
                     case_path=self.case_path,
                     file_number=self.file_number,
