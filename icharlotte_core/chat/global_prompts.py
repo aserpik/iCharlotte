@@ -12,6 +12,7 @@ from typing import List, Optional
 
 from ..config import GEMINI_DATA_DIR
 from .models import QuickPrompt
+from ..utils import log_event
 
 
 # Global store lives one level ABOVE the per-case case_data/ folder so it is clearly app-global
@@ -57,8 +58,7 @@ class GlobalQuickPromptStore:
     def _save(self, data: dict):
         """Atomically write the store to disk (temp file + os.replace)."""
         directory = os.path.dirname(self.path) or "."
-        if not os.path.exists(directory):
-            os.makedirs(directory)
+        os.makedirs(directory, exist_ok=True)
         fd, tmp_path = tempfile.mkstemp(dir=directory, suffix=".tmp")
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -90,8 +90,8 @@ class GlobalQuickPromptStore:
         self._save(data)
         return qp.id
 
-    def update_quick_prompt(self, prompt_id: str, name: str = None,
-                            prompt: str = None, category: str = None):
+    def update_quick_prompt(self, prompt_id: str, name: Optional[str] = None,
+                            prompt: Optional[str] = None, category: Optional[str] = None):
         """Update an existing custom quick prompt in place."""
         data = self._load()
         for p in data.get("quick_prompts", []):
@@ -148,7 +148,7 @@ class GlobalQuickPromptStore:
         data["migrated_from_per_case"] = True
         self._save(data)
         if migrated:
-            print(f"[GlobalQuickPromptStore] Migrated {migrated} per-case quick prompts to global storage")
+            log_event(f"[GlobalQuickPromptStore] Migrated {migrated} per-case quick prompts to global storage")
 
 
 _global_store: Optional[GlobalQuickPromptStore] = None

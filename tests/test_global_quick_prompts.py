@@ -65,6 +65,20 @@ class TestGlobalQuickPromptStore(unittest.TestCase):
         store.delete_quick_prompt(tid)
         self.assertEqual(len(store.get_quick_prompts()), 0)
 
+    def test_update_nonexistent_id_is_noop(self):
+        store = self._store()
+        store.add_quick_prompt("Keep", "text", "Custom")
+        store.update_quick_prompt("does-not-exist", name="Nope")
+        prompts = store.get_quick_prompts()
+        self.assertEqual(len(prompts), 1)
+        self.assertEqual(prompts[0].name, "Keep")
+
+    def test_delete_nonexistent_id_is_noop(self):
+        store = self._store()
+        store.add_quick_prompt("Keep", "text", "Custom")
+        store.delete_quick_prompt("does-not-exist")
+        self.assertEqual(len(store.get_quick_prompts()), 1)
+
     # --- persistence / robustness ---
 
     def test_persists_across_instances(self):
