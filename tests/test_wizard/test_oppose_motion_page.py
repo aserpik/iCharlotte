@@ -710,7 +710,7 @@ def test_save_as_uses_dialog_and_does_not_save_when_cancelled(qtbot, tmp_path):
         "icharlotte_core.ui.wizard.pages.oppose_motion_page.QFileDialog.getSaveFileName",
         return_value=("", ""),
     ) as dialog, patch(
-        "icharlotte_core.ui.wizard.pages.oppose_motion_page.shutil.copyfile"
+        "icharlotte_core.ui.wizard.pages.citation_review.shutil.copyfile"
     ) as copyfile, patch(
         "icharlotte_core.ui.wizard.pages.oppose_motion_page.QMessageBox.information"
     ) as info:
@@ -798,7 +798,7 @@ def test_save_as_reports_copy_errors(qtbot, tmp_path):
         "icharlotte_core.ui.wizard.pages.oppose_motion_page.QFileDialog.getSaveFileName",
         return_value=(str(target), ""),
     ), patch(
-        "icharlotte_core.ui.wizard.pages.oppose_motion_page.shutil.copyfile",
+        "icharlotte_core.ui.wizard.pages.citation_review.shutil.copyfile",
         side_effect=OSError("locked"),
     ), patch(
         "icharlotte_core.ui.wizard.pages.oppose_motion_page.QMessageBox.critical"
