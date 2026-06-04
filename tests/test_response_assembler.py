@@ -188,6 +188,39 @@ class TestInsertResponsePairs(unittest.TestCase):
         self.assertIn(f"Objection text. {rules.waiver_language}", full_text)
         self.assertIn("General denial response.", full_text)
 
+    def test_multiple_objections_render_as_single_paragraph(self):
+        """All objections collapse into one paragraph; substantive stays separate."""
+        doc = DocxDocument()
+        assembler = ResponseAssembler.__new__(ResponseAssembler)
+        rules = ResponseRules()
+
+        response = (
+            "Responding Party objects on grounds A.\n\n"
+            "Responding Party further objects on grounds B. "
+            f"{rules.waiver_language}\n"
+            "Substantive response here."
+        )
+        assembler._insert_response_pairs(
+            doc,
+            [{"number": "1", "request": "Admit X.", "response": response}],
+            "RFA",
+            "ONE",
+            rules,
+        )
+
+        paras = [p.text for p in doc.paragraphs if p.text.strip()]
+        obj_paras = [t for t in paras if "grounds A" in t or "grounds B" in t]
+        # Both objections must live in exactly ONE paragraph.
+        self.assertEqual(len(obj_paras), 1, f"objections split across paragraphs: {obj_paras}")
+        self.assertIn("grounds A", obj_paras[0])
+        self.assertIn("grounds B", obj_paras[0])
+        # The waiver attaches to that single objections paragraph.
+        self.assertIn(rules.waiver_language, obj_paras[0])
+        # The substantive response is its own, separate paragraph.
+        subst_paras = [t for t in paras if "Substantive response here." in t]
+        self.assertEqual(len(subst_paras), 1)
+        self.assertNotIn("grounds A", subst_paras[0])
+
 
 class TestFirmContactPlaceholders(unittest.TestCase):
     def test_fills_firm_contact_placeholders_from_caption_text(self):

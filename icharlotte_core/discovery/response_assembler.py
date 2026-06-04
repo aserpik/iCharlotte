@@ -555,20 +555,18 @@ class ResponseAssembler:
                 resp_text, waiver, reservation
             )
 
-            # Objections — each block (quick objections are joined with blank
-            # lines) becomes its own double-spaced paragraph. Emitting the
-            # blank-line-separated text in a single run would render an extra
-            # blank line, because python-docx turns each "\n" into a line break.
-            # The waiver attaches to the LAST objection paragraph, and only when
-            # a substantive response follows (no waiver on objection-only rows).
+            # Objections — all objections (quick objections are joined internally
+            # with blank lines) collapse into ONE double-spaced paragraph; only
+            # the substantive response begins a new paragraph. The waiver attaches
+            # to that single objections paragraph, and only when a substantive
+            # response follows (no waiver on objection-only rows).
             if obj_part:
                 obj_blocks = [o.strip() for o in obj_part.split("\n\n") if o.strip()]
-                for i, block in enumerate(obj_blocks):
-                    is_last = i == len(obj_blocks) - 1
-                    if is_last and subst_part and waiver:
-                        _add_para(doc, f"{block} {waiver}", STYLE_BODY_DOUBLE)
-                    else:
-                        _add_para(doc, block, STYLE_BODY_DOUBLE)
+                objections_para = " ".join(obj_blocks)
+                if subst_part and waiver:
+                    _add_para(doc, f"{objections_para} {waiver}", STYLE_BODY_DOUBLE)
+                else:
+                    _add_para(doc, objections_para, STYLE_BODY_DOUBLE)
 
             # Substantive response — new paragraph with explicit 0.5" first-line indent
             if subst_part:

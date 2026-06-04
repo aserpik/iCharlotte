@@ -63,6 +63,37 @@ class TestFormatSingleResponse(unittest.TestCase):
         self.assertIn("REQUEST FOR PRODUCTION NO. 7:", result)
         self.assertIn("RESPONSE TO REQUEST NO. 7:", result)
 
+    def test_multiple_objections_render_as_one_paragraph(self):
+        """All objections share one paragraph; only the substantive starts a new one.
+
+        Objections arrive joined by a blank line (the internal block separator).
+        They must collapse onto a single line so the rendered document shows every
+        objection in one paragraph, with the substantive response beginning the
+        next paragraph.
+        """
+        result = format_single_response(
+            disc_type="RFA", request_number="3",
+            request_text="Admit that the light was red.",
+            objections="Responding Party objects on grounds A.\n\n"
+                       "Responding Party further objects on grounds B.",
+            substantive="Deny.",
+            waiver="Subject to and without waiving the foregoing objections, "
+                   "Responding Party responds as follows:",
+            reservation="Discovery is ongoing.",
+        )
+        # No blank line splitting the two objections apart.
+        self.assertNotIn("grounds A.\n\nResponding Party further objects", result)
+        # Both objections sit on the same line, followed by the waiver.
+        self.assertIn(
+            "Responding Party objects on grounds A. "
+            "Responding Party further objects on grounds B. "
+            "Subject to and without waiving the foregoing objections, "
+            "Responding Party responds as follows:",
+            result,
+        )
+        # The substantive response begins on its own line.
+        self.assertIn("\nDeny. Discovery is ongoing.", result)
+
 
 class TestIsFiSeries(unittest.TestCase):
     def test_series_3(self):

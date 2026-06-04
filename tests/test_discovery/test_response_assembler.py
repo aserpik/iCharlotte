@@ -66,7 +66,7 @@ class ResponseAssemblerOutputTests(unittest.TestCase):
         self.assertNotIn("PLEADING TITLE", footer_text.upper())
         self.assertIn("RESPONSES TO", footer_text.upper())
 
-    def test_multiple_objections_render_without_blank_line(self):
+    def test_multiple_objections_render_as_single_paragraph(self):
         review = RequestReview(
             number="12.4",
             request_text="State the names of witnesses.",
@@ -81,13 +81,16 @@ class ResponseAssemblerOutputTests(unittest.TestCase):
         )
         out = _assemble(review)
         try:
-            paras = DocxDocument(out).paragraphs
-            idx = [i for i, p in enumerate(paras) if "objects to this Request" in p.text]
-            self.assertEqual(len(idx), 2, "expected two objection paragraphs")
-            # The two objection paragraphs must be adjacent — no blank paragraph
-            # (or blank-line run) inserted between them.
-            self.assertEqual(idx[1] - idx[0], 1)
-            self.assertNotIn("speculation", paras[idx[1]].text)  # not merged into one run
+            paras = [p.text for p in DocxDocument(out).paragraphs if p.text.strip()]
+            obj_paras = [t for t in paras if "objects to this Request" in t]
+            # All objections collapse into ONE paragraph.
+            self.assertEqual(len(obj_paras), 1, "expected a single objection paragraph")
+            self.assertIn("speculation", obj_paras[0])
+            self.assertIn("unduly burdensome", obj_paras[0])
+            # Only the substantive response begins a new paragraph.
+            subst_paras = [t for t in paras if "The witnesses are A and B." in t]
+            self.assertEqual(len(subst_paras), 1)
+            self.assertNotIn("objects to this Request", subst_paras[0])
         finally:
             os.remove(out)
 

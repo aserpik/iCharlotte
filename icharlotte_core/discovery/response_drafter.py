@@ -70,6 +70,14 @@ def format_single_response(
 
     parts = [req_header, request_text, "", resp_header]
 
+    # All objections render as a single paragraph; only the substantive response
+    # begins a new paragraph. Collapse the internal block separators (blank lines
+    # used to keep quick objections individually addressable) into spaces.
+    if objections:
+        objections = " ".join(
+            block.strip() for block in objections.split("\n\n") if block.strip()
+        )
+
     # Objections + waiver on the same line
     if objections and waiver:
         parts.append(f"{objections} {waiver}")
