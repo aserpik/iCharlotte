@@ -5,8 +5,24 @@ cites; statutes are reused elsewhere (leginfo) and out of scope here.
 """
 from __future__ import annotations
 
+import re as _re
 from dataclasses import dataclass
 from typing import List
+
+_SIGNAL_PREFIX = _re.compile(
+    r"^\s*(?:see,?\s+e\.?g\.?,?|see\s+also|see|accord|cf\.?|but\s+see|in\s+re|in)\s+",
+    _re.IGNORECASE,
+)
+
+
+def clean_case_name(name: str) -> str:
+    """Strip leading citation signal words and collapse whitespace/newlines."""
+    s = _re.sub(r"\s+", " ", (name or "").strip())
+    prev = None
+    while s and s != prev:           # strip stacked signals ("See, e.g., ...")
+        prev = s
+        s = _SIGNAL_PREFIX.sub("", s).strip()
+    return s
 
 
 @dataclass
@@ -36,7 +52,7 @@ def harvest_cites(text: str) -> List[HarvestedCite]:
         proposition = getattr(c, "proposition", "") or ""
         out.append(
             HarvestedCite(
-                case_name=getattr(c, "case_name", "") or "",
+                case_name=clean_case_name(getattr(c, "case_name", "") or ""),
                 reporter_citation=reporter,
                 year=str(getattr(c, "year", "") or ""),
                 norm_cite=_norm(reporter),
