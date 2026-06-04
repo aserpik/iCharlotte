@@ -196,6 +196,54 @@ class FirmBriefIndex:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def style_candidates(self, query_vec, *, motion_type: str, side: str,
+                         k: int = 3) -> list[dict]:
+        """Top-k briefs of this motion_type AND side by cosine similarity of the
+        stored profile vector to query_vec, with a quality penalty (short/noisy
+        briefs make poor style models) and version dedup."""
+        import os
+        import re as _re
+        con = self._conn()
+        rows = con.execute(
+            "SELECT id, path, vec_row, char_len, ocr_ratio FROM briefs "
+            "WHERE status='ok' AND motion_type=? AND side=? AND vec_row>=0",
+            (motion_type, side),
+        ).fetchall()
+        if not rows:
+            return []
+        vecs = self.load_vectors()
+        if getattr(vecs, "shape", (0,))[0] == 0:
+            return []
+        q = np.asarray(query_vec, dtype=np.float32).reshape(-1)
+        qn = float(np.linalg.norm(q)) or 1.0
+        scored: list[tuple[float, dict]] = []
+        for r in rows:
+            vr = int(r["vec_row"])
+            if vr < 0 or vr >= vecs.shape[0]:
+                continue
+            v = np.asarray(vecs[vr], dtype=np.float32)
+            vn = float(np.linalg.norm(v)) or 1.0
+            cos = float(np.dot(q, v) / (qn * vn))
+            penalty = 0.0
+            if (r["char_len"] or 0) < 1500:
+                penalty += 0.15
+            if (r["ocr_ratio"] or 0.0) > 0.10:
+                penalty += 0.15
+            scored.append((cos - penalty, dict(r)))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        out: list[dict] = []
+        seen: set[str] = set()
+        for score, r in scored:
+            base = _re.sub(r"_\d+$", "", os.path.splitext(os.path.basename(r["path"]))[0])
+            if base in seen:
+                continue
+            seen.add(base)
+            r["score"] = score
+            out.append(r)
+            if len(out) >= k:
+                break
+        return out
+
     def stats(self) -> dict:
         con = self._conn()
         b = con.execute("SELECT COUNT(*) n FROM briefs WHERE status='ok'").fetchone()["n"]
