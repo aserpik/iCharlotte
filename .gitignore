@@ -33,6 +33,7 @@ NoteTaker/dist/
 .gemini/tmp/
 .gemini/case_data/
 .gemini/caselaw/
+.gemini/firm_briefs/
 *.pdf
 *.docx
 !Templates/litigation_report.docx
