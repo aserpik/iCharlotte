@@ -16,8 +16,19 @@ classic-mode tabs.
 """
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QPushButton, QWidget
+
+
+def _asset_path(name: str) -> str:
+    """Forward-slash absolute path to a bundled asset, for embedding in QSS ``url()``.
+
+    Note: QSS ``url()`` does NOT reliably load images via the ``file://`` scheme,
+    so this returns a plain path (``as_posix``), not ``Path.as_uri()``.
+    """
+    return (Path(__file__).resolve().parent / "assets" / name).as_posix()
 
 
 # --------------------------------------------------------------------------- #
@@ -178,6 +189,7 @@ def wizard_stylesheet() -> str:
     """QSS applied to wizard root widgets so all default child controls share a
     consistent look. Accent buttons created via the builders above carry their
     own inline styling and intentionally override these defaults."""
+    check_path = _asset_path("checkmark.svg")
     return f"""
     QLabel {{ color: {TEXT_BODY}; }}
 
@@ -208,6 +220,23 @@ def wizard_stylesheet() -> str:
 
     QListWidget::item {{ padding: 4px 6px; border-radius: 3px; }}
     QListWidget::item:selected {{ background-color: {PRIMARY_SUBTLE}; color: {TEXT}; }}
+
+    /* Styling ::item above makes Qt drop the native check indicator, so it must
+       be defined explicitly or checkable rows render with no visible checkbox. */
+    QListWidget::indicator {{
+        width: 16px;
+        height: 16px;
+        border: 1px solid {BORDER};
+        border-radius: 3px;
+        background-color: #FFFFFF;
+    }}
+    QListWidget::indicator:hover {{ border-color: {PRIMARY}; }}
+    QListWidget::indicator:checked {{
+        background-color: {PRIMARY};
+        border-color: {PRIMARY};
+        image: url("{check_path}");
+    }}
+    QListWidget::indicator:checked:hover {{ background-color: {PRIMARY_HOVER}; }}
 
     QProgressBar {{
         border: 1px solid {BORDER};

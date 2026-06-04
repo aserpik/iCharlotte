@@ -20,6 +20,30 @@ def test_wizard_stylesheet_is_nonempty_str():
     assert isinstance(qss, str) and "QPushButton" in qss and theme.PRIMARY in qss
 
 
+def test_wizard_stylesheet_defines_listwidget_check_indicator():
+    """Styling ``QListWidget::item`` makes Qt drop the native check indicator, so
+    the stylesheet MUST define ``::indicator`` or checkable rows (e.g. Depo Prep
+    proposed topics) render with no visible checkbox."""
+    qss = theme.wizard_stylesheet()
+    assert "QListWidget::item" in qss
+    assert "QListWidget::indicator" in qss
+    # Checked state must paint the checkmark image.
+    assert "QListWidget::indicator:checked" in qss
+    assert "image: url(" in qss
+
+
+def test_check_indicator_image_uses_loadable_path():
+    """QSS ``url()`` does not load images via the ``file://`` scheme; the embedded
+    path must be a plain filesystem path and the asset must exist."""
+    from pathlib import Path
+
+    qss = theme.wizard_stylesheet()
+    assert "file://" not in qss  # file:// urls silently fail to render in QSS
+    asset = Path(theme.__file__).resolve().parent / "assets" / "checkmark.svg"
+    assert asset.is_file()
+    assert asset.as_posix() in qss
+
+
 def test_button_builders_return_styled_buttons(qtbot):
     for build, needle in [
         (theme.primary_button, theme.PRIMARY),
