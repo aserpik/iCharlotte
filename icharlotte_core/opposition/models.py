@@ -138,6 +138,12 @@ class RetrievedAuthority:
     citation_count: int | None = None
     latest_citing_year: str = ""
 
+    # Provenance (firm-brief authority reuse). Defaults keep corpus-only behavior.
+    source: str = "corpus"            # "firm" | "corpus"
+    verification: str = "local"       # "local" | "courtlistener" | "unverified_firm"
+    source_brief: str = ""            # path/label of the firm brief this came from
+    alternatives: list = field(default_factory=list)  # corpus options for same point
+
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
