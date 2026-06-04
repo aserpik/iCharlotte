@@ -23,7 +23,6 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QStackedWidget,
-    QTextBrowser,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -49,7 +48,11 @@ from icharlotte_core.opposition.verifier import (
     enrich_with_pool_signals,
     pool_membership_check,
 )
-from icharlotte_core.ui.wizard.pages.oppose_motion_page import _make_local_corpus
+from icharlotte_core.ui.wizard.pages.citation_review import CitationReviewOutputPage
+from icharlotte_core.ui.wizard.pages.oppose_motion_page import (
+    _make_local_corpus,
+    _research_targets,
+)
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
 from icharlotte_core.ui.wizard.task_scaffold import WizardTaskContainer
 from icharlotte_core.ui.context_files_dialog import ContextFilesDialog
@@ -488,26 +491,47 @@ class GenerateMotionWorker(QThread):
 
             _, draft_llm, make_pass_llm = _make_llms()
 
+            research_targets = _research_targets(metadata, plan)
             corpus = _make_local_corpus()
             token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
             retrieved = []
-            if metadata.principal_arguments and (corpus is not None or token):
+            # Cache opinion text under this task's prompt dir (mirrors oppose).
+            repo_root = os.path.dirname(
+                os.path.dirname(
+                    os.path.dirname(
+                        os.path.dirname(os.path.dirname(__file__))
+                    )
+                )
+            )
+            opinion_cache = os.path.join(
+                repo_root, "Scripts", "prompts", "generate_motion", ".cache", "opinions"
+            )
+            if research_targets and (corpus is not None or token):
                 client = corpus
                 if client is None:
                     from icharlotte_core.legal_research.sources.courtlistener import (
                         CourtListenerClient,
                     )
                     client = CourtListenerClient(token)
-                    self.progress.emit("Local corpus not built; using CourtListener API...")
+                    self.progress.emit(
+                        "Local corpus not built; using CourtListener API "
+                        f"({len(research_targets)} points)..."
+                    )
                 else:
-                    self.progress.emit("Researching authorities locally...")
+                    self.progress.emit(
+                        f"Researching authorities locally ({len(research_targets)} points)..."
+                    )
                 retrieved = research_arguments(
-                    metadata.principal_arguments,
+                    research_targets,
                     cl_client=client,
                     query_llm=make_pass_llm("research_queries"),
                     rerank_llm=make_pass_llm("rerank_select"),
-                    max_workers=4,
+                    # Keep concurrency low: 4 parallel workers burst the LLM /
+                    # CourtListener rate limit on the per-point query-gen +
+                    # rerank calls (oppose's hard-won lesson).
+                    max_workers=2,
                     on_progress=self.progress.emit,
+                    cache_dir=opinion_cache,
                 )
                 self.progress.emit(f"Retrieved {len(retrieved)} grounded authorities.")
             else:
@@ -578,53 +602,40 @@ class GenerateMotionWorker(QThread):
             self.finished_result.emit(False, str(exc))
 
 
-class GenerateMotionOutputPage(QWidget):
-    def __init__(self, parent: QWidget | None = None):
-        super().__init__(parent)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(10)
+class GenerateMotionOutputPage(CitationReviewOutputPage):
+    default_title = "Generated Motion"
 
-        self.heading = QLabel("Generated Motion")
-        layout.addWidget(self.heading)
+    def empty_citations_message(self) -> str:
+        return (
+            "No citations were detected in this motion. If California "
+            "case-law research returned no results, the motion was drafted "
+            "without case citations. Review for any statutory support that "
+            "may need strengthening."
+        )
 
-        self.body = QTextBrowser()
-        layout.addWidget(self.body, 1)
-
-        row = QHBoxLayout()
+    def _build_action_buttons(self, row) -> None:
+        self._add_save_button(row)
         self.open_btn = QPushButton("Open in Word")
         self.open_btn.clicked.connect(self._open_preview)
         self.open_btn.setEnabled(False)
         row.addWidget(self.open_btn)
-        row.addStretch()
-        layout.addLayout(row)
-
-        self._preview_path = ""
-
-    @property
-    def output_path(self) -> str:
-        return self._preview_path
 
     def show_result(self, draft: DraftDocument) -> None:
-        self._preview_path = getattr(draft, "preview_path", "") or ""
-        self.heading.setText(draft.title or "Generated Motion")
-        self.body.setPlainText(draft.body_text or "")
-        self.open_btn.setEnabled(bool(self._preview_path) and os.path.isfile(self._preview_path))
+        super().show_result(draft)
+        self._refresh_open_btn()
 
-    def load_output(self, path: str) -> None:
-        self._preview_path = path or ""
-        self.open_btn.setEnabled(bool(self._preview_path) and os.path.isfile(self._preview_path))
-        try:
-            from docx import Document
+    def load_output(self, output_path: str) -> None:
+        super().load_output(output_path)
+        self._refresh_open_btn()
 
-            text = "\n".join(p.text for p in Document(path).paragraphs)
-            self.body.setPlainText(text)
-        except Exception:  # noqa: BLE001
-            pass
+    def _refresh_open_btn(self) -> None:
+        path = self.output_path
+        self.open_btn.setEnabled(bool(path) and os.path.isfile(path))
 
     def _open_preview(self) -> None:
-        if self._preview_path and os.path.isfile(self._preview_path):
-            QDesktopServices.openUrl(QUrl.fromLocalFile(self._preview_path))
+        path = self.output_path
+        if path and os.path.isfile(path):
+            QDesktopServices.openUrl(QUrl.fromLocalFile(path))
 
 
 class GenerateMotionTaskTab(WizardTaskContainer):
