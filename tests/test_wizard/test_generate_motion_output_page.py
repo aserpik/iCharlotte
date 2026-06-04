@@ -123,3 +123,34 @@ def test_open_in_word_button_present(qtbot):
     qtbot.addWidget(page)
     assert hasattr(page, "open_btn")
     assert page.open_btn.text() == "Open in Word"
+
+
+def test_open_in_word_enabled_only_with_existing_preview(qtbot, tmp_path):
+    page = GenerateMotionOutputPage()
+    qtbot.addWidget(page)
+
+    # No preview path → disabled.
+    page.show_result(DraftDocument(title="M", body_text="Body.", citations=[]))
+    assert not page.open_btn.isEnabled()
+
+    # preview_path that does not exist on disk → still disabled.
+    page.show_result(DraftDocument(
+        title="M", body_text="Body.", citations=[],
+        preview_path=str(tmp_path / "nope.docx"),
+    ))
+    assert not page.open_btn.isEnabled()
+
+    # Real on-disk .docx preview → enabled.
+    preview = tmp_path / "preview.docx"
+    preview.write_bytes(b"dummy")
+    page.show_result(DraftDocument(
+        title="M", body_text="Body.", citations=[],
+        preview_path=str(preview),
+    ))
+    assert page.open_btn.isEnabled()
+
+    # load_output on a real file also enables it.
+    page2 = GenerateMotionOutputPage()
+    qtbot.addWidget(page2)
+    page2.load_output(str(preview))
+    assert page2.open_btn.isEnabled()
