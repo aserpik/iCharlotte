@@ -75,6 +75,14 @@ subheadings) builds on it and reuses the threaded motion identity.
 
 ## Part A — Thread the specified motion identity (fixes the wrong-motion bug)
 
+**Principle:** the user-specified motion name is the SOURCE OF TRUTH for the
+motion vehicle. When the user names an "Other" motion (e.g. "Motion in Limine to
+Exclude Witnesses"), the task drafts *that* motion; the context documents inform
+the CONTENT (facts, specific arguments, supporting details) but never change the
+motion type. The analyzer's job becomes "given this named motion, mine the
+documents for the grounds/relief that support it" — not "infer which motion to
+bring from the documents."
+
 Root-cause fix is at the **source** (the analyzer), with defense-in-depth at the
 drafter.
 

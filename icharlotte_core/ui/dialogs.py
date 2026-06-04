@@ -1832,6 +1832,7 @@ class PromptsDialog(QDialog):
             from icharlotte_core.motion_generation.prompts import (
                 DEFAULT_ANALYZE_TEMPLATE,
                 MOTION_DRAFT_PROMPT,
+                MOTION_OUTLINE_PROMPT,
             )
         except Exception:
             return
@@ -1841,6 +1842,8 @@ class PromptsDialog(QDialog):
              "Generate Motion: moving-party points & authorities draft"),
             ("analyze_target", DEFAULT_ANALYZE_TEMPLATE,
              "Generate Motion: propose grounds/relief from documents"),
+            ("generate_outline", MOTION_OUTLINE_PROMPT,
+             "Generate Motion: nested argument-subheading outline"),
         ]
         for pass_name, content, desc in seeds:
             if f"generate_motion:{pass_name}" not in registry:

@@ -62,3 +62,73 @@ def test_worker_researches_subsection_leaves(monkeypatch, tmp_path):
     # Parity knobs.
     assert captured["max_workers"] == 2
     assert captured["cache_dir"] and "generate_motion" in captured["cache_dir"]
+
+
+def test_analysis_worker_passes_motion_name(monkeypatch):
+    import icharlotte_core.ui.wizard.pages.generate_motion_page as gm
+    from icharlotte_core.opposition.models import MotionMetadata
+
+    captured = {}
+
+    def fake_analyze(config, target_text, *, llm_callback, context_text="", motion_name=""):
+        captured["motion_name"] = motion_name
+        return MotionMetadata(motion_type=motion_name or "X",
+                              relief_requested="r", principal_arguments=["g1"])
+
+    monkeypatch.setattr(gm, "analyze_target", fake_analyze)
+    monkeypatch.setattr(gm, "extract_context_bundle", lambda files: ("some facts", []))
+    # Harmless stub LLM closures so any outline generation (a later task) makes no real call.
+    monkeypatch.setattr(gm, "_make_llms", lambda: ((lambda s, u: ""), (lambda s, u: ""),
+                                                   (lambda p: (lambda s, u: ""))))
+
+    settings = {
+        "motion_type_id": "generic",
+        "motion_type_name": "Motion in Limine to Exclude Witnesses",
+        "target_files": ["x.pdf"], "user_relief": "", "user_arguments": [],
+    }
+    worker = gm.GenerateMotionAnalysisWorker(settings=settings)
+    results = {}
+    worker.finished_analysis.connect(lambda ok, payload: results.update(ok=ok, payload=payload))
+    worker.run()
+
+    assert results["ok"] is True
+    assert captured["motion_name"] == "Motion in Limine to Exclude Witnesses"
+
+
+def test_analysis_worker_emits_nested_outline(monkeypatch):
+    import icharlotte_core.ui.wizard.pages.generate_motion_page as gm
+    from icharlotte_core.opposition.models import MotionMetadata
+
+    monkeypatch.setattr(gm, "extract_context_bundle", lambda files: ("facts", []))
+    monkeypatch.setattr(
+        gm, "analyze_target",
+        lambda *a, **k: MotionMetadata(
+            motion_type=k.get("motion_name") or "M",
+            relief_requested="r", principal_arguments=["g1", "g2"]),
+    )
+
+    def fake_outline_llm(system, user):
+        return ('{"outline": [{"text": "Argument", '
+                '"children": [{"text": "Sub A"}, {"text": "Sub B"}]}]}')
+
+    # _make_llms() returns (analysis_llm, draft_llm, make_pass_llm); the worker
+    # uses analysis_llm for both analyze_target and generate_motion_outline.
+    monkeypatch.setattr(
+        gm, "_make_llms",
+        lambda: (fake_outline_llm, fake_outline_llm, (lambda p: fake_outline_llm)),
+    )
+
+    settings = {
+        "motion_type_id": "generic",
+        "motion_type_name": "Motion in Limine to Exclude Witnesses",
+        "target_files": ["x.pdf"], "user_relief": "", "user_arguments": [],
+    }
+    worker = gm.GenerateMotionAnalysisWorker(settings=settings)
+    out = {}
+    worker.finished_analysis.connect(lambda ok, payload: out.update(ok=ok, payload=payload))
+    worker.run()
+
+    assert out["ok"] is True
+    outline = out["payload"]["outline"]
+    arg = [n for n in outline if n.text == "Argument"]
+    assert arg and len(arg[0].children) >= 2
