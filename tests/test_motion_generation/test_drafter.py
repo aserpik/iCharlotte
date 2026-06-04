@@ -79,3 +79,25 @@ def test_draft_motion_bad_json_is_rejected():
     draft = draft_motion(cfg, _meta(), [], "C", "", style_exemplars=[], llm_callback=llm)
     assert draft.body_text == ""
     assert draft.rejection_reason
+
+
+def test_draft_motion_prompt_carries_motion_type_and_guardrail():
+    from icharlotte_core.motion_generation.drafter import draft_motion
+    from icharlotte_core.motion_generation.config import get_motion_config
+    from icharlotte_core.opposition.models import MotionMetadata
+
+    captured = {}
+
+    def fake_llm(system_prompt, user_prompt):
+        captured["system"] = system_prompt
+        captured["user"] = user_prompt
+        return '{"title": "T", "body_text": "Argument in favor of granting the motion."}'
+
+    cfg = get_motion_config("generic")
+    md = MotionMetadata(motion_type="Motion in Limine to Exclude Witnesses",
+                        relief_requested="Exclude", principal_arguments=["A"])
+    draft_motion(cfg, md, [], "facts", "", style_exemplars=[], llm_callback=fake_llm)
+
+    blob = (captured["system"] + "\n" + captured["user"]).lower()
+    assert "motion in limine to exclude witnesses" in blob
+    assert "summary judgment" in blob  # the "do not convert into an MSJ" guardrail

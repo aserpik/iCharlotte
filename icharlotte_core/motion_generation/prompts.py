@@ -3,6 +3,10 @@
 MOTION_DRAFT_PROMPT = """You are drafting the Memorandum of Points and Authorities \
 for a {motion_type} brought by the MOVING party in a California civil case.
 
+You are drafting a {motion_type}. The relief and every argument MUST fit a \
+{motion_type}; do not reframe it as a different motion vehicle (e.g., do not \
+convert a motion in limine into a motion for summary judgment).
+
 Draft a persuasive memorandum that argues IN FAVOR of granting the motion and \
 the relief sought. Follow the section plan. Ground every case citation in the \
 authority pool below; do not cite cases from memory. Cite the controlling \
