@@ -25,6 +25,7 @@ _SPLITTER_SETTINGS_KEY = "wizard_tab/recent_splitter_sizes"
 class WizardTab(QWidget):
     task_requested = Signal(str)            # task_id
     reopen_requested = Signal(dict)         # recent-tasks entry
+    card_action_requested = Signal(str)     # card_action_id (corner button)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -92,6 +93,7 @@ class WizardTab(QWidget):
         for spec in list_tasks():
             card = TaskCard(spec)
             card.clicked.connect(self.task_requested.emit)
+            card.action_requested.connect(self.card_action_requested.emit)
             self.cards[spec.task_id] = card
 
         # Build one section (header + grid) per category, in order.
