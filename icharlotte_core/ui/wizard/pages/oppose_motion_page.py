@@ -112,6 +112,30 @@ def _make_local_corpus():
     from icharlotte_core.legal_research.local_corpus.corpus import LocalCaseCorpus
     db, vec = _corpus_paths()
     return LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=_corpus_embedder())
+
+
+def _make_firm_provider(corpus):
+    """Build a FirmAuthorityProvider if the firm-brief index is built, else None.
+
+    cl_client is the live CourtListener fallback for firm cites not in the local
+    corpus; reuse the same token the research path uses.
+    """
+    try:
+        from icharlotte_core.firm_briefs import factory
+        index = factory.make_index()
+        if index is None:
+            return None
+        from icharlotte_core.firm_briefs.provider import FirmAuthorityProvider
+        cl = None
+        token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
+        if token:
+            from icharlotte_core.legal_research.sources.courtlistener import CourtListenerClient
+            cl = CourtListenerClient(token)
+        return FirmAuthorityProvider(index, corpus, cl_client=cl)
+    except Exception:
+        return None
+
+
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
 from icharlotte_core.ui.wizard.task_scaffold import WizardTaskContainer
 from icharlotte_core.ui.context_files_dialog import ContextFilesDialog
@@ -637,6 +661,9 @@ class OpposeMotionWorker(QThread):
                 self.progress.emit(
                     f"Researching authorities locally ({len(research_targets)} points)..."
                 )
+                firm_provider = _make_firm_provider(corpus)
+                if firm_provider is not None:
+                    self.progress.emit("  Firm brief library active (preferring your prior authorities).")
                 retrieved = research_arguments(
                     research_targets,
                     cl_client=corpus,
@@ -648,6 +675,9 @@ class OpposeMotionWorker(QThread):
                     max_workers=2,
                     on_progress=self.progress.emit,
                     cache_dir=opinion_cache,
+                    firm_provider=firm_provider,
+                    motion_type=metadata.motion_type,
+                    side="opposition",
                 )
                 self.progress.emit(f"Retrieved {len(retrieved)} grounded authorities.")
             elif corpus is None and token and research_targets:
