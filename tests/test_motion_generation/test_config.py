@@ -7,12 +7,8 @@ from icharlotte_core.motion_generation.config import (
 
 
 def test_configured_type_set():
-    assert set(MOTION_TYPE_CONFIGS.keys()) == {
-        "compel",
-        "demurrer",
-        "strike",
-        "generic",
-    }
+    # Original three + generic must still be present; new taxonomy types are also registered.
+    assert {"compel", "demurrer", "strike", "generic"}.issubset(set(MOTION_TYPE_CONFIGS.keys()))
 
 
 def test_each_config_is_a_motiontypeconfig():
