@@ -24,7 +24,8 @@ def content_hash(path: str) -> str:
 def _default_extract(path: str) -> str:
     from icharlotte_core.document_processor import DocumentProcessor
     try:
-        return DocumentProcessor().extract_text(path) or ""
+        # extract_text returns an ExtractResult; .text is the extracted string.
+        return DocumentProcessor().extract_text(path).text or ""
     except Exception:
         return ""
 
