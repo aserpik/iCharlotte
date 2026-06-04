@@ -68,6 +68,13 @@ def ingest_root(root: str, index, embedder, *,
             profile = compose_profile("", headings, [c.proposition for c in cites]) \
                 or profile_from_text(text)
             vec = embedder.encode([profile])[0]
+            # Batch-embed propositions for per-citation semantic rerank.
+            prop_vecs = None
+            if cites:
+                try:
+                    prop_vecs = list(embedder.encode([c.proposition for c in cites]))
+                except Exception:
+                    prop_vecs = None
             # Corrected: check if path already exists in DB (any hash) to distinguish add vs update
             existed = bool(index._conn().execute(
                 "SELECT 1 FROM briefs WHERE path=?", (path,)).fetchone())
@@ -75,7 +82,7 @@ def ingest_root(root: str, index, embedder, *,
                 path=path, content_hash=h, motion_type=motion_type, side=side,
                 heading=headings[0] if headings else "", profile=profile,
                 profile_vec=vec, char_len=len(text), ocr_ratio=_ocr_ratio(text),
-                cites=cites, full_text=text,
+                cites=cites, full_text=text, prop_vecs=prop_vecs,
             )
             updated += 1 if existed else 0
             added += 0 if existed else 1

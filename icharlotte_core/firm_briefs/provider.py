@@ -12,16 +12,40 @@ logger = logging.getLogger(__name__)
 
 
 class FirmAuthorityProvider:
-    def __init__(self, index, corpus, cl_client: Optional[Any] = None) -> None:
+    def __init__(self, index, corpus, cl_client: Optional[Any] = None,
+                 embedder=None) -> None:
         self.index = index
         self.corpus = corpus
         self.cl_client = cl_client
+        self._embedder = embedder
+
+    def _get_embedder(self):
+        if self._embedder is not None:
+            return self._embedder
+        from .embedding import get_embedder
+        return get_embedder()
 
     def candidates_for(self, proposition: str, *, motion_type: str, side: str,
                        limit: int = 6) -> List[dict]:
+        # Embed proposition for semantic rerank; fall back to FTS-only on failure.
+        query_vec = None
+        try:
+            emb = self._get_embedder()
+            query_vec = emb.encode([proposition])[0]
+        except Exception:
+            logger.warning("prop embed failed, falling back to FTS-only", exc_info=True)
+            query_vec = None
         try:
             rows = self.index.authority_candidates(
-                proposition, motion_type=motion_type, limit=limit)
+                proposition, motion_type=motion_type, limit=limit, query_vec=query_vec)
+        except TypeError:
+            # Index may not support query_vec (e.g., legacy FakeIndex in tests); fall back.
+            try:
+                rows = self.index.authority_candidates(
+                    proposition, motion_type=motion_type, limit=limit)
+            except Exception:
+                logger.warning("firm authority lookup failed", exc_info=True)
+                return []
         except Exception:
             logger.warning("firm authority lookup failed", exc_info=True)
             return []

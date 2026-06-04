@@ -39,7 +39,8 @@ CREATE TABLE IF NOT EXISTS citations(
   id INTEGER PRIMARY KEY,
   brief_id INTEGER REFERENCES briefs(id) ON DELETE CASCADE,
   case_name TEXT, reporter_cite TEXT, year TEXT, norm_cite TEXT,
-  proposition TEXT, quoted_passage TEXT
+  proposition TEXT, quoted_passage TEXT,
+  prop_vec_row INTEGER DEFAULT -1
 );
 CREATE INDEX IF NOT EXISTS ix_cit_norm ON citations(norm_cite);
 CREATE INDEX IF NOT EXISTS ix_cit_brief ON citations(brief_id);
@@ -53,6 +54,7 @@ class FirmBriefIndex:
     def __init__(self, *, db_path: str, vectors_path: str, embedder=None) -> None:
         self.db_path = db_path
         self.vectors_path = vectors_path
+        self.prop_vectors_path = vectors_path + ".prop"
         self.embedder = embedder
         self._local = threading.local()
         os.makedirs(os.path.dirname(db_path) or ".", exist_ok=True)
@@ -76,6 +78,10 @@ class FirmBriefIndex:
             con.execute("ALTER TABLE briefs ADD COLUMN full_text TEXT DEFAULT ''")
         except sqlite3.OperationalError:
             pass  # column already exists
+        try:
+            con.execute("ALTER TABLE citations ADD COLUMN prop_vec_row INTEGER DEFAULT -1")
+        except sqlite3.OperationalError:
+            pass  # column already exists
         con.commit()
 
     # -- vector sidecar ---------------------------------------------------
@@ -94,6 +100,23 @@ class FirmBriefIndex:
         if not os.path.exists(self.vectors_path) or os.path.getsize(self.vectors_path) == 0:
             return np.zeros((0, EMBED_DIM), dtype=np.float16)
         return np.memmap(self.vectors_path, dtype=np.float16, mode="r").reshape(-1, EMBED_DIM)
+
+    # -- prop vector sidecar (per-citation) --------------------------------
+    def _append_prop_vector(self, vec: np.ndarray) -> int:
+        v = np.asarray(vec, dtype=np.float16).reshape(EMBED_DIM)
+        row = 0
+        if os.path.exists(self.prop_vectors_path):
+            row = os.path.getsize(self.prop_vectors_path) // (EMBED_DIM * 2)
+        with open(self.prop_vectors_path, "ab") as f:
+            f.write(v.tobytes())
+            f.flush()
+            os.fsync(f.fileno())
+        return int(row)
+
+    def load_prop_vectors(self) -> np.ndarray:
+        if not os.path.exists(self.prop_vectors_path) or os.path.getsize(self.prop_vectors_path) == 0:
+            return np.zeros((0, EMBED_DIM), dtype=np.float16)
+        return np.memmap(self.prop_vectors_path, dtype=np.float16, mode="r").reshape(-1, EMBED_DIM)
 
     # -- writes -----------------------------------------------------------
     def _delete_citations_for_brief(self, con: sqlite3.Connection, bid: int) -> None:
@@ -117,7 +140,8 @@ class FirmBriefIndex:
 
     def upsert_brief(self, *, path: str, content_hash: str, motion_type: str, side: str,
                      heading: str, profile: str, profile_vec, char_len: int, ocr_ratio: float,
-                     cites: List[Any], full_text: str = "") -> int:
+                     cites: List[Any], full_text: str = "",
+                     prop_vecs: Optional[List] = None) -> int:
         con = self._conn()
         # Append a fresh vector row (sidecar is append-only; old rows orphaned
         # until --compact). fsync sidecar BEFORE the DB commit (crash ordering).
@@ -141,13 +165,18 @@ class FirmBriefIndex:
                  char_len, ocr_ratio, full_text or ""),
             )
             bid = int(cur.lastrowid)
-        for c in cites:
+        # Determine whether we have aligned prop vectors for citations.
+        _has_prop_vecs = (prop_vecs is not None and len(prop_vecs) == len(cites))
+        for i, c in enumerate(cites):
+            pvr = -1
+            if _has_prop_vecs:
+                pvr = self._append_prop_vector(prop_vecs[i])
             cur = con.execute(
                 "INSERT INTO citations(brief_id, case_name, reporter_cite, year, "
-                "norm_cite, proposition, quoted_passage) VALUES(?,?,?,?,?,?,?)",
+                "norm_cite, proposition, quoted_passage, prop_vec_row) VALUES(?,?,?,?,?,?,?,?)",
                 (bid, getattr(c, "case_name", ""), getattr(c, "reporter_citation", ""),
                  getattr(c, "year", ""), getattr(c, "norm_cite", ""),
-                 getattr(c, "proposition", ""), getattr(c, "quoted_passage", "")),
+                 getattr(c, "proposition", ""), getattr(c, "quoted_passage", ""), pvr),
             )
             con.execute("INSERT INTO citations_fts(rowid, proposition) VALUES(?,?)",
                         (cur.lastrowid, getattr(c, "proposition", "")))
@@ -182,7 +211,7 @@ class FirmBriefIndex:
         return row is not None
 
     def authority_candidates(self, proposition: str, *, motion_type: str,
-                             limit: int = 8) -> List[dict]:
+                             limit: int = 8, query_vec=None) -> List[dict]:
         con = self._conn()
         q = _fts_query(proposition)
         if not q:
@@ -190,7 +219,7 @@ class FirmBriefIndex:
         try:
             rows = con.execute(
                 "SELECT c.case_name, c.reporter_cite, c.year, c.norm_cite, c.proposition, "
-                "c.quoted_passage, b.path AS source_brief "
+                "c.quoted_passage, b.path AS source_brief, c.prop_vec_row "
                 "FROM citations_fts f "
                 "JOIN citations c ON c.id = f.rowid "
                 "JOIN briefs b ON b.id = c.brief_id "
@@ -202,7 +231,7 @@ class FirmBriefIndex:
             # bm25 not available — fall back to rowid ordering
             rows = con.execute(
                 "SELECT c.case_name, c.reporter_cite, c.year, c.norm_cite, c.proposition, "
-                "c.quoted_passage, b.path AS source_brief "
+                "c.quoted_passage, b.path AS source_brief, c.prop_vec_row "
                 "FROM citations_fts f "
                 "JOIN citations c ON c.id = f.rowid "
                 "JOIN briefs b ON b.id = c.brief_id "
@@ -210,7 +239,31 @@ class FirmBriefIndex:
                 "ORDER BY f.rowid LIMIT ?",
                 (q, motion_type, limit),
             ).fetchall()
-        return [dict(r) for r in rows]
+        # When query_vec is None, return in FTS order (byte-identical to old behavior).
+        if query_vec is None:
+            return [
+                {k: r[k] for k in r.keys() if k != "prop_vec_row"}
+                for r in rows
+            ]
+        # Semantic rerank: reciprocal-rank fusion of FTS position and cosine(query_vec, prop_vec).
+        pvecs = self.load_prop_vectors()
+        qv = np.asarray(query_vec, dtype=np.float32).reshape(-1)
+        qvn = float(np.linalg.norm(qv)) or 1.0
+        scored: List[tuple] = []
+        for fts_pos, r in enumerate(rows):
+            pvr = r["prop_vec_row"] if "prop_vec_row" in r.keys() else -1
+            fts_score = 1.0 / (60 + fts_pos)
+            sem_score = 0.0
+            if pvr >= 0 and pvecs.shape[0] > pvr:
+                pv = np.asarray(pvecs[pvr], dtype=np.float32)
+                pvn = float(np.linalg.norm(pv)) or 1.0
+                sem_score = float(np.dot(qv, pv) / (qvn * pvn))
+            scored.append((fts_score + sem_score, r))
+        scored.sort(key=lambda x: x[0], reverse=True)
+        return [
+            {k: r[k] for k in r.keys() if k != "prop_vec_row"}
+            for _, r in scored
+        ]
 
     def style_candidates(self, query_vec, *, motion_type: str, side: str,
                          k: int = 3) -> list[dict]:
