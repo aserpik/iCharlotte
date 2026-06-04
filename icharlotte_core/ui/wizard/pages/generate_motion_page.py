@@ -49,7 +49,10 @@ from icharlotte_core.opposition.verifier import (
     pool_membership_check,
 )
 from icharlotte_core.ui.wizard.pages.citation_review import CitationReviewOutputPage
-from icharlotte_core.ui.wizard.pages.oppose_motion_page import _make_local_corpus
+from icharlotte_core.ui.wizard.pages.oppose_motion_page import (
+    _make_local_corpus,
+    _research_targets,
+)
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
 from icharlotte_core.ui.wizard.task_scaffold import WizardTaskContainer
 from icharlotte_core.ui.context_files_dialog import ContextFilesDialog
@@ -488,26 +491,47 @@ class GenerateMotionWorker(QThread):
 
             _, draft_llm, make_pass_llm = _make_llms()
 
+            research_targets = _research_targets(metadata, plan)
             corpus = _make_local_corpus()
             token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
             retrieved = []
-            if metadata.principal_arguments and (corpus is not None or token):
+            # Cache opinion text under this task's prompt dir (mirrors oppose).
+            repo_root = os.path.dirname(
+                os.path.dirname(
+                    os.path.dirname(
+                        os.path.dirname(os.path.dirname(__file__))
+                    )
+                )
+            )
+            opinion_cache = os.path.join(
+                repo_root, "Scripts", "prompts", "generate_motion", ".cache", "opinions"
+            )
+            if research_targets and (corpus is not None or token):
                 client = corpus
                 if client is None:
                     from icharlotte_core.legal_research.sources.courtlistener import (
                         CourtListenerClient,
                     )
                     client = CourtListenerClient(token)
-                    self.progress.emit("Local corpus not built; using CourtListener API...")
+                    self.progress.emit(
+                        "Local corpus not built; using CourtListener API "
+                        f"({len(research_targets)} points)..."
+                    )
                 else:
-                    self.progress.emit("Researching authorities locally...")
+                    self.progress.emit(
+                        f"Researching authorities locally ({len(research_targets)} points)..."
+                    )
                 retrieved = research_arguments(
-                    metadata.principal_arguments,
+                    research_targets,
                     cl_client=client,
                     query_llm=make_pass_llm("research_queries"),
                     rerank_llm=make_pass_llm("rerank_select"),
-                    max_workers=4,
+                    # Keep concurrency low: 4 parallel workers burst the LLM /
+                    # CourtListener rate limit on the per-point query-gen +
+                    # rerank calls (oppose's hard-won lesson).
+                    max_workers=2,
                     on_progress=self.progress.emit,
+                    cache_dir=opinion_cache,
                 )
                 self.progress.emit(f"Retrieved {len(retrieved)} grounded authorities.")
             else:
