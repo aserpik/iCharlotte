@@ -1701,7 +1701,8 @@ class MainWindow(QMainWindow):
         worker = getattr(widget, "_worker", None)
         if worker is not None:
             if widget.__class__.__name__ in (
-                "OpposeMotionTaskTab", "GenerateMotionTaskTab", "SeparateTaskTab"
+                "OpposeMotionTaskTab", "GenerateMotionTaskTab", "SeparateTaskTab",
+                "MediationBriefTaskTab",
             ) and worker.isRunning():
                 QMessageBox.information(
                     self,
