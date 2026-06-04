@@ -163,7 +163,34 @@ def _citation_header_html(citation, verdict: str) -> str:
 
 
 def _citation_body_html(citation, verdict: str) -> str:
+    import os as _os
     parts: list[str] = []
+    if getattr(citation, "source", "") == "firm":
+        label = _os.path.splitext(_os.path.basename(citation.source_brief or ""))[0] or "your brief"
+        # strip the "Matter__" prefix the library uses, if present
+        label = label.split("__", 1)[-1]
+        fv = getattr(citation, "firm_verification", "")
+        if fv == "unverified_firm":
+            parts.append(
+                f"<p style='color:#b06000;'>⚠ <b>From firm brief</b> "
+                f"(<i>{html.escape(label)}</i>) — not independently verified.</p>"
+            )
+        else:
+            tier = "verified locally" if fv == "local" else (
+                   "verified via CourtListener" if fv == "courtlistener" else "")
+            tail = f" — {tier}" if tier else ""
+            parts.append(
+                f"<p style='color:#188038;'>\U0001F4C1 <b>From your brief:</b> "
+                f"<i>{html.escape(label)}</i>{tail}</p>"
+            )
+        alts = getattr(citation, "alternatives", []) or []
+        if alts:
+            links = []
+            for i, a in enumerate(alts):
+                nm = html.escape((a.get('case_name') or '').strip())
+                ct = html.escape((a.get('citation') or '').strip())
+                links.append(f"<li>{nm}, {ct} &nbsp;<a href='altswap:{i}'>Use this instead</a></li>")
+            parts.append("<p><b>Corpus alternatives:</b></p><ul>" + "".join(links) + "</ul>")
 
     prop = (citation.proposition or "").strip()
     if prop:
