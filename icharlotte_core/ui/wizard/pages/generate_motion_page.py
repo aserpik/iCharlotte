@@ -71,6 +71,7 @@ from icharlotte_core.motion_generation.config import (
     list_motion_types,
 )
 from icharlotte_core.motion_generation.drafter import draft_motion
+from icharlotte_core.firm_briefs.motion_taxonomy import normalize_motion_type
 
 
 SETTINGS_PAGE_INTAKE = 0
@@ -517,6 +518,9 @@ class GenerateMotionWorker(QThread):
             opinion_cache = os.path.join(
                 repo_root, "Scripts", "prompts", "generate_motion", ".cache", "opinions"
             )
+            raw_type = self.settings.get("motion_type_id") or getattr(metadata, "motion_type", "")
+            firm_motion_type = raw_type if raw_type not in ("", "generic") else \
+                normalize_motion_type(self.settings.get("motion_type_name", "") or getattr(metadata, "motion_type", ""))
             if research_targets and (corpus is not None or token):
                 client = corpus
                 if client is None:
@@ -548,7 +552,7 @@ class GenerateMotionWorker(QThread):
                     on_progress=self.progress.emit,
                     cache_dir=opinion_cache,
                     firm_provider=firm_provider,
-                    motion_type=metadata.motion_type,
+                    motion_type=firm_motion_type,
                     side="moving",
                 )
                 self.progress.emit(f"Retrieved {len(retrieved)} grounded authorities.")
@@ -562,9 +566,7 @@ class GenerateMotionWorker(QThread):
             exemplars = load_exemplars(self.settings.get("motion_type_id") or "")
             if exemplars:
                 self.progress.emit(f"Using {len(exemplars)} style sample(s) for this motion type.")
-            firm_style = _firm_style_exemplars(
-                self.settings.get("motion_type_id") or getattr(metadata, "motion_type", ""),
-                "moving", metadata)
+            firm_style = _firm_style_exemplars(firm_motion_type, "moving", metadata)
             if firm_style:
                 self.progress.emit(f"Using {len(firm_style)} firm-library style sample(s).")
             exemplars = (firm_style + exemplars)[:3]
