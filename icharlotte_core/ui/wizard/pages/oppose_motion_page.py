@@ -114,6 +114,15 @@ def _make_local_corpus():
     return LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=_corpus_embedder())
 
 
+def _firm_style_exemplars(motion_type, side, metadata):
+    """Firm-library style excerpts most similar to this motion; [] if no index."""
+    try:
+        from icharlotte_core.firm_briefs import style
+        return style.select_exemplars(motion_type, side, metadata) or []
+    except Exception:
+        return []
+
+
 def _make_firm_provider(corpus):
     """Build a FirmAuthorityProvider if the firm-brief index is built, else None.
 
@@ -636,6 +645,10 @@ class OpposeMotionWorker(QThread):
                 self.progress.emit(f"  Using {len(exemplar_texts)} style exemplar(s).")
             else:
                 self.progress.emit("  No matching style exemplars; using default voice.")
+            firm_style = _firm_style_exemplars(metadata.motion_type, "opposition", metadata)
+            if firm_style:
+                self.progress.emit(f"  + {len(firm_style)} firm-library style sample(s).")
+            exemplar_texts = (firm_style + exemplar_texts)[:3]
 
             # Retrieval-first grounding: research real California authority for
             # each principal argument before drafting, so the drafter cites only
