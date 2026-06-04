@@ -1,7 +1,7 @@
 """TaskCard — clickable card on the Wizard tab."""
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QMouseEvent
-from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout
+from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QToolButton, QVBoxLayout
 
 from . import theme
 from .registry import TaskSpec
@@ -32,7 +32,8 @@ QLabel#icon_tile {{
 class TaskCard(QFrame):
     """A single card representing a task. Clicking emits `clicked(task_id)`."""
 
-    clicked = Signal(str)  # task_id
+    clicked = Signal(str)            # task_id
+    action_requested = Signal(str)   # card_action_id (corner button)
 
     def __init__(self, spec: TaskSpec, parent=None):
         super().__init__(parent)
@@ -69,6 +70,27 @@ class TaskCard(QFrame):
             f"font-size: {theme.FONT_BODY}px; color: {theme.TEXT_MUTED};"
         )
         outer.addWidget(self.description_label, 1)
+
+        self.action_btn = None
+        if spec.card_action_id:
+            footer = QHBoxLayout()
+            footer.setContentsMargins(0, 0, 0, 0)
+            footer.addStretch()
+            self.action_btn = QToolButton()
+            self.action_btn.setText(spec.card_action_glyph or "⋯")
+            self.action_btn.setToolTip(spec.card_action_tooltip or "")
+            self.action_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.action_btn.setAutoRaise(True)
+            self.action_btn.setStyleSheet(
+                "QToolButton { border: none; font-size: 16px; padding: 2px; }"
+                f" QToolButton:hover {{ background-color: {theme.BG_SUBTLE};"
+                f" border-radius: {theme.RADIUS_MD}px; }}"
+            )
+            self.action_btn.clicked.connect(
+                lambda _=False: self.action_requested.emit(self._spec.card_action_id)
+            )
+            footer.addWidget(self.action_btn)
+            outer.addLayout(footer)
 
     @property
     def task_id(self) -> str:
