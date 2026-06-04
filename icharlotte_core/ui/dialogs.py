@@ -661,6 +661,7 @@ class PromptsDialog(QDialog):
         # tab (generate_motion) are added/removed per selected agent.
         self._style_examples_tab = None
         self._motion_types_tab = None
+        self._sample_library_tab = None
 
         # Bottom buttons
         btn_layout = QHBoxLayout()
@@ -1941,9 +1942,10 @@ class PromptsDialog(QDialog):
             self.current_pass = None
             self._load_pass_model_defaults()
 
-        # Show/hide the Style Examples + Motion Types tabs based on the agent.
+        # Show/hide the Style Examples + Motion Types + Sample Library tabs based on the agent.
         self._refresh_style_examples_tab()
         self._refresh_motion_types_tab()
+        self._refresh_sample_library_tab()
 
     def _refresh_style_examples_tab(self) -> None:
         """Show the Style Examples tab for agents that use style exemplars."""
@@ -2005,6 +2007,34 @@ class PromptsDialog(QDialog):
             if existing_index >= 0:
                 tabs.removeTab(existing_index)
                 self._motion_types_tab = None
+
+    def _refresh_sample_library_tab(self) -> None:
+        """Show the Sample Library tab for agents that use the firm-brief library."""
+        from icharlotte_core.ui.dialogs_sample_library import SampleLibraryTab
+
+        tabs = getattr(self, "tabs", None)
+        if tabs is None:
+            return
+
+        existing_index = -1
+        for i in range(tabs.count()):
+            if tabs.tabText(i) == "Sample Library":
+                existing_index = i
+                break
+
+        if self.current_agent in ("oppose_motion", "generate_motion"):
+            if existing_index < 0:
+                roots_config_path = os.path.join(
+                    PROMPTS_DIR, "firm_briefs", "roots.json"
+                )
+                self._sample_library_tab = SampleLibraryTab(
+                    roots_config_path=roots_config_path
+                )
+                tabs.addTab(self._sample_library_tab, "Sample Library")
+        else:
+            if existing_index >= 0:
+                tabs.removeTab(existing_index)
+                self._sample_library_tab = None
 
     def _on_pass_changed(self, pass_name: str):
         """Handle pass selection change."""
