@@ -450,7 +450,9 @@ class GenerateMotionAnalysisWorker(QThread):
             if target_text.strip():
                 analysis_llm, _, _ = _make_llms()
                 self.progress.emit("Proposing additional grounds from documents...")
-                ai_metadata = analyze_target(config, target_text, llm_callback=analysis_llm)
+                ai_metadata = analyze_target(
+                    config, target_text, llm_callback=analysis_llm, motion_name=name
+                )
 
             merged = merge_intake_with_analysis(user_relief, user_arguments, ai_metadata, name)
             outline = outline_from_config(config)
