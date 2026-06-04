@@ -7,7 +7,9 @@ citations are unchanged). Idempotent. Usage:
 import os
 import sys
 
-sys.path.insert(0, r"C:\geminiterminal2")
+# Resolve imports relative to this file so it works from the main checkout OR a
+# worktree. The index DATA location is separate (FIRM_BRIEFS_DATA_DIR / config).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from icharlotte_core.firm_briefs.motion_taxonomy import normalize_motion_type
 
