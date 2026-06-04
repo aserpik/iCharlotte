@@ -313,6 +313,50 @@ class FirmBriefIndex:
                 break
         return out
 
+    def compact(self) -> None:
+        """Rewrite the profile + prop vector sidecars keeping only live rows,
+        re-pointing vec_row/prop_vec_row. Reclaims space from upsert/stale churn."""
+        con = self._conn()
+        # profile vectors: rebuild for status='ok' briefs
+        # Copy memmap into a plain numpy array immediately so the file handle is released
+        # before we open the same path for writing (required on Windows).
+        vecs_mm = self.load_vectors()
+        vecs = np.array(vecs_mm, dtype=np.float16)
+        del vecs_mm  # release memmap file handle
+        live = con.execute(
+            "SELECT id, vec_row FROM briefs WHERE status='ok' AND vec_row>=0 ORDER BY id"
+        ).fetchall()
+        new = []
+        for new_row, r in enumerate(live):
+            if 0 <= r["vec_row"] < vecs.shape[0]:
+                new.append(np.asarray(vecs[r["vec_row"]], dtype=np.float16))
+                con.execute("UPDATE briefs SET vec_row=? WHERE id=?", (new_row, r["id"]))
+        with open(self.vectors_path, "wb") as f:
+            if new:
+                f.write(np.stack(new).astype(np.float16).tobytes())
+            f.flush()
+            os.fsync(f.fileno())
+        # prop vectors (if present)
+        if os.path.exists(self.prop_vectors_path):
+            pvecs_mm = self.load_prop_vectors()
+            pvecs = np.array(pvecs_mm, dtype=np.float16)
+            del pvecs_mm  # release memmap file handle
+            plive = con.execute(
+                "SELECT c.id, c.prop_vec_row FROM citations c JOIN briefs b ON b.id=c.brief_id "
+                "WHERE b.status='ok' AND c.prop_vec_row>=0 ORDER BY c.id"
+            ).fetchall()
+            pnew = []
+            for nr, r in enumerate(plive):
+                if 0 <= r["prop_vec_row"] < pvecs.shape[0]:
+                    pnew.append(np.asarray(pvecs[r["prop_vec_row"]], dtype=np.float16))
+                    con.execute("UPDATE citations SET prop_vec_row=? WHERE id=?", (nr, r["id"]))
+            with open(self.prop_vectors_path, "wb") as f:
+                if pnew:
+                    f.write(np.stack(pnew).astype(np.float16).tobytes())
+                f.flush()
+                os.fsync(f.fileno())
+        con.commit()
+
     def stats(self) -> dict:
         con = self._conn()
         b = con.execute("SELECT COUNT(*) n FROM briefs WHERE status='ok'").fetchone()["n"]
