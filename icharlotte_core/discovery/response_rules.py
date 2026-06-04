@@ -20,6 +20,17 @@ _DEFAULT_RESERVATION = (
     "facts and/or information are discovered, or their relevance becomes apparent."
 )
 
+# Superseded firm-standard reservation clauses. Older per-case ``respond_rules``
+# persisted the prior wording (the clause appended after every substantive
+# response); when such data is reloaded it is upgraded to _DEFAULT_RESERVATION so
+# generated responses always carry the current firm-standard language. Genuine
+# per-case customizations (anything not in this set) are left untouched.
+_SUPERSEDED_RESERVATIONS = frozenset({
+    "Discovery and investigation are ongoing and Responding Party reserves the right to amend, "
+    "modify and/or supplement this response as additional facts and further information is "
+    "obtained, new analyses are made, and legal research is completed.",
+})
+
 _DEFAULT_PRELIMINARY_FI = (
     "These responses are made solely for the purpose of this action. Each response is subject to all "
     "appropriate objections, including competency, relevancy, materiality, propriety and admissibility, "
@@ -493,6 +504,10 @@ class ResponseRules:
             merged.get("fi_responses_by_number") or {}
         )
         merged["fi_responses_by_number"].update(_MANDATORY_FI_RESPONSES_BY_NUMBER)
+        # Upgrade superseded firm-standard reservation wording persisted in older
+        # case data to the current default. Genuine customizations are preserved.
+        if (merged.get("reservation_clause") or "").strip() in _SUPERSEDED_RESERVATIONS:
+            merged["reservation_clause"] = _DEFAULT_RESERVATION
         return cls(**merged)
 
     def save_to_json(self, path: str) -> None:

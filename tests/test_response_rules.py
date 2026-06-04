@@ -84,6 +84,34 @@ class TestResponseRules(unittest.TestCase):
         self.assertIn("{document_title}", rules.verification_template)
         self.assertIn("{verifier_name}", rules.verification_template)
 
+    def test_from_dict_upgrades_superseded_reservation_clause(self):
+        """Stale firm-standard reservation wording saved in old case data is upgraded.
+
+        The clause is appended after every substantive response. Older per-case
+        ``respond_rules`` persisted the prior wording; loading it must yield the
+        current firm-standard clause, not the superseded one.
+        """
+        superseded = (
+            "Discovery and investigation are ongoing and Responding Party reserves "
+            "the right to amend, modify and/or supplement this response as additional "
+            "facts and further information is obtained, new analyses are made, and "
+            "legal research is completed."
+        )
+        rules = ResponseRules.from_dict({"reservation_clause": superseded})
+        self.assertNotIn("new analyses are made", rules.reservation_clause)
+        self.assertEqual(rules.reservation_clause, ResponseRules().reservation_clause)
+        self.assertIn(
+            "in the future in the event that additional documents, facts and/or "
+            "information are discovered, or their relevance becomes apparent.",
+            rules.reservation_clause,
+        )
+
+    def test_from_dict_preserves_genuine_custom_reservation_clause(self):
+        """A reservation clause the user genuinely customized is left untouched."""
+        custom = "Responding Party reserves all rights under CCP section 2030.300."
+        rules = ResponseRules.from_dict({"reservation_clause": custom})
+        self.assertEqual(rules.reservation_clause, custom)
+
 
 if __name__ == "__main__":
     unittest.main()
