@@ -951,6 +951,16 @@ class MainWindow(QMainWindow):
             }
         """
 
+        # Notes button (secondary) — opens/creates the case AS NOTES document.
+        # Mirrors the Notes button in the Case View toolbar so it stays
+        # reachable in Wizard mode, where the Case View tab is hidden. Placed
+        # before the Open File button so it sits to its left in the corner.
+        self.btn_notes_corner = QPushButton("Notes")
+        self.btn_notes_corner.setStyleSheet(secondary_btn_style)
+        self.btn_notes_corner.setToolTip("Open or create the AS NOTES document for the current case")
+        self.btn_notes_corner.clicked.connect(self.open_notes)
+        self.corner_layout.addWidget(self.btn_notes_corner)
+
         # Open File button (blue - primary)
         self.btn_open_root = QPushButton("Open File")
         self.btn_open_root.setStyleSheet(primary_btn_style.format(
@@ -1065,8 +1075,14 @@ class MainWindow(QMainWindow):
         except ValueError:
             return path
 
-    def _snapshot_open_task_tabs(self) -> list:
-        """Build the persistence-ready snapshot of currently-open task tabs."""
+    def _snapshot_open_task_tabs(self, cancel_running: bool = True) -> list:
+        """Build the persistence-ready snapshot of currently-open task tabs.
+
+        cancel_running: at shutdown (True) a tab caught mid-run on the status
+        page has its worker cancelled cleanly on the way out. Opportunistic
+        mid-session saves pass False so they OBSERVE state without killing an
+        in-flight task on this or any other open tab.
+        """
         if not self.case_path:
             return []
         snapshots = []
@@ -1077,8 +1093,9 @@ class MainWindow(QMainWindow):
                 continue
             # Determine page label.
             page_idx = tab.currentIndex()
-            if page_idx == 1:  # PAGE_STATUS — cancel and store as settings
-                if getattr(tab, "_worker", None) is not None:
+            if page_idx == 1:  # PAGE_STATUS — store as settings (no live worker
+                               # survives a restart, so it can't be restored).
+                if cancel_running and getattr(tab, "_worker", None) is not None:
                     try:
                         tab._worker.cancel()
                     except Exception:
@@ -1114,13 +1131,35 @@ class MainWindow(QMainWindow):
             self.tabs.removeTab(idx)
             widget.deleteLater()
 
-    def _save_wizard_state_for_current_case(self) -> None:
+    def _save_wizard_state_for_current_case(self, cancel_running: bool = True) -> None:
         if not self.case_path:
             return
         from icharlotte_core.ui.wizard.persistence import WizardStatePersistence
         p = WizardStatePersistence(self.case_path)
-        p.set_open_tabs(self._snapshot_open_task_tabs())
+        p.set_open_tabs(self._snapshot_open_task_tabs(cancel_running=cancel_running))
         p.save()
+
+    def _persist_open_tabs(self) -> None:
+        """Save the open-tab snapshot WITHOUT cancelling any running worker.
+
+        Called after the open-tab set or a tab's contents change (open / close /
+        complete) so the session survives a force-kill or freeze — both of which
+        bypass closeEvent and restart_app, leaving nothing saved otherwise.
+        """
+        try:
+            self._save_wizard_state_for_current_case(cancel_running=False)
+        except Exception as e:
+            log_event(f"[wizard] opportunistic state save failed: {e}")
+
+    def _persist_open_tabs_soon(self) -> None:
+        """Deferred variant of _persist_open_tabs.
+
+        A task tab emits ``task_completed`` BEFORE it finishes switching to its
+        output page, so deferring one event-loop turn lets the snapshot capture
+        the output page (and its output_path) rather than the stale settings
+        page. Used on task completion.
+        """
+        QTimer.singleShot(0, self._persist_open_tabs)
 
     def _on_library_captured(self, case_root: str) -> None:
         """A background capture finished — refresh any open Chat tab's library tree.
@@ -1157,6 +1196,10 @@ class MainWindow(QMainWindow):
         if hasattr(self, "wizard_tab") and self.wizard_tab is not None:
             if hasattr(self.wizard_tab, "refresh_recent_tasks"):
                 self.wizard_tab.refresh_recent_tasks(p.get_recent_tasks())
+        # Re-snapshot the open tabs so the just-produced output is restorable
+        # even if the session ends by force-kill (deferred so the tab has
+        # finished switching to its output page).
+        self._persist_open_tabs_soon()
 
     def _on_reopen_recent_task(self, entry: dict) -> None:
         from icharlotte_core.ui.wizard.registry import get_task, TASK_REGISTRY
@@ -1529,6 +1572,13 @@ class MainWindow(QMainWindow):
 
     def restart_app(self):
         log_event("User requested manual restart. Spawning new process...")
+        # Persist session state BEFORE quitting. QApplication.quit() does not
+        # dispatch closeEvent, so without this the open wizard tabs and their
+        # contents would be lost when restarting via the in-app button.
+        try:
+            self._persist_session_state()
+        except Exception as e:
+            log_event(f"[wizard] restart persist failed: {e}", "error")
         # Close all agent runners if any are running
         for runner in self.agent_runners:
             try:
@@ -1748,6 +1798,9 @@ class MainWindow(QMainWindow):
                 pass
         self.tabs.removeTab(index)
         widget.deleteLater()
+        # Persist the reduced open-tab set so a later force-kill can't resurrect
+        # a tab the user deliberately closed.
+        self._persist_open_tabs()
 
     def _hide_fixed_close_buttons(self) -> None:
         """Hide close buttons on tabs that are not TaskTabs."""
@@ -3007,24 +3060,44 @@ class MainWindow(QMainWindow):
         except Exception as e:
             log_event(f"Error loading status history: {e}", "error")
 
-    def closeEvent(self, event):
+    def _persist_session_state(self) -> None:
+        """Flush all per-session state to disk.
+
+        Called from BOTH closeEvent and restart_app so the two shutdown paths
+        cannot drift. The in-app Restart button uses QApplication.quit(), which
+        does NOT dispatch closeEvent — so without calling this first, the open
+        wizard task tabs and their contents are silently lost on restart. Each
+        save is isolated so one failure can't block the others on the way out.
+        """
         try:
             self._save_wizard_state_for_current_case()
         except Exception as e:
-            log_event(f"[wizard] close-save failed: {e}")
-        self.save_status_history()
-        # Save persistent chat conversation + any wizard-spawned chat tabs
+            log_event(f"[wizard] state save failed: {e}")
+        try:
+            self.save_status_history()
+        except Exception as e:
+            log_event(f"[wizard] status-history save failed: {e}")
+        # Save persistent chat conversation + any wizard-spawned chat tabs.
         if hasattr(self, 'chat_tab') and self.chat_tab:
-            self.chat_tab.save_current_state()
+            try:
+                self.chat_tab.save_current_state()
+            except Exception as e:
+                log_event(f"[wizard] chat save_current_state failed: {e}")
         for _, tab in self._iter_task_tabs():
             if isinstance(tab, ChatTab):
                 try:
                     tab.save_current_state()
                 except Exception as e:
-                    log_event(f"[wizard] chat save_current_state failed on close: {e}")
-        # Save discovery tab state before closing
+                    log_event(f"[wizard] chat save_current_state failed: {e}")
+        # Save discovery tab state.
         if hasattr(self, 'discovery_tab') and self.discovery_tab:
-            self.discovery_tab.save_state()
+            try:
+                self.discovery_tab.save_state()
+            except Exception as e:
+                log_event(f"[wizard] discovery save_state failed: {e}")
+
+    def closeEvent(self, event):
+        self._persist_session_state()
         # Clean up global hotkeys
         if KEYBOARD_AVAILABLE:
             try:
