@@ -75,7 +75,7 @@ def ingest_root(root: str, index, embedder, *,
                 path=path, content_hash=h, motion_type=motion_type, side=side,
                 heading=headings[0] if headings else "", profile=profile,
                 profile_vec=vec, char_len=len(text), ocr_ratio=_ocr_ratio(text),
-                cites=cites,
+                cites=cites, full_text=text,
             )
             updated += 1 if existed else 0
             added += 0 if existed else 1

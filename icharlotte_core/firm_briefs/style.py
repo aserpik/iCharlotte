@@ -45,7 +45,7 @@ def _cache_key(path: str) -> str:
 
 
 def _excerpt(path: str, *, cache_dir: str, extract_fn: Callable[[str], str],
-             max_chars: int) -> str:
+             max_chars: int, stored_text: str = "") -> str:
     os.makedirs(cache_dir, exist_ok=True)
     cache_path = os.path.join(cache_dir, f"{_cache_key(path)}.txt")
     if os.path.exists(cache_path):
@@ -54,7 +54,8 @@ def _excerpt(path: str, *, cache_dir: str, extract_fn: Callable[[str], str],
                 return f.read()
         except OSError:
             pass
-    excerpt = _trim_to_argument(extract_fn(path), max_chars)
+    raw = stored_text if (stored_text and stored_text.strip()) else extract_fn(path)
+    excerpt = _trim_to_argument(raw, max_chars)
     if excerpt:
         try:
             with open(cache_path, "w", encoding="utf-8") as f:
@@ -99,7 +100,13 @@ def select_exemplars(
     cache_dir = cache_dir or os.path.join(DATA_DIR, ".cache", "style")
     out: List[str] = []
     for c in cands:
-        txt = _excerpt(c["path"], cache_dir=cache_dir, extract_fn=extract_fn, max_chars=max_chars)
+        stored = ""
+        try:
+            stored = index.get_full_text(c["path"])
+        except Exception:
+            stored = ""
+        txt = _excerpt(c["path"], cache_dir=cache_dir, extract_fn=extract_fn,
+                       max_chars=max_chars, stored_text=stored)
         if txt.strip():
             out.append(txt)
     return out

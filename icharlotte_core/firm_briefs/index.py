@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS briefs(
   vec_row INTEGER DEFAULT -1,
   char_len INTEGER DEFAULT 0, ocr_ratio REAL DEFAULT 0.0,
   ingested_at TEXT DEFAULT (datetime('now')),
-  status TEXT DEFAULT 'ok'
+  status TEXT DEFAULT 'ok',
+  full_text TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS citations(
   id INTEGER PRIMARY KEY,
@@ -70,6 +71,11 @@ class FirmBriefIndex:
     def create_schema(self) -> None:
         con = self._conn()
         con.executescript(_SCHEMA)
+        # Migrations: add columns that may not exist in pre-existing tables.
+        try:
+            con.execute("ALTER TABLE briefs ADD COLUMN full_text TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass  # column already exists
         con.commit()
 
     # -- vector sidecar ---------------------------------------------------
@@ -111,7 +117,7 @@ class FirmBriefIndex:
 
     def upsert_brief(self, *, path: str, content_hash: str, motion_type: str, side: str,
                      heading: str, profile: str, profile_vec, char_len: int, ocr_ratio: float,
-                     cites: List[Any]) -> int:
+                     cites: List[Any], full_text: str = "") -> int:
         con = self._conn()
         # Append a fresh vector row (sidecar is append-only; old rows orphaned
         # until --compact). fsync sidecar BEFORE the DB commit (crash ordering).
@@ -122,17 +128,17 @@ class FirmBriefIndex:
             self._delete_citations_for_brief(con, bid)
             con.execute(
                 "UPDATE briefs SET content_hash=?, motion_type=?, side=?, heading=?, "
-                "profile=?, vec_row=?, char_len=?, ocr_ratio=?, status='ok', "
+                "profile=?, vec_row=?, char_len=?, ocr_ratio=?, full_text=?, status='ok', "
                 "ingested_at=datetime('now') WHERE id=?",
                 (content_hash, motion_type, side, heading, profile, vec_row,
-                 char_len, ocr_ratio, bid),
+                 char_len, ocr_ratio, full_text or "", bid),
             )
         else:
             cur = con.execute(
                 "INSERT INTO briefs(path, content_hash, motion_type, side, heading, "
-                "profile, vec_row, char_len, ocr_ratio) VALUES(?,?,?,?,?,?,?,?,?)",
+                "profile, vec_row, char_len, ocr_ratio, full_text) VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (path, content_hash, motion_type, side, heading, profile, vec_row,
-                 char_len, ocr_ratio),
+                 char_len, ocr_ratio, full_text or ""),
             )
             bid = int(cur.lastrowid)
         for c in cites:
@@ -155,6 +161,16 @@ class FirmBriefIndex:
             self._delete_citations_for_brief(con, int(row["id"]))
             con.execute("UPDATE briefs SET status='stale' WHERE id=?", (int(row["id"]),))
             con.commit()
+
+    def get_full_text(self, path: str) -> str:
+        row = self._conn().execute(
+            "SELECT full_text FROM briefs WHERE path=?", (path,)).fetchone()
+        return (row["full_text"] if row else "") or ""
+
+    def get_full_text_by_id(self, brief_id: int) -> str:
+        row = self._conn().execute(
+            "SELECT full_text FROM briefs WHERE id=?", (brief_id,)).fetchone()
+        return (row["full_text"] if row else "") or ""
 
     # -- reads ------------------------------------------------------------
     def has_current(self, path: str, content_hash: str) -> bool:
