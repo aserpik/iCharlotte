@@ -213,6 +213,12 @@ class CitationVerification:
 
     replacement_candidates: list[Any] = field(default_factory=list)
 
+    # Firm-library provenance (Phase 3). Defaults keep corpus-only behavior.
+    source: str = ""                  # "firm" | "corpus" | ""
+    source_brief: str = ""            # path/label of the firm brief it came from
+    firm_verification: str = ""       # "local" | "courtlistener" | "unverified_firm" | ""
+    alternatives: list = field(default_factory=list)  # [{case_name, citation, year?}]
+
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
@@ -243,6 +249,10 @@ class CitationVerification:
             support_end=data.get("support_end"),
             warning=data.get("warning", ""),
             replacement_candidates=_candidate_list(data.get("replacement_candidates")),
+            source=data.get("source", ""),
+            source_brief=data.get("source_brief", ""),
+            firm_verification=data.get("firm_verification", ""),
+            alternatives=list(data.get("alternatives", []) or []),
         )
 
 
