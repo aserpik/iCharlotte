@@ -50,6 +50,7 @@ from icharlotte_core.opposition.verifier import (
 )
 from icharlotte_core.ui.wizard.pages.citation_review import CitationReviewOutputPage
 from icharlotte_core.ui.wizard.pages.oppose_motion_page import (
+    _firm_style_exemplars,
     _make_firm_provider,
     _make_local_corpus,
     _research_targets,
@@ -561,6 +562,12 @@ class GenerateMotionWorker(QThread):
             exemplars = load_exemplars(self.settings.get("motion_type_id") or "")
             if exemplars:
                 self.progress.emit(f"Using {len(exemplars)} style sample(s) for this motion type.")
+            firm_style = _firm_style_exemplars(
+                self.settings.get("motion_type_id") or getattr(metadata, "motion_type", ""),
+                "moving", metadata)
+            if firm_style:
+                self.progress.emit(f"Using {len(firm_style)} firm-library style sample(s).")
+            exemplars = (firm_style + exemplars)[:3]
 
             self.progress.emit("Drafting motion memorandum...")
             draft = draft_motion(
