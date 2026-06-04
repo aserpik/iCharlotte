@@ -47,6 +47,7 @@ from icharlotte_core.opposition.verifier import (
 )
 import os as _os_corpus
 from icharlotte_core.config import CASELAW_DATA_DIR
+from icharlotte_core.firm_briefs.motion_taxonomy import normalize_motion_type
 
 
 def _corpus_paths() -> tuple[str, str]:
@@ -645,7 +646,8 @@ class OpposeMotionWorker(QThread):
                 self.progress.emit(f"  Using {len(exemplar_texts)} style exemplar(s).")
             else:
                 self.progress.emit("  No matching style exemplars; using default voice.")
-            firm_style = _firm_style_exemplars(metadata.motion_type, "opposition", metadata)
+            firm_motion_type = normalize_motion_type(metadata.motion_type)
+            firm_style = _firm_style_exemplars(firm_motion_type, "opposition", metadata)
             if firm_style:
                 self.progress.emit(f"  + {len(firm_style)} firm-library style sample(s).")
             exemplar_texts = (firm_style + exemplar_texts)[:3]
@@ -689,7 +691,7 @@ class OpposeMotionWorker(QThread):
                     on_progress=self.progress.emit,
                     cache_dir=opinion_cache,
                     firm_provider=firm_provider,
-                    motion_type=metadata.motion_type,
+                    motion_type=firm_motion_type,
                     side="opposition",
                 )
                 self.progress.emit(f"Retrieved {len(retrieved)} grounded authorities.")
