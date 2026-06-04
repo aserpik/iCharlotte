@@ -60,6 +60,7 @@ from icharlotte_core.ui.context_files_dialog import ContextFilesDialog
 
 from icharlotte_core.motion_generation.analyzer import (
     analyze_target,
+    generate_motion_outline,
     merge_intake_with_analysis,
     outline_from_config,
 )
@@ -447,15 +448,21 @@ class GenerateMotionAnalysisWorker(QThread):
                 return
 
             ai_metadata = MotionMetadata(motion_type=name)
+            # Build the analysis LLM up front: it is also used to generate the
+            # outline below even when no target documents were supplied.
+            analysis_llm, _, _ = _make_llms()
             if target_text.strip():
-                analysis_llm, _, _ = _make_llms()
                 self.progress.emit("Proposing additional grounds from documents...")
                 ai_metadata = analyze_target(
                     config, target_text, llm_callback=analysis_llm, motion_name=name
                 )
 
             merged = merge_intake_with_analysis(user_relief, user_arguments, ai_metadata, name)
-            outline = outline_from_config(config)
+            self.progress.emit("Building a detailed outline for the motion...")
+            outline = generate_motion_outline(
+                config, merged, context_text="", target_text=target_text,
+                llm_callback=analysis_llm,
+            )
             self.finished_analysis.emit(
                 True,
                 {"metadata": merged, "outline": outline, "target_text": target_text},

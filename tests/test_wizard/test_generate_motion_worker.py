@@ -93,3 +93,42 @@ def test_analysis_worker_passes_motion_name(monkeypatch):
 
     assert results["ok"] is True
     assert captured["motion_name"] == "Motion in Limine to Exclude Witnesses"
+
+
+def test_analysis_worker_emits_nested_outline(monkeypatch):
+    import icharlotte_core.ui.wizard.pages.generate_motion_page as gm
+    from icharlotte_core.opposition.models import MotionMetadata
+
+    monkeypatch.setattr(gm, "extract_context_bundle", lambda files: ("facts", []))
+    monkeypatch.setattr(
+        gm, "analyze_target",
+        lambda *a, **k: MotionMetadata(
+            motion_type=k.get("motion_name") or "M",
+            relief_requested="r", principal_arguments=["g1", "g2"]),
+    )
+
+    def fake_outline_llm(system, user):
+        return ('{"outline": [{"text": "Argument", '
+                '"children": [{"text": "Sub A"}, {"text": "Sub B"}]}]}')
+
+    # _make_llms() returns (analysis_llm, draft_llm, make_pass_llm); the worker
+    # uses analysis_llm for both analyze_target and generate_motion_outline.
+    monkeypatch.setattr(
+        gm, "_make_llms",
+        lambda: (fake_outline_llm, fake_outline_llm, (lambda p: fake_outline_llm)),
+    )
+
+    settings = {
+        "motion_type_id": "generic",
+        "motion_type_name": "Motion in Limine to Exclude Witnesses",
+        "target_files": ["x.pdf"], "user_relief": "", "user_arguments": [],
+    }
+    worker = gm.GenerateMotionAnalysisWorker(settings=settings)
+    out = {}
+    worker.finished_analysis.connect(lambda ok, payload: out.update(ok=ok, payload=payload))
+    worker.run()
+
+    assert out["ok"] is True
+    outline = out["payload"]["outline"]
+    arg = [n for n in outline if n.text == "Argument"]
+    assert arg and len(arg[0].children) >= 2
