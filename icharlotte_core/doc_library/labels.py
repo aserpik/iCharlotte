@@ -32,6 +32,8 @@ def _base_label(task_type: str, source_paths: list, metadata: dict) -> str:
     party = (metadata.get("party") or "").strip()
     name = (metadata.get("name") or "").strip()
     if task_type == "summarize_depositions":
+        if name:
+            return f"Deposition of {name}"
         return f"{party}'s Deposition Transcript" if party else "Deposition Transcript"
     if task_type == "summarize_discovery":
         return f"{party}'s Discovery Responses" if party else "Discovery Responses"

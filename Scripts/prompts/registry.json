@@ -556,13 +556,31 @@
     "oppose_motion:analyze_motion": {
       "agent": "oppose_motion",
       "pass_name": "analyze_motion",
-      "current_version": "v1",
+      "current_version": "v3",
       "versions": [
         {
           "version": "v1",
           "created": "2026-05-27T08:09:30.414972",
           "description": "Motion analysis: extract metadata + principal arguments",
           "author": "system",
+          "is_current": false,
+          "performance_score": 0.0,
+          "usage_count": 0
+        },
+        {
+          "version": "v2",
+          "created": "2026-06-04T12:36:59.483668",
+          "description": "v2",
+          "author": "user",
+          "is_current": false,
+          "performance_score": 0.0,
+          "usage_count": 0
+        },
+        {
+          "version": "v3",
+          "created": "2026-06-04T13:18:28.219464",
+          "description": "v2",
+          "author": "user",
           "is_current": true,
           "performance_score": 0.0,
           "usage_count": 0
@@ -588,7 +606,7 @@
     "oppose_motion:draft_memorandum": {
       "agent": "oppose_motion",
       "pass_name": "draft_memorandum",
-      "current_version": "v4",
+      "current_version": "v5",
       "versions": [
         {
           "version": "v1",
@@ -622,6 +640,15 @@
           "created": "2026-06-02T19:07:19.840283",
           "description": "Relabel pool: Holding=paraphrase, Source quote=verify-only",
           "author": "system",
+          "is_current": false,
+          "performance_score": 0.0,
+          "usage_count": 0
+        },
+        {
+          "version": "v5",
+          "created": "2026-06-04T13:22:39.027867",
+          "description": "v2",
+          "author": "user",
           "is_current": true,
           "performance_score": 0.0,
           "usage_count": 0

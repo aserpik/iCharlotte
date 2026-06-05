@@ -1895,6 +1895,10 @@ class ChatTab(QWidget):
         cursor.movePosition(QTextCursor.MoveOperation.End)
         self.stream_start_pos = cursor.position()
 
+        # Sending jumps to the latest, so the response follows from the start
+        # (until the user deliberately scrolls up).
+        self._chat_scroll_to_bottom()
+
         # Build system prompt (augment with legal authority if research was done)
         effective_system_prompt = self.system_prompt
         if research_result:
@@ -1955,16 +1959,40 @@ class ChatTab(QWidget):
 
 
 
+    # Pixels of slack when deciding whether the chat view is "parked" at the
+    # bottom. Smaller than a line of text, so scrolling up even one notch
+    # disengages auto-follow.
+    _SCROLL_BOTTOM_TOLERANCE_PX = 4
+
+    def _chat_is_at_bottom(self) -> bool:
+        """True when the chat view is parked at (or within a hair of) the bottom."""
+        bar = self.chat_history.verticalScrollBar()
+        return bar.value() >= bar.maximum() - self._SCROLL_BOTTOM_TOLERANCE_PX
+
+    def _chat_scroll_to_bottom(self):
+        """Pin the chat view to the bottom."""
+        bar = self.chat_history.verticalScrollBar()
+        bar.setValue(bar.maximum())
+
     def on_streaming_token(self, token: str):
         """Handle real-time token display during streaming."""
         self.stream_text += token
 
-        # Append token to chat display
+        # Only auto-follow the stream when the user is already parked at the
+        # bottom. Capture this BEFORE inserting, because the insert grows the
+        # scroll range. If the user has scrolled up to read, leave their
+        # viewport untouched (scrolling back to the bottom re-arms following).
+        follow = self._chat_is_at_bottom()
+
+        # Append the token via a local cursor. We deliberately do NOT call
+        # setTextCursor()/ensureCursorVisible() here: forcing the cursor into
+        # view on every token is what yanked a scrolled-up reader back down.
         cursor = self.chat_history.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
         cursor.insertText(token)
-        self.chat_history.setTextCursor(cursor)
-        self.chat_history.ensureCursorVisible()
+
+        if follow:
+            self._chat_scroll_to_bottom()
 
     def on_stream_complete(self, full_text: str):
         """Handle completion of streaming response."""
@@ -1976,6 +2004,11 @@ class ChatTab(QWidget):
 
     def finalize_response(self, text: str):
         """Finalize the response with markdown rendering and save to persistence."""
+        # Remember whether the user is following the bottom BEFORE we mutate the
+        # document, so a scrolled-up reader isn't yanked down when the final
+        # formatted text and separators are appended.
+        follow = self._chat_is_at_bottom()
+
         # Calculate response time
         response_time = int((time.time() - self.stream_start_time) * 1000) if self.stream_start_time else 0
 
@@ -2055,6 +2088,9 @@ class ChatTab(QWidget):
 
         # Update legacy history
         self.conversation_history.append({'role': 'assistant', 'content': text})
+
+        if follow:
+            self._chat_scroll_to_bottom()
 
         self.update_context_indicator()
 
@@ -2258,40 +2294,49 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
         """)
 
     def update_template_menu(self):
-        """Update the quick prompts template menu."""
-        menu = QMenu(self)
+        """(Re)populate the quick prompts template menu from built-ins + the global store."""
+        # Reuse one persistent menu so we can refresh it on aboutToShow without re-wiring.
+        menu = self.template_btn.menu()
+        if menu is None:
+            menu = QMenu(self.template_btn)
+            self.template_btn.setMenu(menu)
+            # Rebuild every time the menu opens so newly added/edited/deleted global
+            # templates appear in all chat tabs without needing a restart.
+            menu.aboutToShow.connect(lambda s=self: ChatTab.update_template_menu(s))
+        menu.clear()
 
         # Built-in prompts
         for prompt in BUILTIN_PROMPTS:
             if prompt.id == 'builtin_mediation_brief':
                 continue  # Handled separately below
-            action = QAction(prompt.name, self)
+            action = QAction(prompt.name, menu)
             action.triggered.connect(lambda checked, p=prompt: self.insert_template(p.prompt))
             menu.addAction(action)
 
         # Mediation Brief (special — triggers generation, not text insert)
         menu.addSeparator()
-        med_brief_action = QAction("Mediation Brief", self)
+        med_brief_action = QAction("Mediation Brief", menu)
         med_brief_action.triggered.connect(self._on_mediation_brief_selected)
         menu.addAction(med_brief_action)
 
-        # Custom prompts (if persistence available)
-        if self.persistence:
-            prompts = self.persistence.get_quick_prompts()
-            custom_prompts = [p for p in prompts if not p.is_builtin]
-            if custom_prompts:
-                menu.addSeparator()
-                for prompt in custom_prompts:
-                    action = QAction(prompt.name, self)
-                    action.triggered.connect(lambda checked, p=prompt: self.insert_template(p.prompt))
-                    menu.addAction(action)
+        # Custom prompts from the global store (shared across all cases/sessions)
+        try:
+            from ..chat.global_prompts import get_global_quick_prompt_store
+            custom_prompts = get_global_quick_prompt_store().get_quick_prompts()
+        except Exception as e:
+            custom_prompts = []
+            log_event(f"[ChatTab] Could not load global quick prompts: {e}", "error")
+        if custom_prompts:
+            menu.addSeparator()
+            for prompt in custom_prompts:
+                action = QAction(prompt.name, menu)
+                action.triggered.connect(lambda checked, p=prompt: self.insert_template(p.prompt))
+                menu.addAction(action)
 
         menu.addSeparator()
-        manage_action = QAction("Manage Templates...", self)
+        manage_action = QAction("Manage Templates...", menu)
         manage_action.triggered.connect(self.open_template_manager)
         menu.addAction(manage_action)
-
-        self.template_btn.setMenu(menu)
 
     def insert_template(self, prompt: str):
         """Insert a template prompt into the input."""
@@ -2304,6 +2349,8 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
     def open_template_manager(self):
         """Open the template management dialog."""
         from .chat_dialogs import PromptTemplateDialog
+        # PromptTemplateDialog persists templates to the global store; the persistence
+        # arg is accepted only for backward compatibility and is unused for templates.
         dlg = PromptTemplateDialog(self.persistence, self)
         if dlg.exec():
             self.update_template_menu()
