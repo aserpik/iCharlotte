@@ -9,6 +9,7 @@ operates only on ``DraftDocument`` / ``CitationVerification``.
 from __future__ import annotations
 
 import html
+import json
 import os
 import re
 import shutil
@@ -27,7 +28,45 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from icharlotte_core.opposition.models import DraftDocument
+from icharlotte_core.opposition.models import CitationVerification, DraftDocument
+
+
+# ── Citation verdict persistence ─────────────────────────────────────────
+# The generated .docx stores only the body text, not the verification verdicts.
+# To make a reopened/restored draft show the SAME color-coded citations (rather
+# than "no citations detected"), the verdicts are persisted to a small JSON
+# sidecar next to the preview .docx and reloaded by load_output().
+
+
+def _citations_sidecar_path(preview_path: str) -> str:
+    return (preview_path + ".citations.json") if preview_path else ""
+
+
+def _save_citations_sidecar(preview_path: str, citations) -> None:
+    """Best-effort persist of citation verdicts beside the preview .docx."""
+    path = _citations_sidecar_path(preview_path)
+    if not path:
+        return
+    try:
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump([c.to_dict() for c in (citations or [])], fh)
+    except Exception:
+        pass  # persistence is best-effort; never block the UI
+
+
+def _load_citations_sidecar(preview_path: str) -> list:
+    """Load persisted citation verdicts beside the preview .docx (or [])."""
+    path = _citations_sidecar_path(preview_path)
+    if not path or not os.path.isfile(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        return [
+            CitationVerification.from_dict(d) for d in data if isinstance(d, dict)
+        ]
+    except Exception:
+        return []
 
 
 # ── Body-render block ────────────────────────────────────────────────────────
@@ -513,6 +552,9 @@ class CitationReviewOutputPage(QWidget):
         self._refresh_summary_banner()
         if draft.citations:
             self.show_citation(0)
+            # Persist verdicts beside the preview so a reopened/restored draft
+            # shows the same color-coded citations (the .docx stores no verdicts).
+            _save_citations_sidecar(draft.preview_path, draft.citations)
         else:
             self.detail_panel.clear(self.empty_citations_message())
 
@@ -578,6 +620,7 @@ class CitationReviewOutputPage(QWidget):
                 title=os.path.splitext(os.path.basename(output_path or ""))[0] or self.default_title,
                 body_text=body_text,
                 preview_path=output_path or "",
+                citations=_load_citations_sidecar(output_path or ""),
             )
         )
 
