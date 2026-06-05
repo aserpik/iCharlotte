@@ -1743,7 +1743,7 @@ class MainWindow(QMainWindow):
     def _reveal_index_tab(self) -> None:
         """Wizard Mode: reveal the hidden Index singleton, reloaded from disk so
         it reflects the latest Separate runs (wizard or advanced)."""
-        if not self.case_path:
+        if not self.case_path or not self.file_number:
             QMessageBox.information(
                 self, "No case loaded",
                 "Open a case from the Master List first.",
@@ -1752,7 +1752,7 @@ class MainWindow(QMainWindow):
         idx = self._index_of_tab("Index")
         if idx < 0:
             return
-        if self.file_number and hasattr(self, "index_tab"):
+        if hasattr(self, "index_tab"):
             self.index_tab.load_data(self.file_number)
         self.tabs.setTabVisible(idx, True)
         self.tabs.setCurrentIndex(idx)
@@ -1771,6 +1771,7 @@ class MainWindow(QMainWindow):
             and self.mode_controller.is_wizard
         ):
             self.tabs.setTabVisible(index, False)
+            self._hide_fixed_close_buttons()
             wiz = self._index_of_tab("Wizard")
             if wiz >= 0:
                 self.tabs.setCurrentIndex(wiz)

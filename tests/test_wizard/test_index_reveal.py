@@ -22,7 +22,7 @@ import iCharlotte
 from iCharlotte import MainWindow
 
 
-def _make(qtbot, *, is_wizard, file_number=""):
+def _make(qtbot, *, is_wizard, file_number="1234.001"):
     mw = MainWindow.__new__(MainWindow)  # skip the heavy __init__
     tabs = QTabWidget()
     tabs.setTabsClosable(True)
@@ -30,6 +30,7 @@ def _make(qtbot, *, is_wizard, file_number=""):
     tabs.addTab(QWidget(), "Master List")
     tabs.addTab(QWidget(), "Wizard")
     index_tab = QWidget()
+    index_tab.load_data = lambda fn: None  # real IndexTab.load_data hits disk
     tabs.addTab(index_tab, "Index")
     mw.tabs = tabs
     mw.index_tab = index_tab
@@ -58,6 +59,17 @@ def test_reveal_without_case_noops(qtbot, monkeypatch):
     mw, tabs, index_tab = _make(qtbot, is_wizard=True)
     mw.case_path = ""
     # The no-case guard pops a modal dialog; stub it so the test can't block.
+    monkeypatch.setattr(iCharlotte.QMessageBox, "information",
+                        staticmethod(lambda *a, **k: None))
+    idx = tabs.indexOf(index_tab)
+    tabs.setTabVisible(idx, False)
+    mw._reveal_index_tab()
+    assert not tabs.isTabVisible(idx)
+
+
+def test_reveal_without_file_number_noops(qtbot, monkeypatch):
+    # A case with no file number can't key the index store → treat as no case.
+    mw, tabs, index_tab = _make(qtbot, is_wizard=True, file_number="")
     monkeypatch.setattr(iCharlotte.QMessageBox, "information",
                         staticmethod(lambda *a, **k: None))
     idx = tabs.indexOf(index_tab)
