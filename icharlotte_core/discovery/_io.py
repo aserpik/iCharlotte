@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 
+from icharlotte_core.doc_library.library import DocumentLibrary
 from icharlotte_core.discovery.form_interrogatory_selection import (
     complete_selected_form_interrogatories,
     extract_selected_form_interrogatory_numbers,
@@ -16,11 +17,27 @@ except ImportError:  # pragma: no cover - depends on local install
     fitz = None
 
 
-def read_document_text(path: str) -> str:
+def _read_cached_document_text(path: str, case_root: str | None) -> str | None:
+    if not case_root:
+        return None
+    try:
+        text, _method, error = DocumentLibrary(case_root).get_or_extract_text(path)
+    except Exception:  # noqa: BLE001 - direct reader below preserves old behavior
+        return None
+    if error:
+        return None
+    return text
+
+
+def read_document_text(path: str, case_root: str | None = None) -> str:
     """Extract text from a supported context or discovery file."""
     if not path or not os.path.isfile(path):
         return ""
     lower = path.lower()
+    if lower.endswith((".pdf", ".docx", ".txt")):
+        cached = _read_cached_document_text(path, case_root)
+        if cached is not None:
+            return cached
     if lower.endswith(".pdf"):
         if not fitz:
             return ""

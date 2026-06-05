@@ -26,6 +26,14 @@ class SessionPaths:
     trace_log: Path
 
 
+@dataclass(frozen=True)
+class SourceCachePaths:
+    source_dir: Path
+    raw_dir: Path
+    raw_text: Path
+    digests_dir: Path
+
+
 def build_session_folder_name(deponent_name: str, when_iso: str | None = None) -> str:
     """Return a Windows-safe folder name like 'Depo Prep - Jane Doe - 2026-05-27 1432'."""
     when_iso = (when_iso or datetime.now().isoformat(timespec="minutes"))[:16]
@@ -84,3 +92,28 @@ def file_sha256(path: Union[str, Path]) -> str:
         for chunk in iter(lambda: f.read(65536), b""):
             h.update(chunk)
     return h.hexdigest()
+
+
+def compute_source_cache_paths(case_root: str, source_path: Union[str, Path]) -> SourceCachePaths:
+    """Return hidden per-case cache paths for one Depo Prep source file."""
+    source = Path(source_path)
+    digest = file_sha256(source)
+    safe_name = _UNSAFE_FILENAME_CHARS.sub("", source.name).strip()
+    safe_name = re.sub(r"\s+", " ", safe_name) or "source"
+    safe_name = safe_name[:80].rstrip()
+    source_dir = (
+        Path(case_root)
+        / "NOTES"
+        / "AI Output"
+        / ".icharlotte"
+        / "depo_prep_cache"
+        / "v1"
+        / f"{safe_name}-{digest[:16]}"
+    )
+    raw_dir = source_dir / "raw"
+    return SourceCachePaths(
+        source_dir=source_dir,
+        raw_dir=raw_dir,
+        raw_text=raw_dir / f"{source.name}.txt",
+        digests_dir=source_dir / "digests",
+    )

@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import os
 
-from icharlotte_core.document_processor import DocumentProcessor, ExtractResult
+from icharlotte_core.doc_library.library import DocumentLibrary
+from icharlotte_core.document_processor import (
+    DocumentProcessor,
+    ExtractionMethod,
+    ExtractResult,
+)
 
 MOTION_EXTENSIONS = {".pdf", ".docx"}
 CONTEXT_EXTENSIONS = {".pdf", ".docx", ".txt", ".msg"}
@@ -58,16 +63,50 @@ def validate_context_files(paths: list[str]) -> tuple[list[str], list[str]]:
     return valid_paths, warnings
 
 
-def extract_document_text(path: str, *, ocr_enabled: bool = True) -> ExtractResult:
+def _extract_from_case_cache(path: str, case_root: str | None) -> ExtractResult | None:
+    if not case_root:
+        return None
+    text, _method, error = DocumentLibrary(case_root).get_or_extract_text(path)
+    if error:
+        return ExtractResult(
+            text=text or "",
+            page_count=0,
+            extraction_method=ExtractionMethod.FAILED,
+            char_count=len(text or ""),
+            file_path=path,
+            error=error,
+        )
+    return ExtractResult(
+        text=text,
+        page_count=0,
+        extraction_method=ExtractionMethod.NATIVE,
+        char_count=len(text or ""),
+        file_path=path,
+    )
+
+
+def extract_document_text(
+    path: str,
+    *,
+    ocr_enabled: bool = True,
+    case_root: str | None = None,
+) -> ExtractResult:
+    cached = _extract_from_case_cache(path, case_root)
+    if cached is not None:
+        return cached
     return DocumentProcessor().extract_text(path, ocr_enabled=ocr_enabled)
 
 
-def extract_context_bundle(paths: list[str]) -> tuple[str, list[str]]:
+def extract_context_bundle(
+    paths: list[str],
+    case_root: str | None = None,
+) -> tuple[str, list[str]]:
     valid_paths, warnings = validate_context_files(paths)
     sections: list[str] = []
 
     for path in valid_paths:
-        result = extract_document_text(path)
+        kwargs = {"case_root": case_root} if case_root else {}
+        result = extract_document_text(path, **kwargs)
         label = os.path.basename(path) or path
 
         if not result.success:

@@ -162,6 +162,10 @@ class RetrievedAuthority:
             opinion_url=data.get("opinion_url", ""),
             citation_count=data.get("citation_count"),
             latest_citing_year=data.get("latest_citing_year", ""),
+            source=data.get("source", "corpus"),
+            verification=data.get("verification", "local"),
+            source_brief=data.get("source_brief", ""),
+            alternatives=list(data.get("alternatives", []) or []),
         )
 
 
@@ -262,6 +266,7 @@ class DraftDocument:
     body_text: str = ""
     citations: list[CitationVerification] = field(default_factory=list)
     preview_path: str = ""
+    diagnostics: dict[str, Any] = field(default_factory=dict)
     # Populated by the drafter when it rejects a response; lets the wizard
     # surface a specific reason instead of a generic "no usable body" error.
     rejection_reason: str = ""
@@ -272,6 +277,7 @@ class DraftDocument:
             "body_text": self.body_text,
             "citations": [citation.to_dict() for citation in self.citations],
             "preview_path": self.preview_path,
+            "diagnostics": dict(self.diagnostics or {}),
             "rejection_reason": self.rejection_reason,
         }
 
@@ -288,5 +294,6 @@ class DraftDocument:
                 for citation in data.get("citations", []) or []
             ],
             preview_path=data.get("preview_path", ""),
+            diagnostics=dict(data.get("diagnostics", {}) or {}),
             rejection_reason=data.get("rejection_reason", ""),
         )

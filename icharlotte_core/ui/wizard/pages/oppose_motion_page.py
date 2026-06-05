@@ -51,7 +51,7 @@ from icharlotte_core.ui.wizard.pages._motion_research_support import (
     _corpus_embedder,
     _corpus_paths,
     make_firm_provider as _make_firm_provider,
-    make_local_corpus as _make_local_corpus,
+    make_local_corpus as _make_local_corpus_impl,
     research_targets as _research_targets,
     firm_style_exemplars as _firm_style_exemplars,
 )
@@ -83,6 +83,32 @@ SETTINGS_PAGE_OUTLINE = 1
 TASK_PAGE_SETTINGS = 0
 TASK_PAGE_STATUS = 1
 TASK_PAGE_OUTPUT = 2
+
+
+def _extract_document_text_for_case(path: str, case_root: str = ""):
+    if case_root:
+        try:
+            return extract_document_text(path, case_root=case_root)
+        except TypeError as exc:
+            if "case_root" not in str(exc):
+                raise
+    return extract_document_text(path)
+
+
+def _extract_context_bundle_for_case(paths: list[str], case_root: str = ""):
+    if case_root:
+        try:
+            return extract_context_bundle(paths, case_root=case_root)
+        except TypeError as exc:
+            if "case_root" not in str(exc):
+                raise
+    return extract_context_bundle(paths)
+
+
+def _make_local_corpus():
+    if not _corpus_available():
+        return None
+    return _make_local_corpus_impl()
 
 
 class OpposeMotionSettingsPage(QStackedWidget):
@@ -411,16 +437,21 @@ class OpposeMotionAnalysisWorker(QThread):
         try:
             from icharlotte_core.llm_config import call_llm
 
+            case_root = self.settings.get("case_root", "")
             self.progress.emit("Extracting motion text...")
-            motion_result = extract_document_text(self.settings.get("motion_file", ""))
+            motion_result = _extract_document_text_for_case(
+                self.settings.get("motion_file", ""),
+                case_root,
+            )
             if not motion_result.success:
                 message = motion_result.error or "Could not read motion."
                 self.finished_analysis.emit(False, message)
                 return
 
             self.progress.emit("Extracting context documents...")
-            context_text, warnings = extract_context_bundle(
-                self.settings.get("context_files", [])
+            context_text, warnings = _extract_context_bundle_for_case(
+                self.settings.get("context_files", []),
+                case_root,
             )
             for warning in warnings:
                 self.progress.emit(f"WARNING: {warning}")
@@ -485,16 +516,21 @@ class OpposeMotionWorker(QThread):
         try:
             from icharlotte_core.llm_config import call_llm
 
+            case_root = self.case_path or self.settings.get("case_root", "")
             self.progress.emit("Extracting motion text...")
-            motion_result = extract_document_text(self.settings.get("motion_file", ""))
+            motion_result = _extract_document_text_for_case(
+                self.settings.get("motion_file", ""),
+                case_root,
+            )
             if not motion_result.success:
                 message = motion_result.error or "Could not read motion."
                 self.finished_result.emit(False, message)
                 return
 
             self.progress.emit("Extracting context documents...")
-            context_text, warnings = extract_context_bundle(
-                self.settings.get("context_files", [])
+            context_text, warnings = _extract_context_bundle_for_case(
+                self.settings.get("context_files", []),
+                case_root,
             )
             for warning in warnings:
                 self.progress.emit(f"WARNING: {warning}")
@@ -780,6 +816,7 @@ class OpposeMotionTaskTab(WizardTaskContainer):
             settings={
                 "motion_file": self.settings_page.motion_file,
                 "context_files": list(self.settings_page.context_files),
+                "case_root": self._case_path,
             },
             parent=None,
         )

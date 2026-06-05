@@ -69,6 +69,33 @@ def _load_citations_sidecar(preview_path: str) -> list:
         return []
 
 
+def _diagnostics_sidecar_path(preview_path: str) -> str:
+    return (preview_path + ".diagnostics.json") if preview_path else ""
+
+
+def _save_diagnostics_sidecar(preview_path: str, diagnostics: dict) -> None:
+    path = _diagnostics_sidecar_path(preview_path)
+    if not path or not diagnostics:
+        return
+    try:
+        with open(path, "w", encoding="utf-8") as fh:
+            json.dump(diagnostics, fh, indent=2)
+    except Exception:
+        pass
+
+
+def _load_diagnostics_sidecar(preview_path: str) -> dict:
+    path = _diagnostics_sidecar_path(preview_path)
+    if not path or not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+        return dict(data or {}) if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
 # ── Body-render block ────────────────────────────────────────────────────────
 
 _HORIZONTAL_RULE_RE = re.compile(r"^[\*\-_]{3,}\s*$")
@@ -237,6 +264,24 @@ def _citation_body_html(citation, verdict: str) -> str:
             f"<p><b>Brief's proposition:</b><br><i>{html.escape(prop)}</i></p>"
         )
 
+    replacements = _replacement_candidates(citation)
+    if replacements:
+        rows = []
+        for i, candidate in enumerate(replacements):
+            label = html.escape(
+                candidate.citation_text
+                or candidate.normalized_citation
+                or candidate.case_name
+                or "Replacement candidate"
+            )
+            cand_verdict = html.escape(candidate.verdict or "UNVERIFIED")
+            note = html.escape(candidate.note or "")
+            rows.append(
+                f"<li><b>{label}</b> — {cand_verdict}"
+                f"<br>{note} &nbsp;<a href='replswap:{i}'>Use this replacement</a></li>"
+            )
+        parts.append("<p><b>Replacement candidates:</b></p><ul>" + "".join(rows) + "</ul>")
+
     if verdict == "SUPPORTED":
         if citation.evidence:
             parts.append(
@@ -312,6 +357,47 @@ def _citation_body_html(citation, verdict: str) -> str:
             )
 
     return "\n".join(parts)
+
+
+def _replacement_candidates(citation) -> list[CitationVerification]:
+    out: list[CitationVerification] = []
+    for item in (getattr(citation, "replacement_candidates", []) or []):
+        if isinstance(item, CitationVerification):
+            out.append(item)
+        elif isinstance(item, dict):
+            out.append(CitationVerification.from_dict(item))
+    return out
+
+
+def _diagnostics_text(diagnostics: dict) -> str:
+    if not diagnostics:
+        return ""
+    research = diagnostics.get("research") or {}
+    citations = diagnostics.get("citations") or {}
+    phases = diagnostics.get("phase_seconds") or {}
+    output = diagnostics.get("output") or {}
+    verdicts = citations.get("verdicts") or {}
+    lines = ["Run diagnostics"]
+    if research:
+        lines.append(f"Research source: {research.get('source', 'unknown')}")
+        lines.append(f"Research targets: {research.get('target_count', 0)}")
+        lines.append(f"Retrieved authorities: {research.get('retrieved_authorities', 0)}")
+        if research.get("firm_provider") is not None:
+            lines.append(f"Firm brief library: {'active' if research.get('firm_provider') else 'inactive'}")
+        if research.get("workers"):
+            lines.append(f"Research workers: {research.get('workers')}")
+    if citations:
+        lines.append(f"Citations found: {citations.get('found', 0)}")
+        if verdicts:
+            verdict_text = ", ".join(f"{k}: {v}" for k, v in sorted(verdicts.items()))
+            lines.append(f"Verdicts: {verdict_text}")
+        lines.append(f"Replacement candidates: {citations.get('replacement_candidates', 0)}")
+    if phases:
+        phase_text = ", ".join(f"{k}: {float(v):.1f}s" for k, v in sorted(phases.items()))
+        lines.append(f"Phase timing: {phase_text}")
+    if output.get("preview_path"):
+        lines.append(f"Preview: {output.get('preview_path')}")
+    return "\n".join(lines)
 
 
 def _run_find_replacement(parent_widget, citation):
@@ -396,6 +482,7 @@ class CitationDetailPanel(QWidget):
 
     #: Emitted as (citation_object, alt_index: int) when an altswap link is clicked.
     swap_requested = Signal(object, int)
+    replacement_requested = Signal(object, int)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -488,6 +575,14 @@ class CitationDetailPanel(QWidget):
             if self.citation is not None:
                 self.swap_requested.emit(self.citation, alt_index)
             return
+        if scheme == "replswap":
+            try:
+                repl_index = int(url.path().lstrip("/") or url.host() or "0")
+            except (TypeError, ValueError):
+                return
+            if self.citation is not None:
+                self.replacement_requested.emit(self.citation, repl_index)
+            return
         QDesktopServices.openUrl(url)
 
 
@@ -576,6 +671,12 @@ class CitationReviewOutputPage(QWidget):
         self.summary_banner.setVisible(False)
         outer.addWidget(self.summary_banner)
 
+        self.diagnostics_browser = QTextBrowser()
+        self.diagnostics_browser.setMaximumHeight(130)
+        self.diagnostics_browser.setVisible(False)
+        self.diagnostics_browser.setStyleSheet("QTextBrowser { background: #f8f9fa; }")
+        outer.addWidget(self.diagnostics_browser)
+
         layout = QHBoxLayout()
         layout.setSpacing(12)
         self.editor = QTextBrowser()
@@ -586,6 +687,7 @@ class CitationReviewOutputPage(QWidget):
 
         self.detail_panel = CitationDetailPanel()
         self.detail_panel.swap_requested.connect(self._on_swap_requested)
+        self.detail_panel.replacement_requested.connect(self._on_replacement_requested)
         layout.addWidget(self.detail_panel, 1)
         outer.addLayout(layout, 1)
 
@@ -620,6 +722,8 @@ class CitationReviewOutputPage(QWidget):
         self.draft = draft
         self.editor.setHtml(_render_draft_html(draft))
         self._refresh_summary_banner()
+        self._refresh_diagnostics_panel()
+        _save_diagnostics_sidecar(draft.preview_path, draft.diagnostics or {})
         if draft.citations:
             self.show_citation(0)
             # Persist verdicts beside the preview so a reopened/restored draft
@@ -660,6 +764,11 @@ class CitationReviewOutputPage(QWidget):
         self.summary_banner.setText("".join(parts) + warning)
         self.summary_banner.setVisible(True)
 
+    def _refresh_diagnostics_panel(self) -> None:
+        text = _diagnostics_text(self.draft.diagnostics or {})
+        self.diagnostics_browser.setPlainText(text)
+        self.diagnostics_browser.setVisible(bool(text))
+
     def _on_anchor_clicked(self, url: QUrl) -> None:
         scheme = url.scheme()
         if scheme == "citation":
@@ -691,6 +800,27 @@ class CitationReviewOutputPage(QWidget):
         self.draft.body_text = new_body
         self.editor.setHtml(_render_draft_html(self.draft))
 
+    def _on_replacement_requested(self, citation, replacement_index: int) -> None:
+        replacements = _replacement_candidates(citation)
+        if replacement_index < 0 or replacement_index >= len(replacements):
+            return
+        replacement = replacements[replacement_index]
+        old_text = (citation.citation_text or citation.normalized_citation or "").strip()
+        new_text = (replacement.citation_text or replacement.normalized_citation or "").strip()
+        if old_text and new_text:
+            self.draft.body_text = self.draft.body_text.replace(old_text, new_text, 1)
+        citation_index = -1
+        for idx, existing in enumerate(self.draft.citations or []):
+            if existing is citation:
+                replacement.body_offset = existing.body_offset
+                self.draft.citations[idx] = replacement
+                citation_index = idx
+                break
+        self.editor.setHtml(_render_draft_html(self.draft))
+        self._refresh_summary_banner()
+        if citation_index >= 0:
+            self.show_citation(citation_index)
+
     @property
     def output_path(self) -> str:
         return self.draft.preview_path
@@ -711,6 +841,7 @@ class CitationReviewOutputPage(QWidget):
                 body_text=body_text,
                 preview_path=output_path or "",
                 citations=_load_citations_sidecar(output_path or ""),
+                diagnostics=_load_diagnostics_sidecar(output_path or ""),
             )
         )
 

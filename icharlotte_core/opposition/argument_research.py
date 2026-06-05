@@ -9,6 +9,7 @@ Returns RetrievedAuthority records the drafter cites from.
 from __future__ import annotations
 
 import concurrent.futures
+import hashlib
 import json
 import logging
 import os
@@ -66,6 +67,134 @@ def generate_search_queries(argument: str, *, llm_callback: LLMCallback) -> list
 
 def _normalize_ws(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "")).strip().lower()
+
+
+def _file_signature(path: str) -> dict[str, Any] | None:
+    if not path:
+        return None
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return {
+        "path": os.path.abspath(path),
+        "mtime_ns": st.st_mtime_ns,
+        "size": st.st_size,
+    }
+
+
+def _stable_source_signature(cl_client, firm_provider=None) -> dict[str, Any] | None:
+    """Return a cache signature only for stable local data sources."""
+    db_sig = _file_signature(getattr(cl_client, "db_path", ""))
+    vec_sig = _file_signature(getattr(cl_client, "vectors_path", ""))
+    if not db_sig or not vec_sig:
+        return None
+
+    source: dict[str, Any] = {
+        "client": f"{cl_client.__class__.__module__}.{cl_client.__class__.__name__}",
+        "db": db_sig,
+        "vectors": vec_sig,
+    }
+    index = getattr(firm_provider, "index", None)
+    if index is not None:
+        firm_paths = [
+            getattr(index, "db_path", ""),
+            getattr(index, "vectors_path", ""),
+            getattr(index, "prop_vectors_path", ""),
+        ]
+        source["firm_index"] = [
+            sig for sig in (_file_signature(path) for path in firm_paths) if sig
+        ]
+    return source
+
+
+def _research_prompt_fingerprint() -> dict[str, str]:
+    from icharlotte_core.prompt_manager import get_prompt
+    from icharlotte_core.opposition import prompts as default_prompts
+
+    return {
+        "research_queries": (
+            get_prompt("oppose_motion", "research_queries")
+            or default_prompts.RESEARCH_QUERIES_PROMPT
+        ),
+        "rerank_select": (
+            get_prompt("oppose_motion", "rerank_select")
+            or default_prompts.RERANK_SELECT_PROMPT
+        ),
+    }
+
+
+def _research_cache_key(
+    argument: str,
+    *,
+    cl_client,
+    firm_provider=None,
+    motion_type: str = "",
+    side: str = "",
+) -> dict[str, Any] | None:
+    source = _stable_source_signature(cl_client, firm_provider)
+    if source is None:
+        return None
+    return {
+        "version": 1,
+        "argument": _normalize_ws(argument),
+        "motion_type": (motion_type or "").strip().lower(),
+        "side": (side or "").strip().lower(),
+        "source": source,
+        "prompts": _research_prompt_fingerprint(),
+    }
+
+
+def _research_cache_path(cache_dir: str | None, cache_key: dict[str, Any] | None) -> str | None:
+    if not cache_dir or cache_key is None:
+        return None
+    raw = json.dumps(cache_key, sort_keys=True, ensure_ascii=True)
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+    return os.path.join(cache_dir, "_research", f"{digest}.json")
+
+
+def _load_cached_research(
+    cache_dir: str | None,
+    cache_key: dict[str, Any] | None,
+    *,
+    argument_id: str,
+    argument_text: str,
+) -> list[RetrievedAuthority] | None:
+    path = _research_cache_path(cache_dir, cache_key)
+    if not path or not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f) or {}
+    except (OSError, ValueError, json.JSONDecodeError):
+        logger.warning("could not read research cache: %s", path, exc_info=True)
+        return None
+    raw = data.get("authorities")
+    if not isinstance(raw, list):
+        return None
+    authorities = [RetrievedAuthority.from_dict(item) for item in raw if isinstance(item, dict)]
+    for authority in authorities:
+        authority.argument_id = argument_id
+        authority.argument_text = argument_text
+    return authorities
+
+
+def _save_cached_research(
+    cache_dir: str | None,
+    cache_key: dict[str, Any] | None,
+    authorities: list[RetrievedAuthority],
+) -> None:
+    if not authorities:
+        return
+    path = _research_cache_path(cache_dir, cache_key)
+    if not path:
+        return
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump({"authorities": [a.to_dict() for a in authorities]}, f)
+    except OSError:
+        logger.warning("could not write research cache: %s", path, exc_info=True)
 
 
 def _year_of(date_str: str) -> str:
@@ -301,6 +430,22 @@ def research_argument(
     side: str = "",
 ) -> list[RetrievedAuthority]:
     """Research one argument end-to-end; returns selected RetrievedAuthority."""
+    cache_key = _research_cache_key(
+        argument,
+        cl_client=cl_client,
+        firm_provider=firm_provider,
+        motion_type=motion_type,
+        side=side,
+    )
+    cached = _load_cached_research(
+        cache_dir,
+        cache_key,
+        argument_id=argument_id,
+        argument_text=argument,
+    )
+    if cached is not None:
+        return cached
+
     queries = generate_search_queries(argument, llm_callback=query_llm)
     # Always lead with the plain argument text. The local corpus's semantic
     # search retrieves far better on-point authority from natural-language prose
@@ -417,6 +562,7 @@ def research_argument(
         if isinstance(signals, dict):
             ra.citation_count = signals.get("citation_count")
             ra.latest_citing_year = signals.get("latest_citing_year", "")
+    _save_cached_research(cache_dir, cache_key, selected)
     return selected
 
 

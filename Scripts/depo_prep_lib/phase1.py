@@ -2,13 +2,14 @@
 from __future__ import annotations
 
 import os
+import shutil
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from pathlib import Path
 from typing import Callable, List
 
-from .session_io import compute_session_paths, write_json
-from .source_digest import digest_single_source
+from .session_io import compute_session_paths, compute_source_cache_paths, write_json
+from .source_digest import DigestResult, digest_single_source
 from .topics import cluster_topics
 
 
@@ -44,6 +45,39 @@ def _extract_text_to_raw(source_path: Path, raw_dir: Path, logger=None) -> Path:
     return out
 
 
+def _session_raw_path(raw_dir: Path, source_path: Path) -> Path:
+    return raw_dir / f"{source_path.name}.txt"
+
+
+def _copy_text_file(source: Path, target: Path) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if source == target:
+        return
+    shutil.copyfile(source, target)
+
+
+def _get_or_extract_cached_raw(
+    source_path: Path,
+    cache_raw_dir: Path,
+    cache_raw_path: Path,
+    logger=None,
+) -> tuple[Path, bool]:
+    if cache_raw_path.exists():
+        return cache_raw_path, True
+    extracted_path = _extract_text_to_raw(source_path, cache_raw_dir, logger=logger)
+    return extracted_path, False
+
+
+def _mirror_digest_to_session(result: DigestResult, session_digest_path: Path) -> None:
+    write_json(session_digest_path, result.digest_data)
+    cache_hash_path = result.digest_path.with_suffix(result.digest_path.suffix + ".sha256")
+    if cache_hash_path.exists():
+        session_digest_path.with_suffix(session_digest_path.suffix + ".sha256").write_text(
+            cache_hash_path.read_text(encoding="utf-8"),
+            encoding="utf-8",
+        )
+
+
 def run_phase1(*, config: dict, llm_caller, progress: Callable[[int, str], None]) -> str:
     """Execute Phase 1: ingest → per-source digest → topic clustering → persist.
 
@@ -69,23 +103,35 @@ def run_phase1(*, config: dict, llm_caller, progress: Callable[[int, str], None]
 
     progress(5, "Extracting source text…")
     extracted_map: dict = {}
+    source_cache_map: dict = {}
     for i, src_str in enumerate(all_sources, 1):
         src = Path(src_str)
-        extracted_map[src] = _extract_text_to_raw(src, paths.raw_dir)
-        progress(5 + int(15 * i / len(all_sources)), f"Extracted {src.name}")
+        cache_paths = compute_source_cache_paths(case_root, src)
+        source_cache_map[src] = cache_paths
+        raw_path, from_cache = _get_or_extract_cached_raw(
+            src,
+            cache_paths.raw_dir,
+            cache_paths.raw_text,
+        )
+        _copy_text_file(raw_path, _session_raw_path(paths.raw_dir, src))
+        extracted_map[src] = raw_path
+        verb = "Reused cached text for" if from_cache else "Extracted"
+        progress(5 + int(15 * i / len(all_sources)), f"{verb} {src.name}")
 
     progress(25, "Building per-source digests…")
     digests: List[dict] = []
 
     def _one(src_path: Path):
-        return digest_single_source(
+        result = digest_single_source(
             source_path=src_path,
             extracted_text_path=extracted_map[src_path],
-            digests_dir=paths.digests_dir,
+            digests_dir=source_cache_map[src_path].digests_dir,
             llm_caller=llm_caller,
             deponent_name=deponent_name,
             deponent_role=deponent_role,
         )
+        _mirror_digest_to_session(result, paths.digests_dir / f"{src_path.name}.json")
+        return result
 
     with ThreadPoolExecutor(max_workers=4) as pool:
         futures = {pool.submit(_one, Path(s)): s for s in all_sources}

@@ -10,6 +10,7 @@ research/verify spine and the motion_generation drafter/assembler.
 from __future__ import annotations
 
 import os
+import time
 
 from PySide6.QtCore import QThread, QUrl, Qt, Signal
 from PySide6.QtGui import QDesktopServices
@@ -46,6 +47,7 @@ from icharlotte_core.opposition.verifier import (
     build_local_opposition_verifier,
     build_opposition_verifier,
     enrich_with_pool_signals,
+    find_replacement_candidates,
     pool_membership_check,
 )
 from icharlotte_core.ui.wizard.pages.citation_review import CitationReviewOutputPage
@@ -84,6 +86,41 @@ TASK_PAGE_OUTPUT = 2
 
 # Sentinel combo entry that enables a custom motion-type name.
 _OTHER = "__other__"
+
+
+# Single-entry cache so the analysis pass and the drafting pass don't each run
+# full text extraction (OCR included) over the same target files. Keyed on each
+# file's path + mtime + size, so editing the selection between Analyze and Draft
+# transparently invalidates the cache and forces a fresh extraction.
+_context_cache: dict = {"key": None, "result": None}
+
+
+def _context_cache_key(paths: list[str]):
+    """Return a hashable signature of the file selection, or None if it can't be
+    cached (empty selection, or any path missing/unstattable)."""
+    if not paths:
+        return None
+    parts = []
+    for path in paths:
+        try:
+            st = os.stat(path)
+        except OSError:
+            return None
+        parts.append((os.path.abspath(path), st.st_mtime_ns, st.st_size))
+    return tuple(parts)
+
+
+def extract_context_cached(paths: list[str]) -> tuple[str, list[str]]:
+    """extract_context_bundle with a single-entry cache shared across workers."""
+    paths = list(paths or [])
+    key = _context_cache_key(paths)
+    if key is not None and _context_cache["key"] == key:
+        return _context_cache["result"]
+    result = extract_context_bundle(paths)
+    if key is not None:
+        _context_cache["key"] = key
+        _context_cache["result"] = result
+    return result
 
 
 class GenerateMotionSettingsPage(QStackedWidget):
@@ -438,7 +475,7 @@ class GenerateMotionAnalysisWorker(QThread):
             user_arguments = list(self.settings.get("user_arguments", []))
 
             self.progress.emit("Extracting context documents...")
-            target_text, warnings = extract_context_bundle(
+            target_text, warnings = extract_context_cached(
                 self.settings.get("target_files", [])
             )
             for warning in warnings:
@@ -474,6 +511,45 @@ class GenerateMotionAnalysisWorker(QThread):
             self.finished_analysis.emit(False, str(exc))
 
 
+_REPLACEMENT_VERDICTS = {"PARTIAL", "NOT_SUPPORTED", "NOT_FOUND"}
+
+
+def _citation_verdict_counts(citations) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for citation in citations or []:
+        verdict = (getattr(citation, "verdict", "") or "UNVERIFIED").upper()
+        counts[verdict] = counts.get(verdict, 0) + 1
+    return counts
+
+
+def _attach_replacement_candidates(citations, *, verifier, llm_callback, on_progress=None) -> int:
+    if verifier is None:
+        return 0
+    total = 0
+    for citation in citations or []:
+        verdict = (getattr(citation, "verdict", "") or "").upper()
+        if verdict not in _REPLACEMENT_VERDICTS or getattr(citation, "kind", "") != "case":
+            continue
+        try:
+            candidates = find_replacement_candidates(
+                failed_citation=citation,
+                verifier=verifier,
+                llm_callback=llm_callback,
+            )
+        except Exception:
+            candidates = []
+        usable = [
+            candidate for candidate in candidates
+            if (getattr(candidate, "verdict", "") or "").upper() in {"SUPPORTED", "PARTIAL"}
+        ]
+        citation.replacement_candidates = [candidate.to_dict() for candidate in usable]
+        total += len(usable)
+        if on_progress and usable:
+            label = citation.citation_text or citation.normalized_citation or "citation"
+            on_progress(f"  Found {len(usable)} replacement candidate(s) for {label}")
+    return total
+
+
 class GenerateMotionWorker(QThread):
     progress = Signal(str)
     finished_result = Signal(bool, object)
@@ -485,14 +561,44 @@ class GenerateMotionWorker(QThread):
         self.settings = dict(settings or {})
 
     def run(self) -> None:
+        started_at = time.perf_counter()
+        phase_started = started_at
+        phase_seconds: dict[str, float] = {}
+        diagnostics = {
+            "task": "generate_motion",
+            "file_number": self.file_number,
+            "motion_type": self.settings.get("motion_type_name") or self.settings.get("motion_type_id") or "",
+            "input": {
+                "target_files": len(self.settings.get("target_files", []) or []),
+            },
+            "research": {},
+            "style": {},
+            "citations": {},
+            "output": {},
+            "phase_seconds": phase_seconds,
+        }
+
+        def finish_phase(name: str) -> None:
+            nonlocal phase_started
+            now = time.perf_counter()
+            phase_seconds[name] = round(now - phase_started, 3)
+            phase_started = now
+
         try:
             config = get_motion_config(self.settings.get("motion_type_id"))
             self.progress.emit("Extracting context documents...")
-            target_text, warnings = extract_context_bundle(
+            target_text, warnings = extract_context_cached(
                 self.settings.get("target_files", [])
             )
             for warning in warnings:
                 self.progress.emit(f"WARNING: {warning}")
+            diagnostics["input"].update(
+                {
+                    "target_text_chars": len(target_text or ""),
+                    "warnings": len(warnings or []),
+                }
+            )
+            finish_phase("extraction")
 
             metadata = MotionMetadata.from_dict(self.settings.get("metadata"))
             outline = [
@@ -508,6 +614,7 @@ class GenerateMotionWorker(QThread):
             corpus = _make_local_corpus()
             token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
             retrieved = []
+            verifier = None
             # Cache opinion text under this task's prompt dir (mirrors oppose).
             repo_root = os.path.dirname(
                 os.path.dirname(
@@ -522,6 +629,16 @@ class GenerateMotionWorker(QThread):
             raw_type = self.settings.get("motion_type_id") or getattr(metadata, "motion_type", "")
             firm_motion_type = raw_type if raw_type not in ("", "generic") else \
                 normalize_motion_type(self.settings.get("motion_type_name", "") or getattr(metadata, "motion_type", ""))
+            diagnostics["research"].update(
+                {
+                    "target_count": len(research_targets),
+                    "local_corpus": corpus is not None,
+                    "courtlistener_token": bool(token),
+                    "source": "none",
+                    "firm_provider": False,
+                    "workers": 0,
+                }
+            )
             if research_targets and (corpus is not None or token):
                 client = corpus
                 if client is None:
@@ -534,6 +651,7 @@ class GenerateMotionWorker(QThread):
                         f"({len(research_targets)} points)..."
                     )
                     firm_provider = None
+                    diagnostics["research"]["source"] = "courtlistener"
                 else:
                     self.progress.emit(
                         f"Researching authorities locally ({len(research_targets)} points)..."
@@ -541,15 +659,19 @@ class GenerateMotionWorker(QThread):
                     firm_provider = _make_firm_provider(corpus)
                     if firm_provider is not None:
                         self.progress.emit("  Firm brief library active (preferring your prior authorities).")
+                    diagnostics["research"]["source"] = "local_corpus"
+                    diagnostics["research"]["firm_provider"] = firm_provider is not None
+                research_workers = 3 if corpus is not None else 2
+                diagnostics["research"]["workers"] = research_workers
                 retrieved = research_arguments(
                     research_targets,
                     cl_client=client,
                     query_llm=make_pass_llm("research_queries"),
                     rerank_llm=make_pass_llm("rerank_select"),
-                    # Keep concurrency low: 4 parallel workers burst the LLM /
-                    # CourtListener rate limit on the per-point query-gen +
-                    # rerank calls (oppose's hard-won lesson).
-                    max_workers=2,
+                    # Keep live CourtListener mode conservative; local corpus
+                    # mode can tolerate one extra worker without search API
+                    # throttling.
+                    max_workers=research_workers,
                     on_progress=self.progress.emit,
                     cache_dir=opinion_cache,
                     firm_provider=firm_provider,
@@ -561,6 +683,8 @@ class GenerateMotionWorker(QThread):
                 self.progress.emit(
                     "WARNING: no grounded research available; drafting from statutes only."
                 )
+            diagnostics["research"]["retrieved_authorities"] = len(retrieved)
+            finish_phase("research")
 
             from icharlotte_core.motion_generation.samples import load_exemplars
 
@@ -570,7 +694,15 @@ class GenerateMotionWorker(QThread):
             firm_style = _firm_style_exemplars(firm_motion_type, "moving", metadata)
             if firm_style:
                 self.progress.emit(f"Using {len(firm_style)} firm-library style sample(s).")
+            diagnostics["style"].update(
+                {
+                    "configured_samples": len(exemplars),
+                    "firm_samples": len(firm_style),
+                    "used_samples": min(3, len(exemplars) + len(firm_style)),
+                }
+            )
             exemplars = (firm_style + exemplars)[:3]
+            finish_phase("style")
 
             self.progress.emit("Drafting motion memorandum...")
             draft = draft_motion(
@@ -587,8 +719,14 @@ class GenerateMotionWorker(QThread):
                 reason = (draft.rejection_reason or "unknown reason").strip()
                 self.finished_result.emit(False, f"Drafting failed: {reason}")
                 return
+            diagnostics["draft"] = {
+                "title": draft.title,
+                "body_chars": len(draft.body_text or ""),
+            }
+            finish_phase("draft")
 
             citations = extract_citations(draft.body_text)
+            replacement_count = 0
             if citations:
                 to_verify, off_pool = pool_membership_check(citations, retrieved)
                 self.progress.emit(f"Verifying citations ({len(to_verify)} found)...")
@@ -613,9 +751,25 @@ class GenerateMotionWorker(QThread):
                     attach_firm_provenance(draft.citations, retrieved)
                 except Exception:
                     pass
+                replacement_count = _attach_replacement_candidates(
+                    draft.citations,
+                    verifier=verifier,
+                    llm_callback=draft_llm,
+                    on_progress=self.progress.emit,
+                )
             else:
                 self.progress.emit("WARNING: No citations detected in the draft.")
                 draft.citations = []
+            diagnostics["citations"].update(
+                {
+                    "found": len(citations),
+                    "to_verify": len(to_verify) if citations else 0,
+                    "off_pool": len(off_pool) if citations else 0,
+                    "verdicts": _citation_verdict_counts(draft.citations),
+                    "replacement_candidates": replacement_count,
+                }
+            )
+            finish_phase("verification")
 
             preview_dir = os.path.join(
                 self.case_path, "NOTES", "AI OUTPUT", ".icharlotte",
@@ -628,6 +782,16 @@ class GenerateMotionWorker(QThread):
                 caption_path=caption_path,
             )
             draft.preview_path = preview_path
+            diagnostics["output"].update(
+                {
+                    "preview_path": preview_path,
+                    "caption_path": caption_path,
+                    "output_size": os.path.getsize(preview_path) if os.path.exists(preview_path) else 0,
+                }
+            )
+            finish_phase("assembly")
+            phase_seconds["total"] = round(time.perf_counter() - started_at, 3)
+            draft.diagnostics = diagnostics
             self.finished_result.emit(True, draft)
         except Exception as exc:  # noqa: BLE001
             self.finished_result.emit(False, str(exc))

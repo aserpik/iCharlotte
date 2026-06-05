@@ -115,7 +115,7 @@ def _read_msg(path: str) -> str:
         pythoncom.CoUninitialize()
 
 
-def _read_documents(paths) -> tuple[str, list[str]]:
+def _read_documents(paths, case_root: str | None = None) -> tuple[str, list[str]]:
     """Extract text from the given files into a single string + warning list.
 
     Table-aware for .docx (uses ``extract_docx_text`` — legal chronologies and
@@ -130,6 +130,22 @@ def _read_documents(paths) -> tuple[str, list[str]]:
             continue
         ext = os.path.splitext(path)[1].lower()
         name = os.path.basename(path)
+        if case_root and ext in {".txt", ".docx", ".doc", ".pdf", ".msg"}:
+            try:
+                from icharlotte_core.doc_library.library import DocumentLibrary
+
+                text, _method, error = DocumentLibrary(case_root).get_or_extract_text(path)
+            except Exception as exc:  # noqa: BLE001
+                warnings.append(f"Could not read {name}: {exc}")
+                continue
+            if error:
+                warnings.append(f"Could not read {name}: {error}")
+                continue
+            if text and text.strip():
+                content_parts.append(f"--- FILE: {name} ---\n{text}")
+            else:
+                warnings.append(f"No text extracted from {name}")
+            continue
         try:
             if ext == ".txt":
                 with open(path, "r", encoding="utf-8", errors="ignore") as fh:
@@ -155,6 +171,16 @@ def _read_documents(paths) -> tuple[str, list[str]]:
         else:
             warnings.append(f"No text extracted from {name}")
     return "\n\n".join(content_parts), warnings
+
+
+def _read_documents_for_case(paths, case_root: str):
+    if case_root:
+        try:
+            return _read_documents(paths, case_root=case_root)
+        except TypeError as exc:
+            if "case_root" not in str(exc):
+                raise
+    return _read_documents(paths)
 
 
 # ------------------------------- assembly ---------------------------------
@@ -206,7 +232,7 @@ class MediationBriefWizardWorker(QThread):
             caption_path = self.settings.get("caption_path", "")
 
             self.progress.emit("Reading source documents…")
-            content, warnings = _read_documents(files)
+            content, warnings = _read_documents_for_case(files, self.case_path)
             for warning in warnings:
                 self.progress.emit(f"WARNING: {warning}")
             if not content.strip():

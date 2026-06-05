@@ -80,6 +80,33 @@ def test_read_documents_reports_missing_file(tmp_path):
     assert any("not found" in w.lower() for w in warnings)
 
 
+def test_read_documents_uses_case_library_cache(tmp_path, monkeypatch):
+    from icharlotte_core.doc_library.extract import Extracted
+    from icharlotte_core.doc_library.library import DocumentLibrary
+    from icharlotte_core.ui.wizard.pages import mediation_brief_page as mod
+
+    pdf = tmp_path / "records.pdf"
+    pdf.write_bytes(b"%PDF cached")
+    DocumentLibrary(str(tmp_path)).get_or_extract_text(
+        str(pdf),
+        extractor=lambda path: Extracted("CACHED PDF TEXT", 1, "pdf_native", None),
+    )
+
+    monkeypatch.setattr(
+        mod,
+        "_read_pdf",
+        lambda path: (_ for _ in ()).throw(
+            AssertionError("PDF reader should not run on cached text")
+        ),
+    )
+
+    content, warnings = mod._read_documents([str(pdf)], case_root=str(tmp_path))
+
+    assert "records.pdf" in content
+    assert "CACHED PDF TEXT" in content
+    assert warnings == []
+
+
 # ---- Save helper ----
 
 def test_save_brief_writes_to_target(tmp_path):

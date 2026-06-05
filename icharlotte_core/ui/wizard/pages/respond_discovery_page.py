@@ -556,7 +556,7 @@ class RespondDiscoverySettingsPage(QWidget):
         response_rules = load_respond_response_rules(self.file_number)
         self._loaded_response_rules = response_rules
         context_text_by_path = {
-            path: read_document_text(path)
+            path: read_document_text(path, case_root=self.case_root)
             for path in self.context_files
             if os.path.isfile(path)
         }

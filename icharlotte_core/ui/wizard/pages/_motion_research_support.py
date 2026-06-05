@@ -13,6 +13,27 @@ import os as _os_corpus
 from icharlotte_core.config import CASELAW_DATA_DIR
 
 
+_STRUCTURAL_TARGETS = {
+    "argument",
+    "legal argument",
+    "legal standard",
+    "standard of review",
+    "introduction",
+    "conclusion",
+    "statement of facts",
+    "factual background",
+    "preliminary statement",
+    "prayer",
+}
+
+_TARGET_STOPWORDS = {
+    "the", "and", "for", "with", "without", "into", "from", "that", "this",
+    "cause", "causes", "action", "actions", "claim", "claims", "complaint",
+    "amended", "first", "second", "third", "fourth", "fifth", "sixth",
+    "seventh", "eighth", "ninth", "tenth",
+}
+
+
 def _corpus_paths() -> tuple[str, str]:
     return (_os_corpus.path.join(CASELAW_DATA_DIR, "corpus.db"),
             _os_corpus.path.join(CASELAW_DATA_DIR, "vectors.f16"))
@@ -32,6 +53,29 @@ def _corpus_embedder():
     return OnnxEmbedder()
 
 
+def _target_heading_key(text: str) -> str:
+    text = re.sub(r"^\s*(?:[A-Z]\.|[IVXLC]+\.)\s*", "", text or "", flags=re.I)
+    text = re.sub(r"^\s*\d+\.\s*", "", text)
+    text = re.sub(r"[^a-z0-9]+", " ", text.lower())
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _target_tokens(text: str) -> set[str]:
+    key = _target_heading_key(text)
+    return {
+        token
+        for token in key.split()
+        if len(token) > 2 and token not in _TARGET_STOPWORDS
+    }
+
+
+def _same_research_point(left: set[str], right: set[str]) -> bool:
+    if not left or not right:
+        return False
+    overlap = len(left & right)
+    return (overlap / min(len(left), len(right))) >= 0.72
+
+
 def research_targets(metadata, plan) -> list[str]:
     """Propositions to research, deduped: the union of the principal arguments
     and every selected section-plan leaf.
@@ -45,26 +89,37 @@ def research_targets(metadata, plan) -> list[str]:
     skipped; the count is capped to bound LLM calls under provider rate limits.
     """
     targets: list[str] = []
+    target_token_sets: list[set[str]] = []
     seen: set[str] = set()
 
     def _add(text: str) -> None:
-        t = (text or "").strip()
+        t = (text or "").replace("\x00", "").strip()
         if not t:
             return
-        key = re.sub(r"\s+", " ", t.lower())
+        key = _target_heading_key(t)
+        if key in _STRUCTURAL_TARGETS:
+            return
         if key in seen:
             return
+        tokens = _target_tokens(t)
+        for idx, existing in enumerate(target_token_sets):
+            if _same_research_point(tokens, existing):
+                if len(tokens) > len(existing) + 2:
+                    seen.discard(_target_heading_key(targets[idx]))
+                    targets[idx] = t
+                    target_token_sets[idx] = tokens
+                    seen.add(key)
+                return
         seen.add(key)
         targets.append(t)
+        target_token_sets.append(tokens)
 
     for arg in (getattr(metadata, "principal_arguments", None) or []):
         _add(arg)
     # Structural sections that argue no legal point and need no case authority.
-    _skip = ("introduction", "conclusion", "statement of facts",
-             "factual background", "preliminary statement", "prayer")
     for item in (plan or []):
         text = (getattr(item, "text", "") or "").strip()
-        if not text or any(s in text.lower() for s in _skip):
+        if not text:
             continue
         _add(text)
     return targets[:24]

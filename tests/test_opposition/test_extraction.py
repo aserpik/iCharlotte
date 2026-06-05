@@ -1,4 +1,6 @@
 from icharlotte_core.document_processor import ExtractResult
+from icharlotte_core.doc_library.extract import Extracted
+from icharlotte_core.doc_library.library import DocumentLibrary
 from icharlotte_core.opposition import extraction
 
 
@@ -72,3 +74,30 @@ def test_extract_context_bundle_labels_documents_without_citation_strings(
     assert "skipped.xlsx" not in bundle
     assert any(".xlsx" in warning for warning in warnings)
     assert "[first.txt]" not in bundle
+
+
+def test_extract_context_bundle_uses_case_library_cache(tmp_path, monkeypatch):
+    context = tmp_path / "context.pdf"
+    context.write_bytes(b"%PDF cached")
+    DocumentLibrary(str(tmp_path)).get_or_extract_text(
+        str(context),
+        extractor=lambda path: Extracted("SEEDED CONTEXT", 1, "pdf_native", None),
+    )
+
+    def fail_extract_text(self, path, **kwargs):
+        raise AssertionError("DocumentProcessor should not run on cached text")
+
+    monkeypatch.setattr(
+        extraction.DocumentProcessor,
+        "extract_text",
+        fail_extract_text,
+    )
+
+    bundle, warnings = extraction.extract_context_bundle(
+        [str(context)],
+        case_root=str(tmp_path),
+    )
+
+    assert "Document: context.pdf" in bundle
+    assert "SEEDED CONTEXT" in bundle
+    assert warnings == []

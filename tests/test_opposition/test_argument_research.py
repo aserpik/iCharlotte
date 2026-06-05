@@ -135,6 +135,52 @@ def test_research_argument_stamps_goodlaw_signals(tmp_path):
     assert out[0].latest_citing_year == "2022"
 
 
+def test_research_argument_reuses_cached_selection_for_same_local_source(tmp_path):
+    class CacheableLocalClient:
+        def __init__(self):
+            self.db_path = str(tmp_path / "corpus.db")
+            self.vectors_path = str(tmp_path / "vectors.f16")
+            (tmp_path / "corpus.db").write_text("db", encoding="utf-8")
+            (tmp_path / "vectors.f16").write_bytes(b"vec")
+            self.search_calls = 0
+            self.text_calls = 0
+            self.signal_calls = 0
+
+        def search_opinions(self, *args, **kwargs):
+            self.search_calls += 1
+            return [_case(111)]
+
+        def get_opinion_text(self, cluster_id):
+            self.text_calls += 1
+            return "The court held discretion is broad here."
+
+        def get_authority_signals(self, cluster_id):
+            self.signal_calls += 1
+            return {"citation_count": 42, "latest_citing_year": "2022"}
+
+    cl = CacheableLocalClient()
+    query_llm = MagicMock(return_value='{"queries": ["q"]}')
+    rerank_llm = MagicMock(return_value='{"selections": [{"id": "111", "supports": "s", '
+                                        '"passage": "The court held discretion is broad here."}]}')
+
+    first = research_argument(
+        "arg", cl_client=cl, query_llm=query_llm, rerank_llm=rerank_llm,
+        argument_id="arg-1", cache_dir=str(tmp_path), motion_type="demurrer", side="moving",
+    )
+    second = research_argument(
+        "arg", cl_client=cl, query_llm=query_llm, rerank_llm=rerank_llm,
+        argument_id="arg-2", cache_dir=str(tmp_path), motion_type="demurrer", side="moving",
+    )
+
+    assert [a.cluster_id for a in first] == ["111"]
+    assert [a.cluster_id for a in second] == ["111"]
+    assert second[0].argument_id == "arg-2"
+    assert query_llm.call_count == 1
+    assert rerank_llm.call_count == 1
+    assert cl.text_calls == 1
+    assert cl.signal_calls == 1
+
+
 from icharlotte_core.opposition.argument_research import research_arguments
 
 

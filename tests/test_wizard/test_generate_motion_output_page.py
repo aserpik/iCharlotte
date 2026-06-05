@@ -192,3 +192,81 @@ def test_reopen_restores_verified_citations_from_sidecar(qtbot, tmp_path):
     assert page2.draft.citations[0].verdict == "SUPPORTED"
     assert page2.draft.citations[0].citation_text == "Smith v. Jones (2010) 50 Cal.4th 100"
     assert "SUPPORTED" in page2.detail_panel.header_label.text()
+
+
+def test_diagnostics_panel_renders_and_reopens_from_sidecar(qtbot, tmp_path):
+    from docx import Document
+
+    preview = tmp_path / "Motion Preview.docx"
+    doc = Document()
+    doc.add_paragraph("Generated motion body.")
+    doc.save(str(preview))
+
+    diagnostics = {
+        "task": "generate_motion",
+        "research": {
+            "target_count": 9,
+            "retrieved_authorities": 27,
+            "source": "local_corpus",
+        },
+        "citations": {
+            "found": 12,
+            "verdicts": {"SUPPORTED": 10, "NOT_SUPPORTED": 2},
+            "replacement_candidates": 2,
+        },
+        "phase_seconds": {"research": 42.25, "total": 50.0},
+    }
+
+    page = GenerateMotionOutputPage()
+    qtbot.addWidget(page)
+    page.show_result(DraftDocument(
+        title="Motion",
+        body_text="Generated motion body.",
+        preview_path=str(preview),
+        diagnostics=diagnostics,
+    ))
+
+    assert not page.diagnostics_browser.isHidden()
+    text = page.diagnostics_browser.toPlainText().lower()
+    assert "research targets: 9" in text
+    assert "replacement candidates: 2" in text
+    assert os.path.isfile(str(preview) + ".diagnostics.json")
+
+    page2 = GenerateMotionOutputPage()
+    qtbot.addWidget(page2)
+    page2.load_output(str(preview))
+    assert page2.draft.diagnostics["research"]["target_count"] == 9
+    assert "retrieved authorities: 27" in page2.diagnostics_browser.toPlainText().lower()
+
+
+def test_accepting_replacement_candidate_updates_draft_body(qtbot):
+    page = GenerateMotionOutputPage()
+    qtbot.addWidget(page)
+    old = CitationVerification(
+        citation_text="Smith v. Jones (2010) 50 Cal.4th 100",
+        normalized_citation="Smith v. Jones (2010) 50 Cal.4th 100",
+        verdict="NOT_SUPPORTED",
+        kind="case",
+        replacement_candidates=[
+            CitationVerification(
+                citation_text="Brown v. Davis (2015) 60 Cal.App.4th 200",
+                normalized_citation="Brown v. Davis (2015) 60 Cal.App.4th 200",
+                verdict="SUPPORTED",
+                kind="case",
+                note="Direct replacement.",
+            ).to_dict()
+        ],
+    )
+    page.show_result(DraftDocument(
+        title="M",
+        body_text="See Smith v. Jones (2010) 50 Cal.4th 100.",
+        citations=[old],
+    ))
+
+    page.show_citation(0)
+    assert "Replacement candidates" in page.detail_panel.body_html
+    page._on_replacement_requested(old, 0)
+
+    assert "Brown v. Davis (2015) 60 Cal.App.4th 200" in page.draft.body_text
+    assert page.draft.citations[0].verdict == "SUPPORTED"
+    assert page.draft.citations[0].citation_text == "Brown v. Davis (2015) 60 Cal.App.4th 200"

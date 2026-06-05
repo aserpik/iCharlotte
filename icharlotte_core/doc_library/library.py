@@ -92,6 +92,43 @@ class DocumentLibrary:
         with open(path, "r", encoding="utf-8", errors="replace") as f:
             return f.read()
 
+    def _write_blob_text(self, blob_path: str, text: str) -> None:
+        tmp = blob_path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(tmp, blob_path)
+
+    def get_or_extract_text(self, source_path: str,
+                            extractor: Callable = _default_extractor) -> tuple[str, str, Optional[str]]:
+        """Return cached extracted text for a file, extracting once if needed.
+
+        Unlike ``add_entry()``, this does not create a user-visible library
+        entry. Wizard tasks use it as a per-case extraction cache for repeated
+        reads of the same source document.
+        """
+        if not source_path:
+            return "", "failed", "File path is required."
+        try:
+            digest = self._hash_file(source_path)
+        except OSError as ex:
+            return "", "failed", str(ex)
+
+        os.makedirs(self.blobs_dir, exist_ok=True)
+        blob_name = f"{digest}.txt"
+        blob_path = os.path.join(self.blobs_dir, blob_name)
+        if os.path.isfile(blob_path):
+            return self.get_member_text(blob_name), "cached", None
+
+        try:
+            result = extractor(source_path)
+        except Exception as ex:  # noqa: BLE001 - callers should get a task warning
+            return "", "failed", f"{type(ex).__name__}: {ex}"
+        text = result.text or ""
+        if result.error or not text.strip():
+            return text, result.extract_method, result.error or "empty extraction"
+        self._write_blob_text(blob_path, text)
+        return text, result.extract_method, None
+
     # ---- write ----
     def add_entry(self, task_type: str, source_paths: list,
                   metadata: Optional[dict] = None,
@@ -130,10 +167,7 @@ class DocumentLibrary:
                     path, name, None, 0, 0, result.extract_method,
                     result.error or "empty extraction"))
                 continue
-            tmp = blob_path + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
-                f.write(result.text)
-            os.replace(tmp, blob_path)
+            self._write_blob_text(blob_path, result.text)
             members.append(MemberFile(
                 path, name, blob_name, len(result.text),
                 TokenCounter.estimate_tokens(result.text),

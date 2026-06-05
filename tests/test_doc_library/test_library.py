@@ -71,6 +71,46 @@ def test_same_file_in_two_entries_extracts_once(tmp_path):
     assert calls["n"] == 1  # second add reused the blob
 
 
+def test_get_or_extract_text_reuses_blob_without_visible_entry(tmp_path):
+    src = tmp_path / "context.pdf"
+    src.write_bytes(b"same bytes")
+    calls = {"n": 0}
+
+    def counting_extractor(path):
+        calls["n"] += 1
+        return Extracted("CACHED CONTEXT", 1, "pdf_native", None)
+
+    lib = DocumentLibrary(str(tmp_path))
+
+    text, method, error = lib.get_or_extract_text(str(src), extractor=counting_extractor)
+    assert text == "CACHED CONTEXT"
+    assert method == "pdf_native"
+    assert error is None
+
+    text, method, error = lib.get_or_extract_text(str(src), extractor=counting_extractor)
+    assert text == "CACHED CONTEXT"
+    assert method == "cached"
+    assert error is None
+    assert calls["n"] == 1
+    assert lib.list_entries() == []
+
+
+def test_get_or_extract_text_reads_existing_entry_blob(tmp_path):
+    src = tmp_path / "depo.pdf"
+    src.write_bytes(b"same bytes")
+    lib = DocumentLibrary(str(tmp_path))
+    lib.add_entry("summarize_depositions", [str(src)], {}, extractor=_fake_extractor("ENTRY TEXT"))
+
+    def raising_extractor(path):
+        raise AssertionError("existing blob should be reused")
+
+    text, method, error = lib.get_or_extract_text(str(src), extractor=raising_extractor)
+
+    assert text == "ENTRY TEXT"
+    assert method == "cached"
+    assert error is None
+
+
 def test_rerun_same_task_same_files_replaces_entry(tmp_path):
     src = tmp_path / "depo.pdf"
     src.write_bytes(b"bytes")

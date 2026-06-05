@@ -101,3 +101,77 @@ def test_phase1_passes_extraction_task_type_to_llm(fake_case_root):
                     if c.kwargs.get("pass_name") == "source_digest"]
     assert digest_calls
     assert all(c.kwargs.get("task_type") == "extraction" for c in digest_calls)
+
+
+def test_phase1_reuses_source_cache_across_timestamped_sessions(
+    fake_case_root, monkeypatch
+):
+    from datetime import datetime
+
+    from Scripts.depo_prep_lib import phase1
+
+    src = _make_text_source(fake_case_root / "RECORDS" / "med.txt", "text")
+    config = {
+        "deponent_name": "J",
+        "deponent_role": "P",
+        "deponent_sources": [str(src)],
+        "context_sources": [],
+        "style": "discovery",
+        "free_text_notes": "",
+        "per_topic_flags": {
+            "strategic_note": False,
+            "source_facts": False,
+            "impeachment_hook": False,
+            "objection_alts": False,
+        },
+        "case_root": str(fake_case_root),
+    }
+
+    class Clock:
+        values = [
+            datetime(2026, 5, 27, 14, 32),
+            datetime(2026, 5, 27, 14, 33),
+        ]
+        index = 0
+
+        @classmethod
+        def now(cls):
+            value = cls.values[cls.index]
+            cls.index += 1
+            return value
+
+    monkeypatch.setattr(phase1, "datetime", Clock)
+    original_extract = phase1._extract_text_to_raw
+    extract_calls = []
+
+    def counting_extract(source_path, raw_dir, logger=None):
+        extract_calls.append(Path(source_path).name)
+        return original_extract(source_path, raw_dir, logger)
+
+    monkeypatch.setattr(phase1, "_extract_text_to_raw", counting_extract)
+
+    caller = _mock_llm()
+    first_session = phase1.run_phase1(
+        config=config,
+        llm_caller=caller,
+        progress=lambda *a, **kw: None,
+    )
+    second_session = phase1.run_phase1(
+        config=config,
+        llm_caller=caller,
+        progress=lambda *a, **kw: None,
+    )
+
+    assert Path(first_session).parent != Path(second_session).parent
+    assert extract_calls == ["med.txt"]
+    digest_calls = [
+        call for call in caller.call.call_args_list
+        if call.kwargs.get("pass_name") == "source_digest"
+    ]
+    topic_calls = [
+        call for call in caller.call.call_args_list
+        if call.kwargs.get("pass_name") == "topic_clustering"
+    ]
+    assert len(digest_calls) == 1
+    assert len(topic_calls) == 2
+    assert (Path(second_session).parent / "digests" / "med.txt.json").exists()
