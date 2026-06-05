@@ -114,7 +114,9 @@ class PromptTemplateDialog(QDialog):
         for prompt in BUILTIN_PROMPTS:
             self.all_prompts.append(prompt)
 
-        # Add custom prompts from the global store (shared across all cases)
+        # Add custom prompts from the global store (shared across all cases).
+        # get_quick_prompts() never returns built-ins (it forces is_builtin=False),
+        # so no filtering is needed here.
         for prompt in self.store.get_quick_prompts():
             self.all_prompts.append(prompt)
 
