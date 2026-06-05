@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from icharlotte_core.config import SCRIPTS_DIR
+from icharlotte_core import case_index_store
 from icharlotte_core.ui.wizard import theme
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
 from icharlotte_core.ui.wizard.task_scaffold import WizardTaskContainer
@@ -76,6 +77,12 @@ class SeparateAnalysisWorker(QThread):
             self.finished_analysis.emit(True, docs)
         except Exception as e:
             self.finished_analysis.emit(False, str(e))
+
+
+def _docs_from_workbench(workbench) -> list:
+    """Read the current (possibly edited) document rows from a SeparatorWorkbench."""
+    table = workbench.doc_table
+    return [workbench._get_doc_from_row(row) for row in range(table.rowCount())]
 
 
 PAGE_SETTINGS = 0
@@ -248,12 +255,14 @@ class SeparateTaskTab(WizardTaskContainer):
         self.workbench.set_busy(False)
         self.workbench.load_docs(self._pdf_path, docs)
         self.setCurrentIndex(PAGE_WORKBENCH)
+        self._persist_to_index(docs)
 
     def _on_cancel(self):
         self.setCurrentIndex(PAGE_SETTINGS)
 
     def _on_processing_complete(self, summary: dict):
         from datetime import datetime
+        self._persist_to_index(_docs_from_workbench(self.workbench))
         self.task_completed.emit({
             "task_id": self._spec.task_id,
             "title": self._spec.title,
@@ -262,6 +271,23 @@ class SeparateTaskTab(WizardTaskContainer):
             "output_path": summary.get("output_folder", ""),
             "completed_at": datetime.now().isoformat(timespec="seconds"),
         })
+
+    def _persist_to_index(self, docs: list) -> None:
+        """Persist this run's document map to the shared per-case index store so
+        it is viewable later (Advanced Index tab / wizard reveal). Never fatal."""
+        if not self._file_number:
+            return
+        try:
+            case_index_store.upsert_pdf(self._file_number, self._pdf_path, docs)
+        except Exception as e:  # persistence must never break the task flow
+            try:
+                from icharlotte_core.utils import log_event
+                log_event(
+                    f"[separate] failed to persist index for {self._pdf_path}: {e}",
+                    "error",
+                )
+            except Exception:
+                pass
 
     def closeEvent(self, event):
         if self._worker is not None and self._worker.isRunning():
