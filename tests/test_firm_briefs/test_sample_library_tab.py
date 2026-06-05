@@ -4,7 +4,10 @@ pytest.importorskip("PySide6")
 from icharlotte_core.ui.dialogs_sample_library import SampleLibraryTab
 
 
-def test_roots_add_remove_persist(tmp_path, qtbot):
+def test_roots_add_remove_persist(tmp_path, qtbot, monkeypatch):
+    # A fresh tab seeds from config.FIRM_BRIEFS_ROOTS; force it empty so this test
+    # is independent of the machine's real configured roots.
+    monkeypatch.setattr("icharlotte_core.config.FIRM_BRIEFS_ROOTS", [])
     cfg = str(tmp_path / "roots.json")
     tab = SampleLibraryTab(roots_config_path=cfg)
     qtbot.addWidget(tab)

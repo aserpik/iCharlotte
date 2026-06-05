@@ -31,7 +31,10 @@ def test_select_returns_trimmed_excerpts(tmp_path):
     assert all(len(t) <= 210 for t in out)
 
 
-def test_select_empty_when_no_index():
+def test_select_empty_when_no_index(monkeypatch):
+    # index=None falls back to factory.make_index(); force it absent so the test
+    # doesn't depend on whether a real index is built on this machine.
+    monkeypatch.setattr("icharlotte_core.firm_briefs.factory.make_index", lambda **k: None)
     assert style.select_exemplars("compel", "opposition", META, index=None) == []
 
 
