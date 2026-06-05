@@ -13,6 +13,13 @@ def test_deposition_without_party_drops_possessive():
     assert lbl == "Deposition Transcript"
 
 
+def test_deposition_with_deponent_name():
+    # Deponent name takes priority over party -> "Deposition of <name>".
+    lbl = auto_label("summarize_depositions", [r"Z:\x\depo.pdf"],
+                     {"name": "Joe Smith", "party": "Plaintiff"}, existing_labels=[])
+    assert lbl == "Deposition of Joe Smith"
+
+
 def test_discovery_with_party():
     lbl = auto_label("summarize_discovery", [r"Z:\x\rfp.pdf"],
                      {"party": "Defendant"}, existing_labels=[])
