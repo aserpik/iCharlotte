@@ -2289,7 +2289,7 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
             custom_prompts = get_global_quick_prompt_store().get_quick_prompts()
         except Exception as e:
             custom_prompts = []
-            print(f"[ChatTab] Could not load global quick prompts: {e}")
+            log_event(f"[ChatTab] Could not load global quick prompts: {e}", "error")
         if custom_prompts:
             menu.addSeparator()
             for prompt in custom_prompts:
@@ -2313,6 +2313,8 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
     def open_template_manager(self):
         """Open the template management dialog."""
         from .chat_dialogs import PromptTemplateDialog
+        # PromptTemplateDialog persists templates to the global store; the persistence
+        # arg is accepted only for backward compatibility and is unused for templates.
         dlg = PromptTemplateDialog(self.persistence, self)
         if dlg.exec():
             self.update_template_menu()
