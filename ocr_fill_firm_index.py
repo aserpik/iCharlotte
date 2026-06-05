@@ -62,7 +62,13 @@ def main() -> int:
     db, vec = factory.index_paths()
     idx = FirmBriefIndex(db_path=db, vectors_path=vec)
     idx.create_schema()
-    emb = get_embedder(fake=False)
+    _threads = int(os.environ.get("FB_EMBED_THREADS", "0") or "0")
+    if _threads > 0:
+        from icharlotte_core.legal_research.local_corpus.embedder import OnnxEmbedder
+        emb = OnnxEmbedder(threads=_threads)
+    else:
+        emb = get_embedder(fake=False)
+    _skip_prop = os.environ.get("FB_SKIP_PROP_VECS") == "1"
     added = failed = 0
     for dirpath, _dirs, files in os.walk(ROOT):
         for name in files:
@@ -88,7 +94,7 @@ def main() -> int:
             headings = extract_headings(text)
             profile = compose_profile("", headings, [c.proposition for c in cites]) or profile_from_text(text)
             vecrow = emb.encode([profile])[0]
-            prop_vecs = list(emb.encode([c.proposition for c in cites])) if cites else None
+            prop_vecs = None if _skip_prop else (list(emb.encode([c.proposition for c in cites])) if cites else None)
             idx.upsert_brief(
                 path=path, content_hash=h, motion_type=mtype, side=side,
                 heading=headings[0] if headings else "", profile=profile,
