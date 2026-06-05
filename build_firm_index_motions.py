@@ -8,7 +8,8 @@ Reuses the shipped firm_briefs helpers so the index format matches normal ingest
 import os
 import sys
 
-sys.path.insert(0, r"C:\geminiterminal2")
+# Resolve imports relative to this file (works from main checkout OR a worktree).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from icharlotte_core.firm_briefs import factory
 from icharlotte_core.firm_briefs.index import FirmBriefIndex

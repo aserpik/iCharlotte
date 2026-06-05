@@ -10,7 +10,8 @@ import io
 import os
 import sys
 
-sys.path.insert(0, r"C:\geminiterminal2")
+# Resolve imports relative to this file (works from main checkout OR a worktree).
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import fitz  # PyMuPDF
 import pytesseract
