@@ -2,6 +2,8 @@
 the oppose output page)."""
 from __future__ import annotations
 
+import os
+
 import pytest
 
 pytest.importorskip("PySide6")
@@ -154,3 +156,39 @@ def test_open_in_word_enabled_only_with_existing_preview(qtbot, tmp_path):
     qtbot.addWidget(page2)
     page2.load_output(str(preview))
     assert page2.open_btn.isEnabled()
+
+
+def test_reopen_restores_verified_citations_from_sidecar(qtbot, tmp_path):
+    # Generating with verified citations must persist a sidecar beside the
+    # preview .docx so that reopening (load_output) restores the SAME verdicts
+    # instead of showing "no citations detected".
+    from docx import Document
+
+    preview = tmp_path / "Motion Preview.docx"
+    doc = Document()
+    doc.add_paragraph("See Smith v. Jones (2010) 50 Cal.4th 100 for support.")
+    doc.save(str(preview))
+
+    page = GenerateMotionOutputPage()
+    qtbot.addWidget(page)
+    page.show_result(DraftDocument(
+        title="Motion to Compel",
+        body_text="See *Smith v. Jones* (2010) 50 Cal.4th 100 for support.",
+        preview_path=str(preview),
+        citations=[CitationVerification(
+            citation_text="Smith v. Jones (2010) 50 Cal.4th 100",
+            case_name="Smith v. Jones", verdict="SUPPORTED", kind="case",
+            evidence="The court held the duty applies.",
+        )],
+    ))
+    # show_result persisted the verdicts beside the preview.
+    assert os.path.isfile(str(preview) + ".citations.json")
+
+    # Reopen in a fresh page → verdicts restored, panel shows the citation.
+    page2 = GenerateMotionOutputPage()
+    qtbot.addWidget(page2)
+    page2.load_output(str(preview))
+    assert len(page2.draft.citations) == 1
+    assert page2.draft.citations[0].verdict == "SUPPORTED"
+    assert page2.draft.citations[0].citation_text == "Smith v. Jones (2010) 50 Cal.4th 100"
+    assert "SUPPORTED" in page2.detail_panel.header_label.text()

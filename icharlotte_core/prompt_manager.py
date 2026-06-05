@@ -313,6 +313,51 @@ class PromptManager:
         self._save_registry()
         return True
 
+    def update_version(
+        self,
+        agent: str,
+        pass_name: str,
+        version: str,
+        content: str,
+    ) -> bool:
+        """
+        Overwrite an existing version's content in place.
+
+        Unlike create_version(), this does NOT create a new version or change
+        any version metadata. If the given version is the active/current one,
+        the current pointer file is refreshed so the runtime picks up the edit.
+
+        Args:
+            agent: Agent name.
+            pass_name: Pass name.
+            version: Version to overwrite (must already exist).
+            content: New prompt content.
+
+        Returns:
+            True if the version existed and was updated, False otherwise.
+        """
+        key = self._get_prompt_key(agent, pass_name)
+        entry = self._registry.get("prompts", {}).get(key)
+        if not entry:
+            return False
+
+        known = any(v.get("version") == version for v in entry.get("versions", []))
+        if not known:
+            return False
+
+        # Overwrite the version file in place.
+        prompt_path = self._get_prompt_path(agent, pass_name, version)
+        os.makedirs(os.path.dirname(prompt_path), exist_ok=True)
+        with open(prompt_path, "w", encoding="utf-8") as f:
+            f.write(content)
+
+        # If this is the active version, refresh the current pointer file.
+        if entry.get("current_version") == version:
+            current_path = self._get_current_path(agent, pass_name)
+            shutil.copy2(prompt_path, current_path)
+
+        return True
+
     def get_info(self, agent: str, pass_name: str) -> Optional[PromptInfo]:
         """
         Get information about a prompt.

@@ -2224,16 +2224,35 @@ class PromptsDialog(QDialog):
             QMessageBox.critical(self, "Error", f"Failed to save: {e}")
 
     def _save_to_current(self):
-        """Save to the current legacy file (for backward compatibility)."""
+        """Save edits to the currently selected version, in place.
+
+        Overwrites the version selected in the Version dropdown without
+        creating a new version or prompting for a description. Falls back to
+        the legacy Scripts/*.txt file for legacy-only prompts, and to creating
+        a first version when there is nothing to overwrite.
+        """
         if not self.current_agent or not self.current_pass:
             return
 
-        # Special handling for email_update agent
+        # Special handling for email_update agent (separate JSON store)
         if self.current_agent == "email_update":
             self._save_email_update_prompt()
             return
 
-        # Find the legacy filename
+        content = self._get_editor_raw_content()
+        version = self.current_version or self.version_combo.currentData()
+
+        # Versioned prompt: overwrite the selected version in place.
+        if version and version not in ("legacy", "current"):
+            if self.prompt_manager.update_version(
+                self.current_agent, self.current_pass, version, content
+            ):
+                QMessageBox.information(self, "Success", f"Saved to {version}")
+                self._populate_versions()
+                return
+            # Version not found in the registry — fall through to legacy/new.
+
+        # Legacy prompt: write the backing Scripts/*.txt file.
         legacy_file = None
         for filename, (agent, pass_name) in LEGACY_PROMPT_MAP.items():
             if agent == self.current_agent and pass_name == self.current_pass:
@@ -2241,13 +2260,11 @@ class PromptsDialog(QDialog):
                 break
 
         if not legacy_file:
-            # No legacy file, save as new version instead
+            # Nothing to overwrite — create the first version instead.
             self._save_as_new_version()
             return
 
         path = os.path.join(self.scripts_dir, legacy_file)
-        content = self._get_editor_raw_content()
-
         try:
             with open(path, 'w', encoding='utf-8') as f:
                 f.write(content)

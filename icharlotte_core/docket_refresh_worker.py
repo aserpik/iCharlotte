@@ -33,6 +33,9 @@ class DocketRefreshWorker(QThread):
     GRACE_DAYS = 2                   # Days to wait after hearing before refreshing
     MAX_CONCURRENT = 2               # Max concurrent docket downloads
     PROCESS_TIMEOUT = 600            # 10 minutes per docket download
+    STARTUP_DELAY = 90               # Defer first check N seconds after launch
+                                     # so the docket-scraper storm doesn't coincide
+                                     # with startup UI build + Z: scan (crash window)
 
     def __init__(self, db: MasterCaseDatabase = None):
         super().__init__()
@@ -43,6 +46,16 @@ class DocketRefreshWorker(QThread):
         """Main loop — check periodically for cases needing docket refresh."""
         log_event("[DocketRefresh] Worker started.")
         self.status.emit("Docket refresh worker started")
+
+        # Defer the first check so the startup docket-scraper storm (Selenium
+        # subprocesses) does not coincide with launch, when the main thread is busy
+        # building the UI and scanning Z:. The 2026-06-04 crash cluster happened
+        # during that window. Interruptible so request_stop() is still prompt.
+        for _ in range(self.STARTUP_DELAY):
+            if not self._running:
+                log_event("[DocketRefresh] Worker stopped before first check.")
+                return
+            time.sleep(1)
 
         while self._running:
             try:

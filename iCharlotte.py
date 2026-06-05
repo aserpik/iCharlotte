@@ -69,6 +69,7 @@ except (ImportError, OSError):
 
 # --- Core Modules ---
 from icharlotte_core.config import SCRIPTS_DIR, GEMINI_DATA_DIR, BASE_PATH_WIN
+from icharlotte_core.gc_guard import no_gc
 from icharlotte_core.utils import (
     log_event, get_case_path, sanitize_filename, format_date_to_mm_dd_yyyy
 )
@@ -3472,6 +3473,16 @@ class MainWindow(QMainWindow):
         self.on_scan_complete()
 
     def add_tree_batch(self, batch):
+        # Pause cyclic GC while building Qt tree items. Cyclic GC can fire mid-loop
+        # (on this thread, during allocation) and finalize a stray pythoncom COM
+        # proxy on the wrong apartment -> RPC_E_WRONG_THREAD (0x8001010e) -> heap
+        # corruption -> access violation in Shiboken/Qt. This batch is also pumped
+        # by the nested event loop of native file dialogs, which is exactly where
+        # the 2026-06-04 11:38 and 16:27 crashes died. See gc_guard.no_gc.
+        with no_gc(collect_on_exit=False):
+            self._add_tree_batch_inner(batch)
+
+    def _add_tree_batch_inner(self, batch):
         _batch_gen = self._tree_generation
         _batch_dirs = 0
         _batch_files = 0

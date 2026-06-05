@@ -591,6 +591,52 @@
     }
   },
   "pass_defaults": {
+    "agent_oppose_motion": {
+      "analyze_motion": {
+        "agent_id": "agent_oppose_motion",
+        "pass_name": "analyze_motion",
+        "model_sequence": [
+          {
+            "provider": "Gemini",
+            "model": "gemini-3.1-pro-preview",
+            "max_tokens": -1,
+            "supports_thinking": false,
+            "supports_streaming": true,
+            "cost_tier": "standard"
+          },
+          {
+            "provider": "Gemini",
+            "model": "gemini-3.5-flash",
+            "max_tokens": -1,
+            "supports_thinking": false,
+            "supports_streaming": true,
+            "cost_tier": "standard"
+          }
+        ]
+      },
+      "draft_memorandum": {
+        "agent_id": "agent_oppose_motion",
+        "pass_name": "draft_memorandum",
+        "model_sequence": [
+          {
+            "provider": "Claude",
+            "model": "claude-opus-4-8",
+            "max_tokens": -1,
+            "supports_thinking": false,
+            "supports_streaming": true,
+            "cost_tier": "standard"
+          },
+          {
+            "provider": "Gemini",
+            "model": "gemini-3.1-pro-preview",
+            "max_tokens": -1,
+            "supports_thinking": false,
+            "supports_streaming": true,
+            "cost_tier": "standard"
+          }
+        ]
+      }
+    },
     "agent_separate": {
       "main": {
         "agent_id": "agent_separate",
