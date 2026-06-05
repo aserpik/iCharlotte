@@ -87,11 +87,12 @@ def main() -> int:
             headings = extract_headings(text)
             profile = compose_profile("", headings, [c.proposition for c in cites]) or profile_from_text(text)
             vecrow = emb.encode([profile])[0]
+            prop_vecs = list(emb.encode([c.proposition for c in cites])) if cites else None
             idx.upsert_brief(
                 path=path, content_hash=h, motion_type=mtype, side=side,
                 heading=headings[0] if headings else "", profile=profile,
                 profile_vec=vecrow, char_len=len(text), ocr_ratio=_ocr_ratio(text),
-                cites=cites,
+                cites=cites, full_text=text, prop_vecs=prop_vecs,
             )
             added += 1
             print(f"  indexed ({mtype}/{side}, {len(text)} chars, {len(cites)} cites)")
