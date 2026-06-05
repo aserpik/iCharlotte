@@ -2258,40 +2258,49 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
         """)
 
     def update_template_menu(self):
-        """Update the quick prompts template menu."""
-        menu = QMenu(self)
+        """(Re)populate the quick prompts template menu from built-ins + the global store."""
+        # Reuse one persistent menu so we can refresh it on aboutToShow without re-wiring.
+        menu = self.template_btn.menu()
+        if menu is None:
+            menu = QMenu(self.template_btn)
+            self.template_btn.setMenu(menu)
+            # Rebuild every time the menu opens so newly added/edited/deleted global
+            # templates appear in all chat tabs without needing a restart.
+            menu.aboutToShow.connect(lambda s=self: ChatTab.update_template_menu(s))
+        menu.clear()
 
         # Built-in prompts
         for prompt in BUILTIN_PROMPTS:
             if prompt.id == 'builtin_mediation_brief':
                 continue  # Handled separately below
-            action = QAction(prompt.name, self)
+            action = QAction(prompt.name, menu)
             action.triggered.connect(lambda checked, p=prompt: self.insert_template(p.prompt))
             menu.addAction(action)
 
         # Mediation Brief (special — triggers generation, not text insert)
         menu.addSeparator()
-        med_brief_action = QAction("Mediation Brief", self)
+        med_brief_action = QAction("Mediation Brief", menu)
         med_brief_action.triggered.connect(self._on_mediation_brief_selected)
         menu.addAction(med_brief_action)
 
-        # Custom prompts (if persistence available)
-        if self.persistence:
-            prompts = self.persistence.get_quick_prompts()
-            custom_prompts = [p for p in prompts if not p.is_builtin]
-            if custom_prompts:
-                menu.addSeparator()
-                for prompt in custom_prompts:
-                    action = QAction(prompt.name, self)
-                    action.triggered.connect(lambda checked, p=prompt: self.insert_template(p.prompt))
-                    menu.addAction(action)
+        # Custom prompts from the global store (shared across all cases/sessions)
+        try:
+            from ..chat.global_prompts import get_global_quick_prompt_store
+            custom_prompts = get_global_quick_prompt_store().get_quick_prompts()
+        except Exception as e:
+            custom_prompts = []
+            print(f"[ChatTab] Could not load global quick prompts: {e}")
+        if custom_prompts:
+            menu.addSeparator()
+            for prompt in custom_prompts:
+                action = QAction(prompt.name, menu)
+                action.triggered.connect(lambda checked, p=prompt: self.insert_template(p.prompt))
+                menu.addAction(action)
 
         menu.addSeparator()
-        manage_action = QAction("Manage Templates...", self)
+        manage_action = QAction("Manage Templates...", menu)
         manage_action.triggered.connect(self.open_template_manager)
         menu.addAction(manage_action)
-
-        self.template_btn.setMenu(menu)
 
     def insert_template(self, prompt: str):
         """Insert a template prompt into the input."""
