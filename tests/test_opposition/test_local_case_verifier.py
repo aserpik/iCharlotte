@@ -58,6 +58,9 @@ def test_verifier_uses_full_text_not_parenthetical_context(monkeypatch):
     found = {
         "case_uid": "cap:1",
         "full_text": "primary opinion text only",
+        "snippet": "summary judgment burden from parenthetical",
+        "snippet_source": "parenthetical",
+        "snippet_parenthetical_id": "900",
         "name": "Aguilar v. Atlantic Richfield Co.",
         "url": "u",
         "court": "Cal.",

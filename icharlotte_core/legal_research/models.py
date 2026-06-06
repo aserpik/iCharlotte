@@ -149,7 +149,10 @@ class ResearchResult:
                 if case.snippet:
                     snippet_text = case.snippet.strip()
                     if snippet_text:
-                        lines.append(f"    Holding: {snippet_text}")
+                        if case.snippet_source == "parenthetical":
+                            lines.append(f"    Secondary parenthetical: {snippet_text}")
+                        else:
+                            lines.append(f"    Holding: {snippet_text}")
 
         if self.statutes:
             lines.append("")

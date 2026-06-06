@@ -667,6 +667,8 @@ class LegalResearchEngine:
                 cluster_id=c.get("cluster_id"),
                 negative_treatment=c.get("negative_treatment"),
                 relevance_score=c.get("relevance_score", 0.0),
+                snippet_source=c.get("snippet_source", ""),
+                snippet_parenthetical_id=c.get("snippet_parenthetical_id", ""),
             )
             for c in data.get("cases", [])
         ]

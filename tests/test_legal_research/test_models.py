@@ -213,6 +213,47 @@ class TestResearchResult(unittest.TestCase):
         self.assertIn("Civ. Code, \u00a7 1714", block)
         self.assertIn("Text: Everyone is responsible...", block)
 
+    def test_format_authority_block_labels_parenthetical_snippet_as_secondary(self):
+        case = CaseResult(
+            name="Aguilar v. Atlantic Richfield Co.",
+            citation="25 Cal. 4th 826",
+            date="2001-06-14",
+            court="Cal.",
+            snippet="describing Aguilar as allocating the summary judgment burden",
+            url="https://example.com",
+            snippet_source="parenthetical",
+            snippet_parenthetical_id="900",
+        )
+        result = ResearchResult(query="summary judgment", cases=[case])
+
+        block = result.format_authority_block()
+
+        self.assertIn(
+            "Secondary parenthetical: describing Aguilar as allocating the summary judgment burden",
+            block,
+        )
+        self.assertNotIn(
+            "Holding: describing Aguilar as allocating the summary judgment burden",
+            block,
+        )
+
+    def test_format_authority_block_keeps_opinion_snippet_as_holding(self):
+        case = CaseResult(
+            name="Smith v. Jones",
+            citation="123 Cal.App.4th 456",
+            date="2020-01-15",
+            court="Court of Appeal",
+            snippet="The court held that...",
+            url="https://example.com",
+            snippet_source="opinion",
+        )
+        result = ResearchResult(query="negligence", cases=[case])
+
+        block = result.format_authority_block()
+
+        self.assertIn("Holding: The court held that...", block)
+        self.assertNotIn("Secondary parenthetical: The court held that...", block)
+
     def test_to_dict(self):
         case = CaseResult(
             name="Smith v. Jones",

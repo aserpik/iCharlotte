@@ -50,6 +50,7 @@ class LocalCaseCorpus:
         con = getattr(self._local, "con", None)
         if con is None:
             con = schema.connect(self.db_path)
+            schema.create_schema(con)
             self._local.con = con
         return con
 
@@ -70,12 +71,22 @@ class LocalCaseCorpus:
     # ---- retrieval arms -------------------------------------------------
     def _bm25_case_ranking(self, query: str, limit: int) -> list[str]:
         con = self._conn()
-        rows = con.execute(
-            "SELECT p.case_uid AS uid, bm25(passages_fts) AS score "
-            "FROM passages_fts JOIN passages p ON p.vec_row = passages_fts.rowid - 1 "
-            "WHERE passages_fts MATCH ? ORDER BY score LIMIT ?",
-            (_fts_query(query), limit),
-        ).fetchall()
+        try:
+            rows = con.execute(
+                "SELECT p.case_uid AS uid, bm25(passages_fts) AS score "
+                "FROM passages_fts JOIN passages p ON p.vec_row = passages_fts.rowid - 1 "
+                "WHERE p.passage_type='opinion' AND passages_fts MATCH ? "
+                "ORDER BY score LIMIT ?",
+                (_fts_query(query), limit),
+            ).fetchall()
+        except sqlite3.OperationalError:
+            logger.debug("opinion-only BM25 failed; falling back to all passages", exc_info=True)
+            rows = con.execute(
+                "SELECT p.case_uid AS uid, bm25(passages_fts) AS score "
+                "FROM passages_fts JOIN passages p ON p.vec_row = passages_fts.rowid - 1 "
+                "WHERE passages_fts MATCH ? ORDER BY score LIMIT ?",
+                (_fts_query(query), limit),
+            ).fetchall()
         seen, order = set(), []
         for r in rows:                       # bm25() ascending = best first
             if r["uid"] not in seen:
@@ -84,13 +95,17 @@ class LocalCaseCorpus:
 
     def _parenthetical_case_ranking(self, query: str, limit: int) -> list[str]:
         con = self._conn()
-        rows = con.execute(
-            "SELECT p.case_uid AS uid, bm25(passages_fts) AS score "
-            "FROM passages_fts JOIN passages p ON p.vec_row = passages_fts.rowid - 1 "
-            "WHERE p.passage_type='parenthetical' AND passages_fts MATCH ? "
-            "ORDER BY score LIMIT ?",
-            (_fts_query(query), limit),
-        ).fetchall()
+        try:
+            rows = con.execute(
+                "SELECT p.case_uid AS uid, bm25(passages_fts) AS score "
+                "FROM passages_fts JOIN passages p ON p.vec_row = passages_fts.rowid - 1 "
+                "WHERE p.passage_type='parenthetical' AND passages_fts MATCH ? "
+                "ORDER BY score LIMIT ?",
+                (_fts_query(query), limit),
+            ).fetchall()
+        except sqlite3.OperationalError:
+            logger.debug("parenthetical ranking skipped; schema lacks passage_type", exc_info=True)
+            return []
         seen, order = set(), []
         for r in rows:
             if r["uid"] not in seen:

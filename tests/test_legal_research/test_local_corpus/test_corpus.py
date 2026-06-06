@@ -203,3 +203,126 @@ def test_get_opinion_text_excludes_parenthetical_passages(tmp_path):
 
     assert corpus.get_opinion_text("cap:aguilar") == "primary opinion text only"
     assert "external parenthetical" not in corpus.get_opinion_text("cap:aguilar")
+
+
+def test_opinion_text_hit_ranks_before_parenthetical_only_hit(tmp_path):
+    db = str(tmp_path / "c.db")
+    vec = str(tmp_path / "v.f16")
+    con = schema.connect(db)
+    schema.create_schema(con)
+    emb = FakeEmbedder(dim=64)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb)
+    idx.add(
+        CaseRecord(
+            case_uid="cap:opinion",
+            source="cap",
+            name="Opinion Hit",
+            citation="1 Cal. 5th 1",
+            full_text="summary judgment burden applies in the opinion text.",
+        ),
+        [
+            PassageRecord(
+                passage_uid="cap:opinion#0",
+                case_uid="cap:opinion",
+                ordinal=0,
+                text="summary judgment burden applies in the opinion text.",
+            )
+        ],
+    )
+    idx.add(
+        CaseRecord(
+            case_uid="cap:parenthetical",
+            source="cap",
+            name="Parenthetical Hit",
+            citation="2 Cal. 5th 2",
+            full_text="This opinion discusses unrelated procedure.",
+        ),
+        [
+            PassageRecord(
+                passage_uid="cap:parenthetical#0",
+                case_uid="cap:parenthetical",
+                ordinal=0,
+                text="This opinion discusses unrelated procedure.",
+            )
+        ],
+    )
+    idx.finalize()
+    con.close()
+    con = schema.connect(db)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb, resume=True)
+    idx.add_passages(
+        [
+            PassageRecord(
+                passage_uid="cap:parenthetical#parenthetical:901",
+                case_uid="cap:parenthetical",
+                ordinal=1_000_000,
+                text="summary judgment burden summary judgment burden summary judgment burden",
+                passage_type="parenthetical",
+                parenthetical_id="901",
+            )
+        ],
+        embed=False,
+    )
+    idx.finalize()
+    con.close()
+
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    results = corpus.search_opinions("summary judgment burden", semantic=False, max_results=5)
+
+    assert [r.cluster_id for r in results[:2]] == ["cap:opinion", "cap:parenthetical"]
+    assert results[0].snippet_source == "opinion"
+    assert results[1].snippet_source == "parenthetical"
+
+
+def test_search_opinions_migrates_pre_parenthetical_schema(tmp_path):
+    db = str(tmp_path / "legacy.db")
+    vec = str(tmp_path / "legacy.f16")
+    con = schema.connect(db)
+    con.executescript(
+        """
+        CREATE TABLE cases (
+            case_uid TEXT PRIMARY KEY,
+            source TEXT NOT NULL,
+            name TEXT,
+            name_abbreviation TEXT,
+            citation TEXT,
+            parallel_citations TEXT,
+            court TEXT,
+            decision_date TEXT,
+            year TEXT,
+            docket_number TEXT,
+            url TEXT,
+            full_text TEXT,
+            citation_count INTEGER,
+            latest_citing_year TEXT,
+            cites_to TEXT
+        );
+        CREATE TABLE passages (
+            passage_uid TEXT PRIMARY KEY,
+            case_uid TEXT NOT NULL,
+            ordinal INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            page_label TEXT,
+            vec_row INTEGER
+        );
+        CREATE VIRTUAL TABLE passages_fts USING fts5(text, content='');
+        """
+    )
+    con.execute(
+        "INSERT INTO cases (case_uid, source, name, citation, full_text) VALUES (?, ?, ?, ?, ?)",
+        ("cap:legacy", "cap", "Legacy Case", "3 Cal. 5th 3", "legacy summary judgment text"),
+    )
+    con.execute(
+        "INSERT INTO passages (passage_uid, case_uid, ordinal, text, vec_row) VALUES (?, ?, ?, ?, ?)",
+        ("cap:legacy#0", "cap:legacy", 0, "legacy summary judgment text", 0),
+    )
+    con.execute("INSERT INTO passages_fts(rowid, text) VALUES (?, ?)", (1, "legacy summary judgment text"))
+    con.commit()
+    con.close()
+    open(vec, "wb").close()
+
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=FakeEmbedder(dim=64))
+    results = corpus.search_opinions("summary judgment", semantic=False, max_results=3)
+
+    assert results
+    assert results[0].cluster_id == "cap:legacy"
