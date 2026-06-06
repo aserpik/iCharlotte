@@ -116,7 +116,10 @@ class CorpusIndexer:
         are skipped, which makes parenthetical snapshot re-runs idempotent.
         """
         added = 0
+        buffered_uids = {p.passage_uid for p, _e in self._pending}
         for p in passages:
+            if p.passage_uid in buffered_uids:
+                continue
             exists = self.con.execute(
                 "SELECT 1 FROM passages WHERE passage_uid=?",
                 (p.passage_uid,),
@@ -130,9 +133,11 @@ class CorpusIndexer:
             if not case_exists:
                 continue
             self._pending.append((p, bool(embed)))
+            buffered_uids.add(p.passage_uid)
             added += 1
             if len(self._pending) >= _BATCH:
                 self._flush()
+                buffered_uids.clear()
         return added
 
     def _flush(self) -> None:

@@ -34,6 +34,61 @@ def test_schema_creates_parenthetical_passage_columns_and_opinion_map():
     assert "courtlistener_opinion_map" in tables
 
 
+def test_ensure_runtime_schema_migrates_old_passages_table():
+    con = sqlite3.connect(":memory:")
+    con.executescript(
+        """
+        CREATE TABLE cases (
+            case_uid TEXT PRIMARY KEY,
+            source TEXT NOT NULL,
+            citation TEXT,
+            full_text TEXT
+        );
+        CREATE TABLE passages (
+            passage_uid  TEXT PRIMARY KEY,
+            case_uid     TEXT NOT NULL,
+            ordinal      INTEGER NOT NULL,
+            text         TEXT NOT NULL,
+            page_label   TEXT,
+            vec_row      INTEGER
+        );
+        CREATE INDEX idx_passages_case ON passages(case_uid);
+        CREATE INDEX idx_passages_vec ON passages(vec_row);
+        CREATE VIRTUAL TABLE passages_fts USING fts5(text, content='');
+        CREATE TABLE ingested_volumes (name TEXT PRIMARY KEY);
+        """
+    )
+
+    schema.ensure_runtime_schema(con)
+
+    passage_columns = {
+        row[1] for row in con.execute("PRAGMA table_info(passages)").fetchall()
+    }
+    assert {
+        "passage_type",
+        "source",
+        "parenthetical_id",
+        "parenthetical_score",
+        "described_opinion_id",
+        "describing_opinion_id",
+        "describing_cluster_id",
+    }.issubset(passage_columns)
+
+    tables = {
+        row[0]
+        for row in con.execute(
+            "SELECT name FROM sqlite_master WHERE type IN ('table','view')"
+        ).fetchall()
+    }
+    assert "courtlistener_opinion_map" in tables
+
+    indexes = {
+        row[1] for row in con.execute("PRAGMA index_list(passages)").fetchall()
+    }
+    assert "idx_passages_type" in indexes
+    assert "idx_passages_parenthetical" in indexes
+
+
 def test_passage_record_accepts_parenthetical_metadata():
     passage = PassageRecord(
         passage_uid="cap:1#parenthetical:900",
@@ -155,3 +210,44 @@ def test_indexer_skips_duplicate_parenthetical_passage_uid(tmp_path):
     assert con.execute(
         "SELECT COUNT(*) FROM passages WHERE parenthetical_id='900'"
     ).fetchone()[0] == 1
+
+
+def test_indexer_skips_same_call_duplicate_parenthetical_passage_uid(tmp_path):
+    db = str(tmp_path / "corpus.db")
+    vec = str(tmp_path / "vectors.f16")
+    emb = FakeEmbedder(dim=16)
+    con = schema.connect(db)
+    schema.create_schema(con)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb)
+    idx.add(
+        CaseRecord(case_uid="cap:1", source="cap", citation="25 Cal. 4th 826"),
+        [PassageRecord(passage_uid="cap:1#0", case_uid="cap:1", ordinal=0, text="x")],
+    )
+    idx.finalize()
+    con.close()
+
+    passage = PassageRecord(
+        passage_uid="cap:1#parenthetical:900",
+        case_uid="cap:1",
+        ordinal=1_000_000,
+        text="summary judgment burden",
+        passage_type="parenthetical",
+        parenthetical_id="900",
+    )
+    con = schema.connect(db)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb, resume=True)
+    assert idx.add_passages([passage, passage], embed=False) == 1
+    idx.finalize()
+
+    assert con.execute(
+        "SELECT COUNT(*) FROM passages WHERE parenthetical_id='900'"
+    ).fetchone()[0] == 1
+    assert con.execute("SELECT COUNT(*) FROM passages_fts").fetchone()[0] == 2
+
+    row = con.execute(
+        "SELECT * FROM passages WHERE passage_uid=?",
+        ("cap:1#parenthetical:900",),
+    ).fetchone()
+    arr = np.memmap(vec, dtype=np.float16, mode="r").reshape(-1, 16)
+    assert arr.shape[0] == 2
+    assert np.allclose(arr[int(row["vec_row"])], 0.0)
