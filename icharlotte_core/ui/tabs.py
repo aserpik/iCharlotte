@@ -2050,16 +2050,16 @@ class ChatTab(QWidget):
 
         # Apply deterministic citation cross-check if legal research was done
         if hasattr(self, '_pending_research') and self._pending_research:
-            rr = self._pending_research
-            if rr.cases:
-                try:
+            packet = self._pending_research
+            try:
+                known_names = packet.get_known_case_names()
+                if known_names:
                     from icharlotte_core.legal_research.engine import LegalResearchEngine
-                    known_names = rr.get_known_case_names()
                     text = LegalResearchEngine._deterministic_citation_check(
                         text, known_names
                     )
-                except Exception as e:
-                    print(f"[ChatTab] Deterministic citation check failed: {e}")
+            except Exception as e:
+                print(f"[ChatTab] Deterministic citation check failed: {e}")
 
         # Convert markdown to HTML (tables, fenced code, GFM line breaks, lists)
         try:
@@ -2072,33 +2072,14 @@ class ChatTab(QWidget):
         self.chat_history.append("")  # New line
         self.chat_history.append("-" * 50)
 
-        # Show legal research sources if available
+        # Show legal research basis if available
         if hasattr(self, '_pending_research') and self._pending_research:
-            rr = self._pending_research
-            sources_parts = []
-            sources_parts.append("<b>Legal Sources Found</b>")
-            if rr.verification:
-                pass_count = sum(1 for v in rr.verification if v.status == "PASS")
-                fixed_count = sum(1 for v in rr.verification if v.status == "FIXED")
-                flagged_count = sum(1 for v in rr.verification if v.status == "FLAGGED")
-                parts = []
-                if pass_count: parts.append(f"verified:{pass_count}")
-                if fixed_count: parts.append(f"fixed:{fixed_count}")
-                if flagged_count: parts.append(f"flagged:{flagged_count}")
-                if parts:
-                    sources_parts.append(f"<i>Citations: {', '.join(parts)}</i>")
-            for c in rr.cases:
-                line = f"- <b>{c.formatted_citation}</b>"
-                if c.url:
-                    line += f' -- <a href="{c.url}">View</a>'
-                sources_parts.append(line)
-            for s in rr.statutes:
-                line = f"- <b>{s.formatted_citation}</b>"
-                if s.url:
-                    line += f' -- <a href="{s.url}">View</a>'
-                sources_parts.append(line)
-            for line in sources_parts:
-                self.chat_history.append(line)
+            packet = self._pending_research
+            try:
+                for line in packet.format_research_basis_html():
+                    self.chat_history.append(line)
+            except Exception as e:
+                print(f"[ChatTab] Research basis display failed: {e}")
             self._pending_research = None
 
         # Save assistant message to persistence

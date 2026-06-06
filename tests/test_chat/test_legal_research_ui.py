@@ -343,3 +343,48 @@ def test_run_chat_legal_research_fail_closed_restores_buttons(qtbot, monkeypatch
     assert "No verified legal authorities were found." in tab.chat_history.toPlainText()
     assert tab.send_btn.isEnabled() is True
     assert tab.stop_btn.isEnabled() is False
+
+
+def test_finalize_response_appends_research_basis_for_packet(qtbot, monkeypatch):
+    _app()
+    _clear_chat_research_settings()
+    from icharlotte_core.chat.legal_research import (
+        ChatResearchPacket,
+        ChatResearchSettings,
+        ChatResearchSource,
+        ChatSelectedAuthority,
+    )
+
+    tab = _make_chat_tab(qtbot, monkeypatch)
+    tab.stream_start_time = 1.0
+    tab.stream_start_pos = tab.chat_history.textCursor().position()
+    tab._pending_research = ChatResearchPacket(
+        query="duty rule",
+        settings=ChatResearchSettings.default(),
+        selected_authorities=[
+            ChatSelectedAuthority(
+                id="cap:1",
+                proposition="duty rule",
+                case_name="Duty v. Care",
+                citation="30 Cal. 4th 43",
+                year="2020",
+                reason="It states the governing duty rule.",
+                supports="Duty controls negligence.",
+                quote="The duty rule controls the negligence analysis.",
+                sources=[
+                    ChatResearchSource(
+                        kind="local_corpus",
+                        label="Local California corpus",
+                    )
+                ],
+            )
+        ],
+    )
+
+    tab.finalize_response("Duty is governed by Duty v. Care (2020) 30 Cal. 4th 43.")
+
+    plain = tab.chat_history.toPlainText()
+    assert "Legal Research Basis" in plain
+    assert "It states the governing duty rule." in plain
+    assert "The duty rule controls the negligence analysis." in plain
+    assert tab._pending_research is None
