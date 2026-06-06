@@ -11,7 +11,8 @@ import json
 import re
 import sys
 from collections import defaultdict
-from typing import Iterator, TextIO
+from collections.abc import Iterator, Mapping
+from typing import TextIO
 
 from icharlotte_core.legal_research.local_corpus.models import PassageRecord
 from icharlotte_core.legal_research.local_corpus.textproc import normalize_text
@@ -23,6 +24,54 @@ except OverflowError:  # pragma: no cover - platform-dependent
 
 
 _PARENTHETICAL_ORDINAL_BASE = 1_000_000
+
+
+class OpinionClusterLookup(Mapping[str, str]):
+    """DB-backed opinion_id -> cluster_id lookup for one snapshot."""
+
+    def __init__(self, con, snapshot_date: str) -> None:
+        self._con = con
+        self._snapshot_date = snapshot_date
+
+    def __getitem__(self, opinion_id: str) -> str:
+        row = self._con.execute(
+            "SELECT cluster_id FROM courtlistener_opinion_map "
+            "WHERE opinion_id=? AND snapshot_date=?",
+            (str(opinion_id), self._snapshot_date),
+        ).fetchone()
+        if row is None:
+            raise KeyError(opinion_id)
+        return str(row["cluster_id"])
+
+    def __iter__(self) -> Iterator[str]:
+        for row in self._con.execute(
+            "SELECT opinion_id FROM courtlistener_opinion_map "
+            "WHERE snapshot_date=? ORDER BY opinion_id",
+            (self._snapshot_date,),
+        ):
+            yield str(row["opinion_id"])
+
+    def __len__(self) -> int:
+        row = self._con.execute(
+            "SELECT COUNT(*) FROM courtlistener_opinion_map WHERE snapshot_date=?",
+            (self._snapshot_date,),
+        ).fetchone()
+        return int(row[0])
+
+    def get(self, opinion_id: str, default: str = "") -> str:
+        row = self._con.execute(
+            "SELECT cluster_id FROM courtlistener_opinion_map "
+            "WHERE opinion_id=? AND snapshot_date=?",
+            (str(opinion_id), self._snapshot_date),
+        ).fetchone()
+        if row is None:
+            return default
+        return str(row["cluster_id"])
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, Mapping):
+            return dict(self.items()) == dict(other.items())
+        return NotImplemented
 
 
 def _norm_citation(citation: str) -> str:
@@ -45,7 +94,8 @@ def _citation_from_row(row: dict) -> str:
 def _local_citation_index(con) -> dict[str, str]:
     out: dict[str, str] = {}
     rows = con.execute(
-        "SELECT case_uid, citation, parallel_citations FROM cases"
+        "SELECT case_uid, citation, parallel_citations FROM cases "
+        "ORDER BY CASE WHEN source='cap' THEN 0 ELSE 1 END, case_uid"
     ).fetchall()
     for row in rows:
         citations = [row["citation"] or ""]
@@ -66,18 +116,14 @@ def load_opinion_cluster_map(
     opinions_stream: TextIO | None,
     snapshot_date: str,
     refresh: bool = False,
-) -> dict[str, str]:
+) -> Mapping[str, str]:
     if not refresh:
-        cached = {
-            str(row["opinion_id"]): str(row["cluster_id"])
-            for row in con.execute(
-                "SELECT opinion_id, cluster_id FROM courtlistener_opinion_map "
-                "WHERE snapshot_date=?",
-                (snapshot_date,),
-            )
-        }
+        cached = con.execute(
+            "SELECT 1 FROM courtlistener_opinion_map WHERE snapshot_date=? LIMIT 1",
+            (snapshot_date,),
+        ).fetchone()
         if cached:
-            return cached
+            return OpinionClusterLookup(con, snapshot_date)
     if opinions_stream is None:
         raise ValueError("opinions_stream is required when no cached opinion map exists")
 
@@ -87,20 +133,18 @@ def load_opinion_cluster_map(
             (snapshot_date,),
         )
 
-    out: dict[str, str] = {}
     for row in csv.DictReader(opinions_stream):
         opinion_id = (row.get("id") or "").strip()
         cluster_id = (row.get("cluster_id") or "").strip()
         if not opinion_id or not cluster_id:
             continue
-        out[opinion_id] = cluster_id
         con.execute(
             "INSERT OR REPLACE INTO courtlistener_opinion_map "
             "(opinion_id, cluster_id, snapshot_date) VALUES (?,?,?)",
             (opinion_id, cluster_id, snapshot_date),
         )
     con.commit()
-    return out
+    return OpinionClusterLookup(con, snapshot_date)
 
 
 def build_cluster_case_map(con, *, citations_stream: TextIO | None) -> dict[str, str]:
@@ -139,11 +183,15 @@ def _id_sort_key(value: str) -> tuple[int, int, str]:
     return (1, 0, value)
 
 
+def _parenthetical_sort_key(item: tuple[float, str, PassageRecord]):
+    return (-item[0], _id_sort_key(item[1]))
+
+
 def iter_parenthetical_passages(
     *,
     parentheticals_stream: TextIO,
-    opinion_cluster_map: dict[str, str],
-    cluster_case_map: dict[str, str],
+    opinion_cluster_map: Mapping[str, str],
+    cluster_case_map: Mapping[str, str],
     min_score: float = 0.5,
     max_per_case: int = 25,
 ) -> Iterator[PassageRecord]:
@@ -177,13 +225,14 @@ def iter_parenthetical_passages(
             describing_opinion_id=describing_opinion_id,
             describing_cluster_id=describing_cluster_id,
         )
-        buckets[case_uid].append((score, parenthetical_id, passage))
+        bucket = buckets[case_uid]
+        bucket.append((score, parenthetical_id, passage))
+        if len(bucket) > max_per_case:
+            bucket.sort(key=_parenthetical_sort_key)
+            del bucket[max_per_case:]
 
     for case_uid in sorted(buckets):
-        selected = sorted(
-            buckets[case_uid],
-            key=lambda item: (-item[0], _id_sort_key(item[1])),
-        )[:max_per_case]
+        selected = sorted(buckets[case_uid], key=_parenthetical_sort_key)
         for offset, (_score, _pid, passage) in enumerate(selected):
             passage.ordinal = _PARENTHETICAL_ORDINAL_BASE + offset
             yield passage

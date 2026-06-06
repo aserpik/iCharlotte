@@ -43,6 +43,9 @@ def test_load_opinion_cluster_map_caches_snapshot_rows(tmp_path):
     )
 
     assert out == {"10": "100", "20": "200"}
+    assert isinstance(out, parenthetical_loader.OpinionClusterLookup)
+    assert out.get("10") == "100"
+    assert out.get("missing", "fallback") == "fallback"
     rows = con.execute(
         "SELECT opinion_id, cluster_id, snapshot_date FROM courtlistener_opinion_map "
         "ORDER BY opinion_id"
@@ -128,6 +131,20 @@ def test_build_cluster_case_map_prefers_direct_cl_case_then_cap_citation(tmp_pat
     assert out["100"] == "cl:100"
     assert out["300"] == "cap:aguilar"
     assert "400" not in out
+
+
+def test_build_cluster_case_map_uses_deterministic_local_citation_preference(tmp_path):
+    con = schema.connect(str(tmp_path / "c.db"))
+    schema.create_schema(con)
+    _insert_case(con, CaseRecord(case_uid="cl:999", source="cl", citation="25 Cal. 4th 826"))
+    _insert_case(con, CaseRecord(case_uid="cap:aguilar", source="cap", citation="25 Cal. 4th 826"))
+    citations = _csv([
+        {"id": "1", "volume": "25", "reporter": "Cal. 4th", "page": "826", "type": "8", "cluster_id": "300"},
+    ])
+
+    out = parenthetical_loader.build_cluster_case_map(con, citations_stream=citations)
+
+    assert out["300"] == "cap:aguilar"
 
 
 def test_iter_parenthetical_passages_filters_scores_and_attaches_to_local_cases():
@@ -241,3 +258,25 @@ def test_iter_parenthetical_passages_tie_cap_sorts_numeric_ids_numerically():
     )
 
     assert [p.parenthetical_id for p in rows] == ["2", "3"]
+
+
+def test_iter_parenthetical_passages_retains_only_max_per_case_rows():
+    parentheticals = _csv([
+        {"id": "1", "text": "score one", "score": "0.1", "described_opinion_id": "10", "describing_opinion_id": "20", "group_id": ""},
+        {"id": "2", "text": "score two", "score": "0.2", "described_opinion_id": "10", "describing_opinion_id": "20", "group_id": ""},
+        {"id": "3", "text": "score three", "score": "0.3", "described_opinion_id": "10", "describing_opinion_id": "20", "group_id": ""},
+        {"id": "4", "text": "score four", "score": "0.4", "described_opinion_id": "10", "describing_opinion_id": "20", "group_id": ""},
+        {"id": "5", "text": "score five", "score": "0.5", "described_opinion_id": "10", "describing_opinion_id": "20", "group_id": ""},
+    ])
+
+    rows = list(
+        parenthetical_loader.iter_parenthetical_passages(
+            parentheticals_stream=parentheticals,
+            opinion_cluster_map={"10": "300", "20": "200"},
+            cluster_case_map={"300": "cap:aguilar"},
+            min_score=0.0,
+            max_per_case=3,
+        )
+    )
+
+    assert [p.parenthetical_id for p in rows] == ["5", "4", "3"]
