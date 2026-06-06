@@ -10,7 +10,9 @@ from dataclasses import dataclass, field
 from enum import Enum
 import json
 import re
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterable, Optional
+
+from icharlotte_core.legal_research.models import CaseResult
 
 LLMCallback = Callable[[str, str], str]
 StatusCallback = Optional[Callable[[str], None]]
@@ -246,6 +248,129 @@ def is_current_law_query(text: str) -> bool:
     return bool(CURRENT_LAW_RE.search(text or ""))
 
 
+FRESHNESS_MAX_AGE_DAYS = 548
+THIN_RESULT_THRESHOLD = 2
+
+
+def _year(value: str) -> str:
+    text = str(value or "")
+    return text[:4] if len(text) >= 4 and text[:4].isdigit() else ""
+
+
+def _candidate_key(candidate: ChatAuthorityCandidate) -> str:
+    cite = re.sub(r"[^a-z0-9]+", "", (candidate.citation or "").lower())
+    if cite:
+        return f"cite:{cite}"
+    if candidate.id:
+        return f"id:{candidate.id}"
+    name = re.sub(r"[^a-z0-9]+", "", (candidate.case_name or "").lower())
+    return f"name:{name}:{candidate.year}"
+
+
+def _case_result_candidate(
+    case: CaseResult,
+    *,
+    proposition: str,
+    source_kind: str,
+    source_label: str,
+    text: str,
+    authority_signals: dict[str, Any] | None = None,
+) -> ChatAuthorityCandidate:
+    cluster_id = str(getattr(case, "cluster_id", "") or "")
+    year = _year(getattr(case, "date", "") or "")
+    signals = authority_signals or {}
+    return ChatAuthorityCandidate(
+        id=cluster_id or f"{source_kind}:{case.name}:{case.citation}",
+        proposition=proposition,
+        case_name=case.name,
+        citation=case.citation,
+        year=year,
+        court=case.court,
+        url=case.url,
+        text=text or "",
+        snippet=case.snippet or "",
+        sources=[ChatResearchSource(kind=source_kind, label=source_label, verification="verified")],
+        citation_count=signals.get("citation_count", getattr(case, "citation_count", None)),
+        latest_citing_year=str(
+            signals.get("latest_citing_year", getattr(case, "latest_citing_year", "") or "")
+            or ""
+        ),
+    )
+
+
+def _firm_candidate(row: dict[str, Any], *, proposition: str) -> ChatAuthorityCandidate:
+    verification = str(row.get("verification") or "unverified_firm")
+    source_brief = str(row.get("source_brief") or "")
+    return ChatAuthorityCandidate(
+        id=str(row.get("cluster_id") or row.get("citation") or row.get("case_name") or ""),
+        proposition=proposition,
+        case_name=str(row.get("case_name") or ""),
+        citation=str(row.get("citation") or ""),
+        year=str(row.get("year") or ""),
+        court=str(row.get("court") or ""),
+        url=str(row.get("opinion_url") or row.get("url") or ""),
+        text=str(row.get("text") or ""),
+        snippet=str(row.get("passage") or row.get("proposition") or ""),
+        sources=[
+            ChatResearchSource(
+                kind="firm",
+                label="Firm/sample-motion authority",
+                verification=verification,
+                reference=source_brief,
+            )
+        ],
+    )
+
+
+def _merge_candidates(candidates: Iterable[ChatAuthorityCandidate]) -> list[ChatAuthorityCandidate]:
+    merged: dict[str, ChatAuthorityCandidate] = {}
+    for candidate in candidates:
+        key = _candidate_key(candidate)
+        existing = merged.get(key)
+        if existing is None:
+            merged[key] = candidate
+            continue
+        seen_sources = {(s.kind, s.label, s.reference) for s in existing.sources}
+        for source in candidate.sources:
+            source_key = (source.kind, source.label, source.reference)
+            if source_key not in seen_sources:
+                existing.sources.append(source)
+                seen_sources.add(source_key)
+        if not existing.text and candidate.text:
+            existing.text = candidate.text
+        if not existing.snippet and candidate.snippet:
+            existing.snippet = candidate.snippet
+        if not existing.url and candidate.url:
+            existing.url = candidate.url
+        if existing.citation_count is None and candidate.citation_count is not None:
+            existing.citation_count = candidate.citation_count
+        if not existing.latest_citing_year and candidate.latest_citing_year:
+            existing.latest_citing_year = candidate.latest_citing_year
+    return list(merged.values())
+
+
+def _local_freshness_warning(local_corpus: Any) -> str:
+    if local_corpus is None or not hasattr(local_corpus, "corpus_metadata"):
+        return ""
+    try:
+        metadata = local_corpus.corpus_metadata() or {}
+    except Exception:
+        return ""
+    source_counts = metadata.get("source_counts") or {}
+    cl_count = int(source_counts.get("cl") or 0) if isinstance(source_counts, dict) else 0
+    if cl_count <= 0:
+        return "Local corpus has no CourtListener recent slice."
+    max_date = str(metadata.get("max_decision_date") or "")[:10]
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", max_date):
+        return "Local corpus has no max decision date metadata."
+    from datetime import date, datetime
+
+    age_days = (date.today() - datetime.strptime(max_date, "%Y-%m-%d").date()).days
+    if age_days > FRESHNESS_MAX_AGE_DAYS:
+        return f"Local corpus is stale; newest decision is {max_date}."
+    return ""
+
+
 class ChatLegalResearchService:
     def __init__(
         self,
@@ -284,3 +409,155 @@ class ChatLegalResearchService:
             if fallback:
                 propositions = [fallback]
         return propositions[:5]
+
+    def collect_candidates(
+        self,
+        *,
+        propositions: list[str],
+        settings: ChatResearchSettings,
+        original_query: str,
+    ) -> tuple[list[ChatAuthorityCandidate], list[str], list[str]]:
+        settings = normalize_settings(settings)
+        warnings: list[str] = []
+        searches: list[str] = []
+        all_candidates: list[ChatAuthorityCandidate] = []
+        current_law = is_current_law_query(original_query)
+        local_warning = _local_freshness_warning(self.local_corpus)
+
+        for proposition in propositions:
+            local_count = 0
+            if settings.firm_authority:
+                firm_candidates = self._collect_firm(proposition)
+                all_candidates.extend(firm_candidates)
+                searches.append(f"Firm/sample-motion authority: {proposition}")
+                if self.firm_provider is None:
+                    warnings.append(
+                        "Firm/sample-motion authority selected but the firm authority index is unavailable."
+                    )
+
+            if settings.local_corpus:
+                local_candidates, local_hits = self._collect_case_client(
+                    self.local_corpus,
+                    proposition=proposition,
+                    source_kind="local_corpus",
+                    source_label="Local California corpus",
+                )
+                local_count = local_hits
+                all_candidates.extend(local_candidates)
+                searches.append(f"Local California corpus: {proposition}")
+                if self.local_corpus is None:
+                    warnings.append("Local California corpus selected but the local corpus is unavailable.")
+                elif local_count < THIN_RESULT_THRESHOLD:
+                    warnings.append(f"Local corpus returned thin results for: {proposition}")
+                if local_warning:
+                    warnings.append(local_warning)
+
+            if self._should_call_courtlistener(
+                settings=settings,
+                local_count=local_count,
+                local_warning=local_warning,
+                current_law=current_law,
+            ):
+                if not self.courtlistener_token or self.courtlistener_client is None:
+                    warnings.append("CourtListener API selected but COURTLISTENER_API_TOKEN is not set.")
+                else:
+                    cl_candidates, _cl_hits = self._collect_case_client(
+                        self.courtlistener_client,
+                        proposition=proposition,
+                        source_kind="courtlistener",
+                        source_label="CourtListener API",
+                    )
+                    all_candidates.extend(cl_candidates)
+                    searches.append(f"CourtListener API: {proposition}")
+
+        unique_warnings = list(dict.fromkeys(warnings))
+        unique_searches = list(dict.fromkeys(searches))
+        return _merge_candidates(all_candidates), unique_warnings, unique_searches
+
+    def _collect_firm(self, proposition: str) -> list[ChatAuthorityCandidate]:
+        if self.firm_provider is None:
+            return []
+        try:
+            rows = self.firm_provider.candidates_for(
+                proposition,
+                motion_type="",
+                side="",
+                limit=self.max_results_per_source,
+            ) or []
+        except Exception:
+            return []
+        return [_firm_candidate(row, proposition=proposition) for row in rows]
+
+    def _collect_case_client(
+        self,
+        client: Any,
+        *,
+        proposition: str,
+        source_kind: str,
+        source_label: str,
+    ) -> tuple[list[ChatAuthorityCandidate], int]:
+        if client is None:
+            return [], 0
+        results: list[CaseResult] = []
+        hit_count = 0
+        for semantic in (True, False):
+            try:
+                batch = client.search_opinions(
+                    proposition,
+                    semantic=semantic,
+                    max_results=self.max_results_per_source,
+                    published_only=True,
+                ) or []
+            except Exception:
+                batch = []
+            hit_count += len(batch)
+            results.extend(batch)
+
+        candidates: list[ChatAuthorityCandidate] = []
+        seen: set[str] = set()
+        for case in results:
+            cluster_id = str(getattr(case, "cluster_id", "") or "")
+            case_key = cluster_id or f"{getattr(case, 'name', '')}:{getattr(case, 'citation', '')}"
+            if case_key in seen:
+                continue
+            seen.add(case_key)
+
+            text = ""
+            if cluster_id:
+                try:
+                    text = client.get_opinion_text(cluster_id) or ""
+                except Exception:
+                    text = ""
+
+            signals: dict[str, Any] = {}
+            if cluster_id and hasattr(client, "get_authority_signals"):
+                try:
+                    signals = client.get_authority_signals(cluster_id) or {}
+                except Exception:
+                    signals = {}
+
+            candidates.append(
+                _case_result_candidate(
+                    case,
+                    proposition=proposition,
+                    source_kind=source_kind,
+                    source_label=source_label,
+                    text=text,
+                    authority_signals=signals,
+                )
+            )
+        return candidates, hit_count
+
+    @staticmethod
+    def _should_call_courtlistener(
+        *,
+        settings: ChatResearchSettings,
+        local_count: int,
+        local_warning: str,
+        current_law: bool,
+    ) -> bool:
+        if settings.courtlistener_mode == CourtListenerMode.OFF:
+            return False
+        if settings.courtlistener_mode == CourtListenerMode.ALWAYS_SEARCH:
+            return True
+        return local_count < THIN_RESULT_THRESHOLD or bool(local_warning) or current_law
