@@ -39,6 +39,10 @@ def _normalize_citation(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", normalized.lower())
 
 
+def _normalize_case_name(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", (text or "").lower())
+
+
 def contains_verbatim_quote(source_text: str, quote: str) -> bool:
     """Return True when quote appears unchanged after whitespace normalization."""
     normalized_source = _normalize_ws(source_text)
@@ -57,10 +61,10 @@ def _known_citation_keys(packet: ResearchPacket) -> set[str]:
     for authority in packet.selected_authorities:
         if not _is_prompt_safe_authority(authority):
             continue
-        for value in (authority.formatted_citation, authority.citation):
-            normalized = _normalize_citation(value)
-            if normalized:
-                keys.add(normalized)
+        case_key = _normalize_case_name(authority.case_name)
+        reporter_key = _normalize_citation(authority.citation)
+        if case_key and reporter_key:
+            keys.add(f"{case_key}:{reporter_key}")
     return keys
 
 
@@ -71,13 +75,12 @@ def audit_citations_against_packet(text: str, packet: ResearchPacket) -> Citatio
 
     for match in _CASE_CITATION_RE.finditer(text or ""):
         citation_text = match.group("full").strip()
-        candidates = {
-            _normalize_citation(match.group("full")),
-            _normalize_citation(match.group("reporter")),
-        }
+        case_key = _normalize_case_name(citation_text.rsplit("(", 1)[0])
+        reporter_key = _normalize_citation(match.group("reporter"))
+        candidate_key = f"{case_key}:{reporter_key}" if case_key and reporter_key else ""
         status = (
             CitationAuditStatus.SUPPORTED
-            if candidates & known_keys
+            if candidate_key in known_keys
             else CitationAuditStatus.OFF_PACKET
         )
         detail = (

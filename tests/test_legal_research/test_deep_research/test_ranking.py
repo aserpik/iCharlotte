@@ -1,4 +1,8 @@
-from icharlotte_core.legal_research.deep_research import AuthorityCandidate, TreatmentSignal
+from icharlotte_core.legal_research.deep_research import (
+    AuthorityCandidate,
+    ParentheticalWeightPolicy,
+    TreatmentSignal,
+)
 from icharlotte_core.legal_research.deep_research.ranking import (
     dampen_duplicate_parentheticals,
     score_candidate,
@@ -35,6 +39,19 @@ def test_parenthetical_match_cannot_overcome_direct_text_support_gap():
     )
 
     assert score_candidate(direct_support) > score_candidate(parenthetical_only)
+
+
+def test_parenthetical_match_is_not_sole_support_by_default():
+    candidate = AuthorityCandidate(parenthetical_match_score=1.00)
+
+    assert score_candidate(candidate) == 0.0
+
+
+def test_parenthetical_only_support_requires_explicit_policy():
+    candidate = AuthorityCandidate(parenthetical_match_score=1.00)
+    policy = ParentheticalWeightPolicy(allow_parenthetical_as_sole_support=True)
+
+    assert score_candidate(candidate, parenthetical_policy=policy) == 0.10
 
 
 def test_negative_signal_reduces_score():

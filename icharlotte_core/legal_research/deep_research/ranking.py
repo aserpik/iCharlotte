@@ -17,19 +17,24 @@ def score_candidate(
 ) -> float:
     """Return a deterministic score with parentheticals capped as secondary signal."""
     policy = parenthetical_policy or ParentheticalWeightPolicy.default()
-    direct_score = (
+    positive_direct_score = (
         _clamp_score(candidate.semantic_score)
         + _clamp_score(candidate.keyword_score)
         + _clamp_score(candidate.recency_score)
         + _clamp_score(candidate.authority_signal_score)
         + _clamp_score(candidate.source_count_score)
         + _clamp_score(candidate.firm_prior_score)
+    )
+    direct_score = (
+        positive_direct_score
         - _clamp_score(candidate.negative_signal)
     )
     parenthetical_bonus = min(
         _clamp_score(candidate.parenthetical_match_score),
         _clamp_score(policy.max_score_contribution),
     )
+    if not policy.allow_parenthetical_as_sole_support and positive_direct_score == 0.0:
+        parenthetical_bonus = 0.0
     return round(max(0.0, direct_score + parenthetical_bonus), 6)
 
 

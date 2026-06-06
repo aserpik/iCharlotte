@@ -58,7 +58,7 @@ def test_audit_citations_passes_known_packet_case():
     assert audit.has_off_packet_citations is False
 
 
-def test_audit_citations_matches_reporter_only_packet_case():
+def test_audit_citations_matches_packet_case_identity_and_reporter():
     packet = ResearchPacket(
         selected_authorities=[
             SelectedAuthority(
@@ -76,6 +76,27 @@ def test_audit_citations_matches_reporter_only_packet_case():
     )
 
     assert audit.items[0].status == CitationAuditStatus.SUPPORTED
+
+
+def test_audit_citations_rejects_same_reporter_with_different_case_name():
+    packet = ResearchPacket(
+        selected_authorities=[
+            SelectedAuthority(
+                case_name="Smith v. Jones",
+                citation="12 Cal.5th 100",
+                year="2024",
+                verification_status="verified",
+            )
+        ]
+    )
+
+    audit = audit_citations_against_packet(
+        "Wrong v. Name (2024) 12 Cal.5th 100 is cited.",
+        packet,
+    )
+
+    assert len(audit.items) == 1
+    assert audit.items[0].status == CitationAuditStatus.OFF_PACKET
 
 
 def test_audit_citations_flags_off_packet_case():
