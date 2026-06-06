@@ -82,6 +82,21 @@ class LocalCaseCorpus:
                 seen.add(r["uid"]); order.append(r["uid"])
         return order
 
+    def _parenthetical_case_ranking(self, query: str, limit: int) -> list[str]:
+        con = self._conn()
+        rows = con.execute(
+            "SELECT p.case_uid AS uid, bm25(passages_fts) AS score "
+            "FROM passages_fts JOIN passages p ON p.vec_row = passages_fts.rowid - 1 "
+            "WHERE p.passage_type='parenthetical' AND passages_fts MATCH ? "
+            "ORDER BY score LIMIT ?",
+            (_fts_query(query), limit),
+        ).fetchall()
+        seen, order = set(), []
+        for r in rows:
+            if r["uid"] not in seen:
+                seen.add(r["uid"]); order.append(r["uid"])
+        return order
+
     def _semantic_case_ranking(self, query: str, limit: int) -> list[str]:
         vecs = self._vecs()
         if vecs.shape[0] == 0:
@@ -110,6 +125,9 @@ class LocalCaseCorpus:
                         max_results: int = 15, published_only: bool = True) -> list[CaseResult]:
         bm25 = self._bm25_case_ranking(query, _CANDIDATES)
         rankings = [bm25]
+        parenthetical = self._parenthetical_case_ranking(query, _CANDIDATES)
+        if parenthetical:
+            rankings.append(parenthetical)
         if semantic:
             try:
                 rankings.append(self._semantic_case_ranking(query, _CANDIDATES))
@@ -118,16 +136,39 @@ class LocalCaseCorpus:
         fused = self._rrf(*rankings)[:max_results]
         return [self._case_result(uid, query) for uid in fused]
 
+    def _best_passage_for_query(self, case_uid: str, query: str):
+        con = self._conn()
+        try:
+            row = con.execute(
+                "SELECT p.text, p.passage_type, p.parenthetical_id "
+                "FROM passages_fts JOIN passages p ON p.vec_row = passages_fts.rowid - 1 "
+                "WHERE p.case_uid=? AND passages_fts MATCH ? "
+                "ORDER BY bm25(passages_fts) LIMIT 1",
+                (case_uid, _fts_query(query)),
+            ).fetchone()
+            if row:
+                return row
+        except sqlite3.Error:
+            logger.debug("best passage lookup failed for %s", case_uid, exc_info=True)
+        return con.execute(
+            "SELECT text, passage_type, parenthetical_id FROM passages "
+            "WHERE case_uid=? AND passage_type='opinion' ORDER BY ordinal LIMIT 1",
+            (case_uid,),
+        ).fetchone()
+
     def _case_result(self, case_uid: str, query: str) -> CaseResult:
         con = self._conn()
         c = con.execute("SELECT * FROM cases WHERE case_uid=?", (case_uid,)).fetchone()
         snippet = ""
+        snippet_source = ""
+        snippet_parenthetical_id = ""
         display_name = ""
         if c:
-            p = con.execute(
-                "SELECT text FROM passages WHERE case_uid=? ORDER BY ordinal LIMIT 1", (case_uid,)
-            ).fetchone()
+            p = self._best_passage_for_query(case_uid, query)
             snippet = (p["text"][:400] if p else (c["full_text"] or "")[:400])
+            if p:
+                snippet_source = p["passage_type"] or ""
+                snippet_parenthetical_id = p["parenthetical_id"] or ""
             # Prefer the Bluebook short name (CAP name_abbreviation, e.g.
             # "Engalla v. Permanente Medical Group, Inc.") over the full party
             # caption stored in `name`. The caption is hundreds of chars long,
@@ -138,6 +179,8 @@ class LocalCaseCorpus:
             name=display_name, citation=c["citation"] if c else "",
             date=c["decision_date"] if c else "", court=c["court"] if c else "",
             snippet=snippet, url=c["url"] if c else "", cluster_id=case_uid,
+            snippet_source=snippet_source,
+            snippet_parenthetical_id=snippet_parenthetical_id,
         )
 
     def get_opinion_text(self, case_uid: str | int) -> str | None:

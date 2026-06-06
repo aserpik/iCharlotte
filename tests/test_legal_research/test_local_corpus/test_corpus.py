@@ -101,3 +101,105 @@ def test_search_works_across_threads(tmp_path):
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
         outcomes = list(pool.map(_worker, range(8)))
     assert all(outcomes)  # every worker thread retrieved, none hit the cross-thread error
+
+
+def test_search_finds_case_through_parenthetical_passage(tmp_path):
+    db = str(tmp_path / "c.db")
+    vec = str(tmp_path / "v.f16")
+    con = schema.connect(db)
+    schema.create_schema(con)
+    emb = FakeEmbedder(dim=64)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb)
+    idx.add(
+        CaseRecord(
+            case_uid="cap:aguilar",
+            source="cap",
+            name="Aguilar v. Atlantic Richfield Co.",
+            citation="25 Cal. 4th 826",
+            court="Cal.",
+            decision_date="2001-06-14",
+            year="2001",
+            full_text="The opinion discusses asbestos and procedure.",
+        ),
+        [
+            PassageRecord(
+                passage_uid="cap:aguilar#0",
+                case_uid="cap:aguilar",
+                ordinal=0,
+                text="The opinion discusses asbestos and procedure.",
+            )
+        ],
+    )
+    idx.finalize()
+    con.close()
+
+    con = schema.connect(db)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb, resume=True)
+    idx.add_passages(
+        [
+            PassageRecord(
+                passage_uid="cap:aguilar#parenthetical:900",
+                case_uid="cap:aguilar",
+                ordinal=1_000_000,
+                text="describing Aguilar as allocating the summary judgment burden",
+                passage_type="parenthetical",
+                source="courtlistener_parenthetical",
+                parenthetical_id="900",
+                parenthetical_score=0.95,
+            )
+        ],
+        embed=False,
+    )
+    idx.finalize()
+    con.close()
+
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    results = corpus.search_opinions("summary judgment burden", semantic=False, max_results=5)
+
+    assert results
+    assert results[0].cluster_id == "cap:aguilar"
+    assert "summary judgment burden" in results[0].snippet
+    assert results[0].snippet_source == "parenthetical"
+    assert results[0].snippet_parenthetical_id == "900"
+
+
+def test_get_opinion_text_excludes_parenthetical_passages(tmp_path):
+    db = str(tmp_path / "c.db")
+    vec = str(tmp_path / "v.f16")
+    con = schema.connect(db)
+    schema.create_schema(con)
+    emb = FakeEmbedder(dim=64)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb)
+    idx.add(
+        CaseRecord(
+            case_uid="cap:aguilar",
+            source="cap",
+            citation="25 Cal. 4th 826",
+            full_text="primary opinion text only",
+        ),
+        [PassageRecord(passage_uid="cap:aguilar#0", case_uid="cap:aguilar", ordinal=0, text="primary opinion text only")],
+    )
+    idx.finalize()
+    con.close()
+    con = schema.connect(db)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb, resume=True)
+    idx.add_passages(
+        [
+            PassageRecord(
+                passage_uid="cap:aguilar#parenthetical:900",
+                case_uid="cap:aguilar",
+                ordinal=1_000_000,
+                text="external parenthetical text",
+                passage_type="parenthetical",
+                parenthetical_id="900",
+            )
+        ],
+        embed=False,
+    )
+    idx.finalize()
+    con.close()
+
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+
+    assert corpus.get_opinion_text("cap:aguilar") == "primary opinion text only"
+    assert "external parenthetical" not in corpus.get_opinion_text("cap:aguilar")

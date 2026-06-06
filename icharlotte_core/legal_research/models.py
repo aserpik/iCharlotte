@@ -49,6 +49,8 @@ class CaseResult:
     cluster_id: Optional[int] = None
     negative_treatment: Optional[str] = None
     relevance_score: float = 0.0
+    snippet_source: str = ""
+    snippet_parenthetical_id: str = ""
 
     @property
     def formatted_citation(self) -> str:
@@ -67,6 +69,8 @@ class CaseResult:
             "cluster_id": self.cluster_id,
             "negative_treatment": self.negative_treatment,
             "relevance_score": self.relevance_score,
+            "snippet_source": self.snippet_source,
+            "snippet_parenthetical_id": self.snippet_parenthetical_id,
         }
 
 
