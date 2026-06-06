@@ -542,6 +542,7 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
         self._file_number = file_number
         self._worker = None
         self._worker_role = ""
+        self._worker_connections: list[tuple[Any, Any, Any]] = []
         self._last_settings: dict = {}
         self._last_summary: dict = {}
         self._last_metadata: dict = {}
@@ -566,6 +567,7 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
         self.output_page.edit_settings_requested.connect(
             lambda: self.setCurrentIndex(TASK_PAGE_REVIEW)
         )
+        self.destroyed.connect(self._retire_active_worker)
 
     @property
     def spec(self):
@@ -647,25 +649,29 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
     def _set_worker(self, worker, role: str, status_page: StatusPage) -> None:
         self._worker = worker
         self._worker_role = role
-        worker.status.connect(status_page.on_status)
-        worker.progress.connect(status_page.on_progress)
-        worker.finished.connect(
+        finished_slot = (
             lambda output_path="", w=worker, r=role: self._on_worker_finished(
                 r, w, output_path
             )
         )
-        worker.failed.connect(
-            lambda err, w=worker, r=role: self._on_worker_failed(r, w, err)
-        )
-        worker.cancelled.connect(
-            lambda w=worker, r=role: self._on_worker_cancelled(r, w)
-        )
+        failed_slot = lambda err, w=worker, r=role: self._on_worker_failed(r, w, err)
+        cancelled_slot = lambda w=worker, r=role: self._on_worker_cancelled(r, w)
+        connections = [
+            (worker, worker.status, status_page.on_status),
+            (worker, worker.progress, status_page.on_progress),
+            (worker, worker.finished, finished_slot),
+            (worker, worker.failed, failed_slot),
+            (worker, worker.cancelled, cancelled_slot),
+        ]
+        for _worker, signal, slot in connections:
+            signal.connect(slot)
+        self._worker_connections = connections
 
     def _on_worker_finished(self, role: str, worker, _output_path: str = "") -> None:
         if worker is not self._worker:
             return
         if role == "complaint":
-            self._clear_worker(worker)
+            self._retire_worker(worker)
             metadata = load_case_metadata(self._file_number)
             complaint_file = find_complaint_candidate(self._case_path)
             metadata = dict(metadata or {})
@@ -679,7 +685,7 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
         if worker is not self._worker:
             return
         if role == "complaint":
-            self._clear_worker(worker)
+            self._retire_worker(worker)
             self.complaint_status_page.on_status(f"FAILED: {err}")
             self.complaint_status_page.cancel_btn.setEnabled(True)
             self.complaint_status_page.cancel_btn.setText("Back to Intake")
@@ -691,7 +697,7 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
     def _on_worker_cancelled(self, role: str, worker) -> None:
         if worker is not self._worker:
             return
-        self._clear_worker(worker)
+        self._retire_worker(worker)
         if role == "docket":
             self.setCurrentIndex(TASK_PAGE_REVIEW)
         else:
@@ -703,7 +709,7 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
             try:
                 self._worker.cancel()
             except Exception:  # noqa: BLE001
-                self._clear_worker(self._worker)
+                self._retire_worker(self._worker)
                 self.setCurrentIndex(TASK_PAGE_SETTINGS)
             return
         if self.currentIndex() == TASK_PAGE_DOCKET_STATUS:
@@ -716,18 +722,48 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
 
     def _finish_docket(self, worker, success: bool) -> None:
         recent_lines = list(getattr(worker, "recent_lines", []) or [])
-        self._clear_worker(worker)
-        summary = build_output_summary(
-            self._case_path,
-            self._file_number,
-            master_db=MasterCaseDatabase(),
-            recent_lines=recent_lines,
-            success=success,
-        )
+        self._retire_worker(worker)
+        try:
+            summary = build_output_summary(
+                self._case_path,
+                self._file_number,
+                master_db=MasterCaseDatabase(),
+                recent_lines=recent_lines,
+                success=success,
+            )
+        except Exception as exc:  # noqa: BLE001
+            summary = self._fallback_docket_summary(recent_lines, exc)
         self._last_summary = self._copy_summary(summary)
         self.output_page.show_summary(self._last_summary)
         self.setCurrentIndex(TASK_PAGE_OUTPUT)
         self._emit_task_completed(self._last_summary)
+
+    def _fallback_docket_summary(
+        self,
+        recent_lines: list[str],
+        exc: Exception,
+    ) -> dict[str, Any]:
+        warning = "Docket processing failed because the docket summary could not be built."
+        lines = list(recent_lines or [])
+        if exc:
+            lines.append(f"Docket summary error: {exc}")
+        variables_docx = ""
+        try:
+            variables_docx = find_variables_docx(self._case_path)
+        except Exception:  # noqa: BLE001
+            variables_docx = ""
+        return {
+            "success": False,
+            "state": "failed",
+            "status": warning,
+            "warning": warning,
+            "docket_pdf": "",
+            "variables_docx": variables_docx,
+            "trial_date": "",
+            "other_hearings": "",
+            "procedural_history": "",
+            "recent_lines": lines,
+        }
 
     def _emit_task_completed(self, summary: dict[str, Any]) -> None:
         output_path = self.output_page.output_path
@@ -737,6 +773,7 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
             "title": self._spec.title,
             "files": [],
             "settings": dict(self._last_settings),
+            "metadata": self._copy_metadata(self._last_metadata),
             "summary": self._copy_summary(summary),
             "output_path": output_path,
             "output_paths": output_paths,
@@ -745,9 +782,46 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
         self.task_completed.emit(entry)
 
     def _clear_worker(self, worker) -> None:
+        self._retire_worker(worker)
+
+    def _retire_active_worker(self, *_args) -> None:
+        worker = self._worker
+        if worker is None:
+            return
+        try:
+            worker.cancel()
+        except Exception:  # noqa: BLE001
+            pass
+        self._retire_worker(worker)
+
+    def _retire_worker(self, worker) -> None:
+        matching_connections = [
+            connection
+            for connection in self._worker_connections
+            if connection[0] is worker
+        ]
+        if self._worker is not worker and not matching_connections:
+            return
+
+        self._worker_connections = [
+            connection
+            for connection in self._worker_connections
+            if connection[0] is not worker
+        ]
+        for _worker, signal, slot in matching_connections:
+            try:
+                signal.disconnect(slot)
+            except (RuntimeError, TypeError):
+                pass
         if self._worker is worker:
             self._worker = None
             self._worker_role = ""
+        delete_later = getattr(worker, "deleteLater", None)
+        if callable(delete_later):
+            try:
+                delete_later()
+            except (RuntimeError, TypeError):
+                pass
 
     def _status_page_for_role(self, role: str) -> StatusPage:
         if role == "docket":
@@ -764,6 +838,14 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
         copied = dict(summary or {})
         if isinstance(copied.get("recent_lines"), list):
             copied["recent_lines"] = list(copied["recent_lines"])
+        return copied
+
+    @staticmethod
+    def _copy_metadata(metadata: dict[str, Any]) -> dict[str, Any]:
+        copied = dict(metadata or {})
+        for key, value in list(copied.items()):
+            if isinstance(value, list):
+                copied[key] = list(value)
         return copied
 
     @staticmethod

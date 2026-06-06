@@ -1,4 +1,5 @@
 import os
+import sqlite3
 from types import SimpleNamespace
 
 from PySide6.QtCore import QObject, Qt, Signal
@@ -59,6 +60,7 @@ class FakeCaseAgentWorker(QObject):
         self.file_number = file_number
         self.recent_lines = []
         self.started = False
+        self.delete_later_called = False
         FakeCaseAgentWorker.instances.append(self)
 
     def start(self):
@@ -66,6 +68,9 @@ class FakeCaseAgentWorker(QObject):
 
     def cancel(self):
         self.cancelled.emit()
+
+    def deleteLater(self):
+        self.delete_later_called = True
 
 
 def _spec():
@@ -517,7 +522,11 @@ def test_task_tab_docket_finish_shows_output_and_emits_recent_task(
     monkeypatch.setattr(mod, "MasterCaseDatabase", lambda: "master-db")
     monkeypatch.setattr(mod, "build_output_summary", fake_summary)
     tab = _tab(qtbot, monkeypatch, tmp_path)
-    tab.load_review_state({"case_number": "23STCV00123", "venue_county": "Los Angeles"})
+    tab.load_review_state({
+        "case_number": "23STCV00123",
+        "venue_county": "Los Angeles",
+        "complaint_file": "Complaint.pdf",
+    })
     tab.review_page.run_docket_requested.emit(tab.review_page.to_dict())
     worker = FakeCaseAgentWorker.instances[0]
     worker.recent_lines = ["done"]
@@ -530,11 +539,15 @@ def test_task_tab_docket_finish_shows_output_and_emits_recent_task(
     entry = blocker.args[0]
     assert entry["task_id"] == "case_intake_docket"
     assert entry["settings"] == {}
+    assert entry["metadata"]["case_number"] == "23STCV00123"
+    assert entry["metadata"]["venue_county"] == "Los Angeles"
+    assert entry["metadata"]["complaint_file"] == "Complaint.pdf"
     assert entry["summary"] == summary
     assert entry["output_path"] == summary["docket_pdf"]
     assert entry["output_paths"] == [summary["docket_pdf"], summary["variables_docx"]]
     assert entry["completed_at"]
     assert tab._worker is None
+    assert worker.delete_later_called is True
 
 
 def test_task_tab_docket_failure_shows_failed_summary_without_stale_docket(
@@ -563,7 +576,11 @@ def test_task_tab_docket_failure_shows_failed_summary_without_stale_docket(
     monkeypatch.setattr(mod, "MasterCaseDatabase", lambda: "master-db")
     monkeypatch.setattr(mod, "build_output_summary", fake_summary)
     tab = _tab(qtbot, monkeypatch, tmp_path)
-    tab.load_review_state({"case_number": "23STCV00123", "venue_county": "Los Angeles"})
+    tab.load_review_state({
+        "case_number": "23STCV00123",
+        "venue_county": "Los Angeles",
+        "complaint_file": "Complaint.pdf",
+    })
     tab.review_page.run_docket_requested.emit(tab.review_page.to_dict())
     worker = FakeCaseAgentWorker.instances[0]
     worker.recent_lines = ["traceback"]
@@ -576,9 +593,89 @@ def test_task_tab_docket_failure_shows_failed_summary_without_stale_docket(
     assert tab.output_page.summary["docket_pdf"] == ""
     entry = blocker.args[0]
     assert entry["summary"]["state"] == "failed"
+    assert entry["metadata"]["case_number"] == "23STCV00123"
+    assert entry["metadata"]["complaint_file"] == "Complaint.pdf"
     assert entry["output_path"] == summary["variables_docx"]
     assert stale_docket not in entry["output_paths"]
     assert summary["docket_pdf"] not in entry["output_paths"]
+
+
+def test_task_tab_docket_finish_falls_back_when_master_db_raises(
+    qtbot, monkeypatch, tmp_path
+):
+    out_dir = tmp_path / "NOTES" / "AI OUTPUT"
+    out_dir.mkdir(parents=True)
+    stale_docket = out_dir / "Docket_stale.pdf"
+    variables_docx = out_dir / "variables.docx"
+    stale_docket.write_bytes(b"%PDF")
+    variables_docx.write_bytes(b"docx")
+
+    def broken_master_db():
+        raise sqlite3.OperationalError("database is locked")
+
+    def unexpected_summary(*_args, **_kwargs):
+        raise AssertionError("build_output_summary should not be called")
+
+    monkeypatch.setattr(mod, "save_reviewed_metadata", lambda file_number, metadata: None)
+    monkeypatch.setattr(mod, "MasterCaseDatabase", broken_master_db)
+    monkeypatch.setattr(mod, "build_output_summary", unexpected_summary)
+    tab = _tab(qtbot, monkeypatch, tmp_path)
+    tab.load_review_state({"case_number": "23STCV00123", "venue_county": "Los Angeles"})
+    tab.review_page.run_docket_requested.emit(tab.review_page.to_dict())
+    worker = FakeCaseAgentWorker.instances[0]
+    worker.recent_lines = ["docket worker finished"]
+
+    with qtbot.waitSignal(tab.task_completed, timeout=500) as blocker:
+        worker.finished.emit("")
+
+    assert tab.currentIndex() == TASK_PAGE_OUTPUT
+    summary = tab.output_page.summary
+    assert summary["success"] is False
+    assert summary["state"] == "failed"
+    assert "could not be built" in summary["status"].lower()
+    assert "could not be built" in summary["warning"].lower()
+    assert summary["docket_pdf"] == ""
+    assert summary["variables_docx"] == str(variables_docx)
+    assert summary["trial_date"] == ""
+    assert summary["other_hearings"] == ""
+    assert summary["procedural_history"] == ""
+    assert "docket worker finished" in summary["recent_lines"]
+    assert any("database is locked" in line for line in summary["recent_lines"])
+    entry = blocker.args[0]
+    assert entry["summary"] == summary
+    assert entry["summary"]["docket_pdf"] == ""
+    assert str(stale_docket) not in entry["output_paths"]
+    assert worker.delete_later_called is True
+
+
+def test_task_tab_retired_worker_disconnects_late_signals(
+    qtbot, monkeypatch, tmp_path
+):
+    monkeypatch.setattr(mod, "save_reviewed_metadata", lambda file_number, metadata: None)
+    tab = _tab(qtbot, monkeypatch, tmp_path)
+    completed = []
+    tab.task_completed.connect(lambda entry: completed.append(entry))
+    tab.load_review_state({"case_number": "23STCV00123", "venue_county": "Los Angeles"})
+    tab.review_page.run_docket_requested.emit(tab.review_page.to_dict())
+    worker = FakeCaseAgentWorker.instances[0]
+
+    worker.cancelled.emit()
+
+    assert tab.currentIndex() == TASK_PAGE_REVIEW
+    assert tab._worker is None
+    assert worker.delete_later_called is True
+    status_before = tab.docket_status_page.status_label.text()
+    progress_before = tab.docket_status_page.progress_bar.value()
+
+    worker.status.emit("late status")
+    worker.progress.emit(77)
+    worker.finished.emit("")
+    worker.failed.emit("late failure")
+
+    assert tab.docket_status_page.status_label.text() == status_before
+    assert tab.docket_status_page.progress_bar.value() == progress_before
+    assert tab.currentIndex() == TASK_PAGE_REVIEW
+    assert completed == []
 
 
 def test_task_tab_restore_loads_review_and_output_state(qtbot, monkeypatch, tmp_path):
