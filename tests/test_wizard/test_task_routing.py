@@ -16,6 +16,14 @@ class WizardTaskRoutingTests(unittest.TestCase):
         )
         self.assertFalse(requires_initial_file_picker("subpoena_tracker"))
 
+    def test_med_record_extractor_uses_visible_in_process_route_without_file_picker(self):
+        self.assertEqual(
+            get_in_process_task_builder_name("med_record_extractor"),
+            "build_med_extractor_tab",
+        )
+        self.assertTrue(is_in_process_task("med_record_extractor"))
+        self.assertFalse(requires_initial_file_picker("med_record_extractor"))
+
     def test_document_summary_still_uses_initial_file_picker(self):
         self.assertIsNone(get_in_process_task_builder_name("summarize_documents"))
         self.assertTrue(requires_initial_file_picker("summarize_documents"))
