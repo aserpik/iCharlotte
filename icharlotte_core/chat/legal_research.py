@@ -137,6 +137,30 @@ class ChatSelectedAuthority:
         return f"{self.case_name} {self.citation}".strip()
 
 
+RERANK_SELECT_PROMPT = """You are selecting California legal authorities for a Chat answer.
+
+You are given one research proposition and candidate opinions or firm-authority sources already retrieved by search.
+
+Select the 1 to 4 candidates that best support the proposition. For each selected candidate return:
+- id: candidate id exactly as shown;
+- reason: one sentence explaining why this authority was selected;
+- supports: one sentence stating the rule or proposition the authority supports;
+- quote: a short verbatim quote copied from the candidate excerpt;
+- caveat: a short limitation or empty string.
+
+Return strict JSON only: {"selections":[{"id":"cap:1","reason":"This authority states the governing rule.","supports":"The case supports the requested legal proposition.","quote":"A short verbatim quote from the candidate excerpt.","caveat":""}]}.
+Never invent a quote. The quote must be copied from the candidate excerpt.
+"""
+
+RESEARCH_PROMPT_INSTRUCTION = """LEGAL RESEARCH MODE IS ENABLED.
+
+You must cite only authorities in [CHAT LEGAL RESEARCH AUTHORITY].
+Do not invent, recall, or add citations from memory.
+If the selected authorities do not support a requested proposition, say that the selected sources did not provide support.
+Include a concise section titled "Research Basis" explaining searches run, sources searched, why cited authorities were selected, and the quoted support.
+"""
+
+
 @dataclass
 class ChatResearchPacket:
     query: str
@@ -208,6 +232,15 @@ class ChatResearchPacket:
                 lines.append(f"- {warning}")
         return lines
 
+    def build_augmented_system_prompt(self, base_system_prompt: str) -> str:
+        return "\n\n".join(
+            [
+                base_system_prompt,
+                RESEARCH_PROMPT_INSTRUCTION,
+                self.format_authority_block(),
+            ]
+        )
+
 
 def _loads_json(text: str) -> dict[str, Any]:
     if not isinstance(text, str):
@@ -225,6 +258,66 @@ def _loads_json(text: str) -> dict[str, Any]:
 
 def _normalize_ws(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "")).strip().lower()
+
+
+def _relevant_excerpt(text: str, proposition: str, *, max_chars: int = 3500) -> str:
+    text = text or ""
+    if len(text) <= max_chars:
+        return text
+    terms = {
+        term
+        for term in re.findall(r"[a-z]{4,}", (proposition or "").lower())
+        if term not in {"that", "this", "with", "from", "court", "case", "rule"}
+    }
+    if not terms:
+        return text[:max_chars]
+    lower_text = text.lower()
+    hits: list[int] = []
+    for term in terms:
+        start = 0
+        while True:
+            idx = lower_text.find(term, start)
+            if idx < 0:
+                break
+            hits.append(idx)
+            start = idx + len(term)
+    if not hits:
+        return text[:max_chars]
+    hits.sort()
+    import bisect
+
+    best_start = 0
+    best_score = -1
+    for hit in hits:
+        window_start = max(0, hit - 250)
+        window_end = window_start + max_chars
+        score = bisect.bisect_right(hits, window_end) - bisect.bisect_left(
+            hits,
+            window_start,
+        )
+        if score > best_score:
+            best_score = score
+            best_start = window_start
+    end = min(len(text), best_start + max_chars)
+    prefix = "[excerpt begins mid-opinion] " if best_start > 0 else ""
+    suffix = " [excerpt continues]" if end < len(text) else ""
+    return f"{prefix}{text[best_start:end]}{suffix}"
+
+
+def _format_candidates(candidates: list[ChatAuthorityCandidate], proposition: str) -> str:
+    blocks: list[str] = []
+    for candidate in candidates:
+        source_labels = ", ".join(s.label for s in candidate.sources)
+        text = candidate.text or candidate.snippet
+        excerpt = _relevant_excerpt(text, proposition)
+        if candidate.text and candidate.snippet and candidate.snippet not in candidate.text:
+            excerpt = f"{excerpt}\n\nSnippet:\n{candidate.snippet}"
+        blocks.append(
+            f"[{candidate.id}] {candidate.case_name}, {candidate.citation}\n"
+            f"Sources: {source_labels}\n"
+            f"Excerpt:\n{excerpt}"
+        )
+    return "\n\n".join(blocks)
 
 
 PROPOSITION_EXTRACTION_PROMPT = """You are extracting focused California legal research questions for a litigation attorney.
@@ -582,6 +675,129 @@ class ChatLegalResearchService:
                 )
             )
         return candidates, hit_count
+
+    def select_authorities(
+        self,
+        proposition: str,
+        candidates: list[ChatAuthorityCandidate],
+    ) -> list[ChatSelectedAuthority]:
+        if not candidates:
+            return []
+        by_id = {candidate.id: candidate for candidate in candidates}
+        user_prompt = (
+            f"PROPOSITION:\n{proposition}\n\n"
+            f"CANDIDATES:\n{_format_candidates(candidates, proposition)}"
+        )
+        try:
+            raw = self.llm_callback(RERANK_SELECT_PROMPT, user_prompt) or ""
+        except Exception:
+            raw = ""
+        data = _loads_json(raw)
+        selections = data.get("selections") if isinstance(data, dict) else None
+        if not isinstance(selections, list):
+            return []
+        selected: list[ChatSelectedAuthority] = []
+        for item in selections:
+            if not isinstance(item, dict):
+                continue
+            candidate = by_id.get(str(item.get("id") or ""))
+            if candidate is None:
+                continue
+            quote = str(item.get("quote") or "").strip()
+            normalized_quote = _normalize_ws(quote)
+            if not normalized_quote:
+                continue
+            text_match = normalized_quote in _normalize_ws(candidate.text)
+            snippet_match = normalized_quote in _normalize_ws(candidate.snippet)
+            if not text_match and not snippet_match:
+                continue
+            selected.append(
+                ChatSelectedAuthority(
+                    id=candidate.id,
+                    proposition=proposition,
+                    case_name=candidate.case_name,
+                    citation=candidate.citation,
+                    year=candidate.year,
+                    court=candidate.court,
+                    url=candidate.url,
+                    reason=str(item.get("reason") or "").strip(),
+                    supports=str(item.get("supports") or "").strip(),
+                    quote=quote,
+                    caveat=str(item.get("caveat") or "").strip(),
+                    verification="verified",
+                    sources=list(candidate.sources),
+                )
+            )
+        return selected
+
+    def research(
+        self,
+        *,
+        user_text: str,
+        context_text: str,
+        settings: ChatResearchSettings,
+        status_callback: StatusCallback = None,
+    ) -> ChatResearchPacket:
+        def status(message: str) -> None:
+            if status_callback:
+                status_callback(message)
+
+        settings = normalize_settings(settings)
+        query = (user_text or "").strip()
+        if context_text:
+            query = f"{query}\n\nContext:\n{context_text[:50000]}"
+        status("Extracting legal research questions")
+        propositions = self.extract_propositions(
+            user_text=user_text,
+            context_text=context_text,
+        )
+        status("Searching selected legal research sources")
+        candidates, warnings, searches = self.collect_candidates(
+            propositions=propositions,
+            settings=settings,
+            original_query=query,
+        )
+        selected: list[ChatSelectedAuthority] = []
+        for proposition in propositions:
+            prop_candidates = [
+                candidate
+                for candidate in candidates
+                if candidate.proposition == proposition
+            ]
+            status(f"Selecting authorities for: {proposition}")
+            selected.extend(self.select_authorities(proposition, prop_candidates))
+        selected = self._dedupe_selected(selected)
+        if not selected:
+            if warnings:
+                raise ChatResearchError(
+                    "No verified legal authorities were found. " + " ".join(warnings)
+                )
+            raise ChatResearchError(
+                "No verified legal authorities were found for the selected research sources."
+            )
+        status("Research complete.")
+        return ChatResearchPacket(
+            query=query,
+            settings=settings,
+            propositions=propositions,
+            searches=searches,
+            selected_authorities=selected,
+            warnings=warnings,
+        )
+
+    @staticmethod
+    def _dedupe_selected(
+        authorities: list[ChatSelectedAuthority],
+    ) -> list[ChatSelectedAuthority]:
+        seen: set[str] = set()
+        out: list[ChatSelectedAuthority] = []
+        for authority in authorities:
+            key = re.sub(r"[^a-z0-9]+", "", authority.citation.lower()) or authority.id
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(authority)
+        return out
 
     @staticmethod
     def _should_call_courtlistener(

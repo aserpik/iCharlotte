@@ -1,8 +1,13 @@
 import pytest
 
 from icharlotte_core.chat.legal_research import (
+    ChatAuthorityCandidate,
+    ChatResearchError,
+    ChatResearchPacket,
     ChatLegalResearchService,
     ChatResearchSettings,
+    ChatResearchSource,
+    ChatSelectedAuthority,
     CourtListenerMode,
     THIN_RESULT_THRESHOLD,
     is_current_law_query,
@@ -703,3 +708,127 @@ def test_courtlistener_selected_without_client_warns_and_skips_live():
     assert candidates == []
     assert searches == []
     assert warnings == ["CourtListener API selected but COURTLISTENER_API_TOKEN is not set."]
+
+
+def test_select_authorities_keeps_only_verbatim_quotes():
+    candidates = [
+        ChatAuthorityCandidate(
+            id="cap:1",
+            proposition="duty rule",
+            case_name="Duty v. Care",
+            citation="30 Cal. 4th 43",
+            year="2020",
+            text="The duty rule controls the negligence analysis.",
+            sources=[ChatResearchSource(kind="local_corpus", label="Local California corpus")],
+        ),
+        ChatAuthorityCandidate(
+            id="cap:2",
+            proposition="duty rule",
+            case_name="Bad v. Quote",
+            citation="10 Cal.App.5th 1",
+            year="2021",
+            text="This text does not contain the selected phrase.",
+            sources=[ChatResearchSource(kind="local_corpus", label="Local California corpus")],
+        ),
+    ]
+    service = ChatLegalResearchService(
+        llm_callback=lambda _system, _user: (
+            '{"selections":['
+            '{"id":"cap:1","reason":"Direct duty rule.","supports":"Duty controls negligence.",'
+            '"quote":"The duty rule controls the negligence analysis.","caveat":""},'
+            '{"id":"cap:2","reason":"Bad quote.","supports":"Bad support.",'
+            '"quote":"fabricated quote","caveat":""}'
+            ']}'
+        )
+    )
+
+    selected = service.select_authorities("duty rule", candidates)
+
+    assert len(selected) == 1
+    assert selected[0].case_name == "Duty v. Care"
+    assert selected[0].quote == "The duty rule controls the negligence analysis."
+    assert selected[0].reason == "Direct duty rule."
+
+
+def test_research_raises_when_selected_sources_produce_no_verified_authority():
+    service = ChatLegalResearchService(
+        llm_callback=lambda _system, _user: '{"propositions":["unsupported issue"]}',
+        local_corpus=FakeCorpusClient(results=[]),
+    )
+
+    with pytest.raises(ChatResearchError) as exc:
+        service.research(
+            user_text="unsupported issue",
+            context_text="",
+            settings=ChatResearchSettings(
+                firm_authority=False,
+                local_corpus=True,
+                courtlistener_mode=CourtListenerMode.OFF,
+            ),
+        )
+
+    assert "No verified legal authorities were found" in str(exc.value)
+
+
+def test_research_packet_contains_authority_block_and_research_basis():
+    local = FakeCorpusClient(
+        results=[_case(text="The duty rule controls the negligence analysis.")],
+        text_by_id={"cap:1": "The duty rule controls the negligence analysis."},
+    )
+
+    def llm(system_prompt, user_prompt):
+        if "extracting focused" in system_prompt:
+            return '{"propositions":["duty rule"]}'
+        return (
+            '{"selections":[{"id":"cap:1","reason":"It states the governing duty rule.",'
+            '"supports":"Duty controls negligence analysis.",'
+            '"quote":"The duty rule controls the negligence analysis.","caveat":""}]}'
+        )
+
+    service = ChatLegalResearchService(llm_callback=llm, local_corpus=local)
+
+    packet = service.research(
+        user_text="research duty rule",
+        context_text="",
+        settings=ChatResearchSettings(
+            firm_authority=False,
+            local_corpus=True,
+            courtlistener_mode=CourtListenerMode.OFF,
+        ),
+    )
+
+    block = packet.format_authority_block()
+    html_lines = packet.format_research_basis_html()
+
+    assert "Selected authorities:" in block
+    assert "Duty v. Care (2020) 30 Cal. 4th 43" in block
+    assert "The duty rule controls the negligence analysis." in block
+    assert any("Legal Research Basis" in line for line in html_lines)
+
+
+def test_build_augmented_chat_prompt_requires_research_basis():
+    packet = ChatResearchPacket(
+        query="duty rule",
+        settings=ChatResearchSettings.default(),
+        propositions=["duty rule"],
+        selected_authorities=[
+            ChatSelectedAuthority(
+                id="cap:1",
+                proposition="duty rule",
+                case_name="Duty v. Care",
+                citation="30 Cal. 4th 43",
+                year="2020",
+                reason="It states the rule.",
+                supports="Duty controls negligence.",
+                quote="The duty rule controls the negligence analysis.",
+                sources=[ChatResearchSource(kind="local_corpus", label="Local California corpus")],
+            )
+        ],
+    )
+
+    prompt = packet.build_augmented_system_prompt("Base prompt.")
+
+    assert "Base prompt." in prompt
+    assert "Research Basis" in prompt
+    assert "cite only authorities" in prompt.lower()
+    assert "Duty v. Care" in prompt
