@@ -118,13 +118,28 @@ class LocalCaseCorpus:
             return []
         from icharlotte_core.legal_research.local_corpus.embedder import cosine_topk
         qv = self.embedder.encode([query])[0].astype(np.float32)
-        idx, _scores = cosine_topk(qv, vecs.astype(np.float32), k=limit)
         con = self._conn()
+        rows = con.execute(
+            "SELECT vec_row, case_uid FROM passages "
+            "WHERE passage_type='opinion' AND vec_row IS NOT NULL ORDER BY vec_row"
+        ).fetchall()
+        opinion_rows: list[int] = []
+        case_by_vec_row: dict[int, str] = {}
+        for row in rows:
+            vec_row = int(row["vec_row"])
+            if 0 <= vec_row < vecs.shape[0]:
+                opinion_rows.append(vec_row)
+                case_by_vec_row[vec_row] = row["case_uid"]
+        if not opinion_rows:
+            return []
+        matrix = vecs[np.asarray(opinion_rows, dtype=np.int64)].astype(np.float32)
+        idx, _scores = cosine_topk(qv, matrix, k=limit)
         order, seen = [], set()
-        for vec_row in idx.tolist():
-            row = con.execute("SELECT case_uid FROM passages WHERE vec_row=?", (int(vec_row),)).fetchone()
-            if row and row["case_uid"] not in seen:
-                seen.add(row["case_uid"]); order.append(row["case_uid"])
+        for matrix_row in idx.tolist():
+            vec_row = opinion_rows[int(matrix_row)]
+            case_uid = case_by_vec_row[vec_row]
+            if case_uid not in seen:
+                seen.add(case_uid); order.append(case_uid)
         return order
 
     @staticmethod

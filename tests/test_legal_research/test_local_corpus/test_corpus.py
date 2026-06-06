@@ -46,6 +46,75 @@ def test_search_semantic_path_runs(tmp_path):
     assert any(r.cluster_id == "cap:1" for r in results)
 
 
+def test_semantic_search_ignores_embedded_parenthetical_vectors_for_primary_ranking(tmp_path):
+    db = str(tmp_path / "c.db")
+    vec = str(tmp_path / "v.f16")
+    con = schema.connect(db)
+    schema.create_schema(con)
+    emb = FakeEmbedder(dim=64)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb)
+    idx.add(
+        CaseRecord(
+            case_uid="cap:opinion-semantic",
+            source="cap",
+            name="Opinion Semantic Hit",
+            citation="11 Cal. 5th 11",
+            full_text="§ governing opinion standard",
+        ),
+        [
+            PassageRecord(
+                passage_uid="cap:opinion-semantic#0",
+                case_uid="cap:opinion-semantic",
+                ordinal=0,
+                text="§ governing opinion standard",
+            )
+        ],
+    )
+    idx.add(
+        CaseRecord(
+            case_uid="cap:parenthetical-semantic",
+            source="cap",
+            name="Parenthetical Semantic Hit",
+            citation="12 Cal. 5th 12",
+            full_text="The opinion discusses unrelated procedure.",
+        ),
+        [
+            PassageRecord(
+                passage_uid="cap:parenthetical-semantic#0",
+                case_uid="cap:parenthetical-semantic",
+                ordinal=0,
+                text="The opinion discusses unrelated procedure.",
+            )
+        ],
+    )
+    idx.finalize()
+    con.close()
+
+    con = schema.connect(db)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb, resume=True)
+    idx.add_passages(
+        [
+            PassageRecord(
+                passage_uid="cap:parenthetical-semantic#parenthetical:903",
+                case_uid="cap:parenthetical-semantic",
+                ordinal=1_000_000,
+                text="§",
+                passage_type="parenthetical",
+                parenthetical_id="903",
+            )
+        ],
+        embed=True,
+    )
+    idx.finalize()
+    con.close()
+
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    results = corpus.search_opinions("§", semantic=True, max_results=5)
+
+    assert results[0].cluster_id == "cap:opinion-semantic"
+    assert results[0].snippet_source == "opinion"
+
+
 def test_get_opinion_text_and_lookup(tmp_path):
     db, vec, emb = _build(tmp_path)
     corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
