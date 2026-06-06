@@ -83,6 +83,7 @@ def _finish_build(con, *, db_tmp: str, vec_tmp: str, db_path: str, vectors_path:
     (which requires BOTH final files) and leaves clean state on a crash.
     """
     build_signals(con)
+    _write_corpus_metadata(con, vectors_path=vec_tmp)
     try:
         con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     except Exception:
@@ -203,6 +204,7 @@ def append_cl_to_corpus(*, citations_stream, clusters_stream, opinions_stream,
                 logger.info("CL append: %d new CA cases added", n)
     idx.finalize()
     build_signals(con)
+    _write_corpus_metadata(con, vectors_path=vectors_path)
     con.commit()
     con.close()
     logger.info("CL append: DONE — %d new cases (corpus now %d cases)", n, pre_cases + n)

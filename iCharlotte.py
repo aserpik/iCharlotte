@@ -89,6 +89,11 @@ from icharlotte_core.ui.master_case_tab import MasterCaseTab
 from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.ui.templates_resources_tab import TemplatesResourcesTab
 from icharlotte_core.ui.discovery_tab import DiscoveryTab
+from icharlotte_core.ui.wizard.summary_browser import SummaryBrowserTab
+from icharlotte_core.ui.wizard.summary_outputs import (
+    summary_browser_title,
+    task_id_for_summary_action,
+)
 from icharlotte_core.word_hotkey import init_word_hotkey, stop_word_hotkey
 from icharlotte_core.ui.zoom_handler import ZoomEventFilter
 from icharlotte_core.app_crash_handler import (
@@ -1072,6 +1077,20 @@ class MainWindow(QMainWindow):
                 out.append((i, w))
         return out
 
+    def _iter_summary_browser_tabs(self) -> list:
+        """Return case-scoped summary browser/viewer utility tabs."""
+        out = []
+        for i in range(self.tabs.count()):
+            w = self.tabs.widget(i)
+            if w is None:
+                continue
+            if (
+                w.property("summary_browser_task_id") is not None
+                or w.property("summary_output_viewer_path") is not None
+            ):
+                out.append((i, w))
+        return out
+
     def _relpath_under(self, root: str, path: str) -> str:
         try:
             return os.path.relpath(path, root)
@@ -1178,6 +1197,14 @@ class MainWindow(QMainWindow):
 
     def _remove_all_task_tabs(self) -> None:
         # Iterate in reverse so indices stay stable.
+        summary_tabs = (
+            self._iter_summary_browser_tabs()
+            if hasattr(self, "_iter_summary_browser_tabs")
+            else []
+        )
+        for idx, widget in reversed(summary_tabs):
+            self.tabs.removeTab(idx)
+            widget.deleteLater()
         for idx, widget in reversed(self._iter_task_tabs()):
             if isinstance(widget, ChatTab):
                 try:
@@ -1909,6 +1936,76 @@ class MainWindow(QMainWindow):
         """Dispatch a launcher-card corner-button action."""
         if action_id == "open_separate_index":
             self._reveal_index_tab()
+            return
+        summary_task_id = task_id_for_summary_action(action_id)
+        if summary_task_id:
+            self._open_summary_browser_tab(summary_task_id)
+
+    def _open_summary_browser_tab(self, task_id: str) -> None:
+        """Open or refresh a task-specific summary browser tab."""
+        if not self.case_path or not self.file_number:
+            QMessageBox.information(
+                self, "No case loaded",
+                "Open a case from the Master List first.",
+            )
+            return
+
+        for i in range(self.tabs.count()):
+            widget = self.tabs.widget(i)
+            if (
+                widget is not None
+                and widget.property("summary_browser_task_id") == task_id
+            ):
+                if hasattr(widget, "refresh"):
+                    widget.refresh()
+                self.tabs.setCurrentIndex(i)
+                self._hide_fixed_close_buttons()
+                return
+
+        browser = SummaryBrowserTab(
+            case_path=self.case_path,
+            file_number=self.file_number,
+            task_id=task_id,
+            parent=self,
+        )
+        browser.setProperty("summary_browser_task_id", task_id)
+        browser.open_requested.connect(self._open_summary_output_tab)
+        new_index = self.tabs.addTab(browser, summary_browser_title(task_id))
+        self.tabs.setCurrentIndex(new_index)
+        self._hide_fixed_close_buttons()
+
+    def _open_summary_output_tab(self, output_path: str) -> None:
+        """Open a selected summary in the standard in-app output editor."""
+        if not output_path or not os.path.isfile(output_path):
+            QMessageBox.warning(
+                self,
+                "Output not found",
+                "The selected summary file could not be found.",
+            )
+            return
+
+        norm_path = os.path.normcase(os.path.abspath(output_path))
+        for i in range(self.tabs.count()):
+            widget = self.tabs.widget(i)
+            viewer_path = widget.property("summary_output_viewer_path") if widget else None
+            if viewer_path and os.path.normcase(os.path.abspath(viewer_path)) == norm_path:
+                self.tabs.setCurrentIndex(i)
+                self._hide_fixed_close_buttons()
+                return
+
+        from icharlotte_core.ui.wizard.pages.output_page import OutputPage
+
+        viewer = OutputPage(self)
+        viewer.setProperty("summary_output_viewer_path", output_path)
+        viewer.load_output(output_path)
+        if hasattr(viewer, "rerun_btn"):
+            viewer.rerun_btn.setVisible(False)
+        if hasattr(viewer, "edit_settings_btn"):
+            viewer.edit_settings_btn.setVisible(False)
+        title = f"Output - {os.path.basename(output_path)}"
+        new_index = self.tabs.addTab(viewer, title)
+        self.tabs.setCurrentIndex(new_index)
+        self._hide_fixed_close_buttons()
 
     def _reveal_index_tab(self) -> None:
         """Wizard Mode: reveal the hidden Index singleton, reloaded from disk so
@@ -1945,6 +2042,15 @@ class MainWindow(QMainWindow):
             wiz = self._index_of_tab("Wizard")
             if wiz >= 0:
                 self.tabs.setCurrentIndex(wiz)
+            return
+        if (
+            widget.property("summary_browser_task_id") is not None
+            or widget.property("summary_output_viewer_path") is not None
+        ):
+            self.tabs.removeTab(index)
+            widget.deleteLater()
+            self._hide_fixed_close_buttons()
+            self._persist_open_tabs()
             return
         if widget.property("wizard_task_id") is None:
             return  # not a task tab; ignore
@@ -1985,13 +2091,17 @@ class MainWindow(QMainWindow):
         for i in range(self.tabs.count()):
             widget = self.tabs.widget(i)
             is_task_tab = widget is not None and widget.property("wizard_task_id") is not None
+            is_summary_tab = widget is not None and (
+                widget.property("summary_browser_task_id") is not None
+                or widget.property("summary_output_viewer_path") is not None
+            )
             is_rehideable_index = (
                 index_tab is not None
                 and widget is index_tab
                 and is_wizard
                 and self.tabs.isTabVisible(i)
             )
-            show_close = is_task_tab or is_rehideable_index
+            show_close = is_task_tab or is_summary_tab or is_rehideable_index
             for side in (QTabBar.ButtonPosition.RightSide, QTabBar.ButtonPosition.LeftSide):
                 btn = bar.tabButton(i, side)
                 if btn is not None:

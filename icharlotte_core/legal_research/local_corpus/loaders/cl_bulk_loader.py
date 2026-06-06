@@ -129,6 +129,7 @@ def iter_recent_ca_cases(
         except (TypeError, ValueError):
             cc = None
         name = meta.get("case_name") or meta.get("case_name_short") or ""
+        status = (meta.get("precedential_status") or "").strip()
         rec = CaseRecord(
             case_uid=case_uid, source="cl",
             name=name, name_abbreviation=meta.get("case_name_short", "") or name,
@@ -136,6 +137,8 @@ def iter_recent_ca_cases(
             court="", decision_date=date, year=(date[:4] if len(date) >= 4 else ""),
             url=f"https://www.courtlistener.com/opinion/{cid}/",
             full_text=text, citation_count=cc,
+            published_status=status,
+            citable=status in _PUBLISHED,
         )
         passages = [
             PassageRecord(passage_uid=f"{case_uid}#{i}", case_uid=case_uid,

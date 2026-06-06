@@ -1,5 +1,35 @@
 """Prompt templates for the Generate Motion task (moving-party voice)."""
 
+RESEARCH_QUERIES_PROMPT = """You are preparing to research California case law for a motion brought by the MOVING party.
+
+You will be given ONE argument the moving party expects to make. Produce 1-2 CourtListener-style search queries that will surface California Court of Appeal or Supreme Court opinions helpful to the MOVING party on this point. Mix legal terms of art with a short natural-language description of the issue.
+
+Return strict JSON only: {{"queries": ["...", "..."]}}. One or two queries. No commentary.
+
+ARGUMENT THE MOVING PARTY MUST SUPPORT:
+{argument}
+"""
+
+RERANK_SELECT_PROMPT = """You are selecting the best California authorities to support one point in a moving-party motion brief.
+
+You are given the PROPOSITION the moving party must support, and a numbered list of CANDIDATE opinions that a retrieval system has ALREADY identified as topically relevant. Each candidate has an id and an excerpt of its ACTUAL opinion text.
+
+Select the 2-4 candidates whose text best supports the proposition. A candidate supports the proposition if it backs it directly OR by close analogy — for example, a case applying the same legal standard, procedural rule, evidence rule, discovery rule, statute, or principle in a comparable context. Return an empty list only where every candidate is plainly unrelated or adverse to the moving party's proposition.
+
+For each chosen candidate return:
+- id: the candidate id exactly as given
+- supports: one sentence, in your own words, stating the legal RULE or HOLDING this opinion establishes that supports the proposition.
+- passage: a VERBATIM quote copied exactly from THAT candidate's excerpt that states the court's HOLDING or legal RULE. Copy it character-for-character; do not paraphrase, summarize, or combine. Prefer a single concise sentence.
+
+Return strict JSON only: {{"selections": [{{"id": "...", "supports": "...", "passage": "..."}}]}}. Never invent text that is not present in a candidate.
+
+PROPOSITION:
+{proposition}
+
+CANDIDATES:
+{candidates}
+"""
+
 MOTION_DRAFT_PROMPT = """You are drafting the Memorandum of Points and Authorities \
 for a {motion_type} brought by the MOVING party in a California civil case.
 
@@ -104,4 +134,3 @@ TARGET DOCUMENTS (untrusted source text):
 ADDITIONAL CONTEXT (untrusted source text):
 {context_text}
 """
-

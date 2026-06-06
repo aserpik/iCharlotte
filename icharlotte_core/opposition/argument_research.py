@@ -45,12 +45,28 @@ def _loads_json(text: str) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-def generate_search_queries(argument: str, *, llm_callback: LLMCallback) -> list[str]:
+def _default_prompt_module(prompt_namespace: str):
+    if prompt_namespace == "generate_motion":
+        from icharlotte_core.motion_generation import prompts as motion_prompts
+        return motion_prompts
+    from icharlotte_core.opposition import prompts as opposition_prompts
+    return opposition_prompts
+
+
+def generate_search_queries(
+    argument: str,
+    *,
+    llm_callback: LLMCallback,
+    prompt_namespace: str = "oppose_motion",
+) -> list[str]:
     """Turn one argument into 1-2 CourtListener search queries."""
     from icharlotte_core.prompt_manager import get_prompt
-    from icharlotte_core.opposition import prompts as default_prompts
 
-    template = get_prompt("oppose_motion", "research_queries") or default_prompts.RESEARCH_QUERIES_PROMPT
+    default_prompts = _default_prompt_module(prompt_namespace)
+    template = (
+        get_prompt(prompt_namespace, "research_queries")
+        or default_prompts.RESEARCH_QUERIES_PROMPT
+    )
     user_prompt = template.format(argument=argument or "")
     try:
         response = llm_callback("", user_prompt) or ""
@@ -124,6 +140,23 @@ def _research_prompt_fingerprint() -> dict[str, str]:
     }
 
 
+def _research_prompt_fingerprint_for(prompt_namespace: str) -> dict[str, str]:
+    from icharlotte_core.prompt_manager import get_prompt
+
+    default_prompts = _default_prompt_module(prompt_namespace)
+    return {
+        "namespace": prompt_namespace,
+        "research_queries": (
+            get_prompt(prompt_namespace, "research_queries")
+            or default_prompts.RESEARCH_QUERIES_PROMPT
+        ),
+        "rerank_select": (
+            get_prompt(prompt_namespace, "rerank_select")
+            or default_prompts.RERANK_SELECT_PROMPT
+        ),
+    }
+
+
 def _research_cache_key(
     argument: str,
     *,
@@ -131,6 +164,7 @@ def _research_cache_key(
     firm_provider=None,
     motion_type: str = "",
     side: str = "",
+    prompt_namespace: str = "oppose_motion",
 ) -> dict[str, Any] | None:
     source = _stable_source_signature(cl_client, firm_provider)
     if source is None:
@@ -141,7 +175,7 @@ def _research_cache_key(
         "motion_type": (motion_type or "").strip().lower(),
         "side": (side or "").strip().lower(),
         "source": source,
-        "prompts": _research_prompt_fingerprint(),
+        "prompts": _research_prompt_fingerprint_for(prompt_namespace),
     }
 
 
@@ -276,17 +310,21 @@ def select_authorities(
     argument_text: str,
     argument_id: str = "",
     llm_callback: LLMCallback,
+    prompt_namespace: str = "oppose_motion",
 ) -> list[RetrievedAuthority]:
     """LLM picks the best candidates; citation comes from metadata, and the
     quoted passage must appear verbatim in the candidate's opinion text."""
     from icharlotte_core.prompt_manager import get_prompt
-    from icharlotte_core.opposition import prompts as default_prompts
 
     if not candidates:
         return []
 
     by_id = {str(c.get("cluster_id")): c for c in candidates}
-    template = get_prompt("oppose_motion", "rerank_select") or default_prompts.RERANK_SELECT_PROMPT
+    default_prompts = _default_prompt_module(prompt_namespace)
+    template = (
+        get_prompt(prompt_namespace, "rerank_select")
+        or default_prompts.RERANK_SELECT_PROMPT
+    )
     user_prompt = template.format(
         proposition=proposition or "",
         candidates=_format_candidates(candidates, proposition=proposition or ""),
@@ -428,6 +466,7 @@ def research_argument(
     firm_provider=None,
     motion_type: str = "",
     side: str = "",
+    prompt_namespace: str = "oppose_motion",
 ) -> list[RetrievedAuthority]:
     """Research one argument end-to-end; returns selected RetrievedAuthority."""
     cache_key = _research_cache_key(
@@ -436,6 +475,7 @@ def research_argument(
         firm_provider=firm_provider,
         motion_type=motion_type,
         side=side,
+        prompt_namespace=prompt_namespace,
     )
     cached = _load_cached_research(
         cache_dir,
@@ -446,7 +486,11 @@ def research_argument(
     if cached is not None:
         return cached
 
-    queries = generate_search_queries(argument, llm_callback=query_llm)
+    queries = generate_search_queries(
+        argument,
+        llm_callback=query_llm,
+        prompt_namespace=prompt_namespace,
+    )
     # Always lead with the plain argument text. The local corpus's semantic
     # search retrieves far better on-point authority from natural-language prose
     # than from the LLM's CourtListener boolean syntax (quoted phrases + OR),
@@ -514,6 +558,7 @@ def research_argument(
         return select_authorities(
             argument, cand_dicts, argument_text=argument,
             argument_id=argument_id, llm_callback=rerank_llm,
+            prompt_namespace=prompt_namespace,
         )
 
     selected = _run(queries)
@@ -581,6 +626,7 @@ def research_arguments(
     firm_provider=None,
     motion_type: str = "",
     side: str = "",
+    prompt_namespace: str = "oppose_motion",
 ) -> list[RetrievedAuthority]:
     """Research every argument in parallel; flatten the RetrievedAuthority list."""
     args = [a.strip() for a in (arguments or []) if a and a.strip()]
@@ -593,6 +639,7 @@ def research_arguments(
             arg, cl_client=cl_client, query_llm=query_llm, rerank_llm=rerank_llm,
             argument_id=f"arg-{idx}", cache_dir=cache_dir,
             firm_provider=firm_provider, motion_type=motion_type, side=side,
+            prompt_namespace=prompt_namespace,
         )
         if on_progress:
             if result:

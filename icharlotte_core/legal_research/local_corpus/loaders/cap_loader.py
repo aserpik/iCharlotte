@@ -29,6 +29,10 @@ def _preferred_citation(citations: list[dict]) -> tuple[str, list[str]]:
     return primary, parallel
 
 
+def _is_citable_citation(citation: str) -> bool:
+    return "unrep" not in (citation or "").lower()
+
+
 def _is_california(case: dict) -> bool:
     j = case.get("jurisdiction") or {}
     name = (j.get("name") or "") + (j.get("name_long") or "")
@@ -77,6 +81,8 @@ def iter_cases_from_zip(zip_bytes: bytes) -> Iterator[tuple[CaseRecord, list[Pas
             docket_number=case.get("docket_number", ""),
             url=f"https://static.case.law/{case_uid}",  # informational
             full_text=opinion_text, cites_to=cites_to,
+            published_status=("published" if _is_citable_citation(primary) else "unreported"),
+            citable=_is_citable_citation(primary),
         )
 
         passages: list[PassageRecord] = []

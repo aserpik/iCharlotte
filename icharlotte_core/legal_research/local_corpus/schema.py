@@ -20,9 +20,12 @@ CREATE TABLE IF NOT EXISTS cases (
     full_text           TEXT,
     citation_count      INTEGER,
     latest_citing_year  TEXT,
-    cites_to            TEXT
+    cites_to            TEXT,
+    published_status    TEXT DEFAULT '',
+    citable             INTEGER DEFAULT 1
 );
 CREATE INDEX IF NOT EXISTS idx_cases_citation ON cases(citation);
+CREATE INDEX IF NOT EXISTS idx_cases_citable ON cases(citable);
 
 CREATE TABLE IF NOT EXISTS passages (
     passage_uid            TEXT PRIMARY KEY,
@@ -85,11 +88,13 @@ def connect(db_path: str) -> sqlite3.Connection:
     con = sqlite3.connect(db_path)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA journal_mode=WAL")
+    ensure_runtime_schema(con)
     return con
 
 
 def create_schema(con: sqlite3.Connection) -> None:
     ensure_runtime_schema(con)
+    con.commit()
 
 
 def get_meta(con: sqlite3.Connection) -> dict[str, str]:
@@ -188,7 +193,9 @@ def ensure_runtime_schema(con: sqlite3.Connection) -> None:
             full_text           TEXT,
             citation_count      INTEGER,
             latest_citing_year  TEXT,
-            cites_to            TEXT
+            cites_to            TEXT,
+            published_status    TEXT DEFAULT '',
+            citable             INTEGER DEFAULT 1
         );
         CREATE INDEX IF NOT EXISTS idx_cases_citation ON cases(citation);
 
@@ -230,6 +237,18 @@ def ensure_runtime_schema(con: sqlite3.Connection) -> None:
         );
         """
     )
+
+    case_columns = {
+        r[1] for r in con.execute("PRAGMA table_info(cases)").fetchall()
+    }
+    case_additions = {
+        "published_status": "TEXT DEFAULT ''",
+        "citable": "INTEGER DEFAULT 1",
+    }
+    for name, ddl in case_additions.items():
+        if name not in case_columns:
+            con.execute(f"ALTER TABLE cases ADD COLUMN {name} {ddl}")
+    con.execute("CREATE INDEX IF NOT EXISTS idx_cases_citable ON cases(citable)")
 
     passage_columns = {
         r[1] for r in con.execute("PRAGMA table_info(passages)").fetchall()

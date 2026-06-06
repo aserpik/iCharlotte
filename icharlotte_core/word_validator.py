@@ -1186,6 +1186,41 @@ def validate_report(doc_path: str, profile: Dict = None) -> ValidationResult:
     return result
 
 
+def validate_summary_docx(doc_path: str) -> ValidationResult:
+    """Lightweight offline validation for editable summary .docx files.
+
+    The summary browser lets users make small edits to agent summaries. This
+    validation intentionally avoids report/discovery formatting rules and only
+    verifies that the saved Word file exists, opens, and contains text.
+    """
+    from docx import Document
+
+    result = ValidationResult(context=f"Summary: {os.path.basename(doc_path)}")
+
+    if not os.path.exists(doc_path):
+        result.findings.append(Finding("ERROR", "file", f"File not found: {doc_path}"))
+        return result
+
+    try:
+        doc = Document(doc_path)
+    except Exception as exc:
+        result.findings.append(
+            Finding("ERROR", "open_docx", f"Could not open saved docx: {exc}")
+        )
+        return result
+
+    text = _docx_all_story_text(doc)
+    if text.strip():
+        result.findings.append(
+            Finding("PASS", "content", "Saved summary contains text")
+        )
+    else:
+        result.findings.append(
+            Finding("ERROR", "content", "Saved summary contains no text")
+        )
+    return result
+
+
 def validate_index_docx(doc_path: str, expected_doc_count: Optional[int] = None) -> ValidationResult:
     """Lightweight offline validation for the separator INDEX .docx.
 

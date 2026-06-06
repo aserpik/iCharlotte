@@ -30,6 +30,7 @@ def test_worker_researches_subsection_leaves(monkeypatch, tmp_path):
         captured["targets"] = list(targets)
         captured["max_workers"] = kwargs.get("max_workers")
         captured["cache_dir"] = kwargs.get("cache_dir")
+        captured["prompt_namespace"] = kwargs.get("prompt_namespace")
         return []
 
     monkeypatch.setattr(gm, "research_arguments", fake_research)
@@ -64,6 +65,7 @@ def test_worker_researches_subsection_leaves(monkeypatch, tmp_path):
     # not hit CourtListener search rate limits.
     assert captured["max_workers"] == 3
     assert captured["cache_dir"] and "generate_motion" in captured["cache_dir"]
+    assert captured.get("prompt_namespace") == "generate_motion"
     assert draft.diagnostics["research"]["target_count"] == len(captured["targets"])
     assert draft.diagnostics["research"]["source"] == "local_corpus"
     assert draft.diagnostics["research"]["workers"] == 3
@@ -216,6 +218,71 @@ def test_worker_keeps_live_courtlistener_research_conservative(monkeypatch, tmp_
 
     assert results.get("ok") is True
     assert captured["max_workers"] == 2
+
+
+def test_worker_uses_courtlistener_when_local_corpus_is_stale(monkeypatch, tmp_path):
+    import icharlotte_core.motion_generation.samples as samples
+    import icharlotte_core.ui.wizard.pages.generate_motion_page as gm
+    from icharlotte_core.opposition.models import (
+        DraftDocument, MotionMetadata, OutlineNode,
+    )
+
+    class StaleCorpus:
+        def corpus_metadata(self):
+            return {
+                "source_counts": {"cap": 10},
+                "max_decision_date": "2017-05-26",
+            }
+
+    live_client = object()
+    monkeypatch.setattr(gm, "extract_context_bundle", lambda files: ("ctx", []))
+    monkeypatch.setattr(gm, "_make_local_corpus", lambda: StaleCorpus())
+    monkeypatch.setattr(gm.os.environ, "get", lambda key, default="": "TOKEN" if key == "COURTLISTENER_API_TOKEN" else default)
+    monkeypatch.setattr(
+        "icharlotte_core.legal_research.sources.courtlistener.CourtListenerClient",
+        lambda token: live_client,
+    )
+    monkeypatch.setattr(gm, "draft_motion",
+                        lambda *a, **k: DraftDocument(title="M", body_text="Body."))
+    monkeypatch.setattr(gm, "extract_citations", lambda body: [])
+    monkeypatch.setattr(gm, "assemble_motion_preview", lambda **k: k.get("output_path"))
+    monkeypatch.setattr(gm.DiscoveryAssembler, "find_caption_page", staticmethod(lambda p: ""))
+    monkeypatch.setattr(samples, "load_exemplars", lambda tid: [])
+
+    captured = {}
+
+    def fake_research(targets, **kwargs):
+        captured["client"] = kwargs.get("cl_client")
+        captured["max_workers"] = kwargs.get("max_workers")
+        return []
+
+    monkeypatch.setattr(gm, "research_arguments", fake_research)
+
+    settings = {
+        "motion_type_id": "compel",
+        "motion_type_name": "Motion to Compel",
+        "target_files": [],
+        "metadata": MotionMetadata(
+            motion_type="Motion to Compel",
+            relief_requested="Compel further responses",
+            principal_arguments=["Boilerplate objections are improper"],
+        ).to_dict(),
+        "outline": [
+            OutlineNode(text="Argument", selected=True, children=[
+                OutlineNode(text="Responses were evasive and incomplete", selected=True),
+            ]).to_dict(),
+        ],
+    }
+    worker = gm.GenerateMotionWorker(case_path=str(tmp_path), file_number="123", settings=settings)
+
+    results = {}
+    worker.finished_result.connect(lambda ok, payload: results.update(ok=ok, payload=payload))
+    worker.run()
+
+    assert results.get("ok") is True
+    assert captured["client"] is live_client
+    assert captured["max_workers"] == 2
+    assert results["payload"].diagnostics["research"]["source"] == "courtlistener"
 
 
 def test_analysis_worker_passes_motion_name(monkeypatch):

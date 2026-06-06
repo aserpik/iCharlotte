@@ -1,3 +1,5 @@
+import sqlite3
+
 from icharlotte_core.legal_research.local_corpus import schema
 from icharlotte_core.legal_research.local_corpus.models import CaseRecord, PassageRecord
 from icharlotte_core.legal_research.local_corpus.embedder import FakeEmbedder
@@ -146,6 +148,29 @@ def test_get_opinion_text_and_lookup(tmp_path):
     assert "negligence" in hit["full_text"]
 
 
+def test_lookup_by_citation_matches_parallel_citation_and_spacing(tmp_path):
+    db = str(tmp_path / "c.db"); vec = str(tmp_path / "v.f16")
+    con = schema.connect(db); schema.create_schema(con)
+    emb = FakeEmbedder(dim=64)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb)
+    idx.add(
+        CaseRecord(
+            case_uid="cap:parallel", source="cap", name="Parallel v. Case",
+            citation="25 Cal. 4th 826", parallel_citations=["107 Cal. Rptr. 2d 841"],
+            decision_date="2001-01-01", year="2001", full_text="parallel citation text",
+        ),
+        [PassageRecord(passage_uid="cap:parallel#0", case_uid="cap:parallel", ordinal=0,
+                       text="parallel citation text")],
+    )
+    idx.finalize(); con.close()
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+
+    hit = corpus.lookup_by_citation("107 Cal.Rptr.2d 841")
+
+    assert hit is not None
+    assert hit["case_uid"] == "cap:parallel"
+
+
 def test_search_result_uses_short_name_abbreviation(tmp_path):
     """The corpus must return the Bluebook short name (name_abbreviation), not
     the full party caption — the caption reads badly in a brief and is
@@ -192,6 +217,117 @@ def test_search_works_across_threads(tmp_path):
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
         outcomes = list(pool.map(_worker, range(8)))
     assert all(outcomes)  # every worker thread retrieved, none hit the cross-thread error
+
+
+def test_search_published_only_filters_uncitable_cases(tmp_path):
+    db = str(tmp_path / "c.db"); vec = str(tmp_path / "v.f16")
+    con = schema.connect(db); schema.create_schema(con)
+    emb = FakeEmbedder(dim=64)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb)
+    idx.add(
+        CaseRecord(
+            case_uid="cap:unrep", source="cap", name="Unreported v. Case",
+            citation="1 Cal. Unrep. 1", decision_date="1900-01-01", year="1900",
+            full_text="privacy discovery limits", citable=False,
+            published_status="unreported",
+        ),
+        [PassageRecord(passage_uid="cap:unrep#0", case_uid="cap:unrep", ordinal=0,
+                       text="privacy discovery limits")],
+    )
+    idx.add(
+        CaseRecord(
+            case_uid="cap:pub", source="cap", name="Published v. Case",
+            citation="10 Cal. 5th 1", decision_date="2020-01-01", year="2020",
+            full_text="privacy discovery limits", citable=True,
+            published_status="published",
+        ),
+        [PassageRecord(passage_uid="cap:pub#0", case_uid="cap:pub", ordinal=0,
+                       text="privacy discovery limits")],
+    )
+    idx.finalize(); con.close()
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+
+    published = corpus.search_opinions("privacy discovery limits", semantic=False, max_results=5)
+    all_results = corpus.search_opinions(
+        "privacy discovery limits", semantic=False, max_results=5, published_only=False
+    )
+
+    assert [r.cluster_id for r in published] == ["cap:pub"]
+    assert {r.cluster_id for r in all_results} == {"cap:pub", "cap:unrep"}
+
+
+def test_search_uses_case_name_and_citation_metadata(tmp_path):
+    db = str(tmp_path / "c.db"); vec = str(tmp_path / "v.f16")
+    con = schema.connect(db); schema.create_schema(con)
+    emb = FakeEmbedder(dim=64)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb)
+    idx.add(
+        CaseRecord(
+            case_uid="cap:aguilar", source="cap",
+            name="Theresa Aguilar v. Atlantic Richfield Company",
+            name_abbreviation="Aguilar v. Atlantic Richfield Co.",
+            citation="25 Cal. 4th 826", court="Cal.",
+            decision_date="2001-06-14", year="2001",
+            full_text="asbestos premises liability discussion",
+        ),
+        [PassageRecord(passage_uid="cap:aguilar#0", case_uid="cap:aguilar", ordinal=0,
+                       text="asbestos premises liability discussion")],
+    )
+    idx.add(
+        CaseRecord(
+            case_uid="cap:generic", source="cap", name="Generic v. Case",
+            citation="99 Cal. App. 4th 1", court="Cal. Ct. App.",
+            decision_date="2002-01-01", year="2002",
+            full_text="summary judgment burden moving party triable issue",
+        ),
+        [PassageRecord(passage_uid="cap:generic#0", case_uid="cap:generic", ordinal=0,
+                       text="summary judgment burden moving party triable issue")],
+    )
+    idx.finalize(); con.close()
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+
+    results = corpus.search_opinions(
+        "Aguilar Atlantic Richfield summary judgment burden",
+        semantic=False,
+        max_results=3,
+    )
+
+    assert results[0].cluster_id == "cap:aguilar"
+
+
+def test_search_quality_ranking_prefers_stronger_authority(tmp_path):
+    db = str(tmp_path / "c.db"); vec = str(tmp_path / "v.f16")
+    con = schema.connect(db); schema.create_schema(con)
+    emb = FakeEmbedder(dim=64)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb)
+    idx.add(
+        CaseRecord(
+            case_uid="cap:weak", source="cap", name="Weak v. Case",
+            citation="10 Cal. App. 4th 1", court="Cal. Ct. App.",
+            decision_date="1992-01-01", year="1992",
+            full_text="discovery sanction motion standard",
+            citation_count=1, latest_citing_year="1994",
+        ),
+        [PassageRecord(passage_uid="cap:weak#0", case_uid="cap:weak", ordinal=0,
+                       text="discovery sanction motion standard")],
+    )
+    idx.add(
+        CaseRecord(
+            case_uid="cap:strong", source="cap", name="Strong v. Case",
+            citation="50 Cal. 5th 1", court="Cal.",
+            decision_date="2016-01-01", year="2016",
+            full_text="discovery sanction motion standard",
+            citation_count=150, latest_citing_year="2021",
+        ),
+        [PassageRecord(passage_uid="cap:strong#0", case_uid="cap:strong", ordinal=0,
+                       text="discovery sanction motion standard")],
+    )
+    idx.finalize(); con.close()
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+
+    results = corpus.search_opinions("discovery sanction motion standard", semantic=False, max_results=2)
+
+    assert [r.cluster_id for r in results] == ["cap:strong", "cap:weak"]
 
 
 def test_search_finds_case_through_parenthetical_passage(tmp_path):
@@ -683,7 +819,8 @@ def test_parenthetical_recall_survives_tight_semantic_window(tmp_path):
 def test_search_opinions_migrates_pre_parenthetical_schema(tmp_path):
     db = str(tmp_path / "legacy.db")
     vec = str(tmp_path / "legacy.f16")
-    con = schema.connect(db)
+    con = sqlite3.connect(db)
+    con.row_factory = sqlite3.Row
     con.executescript(
         """
         CREATE TABLE cases (

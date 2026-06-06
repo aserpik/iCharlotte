@@ -54,6 +54,7 @@ from icharlotte_core.ui.wizard.pages._motion_research_support import (
     make_local_corpus as _make_local_corpus_impl,
     research_targets as _research_targets,
     firm_style_exemplars as _firm_style_exemplars,
+    select_research_client as _select_research_client,
 )
 
 
@@ -607,6 +608,7 @@ class OpposeMotionWorker(QThread):
             corpus = _make_local_corpus()
             token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
             retrieved = []
+            research_source = "none"
             opinion_cache = os.path.join(
                 os.path.dirname(registry_path), ".cache", "opinions"
             )
@@ -619,16 +621,28 @@ class OpposeMotionWorker(QThread):
             # Researching every selected section-plan leaf gives each subsection
             # its own on-point authority.
             research_targets = _research_targets(metadata, plan)
-            if corpus is not None and research_targets:
-                self.progress.emit(
-                    f"Researching authorities locally ({len(research_targets)} points)..."
+            if research_targets and (corpus is not None or token):
+                client, source, _corpus_status = _select_research_client(
+                    corpus, token, on_progress=self.progress.emit
                 )
-                firm_provider = _make_firm_provider(corpus)
-                if firm_provider is not None:
-                    self.progress.emit("  Firm brief library active (preferring your prior authorities).")
+                if source == "local_corpus":
+                    self.progress.emit(
+                        f"Researching authorities locally ({len(research_targets)} points)..."
+                    )
+                    firm_provider = _make_firm_provider(corpus)
+                    if firm_provider is not None:
+                        self.progress.emit("  Firm brief library active (preferring your prior authorities).")
+                    research_source = "local_corpus"
+                else:
+                    self.progress.emit(
+                        "Using CourtListener API "
+                        f"({len(research_targets)} points)..."
+                    )
+                    firm_provider = None
+                    research_source = "courtlistener"
                 retrieved = research_arguments(
                     research_targets,
-                    cl_client=corpus,
+                    cl_client=client,
                     query_llm=make_llm("research_queries"),
                     rerank_llm=make_llm("rerank_select"),
                     # Keep concurrency low: the local corpus search is fast, so a
@@ -640,22 +654,7 @@ class OpposeMotionWorker(QThread):
                     firm_provider=firm_provider,
                     motion_type=firm_motion_type,
                     side="opposition",
-                )
-                self.progress.emit(f"Retrieved {len(retrieved)} grounded authorities.")
-            elif corpus is None and token and research_targets:
-                from icharlotte_core.legal_research.sources.courtlistener import CourtListenerClient
-                self.progress.emit(
-                    "Local corpus not built; falling back to CourtListener API "
-                    f"({len(research_targets)} points)..."
-                )
-                retrieved = research_arguments(
-                    research_targets,
-                    cl_client=CourtListenerClient(token),
-                    query_llm=make_llm("research_queries"),
-                    rerank_llm=make_llm("rerank_select"),
-                    max_workers=2,  # avoid bursting provider rate limits
-                    on_progress=self.progress.emit,
-                    cache_dir=opinion_cache,
+                    prompt_namespace="oppose_motion",
                 )
                 self.progress.emit(f"Retrieved {len(retrieved)} grounded authorities.")
             else:
@@ -699,7 +698,10 @@ class OpposeMotionWorker(QThread):
                         "case citations cannot be verified."
                     )
                 self.progress.emit(f"Verifying citations ({len(to_verify)} found)...")
-                if corpus is not None:
+                verification_source = research_source
+                if verification_source == "none":
+                    verification_source = "local_corpus" if corpus is not None else ("courtlistener" if token else "none")
+                if verification_source == "local_corpus":
                     verifier = build_local_opposition_verifier(
                         corpus=corpus,
                         llm_callback=llm,

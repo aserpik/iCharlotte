@@ -103,6 +103,9 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         category="Summarize",
         keywords=["summary", "summarize", "document", "general"],
         default_folders=[],
+        card_action_id="open_summarize_documents_outputs",
+        card_action_glyph="\U0001F5C2",  # 🗂 card index dividers
+        card_action_tooltip="Browse prior document summaries for this case",
     ),
     "summarize_discovery": TaskSpec(
         task_id="summarize_discovery",
@@ -116,6 +119,9 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
             "form interrogatories", "special interrogatories", "production",
         ],
         default_folders=["DISCOVERY/RESPONSES", "DISCOVERY"],
+        card_action_id="open_summarize_discovery_outputs",
+        card_action_glyph="\U0001F5C2",  # 🗂 card index dividers
+        card_action_tooltip="Browse prior discovery summaries for this case",
     ),
     "summarize_depositions": TaskSpec(
         task_id="summarize_depositions",
@@ -126,6 +132,9 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         category="Summarize",
         keywords=["depo", "transcript", "testimony", "witness"],
         default_folders=["DISCOVERY/TRANSCRIPTS", "DISCOVERY"],
+        card_action_id="open_summarize_depositions_outputs",
+        card_action_glyph="\U0001F5C2",  # 🗂 card index dividers
+        card_action_tooltip="Browse prior deposition summaries for this case",
         _settings_page_cls_factory=_deposition_settings_page_cls,
     ),
     "depo_prep": TaskSpec(
@@ -151,6 +160,9 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         category="Medical",
         keywords=["medical", "records", "chronology", "IME", "billing", "MRI", "treatment"],
         default_folders=["RECORDS"],
+        card_action_id="open_medical_records_outputs",
+        card_action_glyph="\U0001F5C2",  # 🗂 card index dividers
+        card_action_tooltip="Browse prior medical record reviews for this case",
     ),
     "med_chron_analysis": TaskSpec(
         task_id="med_chron_analysis",

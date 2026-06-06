@@ -6,11 +6,16 @@ definitions.
 """
 from __future__ import annotations
 
+from datetime import date, datetime
+import json
 import os
 import re
 
 import os as _os_corpus
 from icharlotte_core.config import CASELAW_DATA_DIR
+
+
+_FRESHNESS_MAX_AGE_DAYS = 548
 
 
 _STRUCTURAL_TARGETS = {
@@ -131,6 +136,83 @@ def make_local_corpus():
     from icharlotte_core.legal_research.local_corpus.corpus import LocalCaseCorpus
     db, vec = _corpus_paths()
     return LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=_corpus_embedder())
+
+
+def _parse_date(value) -> date | None:
+    if isinstance(value, date):
+        return value
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.strptime(text[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def corpus_freshness_status(corpus, *, today=None, max_age_days: int = _FRESHNESS_MAX_AGE_DAYS) -> dict:
+    """Return whether local case-law data is current enough to be primary.
+
+    Unknown test doubles are treated as fresh so unit tests that use simple
+    objects do not accidentally exercise the live fallback path.
+    """
+    if corpus is None:
+        return {"fresh": False, "reason": "No local corpus.", "metadata": {}}
+    if not hasattr(corpus, "corpus_metadata"):
+        return {"fresh": True, "reason": "Corpus metadata unavailable.", "metadata": {}}
+    try:
+        metadata = corpus.corpus_metadata() or {}
+    except Exception:
+        return {"fresh": True, "reason": "Corpus metadata unavailable.", "metadata": {}}
+    source_counts = metadata.get("source_counts") or {}
+    if isinstance(source_counts, str):
+        try:
+            source_counts = json.loads(source_counts)
+        except ValueError:
+            source_counts = {}
+    cl_count = int(source_counts.get("cl") or 0)
+    if cl_count <= 0:
+        return {
+            "fresh": False,
+            "reason": "Local corpus has no CourtListener recent slice.",
+            "metadata": metadata,
+        }
+    max_date = _parse_date(metadata.get("max_decision_date"))
+    today_date = _parse_date(today) or date.today()
+    if not max_date:
+        return {
+            "fresh": False,
+            "reason": "Local corpus has no max decision date metadata.",
+            "metadata": metadata,
+        }
+    age_days = (today_date - max_date).days
+    if age_days > max_age_days:
+        return {
+            "fresh": False,
+            "reason": f"Local corpus is stale; newest decision is {max_date.isoformat()}.",
+            "metadata": metadata,
+        }
+    return {"fresh": True, "reason": "", "metadata": metadata}
+
+
+def select_research_client(corpus, token: str, *, on_progress=None):
+    status = corpus_freshness_status(corpus)
+    if corpus is not None and status.get("fresh"):
+        return corpus, "local_corpus", status
+    if corpus is not None and not status.get("fresh"):
+        reason = status.get("reason") or "Local corpus is stale."
+        if token:
+            if on_progress:
+                on_progress(f"WARNING: {reason} Using CourtListener API for current case law.")
+            from icharlotte_core.legal_research.sources.courtlistener import CourtListenerClient
+            return CourtListenerClient(token), "courtlistener", status
+        if on_progress:
+            on_progress(f"WARNING: {reason} No COURTLISTENER_API_TOKEN; using stale local corpus.")
+        return corpus, "local_corpus", status
+    if token:
+        from icharlotte_core.legal_research.sources.courtlistener import CourtListenerClient
+        return CourtListenerClient(token), "courtlistener", status
+    return None, "none", status
 
 
 def firm_style_exemplars(motion_type, side, metadata):

@@ -23,6 +23,8 @@ class CaseRecord:
     citation_count: int | None = None   # inbound count (good-law soft signal)
     latest_citing_year: str = ""
     cites_to: list[str] = field(default_factory=list)  # outbound reporter cites
+    published_status: str = ""
+    citable: bool = True
 
     def to_row(self) -> dict[str, Any]:
         return {
@@ -41,6 +43,8 @@ class CaseRecord:
             "citation_count": self.citation_count,
             "latest_citing_year": self.latest_citing_year,
             "cites_to": json.dumps(self.cites_to),
+            "published_status": self.published_status,
+            "citable": 1 if self.citable else 0,
         }
 
     @classmethod
@@ -69,6 +73,8 @@ class CaseRecord:
             citation_count=row.get("citation_count"),
             latest_citing_year=row.get("latest_citing_year", ""),
             cites_to=_loads(row.get("cites_to")),
+            published_status=row.get("published_status", ""),
+            citable=bool(row.get("citable", 1)),
         )
 
 

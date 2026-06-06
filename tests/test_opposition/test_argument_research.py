@@ -13,6 +13,25 @@ def test_generate_search_queries_parses_json():
     assert queries == ["discovery cutoff abuse of discretion", "late motion to compel"]
 
 
+def test_generate_motion_query_prompt_is_moving_party_directed():
+    captured = {}
+
+    def llm(_system, user):
+        captured["prompt"] = user
+        return '{"queries": ["moving party query"]}'
+
+    queries = generate_search_queries(
+        "The complaint fails to state a claim",
+        llm_callback=llm,
+        prompt_namespace="generate_motion",
+    )
+
+    assert queries == ["moving party query"]
+    prompt = captured["prompt"]
+    assert "MOVING party" in prompt
+    assert "OPPOSING the motion" not in prompt
+
+
 def test_generate_search_queries_caps_at_two():
     llm = MagicMock(return_value='{"queries": ["a", "b", "c", "d"]}')
     queries = generate_search_queries("x", llm_callback=llm)

@@ -50,3 +50,26 @@ def test_research_targets_skip_structural_and_near_duplicate_points():
     assert sum("fraud" in target and "specificity" in target for target in lowered) == 1
     assert any("ucl" in target for target in lowered)
     assert all("\x00" not in target for target in targets)
+
+
+def test_corpus_freshness_requires_recent_courtlistener_slice():
+    class StaleCorpus:
+        def corpus_metadata(self):
+            return {
+                "source_counts": {"cap": 10},
+                "max_decision_date": "2017-05-26",
+            }
+
+    class FreshCorpus:
+        def corpus_metadata(self):
+            return {
+                "source_counts": {"cap": 10, "cl": 5},
+                "max_decision_date": "2026-03-31",
+            }
+
+    stale = mrs.corpus_freshness_status(StaleCorpus(), today="2026-06-05")
+    fresh = mrs.corpus_freshness_status(FreshCorpus(), today="2026-06-05")
+
+    assert stale["fresh"] is False
+    assert "CourtListener" in stale["reason"]
+    assert fresh["fresh"] is True

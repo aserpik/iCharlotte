@@ -56,6 +56,7 @@ from icharlotte_core.ui.wizard.pages._motion_research_support import (
     make_firm_provider as _make_firm_provider,
     make_local_corpus as _make_local_corpus,
     research_targets as _research_targets,
+    select_research_client as _select_research_client,
 )
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
 from icharlotte_core.ui.wizard.task_scaffold import WizardTaskContainer
@@ -615,6 +616,7 @@ class GenerateMotionWorker(QThread):
             token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
             retrieved = []
             verifier = None
+            research_source = "none"
             # Cache opinion text under this task's prompt dir (mirrors oppose).
             repo_root = os.path.dirname(
                 os.path.dirname(
@@ -640,18 +642,17 @@ class GenerateMotionWorker(QThread):
                 }
             )
             if research_targets and (corpus is not None or token):
-                client = corpus
-                if client is None:
-                    from icharlotte_core.legal_research.sources.courtlistener import (
-                        CourtListenerClient,
-                    )
-                    client = CourtListenerClient(token)
+                client, source, corpus_status = _select_research_client(
+                    corpus, token, on_progress=self.progress.emit
+                )
+                if source == "courtlistener":
                     self.progress.emit(
-                        "Local corpus not built; using CourtListener API "
+                        "Using CourtListener API "
                         f"({len(research_targets)} points)..."
                     )
                     firm_provider = None
                     diagnostics["research"]["source"] = "courtlistener"
+                    research_source = "courtlistener"
                 else:
                     self.progress.emit(
                         f"Researching authorities locally ({len(research_targets)} points)..."
@@ -661,7 +662,10 @@ class GenerateMotionWorker(QThread):
                         self.progress.emit("  Firm brief library active (preferring your prior authorities).")
                     diagnostics["research"]["source"] = "local_corpus"
                     diagnostics["research"]["firm_provider"] = firm_provider is not None
-                research_workers = 3 if corpus is not None else 2
+                    research_source = "local_corpus"
+                diagnostics["research"]["corpus_fresh"] = bool(corpus_status.get("fresh"))
+                diagnostics["research"]["corpus_freshness_reason"] = corpus_status.get("reason", "")
+                research_workers = 3 if source == "local_corpus" else 2
                 diagnostics["research"]["workers"] = research_workers
                 retrieved = research_arguments(
                     research_targets,
@@ -677,6 +681,7 @@ class GenerateMotionWorker(QThread):
                     firm_provider=firm_provider,
                     motion_type=firm_motion_type,
                     side="moving",
+                    prompt_namespace="generate_motion",
                 )
                 self.progress.emit(f"Retrieved {len(retrieved)} grounded authorities.")
             else:
@@ -730,7 +735,10 @@ class GenerateMotionWorker(QThread):
             if citations:
                 to_verify, off_pool = pool_membership_check(citations, retrieved)
                 self.progress.emit(f"Verifying citations ({len(to_verify)} found)...")
-                if corpus is not None:
+                verification_source = research_source
+                if verification_source == "none":
+                    verification_source = "local_corpus" if corpus is not None else ("courtlistener" if token else "none")
+                if verification_source == "local_corpus":
                     verifier = build_local_opposition_verifier(
                         corpus=corpus, llm_callback=draft_llm, max_workers=4
                     )
