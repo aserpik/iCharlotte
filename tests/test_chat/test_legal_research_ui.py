@@ -2,10 +2,21 @@ import os
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+import pytest
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication
 
 from icharlotte_core.chat.legal_research import CourtListenerMode
+
+
+@pytest.fixture(autouse=True)
+def isolated_qsettings(tmp_path):
+    previous_default_format = QSettings.defaultFormat()
+    QSettings.setPath(QSettings.Format.IniFormat, QSettings.Scope.UserScope, str(tmp_path))
+    QSettings.setDefaultFormat(QSettings.Format.IniFormat)
+    yield
+    QSettings("iCharlotte", "iCharlotte").sync()
+    QSettings.setDefaultFormat(previous_default_format)
 
 
 def _app():
