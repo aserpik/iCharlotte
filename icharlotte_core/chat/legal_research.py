@@ -203,7 +203,7 @@ class ChatResearchPacket:
                     )
                 lines.append(f"  Source: {source_labels}")
                 if authority.quote:
-                    lines.append(f"  Quote: \"{authority.quote}\"")
+                    lines.append(f"  Quote: \"{_sanitize_selector_text(authority.quote)}\"")
                 if authority.caveat:
                     lines.append(
                         f"  Untrusted selector caveat: {_sanitize_selector_text(authority.caveat)}"
