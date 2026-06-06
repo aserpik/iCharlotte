@@ -4,6 +4,7 @@ from __future__ import annotations
 import glob
 import os
 import re
+from datetime import datetime
 from typing import Any
 
 from PySide6.QtCore import Signal
@@ -18,7 +19,18 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.ui.wizard import theme
+from icharlotte_core.ui.wizard.pages.status_page import StatusPage
+from icharlotte_core.ui.wizard.runners.case_agent_worker import CaseAgentWorker
+from icharlotte_core.ui.wizard.task_scaffold import WizardTaskContainer
+
+
+TASK_PAGE_SETTINGS = 0
+TASK_PAGE_COMPLAINT_STATUS = 1
+TASK_PAGE_REVIEW = 2
+TASK_PAGE_DOCKET_STATUS = 3
+TASK_PAGE_OUTPUT = 4
 
 
 REVIEW_FIELDS = [
@@ -513,3 +525,266 @@ def build_output_summary(
         "procedural_history": str(procedural_history or ""),
         "recent_lines": lines,
     }
+
+
+class CaseIntakeDocketTaskTab(WizardTaskContainer):
+    """Custom task container for complaint intake, metadata review, and docket."""
+
+    task_completed = Signal(dict)
+
+    def __init__(self, spec, case_path: str, file_number: str, parent: QWidget | None = None):
+        super().__init__(
+            spec,
+            steps=["Intake", "Complaint", "Review", "Docket", "Output"],
+            parent=parent,
+        )
+        self._case_path = case_path
+        self._file_number = file_number
+        self._worker = None
+        self._worker_role = ""
+        self._last_settings: dict = {}
+        self._last_summary: dict = {}
+        self._last_metadata: dict = {}
+
+        self.settings_page = CaseIntakeSettingsPage(file_number=file_number)
+        self.complaint_status_page = StatusPage()
+        self.review_page = CaseMetadataReviewPage()
+        self.docket_status_page = StatusPage()
+        self.output_page = CaseIntakeDocketOutputPage()
+
+        self.addWidget(self.settings_page)
+        self.addWidget(self.complaint_status_page)
+        self.addWidget(self.review_page)
+        self.addWidget(self.docket_status_page)
+        self.addWidget(self.output_page)
+
+        self.settings_page.run_complaint_requested.connect(self._start_complaint_worker)
+        self.complaint_status_page.cancel_requested.connect(self._on_cancel)
+        self.review_page.run_docket_requested.connect(self._start_docket_worker)
+        self.docket_status_page.cancel_requested.connect(self._on_cancel)
+        self.output_page.rerun_requested.connect(self._on_rerun)
+        self.output_page.edit_settings_requested.connect(
+            lambda: self.setCurrentIndex(TASK_PAGE_REVIEW)
+        )
+
+    @property
+    def spec(self):
+        return self._spec
+
+    @property
+    def files(self) -> list[str]:
+        return []
+
+    def load_review_state(self, metadata: dict[str, Any] | None) -> None:
+        data = dict(metadata or {})
+        complaint_file = str(data.get("complaint_file", "") or "")
+        self.review_page.load_metadata(data, complaint_file=complaint_file)
+        self._last_metadata = self.review_page.to_dict()
+        self.setCurrentIndex(TASK_PAGE_REVIEW)
+
+    def load_output_summary(
+        self,
+        summary: dict[str, Any] | None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        if metadata is not None:
+            data = dict(metadata or {})
+            complaint_file = str(data.get("complaint_file", "") or "")
+            self.review_page.load_metadata(data, complaint_file=complaint_file)
+            self._last_metadata = self.review_page.to_dict()
+        self._last_summary = self._copy_summary(summary or {})
+        self.output_page.show_summary(self._last_summary)
+        self.setCurrentIndex(TASK_PAGE_OUTPUT)
+
+    def _start_complaint_worker(self) -> None:
+        if self._worker is not None:
+            self._status_page_for_role(self._worker_role).on_status(
+                "A case intake step is already running."
+            )
+            self.setCurrentIndex(self._current_status_index())
+            return
+        self._last_settings = dict(self.settings_page.to_dict())
+        self._last_summary = {}
+        self.complaint_status_page.reset()
+        self.complaint_status_page.on_status("Running complaint intake...")
+        self.complaint_status_page.progress_bar.setRange(0, 0)
+        self.setCurrentIndex(TASK_PAGE_COMPLAINT_STATUS)
+
+        worker = CaseAgentWorker(
+            "complaint.py",
+            self._case_path,
+            self._file_number,
+            parent=None,
+        )
+        self._set_worker(worker, "complaint", self.complaint_status_page)
+        worker.start()
+
+    def _start_docket_worker(self, metadata: dict[str, Any] | None) -> None:
+        if self._worker is not None:
+            self._status_page_for_role(self._worker_role).on_status(
+                "A case intake step is already running."
+            )
+            self.setCurrentIndex(self._current_status_index())
+            return
+        reviewed = dict(metadata or {})
+        self._last_metadata = dict(reviewed)
+        save_reviewed_metadata(self._file_number, reviewed)
+
+        self.docket_status_page.reset()
+        self.docket_status_page.on_status("Running docket...")
+        self.docket_status_page.progress_bar.setRange(0, 0)
+        self.setCurrentIndex(TASK_PAGE_DOCKET_STATUS)
+
+        worker = CaseAgentWorker(
+            "docket.py",
+            self._case_path,
+            self._file_number,
+            parent=None,
+        )
+        self._set_worker(worker, "docket", self.docket_status_page)
+        worker.start()
+
+    def _set_worker(self, worker, role: str, status_page: StatusPage) -> None:
+        self._worker = worker
+        self._worker_role = role
+        worker.status.connect(status_page.on_status)
+        worker.progress.connect(status_page.on_progress)
+        worker.finished.connect(
+            lambda output_path="", w=worker, r=role: self._on_worker_finished(
+                r, w, output_path
+            )
+        )
+        worker.failed.connect(
+            lambda err, w=worker, r=role: self._on_worker_failed(r, w, err)
+        )
+        worker.cancelled.connect(
+            lambda w=worker, r=role: self._on_worker_cancelled(r, w)
+        )
+
+    def _on_worker_finished(self, role: str, worker, _output_path: str = "") -> None:
+        if worker is not self._worker:
+            return
+        if role == "complaint":
+            self._clear_worker(worker)
+            metadata = load_case_metadata(self._file_number)
+            complaint_file = find_complaint_candidate(self._case_path)
+            metadata = dict(metadata or {})
+            metadata["complaint_file"] = complaint_file
+            self.load_review_state(metadata)
+            return
+        if role == "docket":
+            self._finish_docket(worker, success=True)
+
+    def _on_worker_failed(self, role: str, worker, err: str) -> None:
+        if worker is not self._worker:
+            return
+        if role == "complaint":
+            self._clear_worker(worker)
+            self.complaint_status_page.on_status(f"FAILED: {err}")
+            self.complaint_status_page.cancel_btn.setEnabled(True)
+            self.complaint_status_page.cancel_btn.setText("Back to Intake")
+            self.setCurrentIndex(TASK_PAGE_COMPLAINT_STATUS)
+            return
+        if role == "docket":
+            self._finish_docket(worker, success=False)
+
+    def _on_worker_cancelled(self, role: str, worker) -> None:
+        if worker is not self._worker:
+            return
+        self._clear_worker(worker)
+        if role == "docket":
+            self.setCurrentIndex(TASK_PAGE_REVIEW)
+        else:
+            self.setCurrentIndex(TASK_PAGE_SETTINGS)
+
+    def _on_cancel(self) -> None:
+        if self._worker is not None:
+            self._status_page_for_role(self._worker_role).on_status("Cancelling...")
+            try:
+                self._worker.cancel()
+            except Exception:  # noqa: BLE001
+                self._clear_worker(self._worker)
+                self.setCurrentIndex(TASK_PAGE_SETTINGS)
+            return
+        if self.currentIndex() == TASK_PAGE_DOCKET_STATUS:
+            self.setCurrentIndex(TASK_PAGE_REVIEW)
+        else:
+            self.setCurrentIndex(TASK_PAGE_SETTINGS)
+
+    def _on_rerun(self) -> None:
+        self.setCurrentIndex(TASK_PAGE_SETTINGS)
+
+    def _finish_docket(self, worker, success: bool) -> None:
+        recent_lines = list(getattr(worker, "recent_lines", []) or [])
+        self._clear_worker(worker)
+        summary = build_output_summary(
+            self._case_path,
+            self._file_number,
+            master_db=MasterCaseDatabase(),
+            recent_lines=recent_lines,
+            success=success,
+        )
+        self._last_summary = self._copy_summary(summary)
+        self.output_page.show_summary(self._last_summary)
+        self.setCurrentIndex(TASK_PAGE_OUTPUT)
+        self._emit_task_completed(self._last_summary)
+
+    def _emit_task_completed(self, summary: dict[str, Any]) -> None:
+        output_path = self.output_page.output_path
+        output_paths = self._summary_output_paths(summary)
+        entry = {
+            "task_id": self._spec.task_id,
+            "title": self._spec.title,
+            "files": [],
+            "settings": dict(self._last_settings),
+            "summary": self._copy_summary(summary),
+            "output_path": output_path,
+            "output_paths": output_paths,
+            "completed_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        self.task_completed.emit(entry)
+
+    def _clear_worker(self, worker) -> None:
+        if self._worker is worker:
+            self._worker = None
+            self._worker_role = ""
+
+    def _status_page_for_role(self, role: str) -> StatusPage:
+        if role == "docket":
+            return self.docket_status_page
+        return self.complaint_status_page
+
+    def _current_status_index(self) -> int:
+        if self._worker_role == "docket":
+            return TASK_PAGE_DOCKET_STATUS
+        return TASK_PAGE_COMPLAINT_STATUS
+
+    @staticmethod
+    def _copy_summary(summary: dict[str, Any]) -> dict[str, Any]:
+        copied = dict(summary or {})
+        if isinstance(copied.get("recent_lines"), list):
+            copied["recent_lines"] = list(copied["recent_lines"])
+        return copied
+
+    @staticmethod
+    def _summary_output_paths(summary: dict[str, Any]) -> list[str]:
+        paths = []
+        for key in ("docket_pdf", "variables_docx"):
+            path = str((summary or {}).get(key) or "").strip()
+            if path and path not in paths:
+                paths.append(path)
+        return paths
+
+
+def build_case_intake_docket_tab(
+    spec,
+    case_path: str,
+    file_number: str,
+    parent=None,
+) -> CaseIntakeDocketTaskTab:
+    return CaseIntakeDocketTaskTab(
+        spec=spec,
+        case_path=case_path,
+        file_number=file_number,
+        parent=parent,
+    )

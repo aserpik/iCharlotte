@@ -1,14 +1,20 @@
 import os
+from types import SimpleNamespace
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QObject, Qt, Signal
 from PySide6.QtWidgets import QLineEdit, QPlainTextEdit
 
+from icharlotte_core.ui.wizard.pages import case_intake_docket_page as mod
 from icharlotte_core.ui.wizard.pages.case_intake_docket_page import (
     CaseIntakeDocketOutputPage,
     CaseIntakeSettingsPage,
     CaseMetadataReviewPage,
     REVIEW_FIELDS,
+    TASK_PAGE_DOCKET_STATUS,
+    TASK_PAGE_OUTPUT,
+    TASK_PAGE_REVIEW,
     build_output_summary,
+    build_case_intake_docket_tab,
     find_complaint_candidate,
     find_latest_docket_pdf,
     load_case_metadata,
@@ -35,6 +41,48 @@ class FakeManager:
             "extra_tags": list(extra_tags or []),
         })
         self.values[key] = value
+
+
+class FakeCaseAgentWorker(QObject):
+    status = Signal(str)
+    progress = Signal(int)
+    finished = Signal(str)
+    failed = Signal(str)
+    cancelled = Signal()
+
+    instances = []
+
+    def __init__(self, script_name, case_path, file_number, *args, **kwargs):
+        super().__init__(kwargs.get("parent"))
+        self.script_name = script_name
+        self.case_path = case_path
+        self.file_number = file_number
+        self.recent_lines = []
+        self.started = False
+        FakeCaseAgentWorker.instances.append(self)
+
+    def start(self):
+        self.started = True
+
+    def cancel(self):
+        self.cancelled.emit()
+
+
+def _spec():
+    return SimpleNamespace(
+        task_id="case_intake_docket",
+        title="Case Intake & Docket",
+        icon_glyph="",
+        description="Run complaint intake and docket.",
+    )
+
+
+def _tab(qtbot, monkeypatch, tmp_path):
+    FakeCaseAgentWorker.instances = []
+    monkeypatch.setattr(mod, "CaseAgentWorker", FakeCaseAgentWorker)
+    tab = build_case_intake_docket_tab(_spec(), str(tmp_path), "1234.001", None)
+    qtbot.addWidget(tab)
+    return tab
 
 
 def test_normalize_review_value_splits_list_fields():
@@ -379,3 +427,188 @@ def test_settings_page_disables_run_without_file_number_and_emits_when_present(q
 
     with qtbot.waitSignal(page.run_complaint_requested, timeout=500):
         qtbot.mouseClick(page.run_complaint_btn, Qt.MouseButton.LeftButton)
+
+
+def test_task_tab_runs_complaint_then_loads_review_metadata(qtbot, monkeypatch, tmp_path):
+    complaint = str(tmp_path / "PLEADINGS" / "Complaint.pdf")
+    metadata = {
+        "case_number": "23STCV00123",
+        "venue_county": "Los Angeles",
+        "plaintiffs": ["Alice Smith"],
+    }
+    monkeypatch.setattr(mod, "load_case_metadata", lambda file_number: dict(metadata))
+    monkeypatch.setattr(mod, "find_complaint_candidate", lambda case_path: complaint)
+    tab = _tab(qtbot, monkeypatch, tmp_path)
+
+    tab.settings_page.run_complaint_requested.emit()
+
+    assert len(FakeCaseAgentWorker.instances) == 1
+    worker = FakeCaseAgentWorker.instances[0]
+    assert worker.script_name == "complaint.py"
+    assert worker.case_path == str(tmp_path)
+    assert worker.file_number == "1234.001"
+    assert worker.started is True
+
+    worker.finished.emit("")
+
+    assert tab.currentIndex() == TASK_PAGE_REVIEW
+    payload = tab.review_page.to_dict()
+    assert payload["case_number"] == "23STCV00123"
+    assert payload["venue_county"] == "Los Angeles"
+    assert payload["plaintiffs"] == ["Alice Smith"]
+    assert payload["complaint_file"] == complaint
+    assert tab._worker is None
+
+
+def test_task_tab_saves_reviewed_metadata_and_starts_docket(qtbot, monkeypatch, tmp_path):
+    saved = []
+    monkeypatch.setattr(
+        mod,
+        "save_reviewed_metadata",
+        lambda file_number, metadata: saved.append((file_number, dict(metadata))),
+    )
+    tab = _tab(qtbot, monkeypatch, tmp_path)
+    tab.load_review_state({
+        "case_number": "23STCV00123",
+        "venue_county": "Los Angeles",
+        "plaintiffs": ["Alice Smith"],
+        "complaint_file": "Complaint.pdf",
+    })
+
+    tab.review_page.run_docket_requested.emit(tab.review_page.to_dict())
+
+    assert saved
+    assert saved[0][0] == "1234.001"
+    assert saved[0][1]["case_number"] == "23STCV00123"
+    assert saved[0][1]["venue_county"] == "Los Angeles"
+    assert saved[0][1]["complaint_file"] == "Complaint.pdf"
+    assert len(FakeCaseAgentWorker.instances) == 1
+    worker = FakeCaseAgentWorker.instances[0]
+    assert worker.script_name == "docket.py"
+    assert worker.started is True
+    assert tab.currentIndex() == TASK_PAGE_DOCKET_STATUS
+
+
+def test_task_tab_docket_finish_shows_output_and_emits_recent_task(
+    qtbot, monkeypatch, tmp_path
+):
+    summary = {
+        "success": True,
+        "state": "success",
+        "status": "Docket PDF ready.",
+        "warning": "",
+        "docket_pdf": str(tmp_path / "NOTES" / "AI OUTPUT" / "Docket_2026.pdf"),
+        "variables_docx": str(tmp_path / "NOTES" / "AI OUTPUT" / "variables.docx"),
+        "trial_date": "2026-09-01",
+        "other_hearings": "",
+        "procedural_history": "",
+        "recent_lines": ["done"],
+    }
+
+    def fake_summary(case_path, file_number, manager=None, master_db=None, recent_lines=None, success=True):
+        assert case_path == str(tmp_path)
+        assert file_number == "1234.001"
+        assert master_db == "master-db"
+        assert recent_lines == ["done"]
+        assert success is True
+        return dict(summary)
+
+    monkeypatch.setattr(mod, "save_reviewed_metadata", lambda file_number, metadata: None)
+    monkeypatch.setattr(mod, "MasterCaseDatabase", lambda: "master-db")
+    monkeypatch.setattr(mod, "build_output_summary", fake_summary)
+    tab = _tab(qtbot, monkeypatch, tmp_path)
+    tab.load_review_state({"case_number": "23STCV00123", "venue_county": "Los Angeles"})
+    tab.review_page.run_docket_requested.emit(tab.review_page.to_dict())
+    worker = FakeCaseAgentWorker.instances[0]
+    worker.recent_lines = ["done"]
+
+    with qtbot.waitSignal(tab.task_completed, timeout=500) as blocker:
+        worker.finished.emit("")
+
+    assert tab.currentIndex() == TASK_PAGE_OUTPUT
+    assert tab.output_page.summary == summary
+    entry = blocker.args[0]
+    assert entry["task_id"] == "case_intake_docket"
+    assert entry["settings"] == {}
+    assert entry["summary"] == summary
+    assert entry["output_path"] == summary["docket_pdf"]
+    assert entry["output_paths"] == [summary["docket_pdf"], summary["variables_docx"]]
+    assert entry["completed_at"]
+    assert tab._worker is None
+
+
+def test_task_tab_docket_failure_shows_failed_summary_without_stale_docket(
+    qtbot, monkeypatch, tmp_path
+):
+    stale_docket = str(tmp_path / "NOTES" / "AI OUTPUT" / "Docket_stale.pdf")
+    summary = {
+        "success": False,
+        "state": "failed",
+        "status": "Docket processing failed. Review the final log lines below.",
+        "warning": "Docket processing failed. Review the final log lines below.",
+        "docket_pdf": "",
+        "variables_docx": str(tmp_path / "NOTES" / "AI OUTPUT" / "variables.docx"),
+        "trial_date": "",
+        "other_hearings": "",
+        "procedural_history": "",
+        "recent_lines": ["traceback"],
+    }
+
+    def fake_summary(case_path, file_number, manager=None, master_db=None, recent_lines=None, success=True):
+        assert success is False
+        assert recent_lines == ["traceback"]
+        return dict(summary)
+
+    monkeypatch.setattr(mod, "save_reviewed_metadata", lambda file_number, metadata: None)
+    monkeypatch.setattr(mod, "MasterCaseDatabase", lambda: "master-db")
+    monkeypatch.setattr(mod, "build_output_summary", fake_summary)
+    tab = _tab(qtbot, monkeypatch, tmp_path)
+    tab.load_review_state({"case_number": "23STCV00123", "venue_county": "Los Angeles"})
+    tab.review_page.run_docket_requested.emit(tab.review_page.to_dict())
+    worker = FakeCaseAgentWorker.instances[0]
+    worker.recent_lines = ["traceback"]
+
+    with qtbot.waitSignal(tab.task_completed, timeout=500) as blocker:
+        worker.failed.emit("script failed")
+
+    assert tab.currentIndex() == TASK_PAGE_OUTPUT
+    assert tab.output_page.summary["state"] == "failed"
+    assert tab.output_page.summary["docket_pdf"] == ""
+    entry = blocker.args[0]
+    assert entry["summary"]["state"] == "failed"
+    assert entry["output_path"] == summary["variables_docx"]
+    assert stale_docket not in entry["output_paths"]
+    assert summary["docket_pdf"] not in entry["output_paths"]
+
+
+def test_task_tab_restore_loads_review_and_output_state(qtbot, monkeypatch, tmp_path):
+    tab = _tab(qtbot, monkeypatch, tmp_path)
+    metadata = {
+        "case_number": "23STCV00123",
+        "venue_county": "Los Angeles",
+        "plaintiffs": ["Alice Smith"],
+        "complaint_file": "Complaint.pdf",
+    }
+
+    tab.load_review_state(metadata)
+
+    assert tab.currentIndex() == TASK_PAGE_REVIEW
+    assert tab.review_page.to_dict()["case_number"] == "23STCV00123"
+    assert tab.review_page.to_dict()["complaint_file"] == "Complaint.pdf"
+
+    summary = {
+        "success": False,
+        "state": "failed",
+        "status": "Docket failed.",
+        "warning": "Docket failed.",
+        "docket_pdf": "",
+        "variables_docx": "variables.docx",
+        "recent_lines": ["failed"],
+    }
+    updated_metadata = dict(metadata, venue_county="Orange")
+
+    tab.load_output_summary(summary, metadata=updated_metadata)
+
+    assert tab.currentIndex() == TASK_PAGE_OUTPUT
+    assert tab.output_page.summary == summary
+    assert tab.review_page.to_dict()["venue_county"] == "Orange"
