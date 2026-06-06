@@ -154,19 +154,28 @@ class LocalCaseCorpus:
     def search_opinions(self, query: str, *, semantic: bool = False,
                         max_results: int = 15, published_only: bool = True) -> list[CaseResult]:
         bm25 = self._bm25_case_ranking(query, _CANDIDATES)
-        rankings = [bm25]
+        semantic_ranking: list[str] = []
         parenthetical = self._parenthetical_case_ranking(query, _CANDIDATES)
         if semantic:
             try:
-                rankings.append(self._semantic_case_ranking(query, _CANDIDATES))
+                semantic_ranking = self._semantic_case_ranking(query, _CANDIDATES)
             except Exception:
                 logger.warning("semantic ranking failed; BM25 only", exc_info=True)
-        preliminary = set(self._rrf(*rankings)[:max_results])
+        preliminary = set(self._rrf(bm25, semantic_ranking)[:max_results])
+        bm25_cases = set(bm25)
         parenthetical_recall = [
-            case_uid for case_uid in parenthetical if case_uid not in preliminary
+            case_uid for case_uid in parenthetical
+            if case_uid not in preliminary and case_uid not in bm25_cases
         ]
+        rankings = [bm25]
         if parenthetical_recall:
             rankings.append(parenthetical_recall)
+            recall_cases = set(parenthetical_recall)
+            semantic_ranking = [
+                case_uid for case_uid in semantic_ranking if case_uid not in recall_cases
+            ]
+        if semantic:
+            rankings.append(semantic_ranking)
         fused = self._rrf(*rankings)[:max_results]
         return [self._case_result(uid, query) for uid in fused]
 

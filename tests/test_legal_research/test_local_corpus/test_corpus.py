@@ -364,6 +364,14 @@ def test_opinion_text_hit_ranks_before_parenthetical_only_hit(tmp_path):
     assert results[0].snippet_source == "opinion"
     assert results[1].snippet_source == "parenthetical"
 
+    tight_results = corpus.search_opinions(
+        "summary judgment burden",
+        semantic=True,
+        max_results=1,
+    )
+    assert [r.cluster_id for r in tight_results] == ["cap:opinion"]
+    assert tight_results[0].snippet_source == "opinion"
+
 
 def test_parenthetical_does_not_add_duplicate_vote_for_existing_keyword_hit(tmp_path):
     db = str(tmp_path / "c.db")
@@ -509,6 +517,78 @@ def test_semantic_search_does_not_suppress_parenthetical_recall(tmp_path):
     assert results[0].cluster_id == "cap:parenthetical-needle"
     assert results[0].snippet_source == "parenthetical"
     assert results[0].snippet_parenthetical_id == "904"
+
+
+def test_parenthetical_recall_survives_tight_semantic_window(tmp_path):
+    db = str(tmp_path / "c.db")
+    vec = str(tmp_path / "v.f16")
+    con = schema.connect(db)
+    schema.create_schema(con)
+    emb = RankedEmbedder()
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb)
+    for rank in range(1, 106):
+        case_uid = f"cap:semantic-{rank:03d}"
+        idx.add(
+            CaseRecord(
+                case_uid=case_uid,
+                source="cap",
+                name=f"Semantic Rank {rank}",
+                citation=f"{rank} Cal. 5th {rank}",
+                full_text=f"rank{rank:03d} unrelated opinion text",
+            ),
+            [
+                PassageRecord(
+                    passage_uid=f"{case_uid}#0",
+                    case_uid=case_uid,
+                    ordinal=0,
+                    text=f"rank{rank:03d} unrelated opinion text",
+                )
+            ],
+        )
+    idx.add(
+        CaseRecord(
+            case_uid="cap:parenthetical-needle",
+            source="cap",
+            name="Parenthetical Needle",
+            citation="999 Cal. 5th 999",
+            full_text="plain non-query opinion text",
+        ),
+        [
+            PassageRecord(
+                passage_uid="cap:parenthetical-needle#0",
+                case_uid="cap:parenthetical-needle",
+                ordinal=0,
+                text="plain non-query opinion text",
+            )
+        ],
+    )
+    idx.finalize()
+    con.close()
+
+    con = schema.connect(db)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb, resume=True)
+    idx.add_passages(
+        [
+            PassageRecord(
+                passage_uid="cap:parenthetical-needle#parenthetical:905",
+                case_uid="cap:parenthetical-needle",
+                ordinal=1_000_000,
+                text="needle appears only in this parenthetical recall passage",
+                passage_type="parenthetical",
+                parenthetical_id="905",
+            )
+        ],
+        embed=False,
+    )
+    idx.finalize()
+    con.close()
+
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    results = corpus.search_opinions("needle", semantic=True, max_results=1)
+
+    assert [r.cluster_id for r in results] == ["cap:parenthetical-needle"]
+    assert results[0].snippet_source == "parenthetical"
+    assert results[0].snippet_parenthetical_id == "905"
 
 
 def test_search_opinions_migrates_pre_parenthetical_schema(tmp_path):
