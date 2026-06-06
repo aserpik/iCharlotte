@@ -10,11 +10,17 @@ from dataclasses import dataclass, field
 from enum import Enum
 import html as html_lib
 import json
+import os
 import re
 from typing import Any, Callable, Iterable, Optional
 from urllib.parse import urlparse
 
 from icharlotte_core.legal_research.models import CaseResult
+
+try:
+    from icharlotte_core.legal_research.sources.courtlistener import CourtListenerClient
+except Exception:
+    CourtListenerClient = None
 
 LLMCallback = Callable[[str, str], str]
 StatusCallback = Optional[Callable[[str], None]]
@@ -530,6 +536,132 @@ def _local_freshness_warning(local_corpus: Any) -> str:
     return ""
 
 
+def make_local_corpus() -> Any:
+    try:
+        from icharlotte_core.config import CASELAW_DATA_DIR
+        from icharlotte_core.legal_research.local_corpus.corpus import LocalCaseCorpus
+        from icharlotte_core.legal_research.local_corpus.embedder import OnnxEmbedder
+
+        db_path = os.path.join(CASELAW_DATA_DIR, "corpus.db")
+        vectors_path = os.path.join(CASELAW_DATA_DIR, "vectors.f16")
+        if not (os.path.exists(db_path) and os.path.exists(vectors_path)):
+            return None
+        return LocalCaseCorpus(
+            db_path=db_path,
+            vectors_path=vectors_path,
+            embedder=OnnxEmbedder(),
+        )
+    except Exception:
+        return None
+
+
+def make_firm_provider(corpus: Any, token: str) -> Any:
+    try:
+        from icharlotte_core.firm_briefs import factory
+        from icharlotte_core.firm_briefs.provider import FirmAuthorityProvider
+
+        index = factory.make_index()
+        if index is None:
+            return None
+        cl_client = None
+        if token and CourtListenerClient is not None:
+            cl_client = _CourtListenerCitationAdapter(CourtListenerClient(token))
+        return FirmAuthorityProvider(index, corpus, cl_client=cl_client)
+    except Exception:
+        return None
+
+
+class _CourtListenerCitationAdapter:
+    def __init__(self, client: Any) -> None:
+        self.client = client
+        self._citation_to_cluster_id: dict[str, str] = {}
+
+    def lookup_by_citation(self, cite: str) -> dict[str, str] | None:
+        citation = str(cite or "").strip()
+        if not citation:
+            return None
+        try:
+            records = self.client.lookup_citations(citation) or []
+        except Exception:
+            return None
+        for record in records:
+            cluster_id = self._extract_cluster_id(record)
+            if cluster_id:
+                self._remember_citation_cluster(citation, cluster_id)
+                record_citation = str(
+                    record.get("citation")
+                    or record.get("matched_citation")
+                    or citation
+                )
+                self._remember_citation_cluster(record_citation, cluster_id)
+                return {"case_uid": cluster_id, "citation": record_citation}
+        return None
+
+    def get_opinion_text(self, cluster_id: str) -> str:
+        identifier = str(cluster_id or "").strip()
+        if not identifier:
+            return ""
+        resolved = self._citation_to_cluster_id.get(_citation_lookup_key(identifier))
+        if resolved is None and _looks_like_citation(identifier):
+            hit = self.lookup_by_citation(identifier)
+            resolved = str((hit or {}).get("case_uid") or "")
+        if not resolved:
+            resolved = identifier
+        try:
+            return self.client.get_opinion_text(resolved) or ""
+        except Exception:
+            return ""
+
+    def _remember_citation_cluster(self, citation: str, cluster_id: str) -> None:
+        key = _citation_lookup_key(citation)
+        if key:
+            self._citation_to_cluster_id[key] = str(cluster_id)
+
+    @staticmethod
+    def _extract_cluster_id(record: Any) -> str:
+        if not isinstance(record, dict):
+            return ""
+        for key in ("case_uid", "cluster_id"):
+            value = record.get(key)
+            if value:
+                return str(value)
+        cluster = record.get("cluster")
+        if isinstance(cluster, dict):
+            value = cluster.get("id") or cluster.get("cluster_id")
+            if value:
+                return str(value)
+        elif cluster:
+            value = _last_path_number(str(cluster))
+            if value:
+                return value
+        clusters = record.get("clusters")
+        if isinstance(clusters, list):
+            for item in clusters:
+                if isinstance(item, dict):
+                    value = item.get("id") or item.get("cluster_id")
+                    if value:
+                        return str(value)
+                elif item:
+                    value = _last_path_number(str(item))
+                    if value:
+                        return value
+        return ""
+
+
+def _citation_lookup_key(citation: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", str(citation or "").lower())
+
+
+def _looks_like_citation(value: str) -> bool:
+    text = str(value or "")
+    return bool(re.search(r"\b(?:cal|u\.s\.|f\.?\s?\d*d?|s\.ct)\b", text, re.I))
+
+
+def _last_path_number(value: str) -> str:
+    match = re.search(r"/(\d+)/?$", value)
+    return match.group(1) if match else ""
+
+
 class ChatLegalResearchService:
     def __init__(
         self,
@@ -547,6 +679,34 @@ class ChatLegalResearchService:
         self.courtlistener_client = courtlistener_client
         self.courtlistener_token = courtlistener_token
         self.max_results_per_source = max_results_per_source
+
+    @classmethod
+    def from_environment(
+        cls,
+        *,
+        llm_callback: LLMCallback,
+        courtlistener_token: str | None = None,
+    ) -> "ChatLegalResearchService":
+        token = (
+            courtlistener_token
+            if courtlistener_token is not None
+            else os.environ.get("COURTLISTENER_API_TOKEN", "")
+        )
+        token = (token or "").strip()
+        local_corpus = make_local_corpus()
+        firm_provider = make_firm_provider(local_corpus, token)
+        courtlistener_client = (
+            CourtListenerClient(token)
+            if token and CourtListenerClient is not None
+            else None
+        )
+        return cls(
+            llm_callback=llm_callback,
+            local_corpus=local_corpus,
+            firm_provider=firm_provider,
+            courtlistener_client=courtlistener_client,
+            courtlistener_token=token,
+        )
 
     def extract_propositions(self, *, user_text: str, context_text: str) -> list[str]:
         research_input = (

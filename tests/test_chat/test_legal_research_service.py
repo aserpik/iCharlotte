@@ -1133,3 +1133,117 @@ def test_dedupe_selected_keeps_same_citation_for_different_propositions():
     deduped = ChatLegalResearchService._dedupe_selected(authorities)
 
     assert [authority.proposition for authority in deduped] == ["duty rule", "breach rule"]
+
+
+def test_make_service_from_environment_uses_factories(monkeypatch):
+    import icharlotte_core.chat.legal_research as legal_research
+
+    created = {}
+
+    class FakeLocal:
+        pass
+
+    class FakeFirm:
+        pass
+
+    class FakeCL:
+        def __init__(self, token):
+            created["token"] = token
+
+    monkeypatch.setattr(
+        "icharlotte_core.chat.legal_research.make_local_corpus",
+        lambda: FakeLocal(),
+    )
+    monkeypatch.setattr(
+        "icharlotte_core.chat.legal_research.make_firm_provider",
+        lambda corpus, token: FakeFirm(),
+    )
+    monkeypatch.setattr(
+        "icharlotte_core.chat.legal_research.CourtListenerClient",
+        FakeCL,
+    )
+
+    service = ChatLegalResearchService.from_environment(
+        llm_callback=lambda _system, _user: "{}",
+        courtlistener_token="tok",
+    )
+
+    assert isinstance(service.local_corpus, FakeLocal)
+    assert isinstance(service.firm_provider, FakeFirm)
+    assert isinstance(service.courtlistener_client, FakeCL)
+    assert created["token"] == "tok"
+    assert legal_research.CourtListenerClient is FakeCL
+
+
+def test_make_service_from_environment_handles_missing_token(monkeypatch):
+    monkeypatch.setattr(
+        "icharlotte_core.chat.legal_research.make_local_corpus",
+        lambda: None,
+    )
+    monkeypatch.setattr(
+        "icharlotte_core.chat.legal_research.make_firm_provider",
+        lambda corpus, token: None,
+    )
+
+    service = ChatLegalResearchService.from_environment(
+        llm_callback=lambda _system, _user: "{}",
+        courtlistener_token="",
+    )
+
+    assert service.local_corpus is None
+    assert service.firm_provider is None
+    assert service.courtlistener_client is None
+
+
+def test_courtlistener_citation_adapter_resolves_citation_to_opinion_text():
+    import icharlotte_core.chat.legal_research as legal_research
+
+    class FakeCourtListener:
+        def __init__(self):
+            self.lookup_calls = []
+            self.text_calls = []
+
+        def lookup_citations(self, text):
+            self.lookup_calls.append(text)
+            return [
+                {
+                    "citation": "61 Cal.App.4th 1431",
+                    "clusters": [{"id": 9}],
+                }
+            ]
+
+        def get_opinion_text(self, cluster_id):
+            self.text_calls.append(cluster_id)
+            return "court text mentioning good faith effort"
+
+    client = FakeCourtListener()
+    adapter = legal_research._CourtListenerCitationAdapter(client)
+
+    hit = adapter.lookup_by_citation("61 Cal.App.4th 1431")
+    text = adapter.get_opinion_text("61 Cal.App.4th 1431")
+
+    assert hit == {"case_uid": "9", "citation": "61 Cal.App.4th 1431"}
+    assert text == "court text mentioning good faith effort"
+    assert client.lookup_calls == ["61 Cal.App.4th 1431"]
+    assert client.text_calls == ["9"]
+
+
+def test_courtlistener_citation_adapter_accepts_cluster_id_for_opinion_text():
+    import icharlotte_core.chat.legal_research as legal_research
+
+    class FakeCourtListener:
+        def __init__(self):
+            self.text_calls = []
+
+        def lookup_citations(self, text):
+            return []
+
+        def get_opinion_text(self, cluster_id):
+            self.text_calls.append(cluster_id)
+            return "direct cluster text"
+
+    client = FakeCourtListener()
+    adapter = legal_research._CourtListenerCitationAdapter(client)
+
+    assert adapter.get_opinion_text("123") == "direct cluster text"
+    assert client.text_calls == ["123"]
