@@ -1,5 +1,3 @@
-import pytest
-
 from icharlotte_core.chat.legal_research import (
     ChatResearchSettings,
     CourtListenerMode,
@@ -61,3 +59,23 @@ def test_unknown_courtlistener_mode_uses_default():
     )
 
     assert settings.courtlistener_mode == CourtListenerMode.FALLBACK_CURRENT_LAW
+
+
+def test_settings_from_values_preserves_enum_mode():
+    settings = ChatResearchSettings.from_values(
+        courtlistener_mode=CourtListenerMode.ALWAYS_SEARCH,
+    )
+
+    assert settings.courtlistener_mode == CourtListenerMode.ALWAYS_SEARCH
+
+
+def test_settings_from_values_preserves_enum_off_without_local_sources():
+    settings = ChatResearchSettings.from_values(
+        firm_authority=False,
+        local_corpus=False,
+        courtlistener_mode=CourtListenerMode.OFF,
+    )
+
+    assert settings.firm_authority is False
+    assert settings.local_corpus is False
+    assert settings.courtlistener_mode == CourtListenerMode.OFF

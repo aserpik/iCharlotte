@@ -9,11 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 import json
-import os
 import re
-from typing import Any, Callable, Iterable, Optional
-
-from icharlotte_core.legal_research.models import CaseResult
+from typing import Any, Callable, Optional
 
 LLMCallback = Callable[[str, str], str]
 StatusCallback = Optional[Callable[[str], None]]
@@ -61,10 +58,13 @@ class ChatResearchSettings:
         local_corpus: Any = True,
         courtlistener_mode: Any = CourtListenerMode.FALLBACK_CURRENT_LAW,
     ) -> "ChatResearchSettings":
-        try:
-            mode = CourtListenerMode(str(courtlistener_mode))
-        except ValueError:
-            mode = CourtListenerMode.FALLBACK_CURRENT_LAW
+        if isinstance(courtlistener_mode, CourtListenerMode):
+            mode = courtlistener_mode
+        else:
+            try:
+                mode = CourtListenerMode(str(courtlistener_mode))
+            except ValueError:
+                mode = CourtListenerMode.FALLBACK_CURRENT_LAW
         return normalize_settings(
             cls(
                 firm_authority=_bool_value(firm_authority, True),
