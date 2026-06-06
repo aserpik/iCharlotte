@@ -72,6 +72,38 @@ def test_load_opinion_cluster_map_reuses_cache_without_stream(tmp_path):
     assert out == {"10": "100"}
 
 
+def test_load_opinion_cluster_map_keeps_same_opinion_across_snapshots(tmp_path):
+    con = schema.connect(str(tmp_path / "c.db"))
+    schema.create_schema(con)
+
+    out_a = parenthetical_loader.load_opinion_cluster_map(
+        con,
+        opinions_stream=_csv([
+            {"id": "10", "cluster_id": "100", "plain_text": "ignored"},
+        ]),
+        snapshot_date="2026-03-31",
+        refresh=True,
+    )
+    out_b = parenthetical_loader.load_opinion_cluster_map(
+        con,
+        opinions_stream=_csv([
+            {"id": "10", "cluster_id": "101", "plain_text": "ignored"},
+        ]),
+        snapshot_date="2026-06-30",
+        refresh=True,
+    )
+    cached_a = parenthetical_loader.load_opinion_cluster_map(
+        con,
+        opinions_stream=None,
+        snapshot_date="2026-03-31",
+        refresh=False,
+    )
+
+    assert out_a == {"10": "100"}
+    assert out_b == {"10": "101"}
+    assert cached_a == {"10": "100"}
+
+
 def test_build_cluster_case_map_prefers_direct_cl_case_then_cap_citation(tmp_path):
     con = schema.connect(str(tmp_path / "c.db"))
     schema.create_schema(con)
@@ -169,3 +201,23 @@ def test_iter_parenthetical_passages_keeps_top_scored_rows_per_case():
 
     assert [p.parenthetical_id for p in rows] == ["2", "3"]
     assert [p.ordinal for p in rows] == [1_000_000, 1_000_001]
+
+
+def test_iter_parenthetical_passages_tie_cap_keeps_lowest_ids():
+    parentheticals = _csv([
+        {"id": "1", "text": "score nine one", "score": "0.9", "described_opinion_id": "10", "describing_opinion_id": "20", "group_id": ""},
+        {"id": "2", "text": "score nine two", "score": "0.9", "described_opinion_id": "10", "describing_opinion_id": "20", "group_id": ""},
+        {"id": "3", "text": "score nine three", "score": "0.9", "described_opinion_id": "10", "describing_opinion_id": "20", "group_id": ""},
+    ])
+
+    rows = list(
+        parenthetical_loader.iter_parenthetical_passages(
+            parentheticals_stream=parentheticals,
+            opinion_cluster_map={"10": "300", "20": "200"},
+            cluster_case_map={"300": "cap:aguilar"},
+            min_score=0.0,
+            max_per_case=2,
+        )
+    )
+
+    assert [p.parenthetical_id for p in rows] == ["1", "2"]

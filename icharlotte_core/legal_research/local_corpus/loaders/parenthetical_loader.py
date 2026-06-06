@@ -7,7 +7,6 @@ PassageRecord rows; it never mutates case full_text.
 from __future__ import annotations
 
 import csv
-import heapq
 import json
 import re
 import sys
@@ -171,15 +170,13 @@ def iter_parenthetical_passages(
             describing_opinion_id=describing_opinion_id,
             describing_cluster_id=describing_cluster_id,
         )
-        item = (score, parenthetical_id, passage)
-        bucket = buckets[case_uid]
-        if len(bucket) < max_per_case:
-            heapq.heappush(bucket, item)
-        else:
-            heapq.heappushpop(bucket, item)
+        buckets[case_uid].append((score, parenthetical_id, passage))
 
     for case_uid in sorted(buckets):
-        selected = sorted(buckets[case_uid], key=lambda item: (-item[0], item[1]))
+        selected = sorted(
+            buckets[case_uid],
+            key=lambda item: (-item[0], item[1]),
+        )[:max_per_case]
         for offset, (_score, _pid, passage) in enumerate(selected):
             passage.ordinal = _PARENTHETICAL_ORDINAL_BASE + offset
             yield passage

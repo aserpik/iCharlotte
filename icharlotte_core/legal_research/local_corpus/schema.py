@@ -45,9 +45,10 @@ CREATE INDEX IF NOT EXISTS idx_passages_type ON passages(passage_type);
 CREATE INDEX IF NOT EXISTS idx_passages_parenthetical ON passages(parenthetical_id);
 
 CREATE TABLE IF NOT EXISTS courtlistener_opinion_map (
-    opinion_id     TEXT PRIMARY KEY,
+    opinion_id     TEXT NOT NULL,
     cluster_id     TEXT NOT NULL,
-    snapshot_date  TEXT NOT NULL
+    snapshot_date  TEXT NOT NULL,
+    PRIMARY KEY (opinion_id, snapshot_date)
 );
 CREATE INDEX IF NOT EXISTS idx_cl_opinion_map_cluster ON courtlistener_opinion_map(cluster_id);
 CREATE INDEX IF NOT EXISTS idx_cl_opinion_map_snapshot ON courtlistener_opinion_map(snapshot_date);
@@ -84,6 +85,52 @@ def connect(db_path: str) -> sqlite3.Connection:
 
 def create_schema(con: sqlite3.Connection) -> None:
     ensure_runtime_schema(con)
+
+
+def _ensure_opinion_map_schema(con: sqlite3.Connection) -> None:
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS courtlistener_opinion_map ("
+        "opinion_id TEXT NOT NULL, "
+        "cluster_id TEXT NOT NULL, "
+        "snapshot_date TEXT NOT NULL, "
+        "PRIMARY KEY (opinion_id, snapshot_date))"
+    )
+
+    pk_columns = [
+        row[1]
+        for row in sorted(
+            con.execute("PRAGMA table_info(courtlistener_opinion_map)").fetchall(),
+            key=lambda r: r[5],
+        )
+        if row[5]
+    ]
+    if pk_columns != ["opinion_id", "snapshot_date"]:
+        con.execute("ALTER TABLE courtlistener_opinion_map RENAME TO courtlistener_opinion_map_old")
+        con.execute(
+            "CREATE TABLE courtlistener_opinion_map ("
+            "opinion_id TEXT NOT NULL, "
+            "cluster_id TEXT NOT NULL, "
+            "snapshot_date TEXT NOT NULL, "
+            "PRIMARY KEY (opinion_id, snapshot_date))"
+        )
+        con.execute(
+            "INSERT OR REPLACE INTO courtlistener_opinion_map "
+            "(opinion_id, cluster_id, snapshot_date) "
+            "SELECT opinion_id, cluster_id, snapshot_date "
+            "FROM courtlistener_opinion_map_old "
+            "WHERE opinion_id IS NOT NULL AND opinion_id != '' "
+            "AND snapshot_date IS NOT NULL AND snapshot_date != ''"
+        )
+        con.execute("DROP TABLE courtlistener_opinion_map_old")
+
+    con.execute(
+        "CREATE INDEX IF NOT EXISTS idx_cl_opinion_map_cluster "
+        "ON courtlistener_opinion_map(cluster_id)"
+    )
+    con.execute(
+        "CREATE INDEX IF NOT EXISTS idx_cl_opinion_map_snapshot "
+        "ON courtlistener_opinion_map(snapshot_date)"
+    )
 
 
 def ensure_runtime_schema(con: sqlite3.Connection) -> None:
@@ -165,18 +212,5 @@ def ensure_runtime_schema(con: sqlite3.Connection) -> None:
         "CREATE INDEX IF NOT EXISTS idx_passages_parenthetical ON passages(parenthetical_id)"
     )
 
-    con.execute(
-        "CREATE TABLE IF NOT EXISTS courtlistener_opinion_map ("
-        "opinion_id TEXT PRIMARY KEY, "
-        "cluster_id TEXT NOT NULL, "
-        "snapshot_date TEXT NOT NULL)"
-    )
-    con.execute(
-        "CREATE INDEX IF NOT EXISTS idx_cl_opinion_map_cluster "
-        "ON courtlistener_opinion_map(cluster_id)"
-    )
-    con.execute(
-        "CREATE INDEX IF NOT EXISTS idx_cl_opinion_map_snapshot "
-        "ON courtlistener_opinion_map(snapshot_date)"
-    )
+    _ensure_opinion_map_schema(con)
     con.commit()

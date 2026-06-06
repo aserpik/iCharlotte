@@ -144,6 +144,35 @@ def test_create_schema_migrates_old_passages_table():
     assert "idx_passages_parenthetical" in indexes
 
 
+def test_ensure_runtime_schema_migrates_old_opinion_map_primary_key():
+    con = sqlite3.connect(":memory:")
+    con.executescript(
+        """
+        CREATE TABLE courtlistener_opinion_map (
+            opinion_id TEXT PRIMARY KEY,
+            cluster_id TEXT NOT NULL,
+            snapshot_date TEXT NOT NULL
+        );
+        INSERT INTO courtlistener_opinion_map VALUES ('10', '100', '2026-03-31');
+        """
+    )
+
+    schema.ensure_runtime_schema(con)
+    con.execute(
+        "INSERT INTO courtlistener_opinion_map VALUES (?,?,?)",
+        ("10", "101", "2026-06-30"),
+    )
+    rows = con.execute(
+        "SELECT opinion_id, cluster_id, snapshot_date FROM courtlistener_opinion_map "
+        "ORDER BY snapshot_date"
+    ).fetchall()
+
+    assert [tuple(row) for row in rows] == [
+        ("10", "100", "2026-03-31"),
+        ("10", "101", "2026-06-30"),
+    ]
+
+
 def test_passage_record_accepts_parenthetical_metadata():
     passage = PassageRecord(
         passage_uid="cap:1#parenthetical:900",
