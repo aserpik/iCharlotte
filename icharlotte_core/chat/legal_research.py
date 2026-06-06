@@ -427,8 +427,10 @@ class ChatLegalResearchService:
 
         for proposition in propositions:
             local_count = 0
+            non_live_candidates: list[ChatAuthorityCandidate] = []
             if settings.firm_authority:
                 firm_candidates = self._collect_firm(proposition, settings=settings)
+                non_live_candidates.extend(firm_candidates)
                 all_candidates.extend(firm_candidates)
                 searches.append(f"Firm/sample-motion authority: {proposition}")
                 if self.firm_provider is None:
@@ -444,21 +446,29 @@ class ChatLegalResearchService:
                     source_label="Local California corpus",
                 )
                 local_count = len(local_candidates)
+                non_live_candidates.extend(local_candidates)
                 all_candidates.extend(local_candidates)
                 searches.append(f"Local California corpus: {proposition}")
                 if self.local_corpus is None:
                     warnings.append("Local California corpus selected but the local corpus is unavailable.")
-                elif local_count == 0 or (
-                    settings.courtlistener_mode == CourtListenerMode.FALLBACK_CURRENT_LAW
-                    and local_count < THIN_RESULT_THRESHOLD
-                ):
+                elif local_count == 0:
                     warnings.append(f"Local corpus returned thin results for: {proposition}")
                 if local_warning:
                     warnings.append(local_warning)
 
+            non_live_count = len(_merge_candidates(non_live_candidates))
+            fallback_thin = (
+                settings.courtlistener_mode == CourtListenerMode.FALLBACK_CURRENT_LAW
+                and non_live_count < THIN_RESULT_THRESHOLD
+            )
+            if fallback_thin and settings.local_corpus and local_count:
+                warnings.append(f"Local corpus returned thin results for: {proposition}")
+            elif fallback_thin and (settings.firm_authority or settings.local_corpus):
+                warnings.append(f"Selected non-live sources returned thin results for: {proposition}")
+
             if self._should_call_courtlistener(
                 settings=settings,
-                local_count=local_count,
+                non_live_count=non_live_count,
                 local_warning=local_warning,
                 current_law=current_law,
             ):
@@ -577,7 +587,7 @@ class ChatLegalResearchService:
     def _should_call_courtlistener(
         *,
         settings: ChatResearchSettings,
-        local_count: int,
+        non_live_count: int,
         local_warning: str,
         current_law: bool,
     ) -> bool:
@@ -585,4 +595,4 @@ class ChatLegalResearchService:
             return False
         if settings.courtlistener_mode == CourtListenerMode.ALWAYS_SEARCH:
             return True
-        return local_count < THIN_RESULT_THRESHOLD or bool(local_warning) or current_law
+        return non_live_count < THIN_RESULT_THRESHOLD or bool(local_warning) or current_law

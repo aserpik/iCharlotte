@@ -413,6 +413,92 @@ def test_courtlistener_fallback_calls_live_when_local_results_are_thin():
     assert any("CourtListener API" in item for item in searches)
 
 
+def test_courtlistener_fallback_does_not_call_live_when_firm_results_are_not_thin():
+    firm = FakeFirmProvider(
+        candidates=[
+            {
+                "cluster_id": "firm:1",
+                "case_name": "Alpha v. Rule",
+                "citation": "10 Cal.App.5th 1",
+                "year": "2020",
+                "text": "Alpha supports the rule.",
+            },
+            {
+                "cluster_id": "firm:2",
+                "case_name": "Beta v. Rule",
+                "citation": "20 Cal.App.5th 2",
+                "year": "2021",
+                "text": "Beta supports the rule.",
+            },
+            {
+                "cluster_id": "firm:3",
+                "case_name": "Gamma v. Rule",
+                "citation": "30 Cal.App.5th 3",
+                "year": "2022",
+                "text": "Gamma supports the rule.",
+            },
+        ]
+    )
+    cl = FakeCorpusClient(
+        results=[_case(name="Live v. Case", cite="55 Cal.App.5th 10", uid="cl:1")]
+    )
+    service = _service_for_sources(firm=firm, courtlistener=cl)
+
+    candidates, warnings, searches = service.collect_candidates(
+        propositions=["firm-supported issue"],
+        settings=ChatResearchSettings(
+            firm_authority=True,
+            local_corpus=False,
+            courtlistener_mode=CourtListenerMode.FALLBACK_CURRENT_LAW,
+        ),
+        original_query="firm-supported issue",
+    )
+
+    assert {candidate.case_name for candidate in candidates} == {
+        "Alpha v. Rule",
+        "Beta v. Rule",
+        "Gamma v. Rule",
+    }
+    assert cl.calls == []
+    assert warnings == []
+    assert searches == ["Firm/sample-motion authority: firm-supported issue"]
+
+
+def test_courtlistener_fallback_calls_live_when_firm_results_are_thin():
+    firm = FakeFirmProvider(
+        candidates=[
+            {
+                "cluster_id": "firm:1",
+                "case_name": "Alpha v. Rule",
+                "citation": "10 Cal.App.5th 1",
+                "year": "2020",
+                "text": "Alpha supports the rule.",
+            }
+        ]
+    )
+    cl = FakeCorpusClient(
+        results=[_case(name="Live v. Case", cite="55 Cal.App.5th 10", uid="cl:1")],
+        text_by_id={"cl:1": "Live authority supports the rule."},
+    )
+    service = _service_for_sources(firm=firm, courtlistener=cl)
+
+    candidates, warnings, searches = service.collect_candidates(
+        propositions=["thin firm issue"],
+        settings=ChatResearchSettings(
+            firm_authority=True,
+            local_corpus=False,
+            courtlistener_mode=CourtListenerMode.FALLBACK_CURRENT_LAW,
+        ),
+        original_query="thin firm issue",
+    )
+
+    assert any(candidate.case_name == "Alpha v. Rule" for candidate in candidates)
+    assert any(candidate.case_name == "Live v. Case" for candidate in candidates)
+    assert cl.calls
+    assert any("Selected non-live sources returned thin results" in warning for warning in warnings)
+    assert any("CourtListener API" in item for item in searches)
+
+
 def test_courtlistener_fallback_counts_deduped_local_candidates_for_thinness():
     local = FakeCorpusClient(
         results=[_case(name="Local v. Case", cite="10 Cal.App.5th 1", uid="cap:local")],
