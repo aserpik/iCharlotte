@@ -24,6 +24,7 @@ except Exception:
 
 LLMCallback = Callable[[str, str], str]
 StatusCallback = Optional[Callable[[str], None]]
+DebugCallback = Optional[Callable[..., None]]
 
 
 class ChatResearchError(RuntimeError):
@@ -401,7 +402,22 @@ def is_current_law_query(text: str) -> bool:
 
 FRESHNESS_MAX_AGE_DAYS = 548
 THIN_RESULT_THRESHOLD = 2
+COURTLISTENER_KEYWORD_MIN_OVERLAP = 0.35
 _MISSING = object()
+SEARCH_QUALITY_STOPWORDS = {
+    "about",
+    "action",
+    "appeal",
+    "california",
+    "cause",
+    "civil",
+    "code",
+    "court",
+    "legal",
+    "liability",
+    "rule",
+    "under",
+}
 
 
 def _year(value: str) -> str:
@@ -430,6 +446,36 @@ def _only_unverified_firm_sources(candidate: ChatAuthorityCandidate) -> bool:
         if str(source.verification or "").lower() != "unverified_firm":
             return False
     return True
+
+
+def _search_quality_terms(proposition: str) -> set[str]:
+    return {
+        term
+        for term in re.findall(r"[a-z]{4,}", (proposition or "").lower())
+        if term not in SEARCH_QUALITY_STOPWORDS
+    }
+
+
+def _case_search_text(case: CaseResult) -> str:
+    return " ".join(
+        str(value or "")
+        for value in (
+            getattr(case, "name", ""),
+            getattr(case, "citation", ""),
+            getattr(case, "snippet", ""),
+        )
+    ).lower()
+
+
+def _search_overlap_score(proposition: str, cases: list[CaseResult], *, top_n: int = 3) -> float:
+    terms = _search_quality_terms(proposition)
+    if not terms:
+        return 1.0
+    haystack = " ".join(_case_search_text(case) for case in cases[:top_n])
+    if not haystack:
+        return 0.0
+    matched = sum(1 for term in terms if term in haystack)
+    return matched / len(terms)
 
 
 def _case_result_candidate(
@@ -735,7 +781,26 @@ class ChatLegalResearchService:
         propositions: list[str],
         settings: ChatResearchSettings,
         original_query: str,
+        debug_callback: DebugCallback = None,
     ) -> tuple[list[ChatAuthorityCandidate], list[str], list[str]]:
+        def debug(
+            phase: str,
+            message: str,
+            *,
+            level: str = "info",
+            details: dict[str, Any] | None = None,
+        ) -> None:
+            if debug_callback:
+                try:
+                    debug_callback(
+                        phase=phase,
+                        message=message,
+                        level=level,
+                        details=details or {},
+                    )
+                except Exception:
+                    pass
+
         settings = normalize_settings(settings)
         warnings: list[str] = []
         searches: list[str] = []
@@ -744,19 +809,48 @@ class ChatLegalResearchService:
         local_warning = _local_freshness_warning(self.local_corpus) if settings.local_corpus else ""
 
         for proposition in propositions:
+            debug(
+                "proposition",
+                f"Researching proposition: {proposition}",
+                details={"proposition": proposition},
+            )
             local_count = 0
             non_live_candidates: list[ChatAuthorityCandidate] = []
             if settings.firm_authority:
+                debug(
+                    "source_search",
+                    f"Searching firm/sample-motion authority for: {proposition}",
+                    details={"source": "firm_authority", "proposition": proposition},
+                )
                 firm_candidates = self._collect_firm(proposition, settings=settings)
                 non_live_candidates.extend(firm_candidates)
                 all_candidates.extend(firm_candidates)
                 searches.append(f"Firm/sample-motion authority: {proposition}")
+                debug(
+                    "source_result",
+                    f"Firm/sample-motion authority returned {len(firm_candidates)} candidate(s)",
+                    details={
+                        "source": "firm_authority",
+                        "proposition": proposition,
+                        "candidate_count": len(firm_candidates),
+                    },
+                )
                 if self.firm_provider is None:
-                    warnings.append(
-                        "Firm/sample-motion authority selected but the firm authority index is unavailable."
+                    warning = "Firm/sample-motion authority selected but the firm authority index is unavailable."
+                    warnings.append(warning)
+                    debug(
+                        "warning",
+                        warning,
+                        level="warning",
+                        details={"source": "firm_authority"},
                     )
 
             if settings.local_corpus:
+                debug(
+                    "source_search",
+                    f"Searching Local California corpus for: {proposition}",
+                    details={"source": "local_corpus", "proposition": proposition},
+                )
                 local_candidates, _local_hits = self._collect_case_client(
                     self.local_corpus,
                     proposition=proposition,
@@ -767,12 +861,32 @@ class ChatLegalResearchService:
                 non_live_candidates.extend(local_candidates)
                 all_candidates.extend(local_candidates)
                 searches.append(f"Local California corpus: {proposition}")
+                debug(
+                    "source_result",
+                    f"Local California corpus returned {local_count} candidate(s)",
+                    details={
+                        "source": "local_corpus",
+                        "proposition": proposition,
+                        "candidate_count": local_count,
+                        "raw_hit_count": _local_hits,
+                    },
+                )
                 if self.local_corpus is None:
-                    warnings.append("Local California corpus selected but the local corpus is unavailable.")
+                    warning = "Local California corpus selected but the local corpus is unavailable."
+                    warnings.append(warning)
+                    debug("warning", warning, level="warning", details={"source": "local_corpus"})
                 elif local_count == 0:
-                    warnings.append(f"Local corpus returned thin results for: {proposition}")
+                    warning = f"Local corpus returned thin results for: {proposition}"
+                    warnings.append(warning)
+                    debug("warning", warning, level="warning", details={"source": "local_corpus"})
                 if local_warning:
                     warnings.append(local_warning)
+                    debug(
+                        "warning",
+                        local_warning,
+                        level="warning",
+                        details={"source": "local_corpus"},
+                    )
 
             non_live_count = len(_merge_candidates(non_live_candidates))
             fallback_thin = (
@@ -780,9 +894,13 @@ class ChatLegalResearchService:
                 and non_live_count < THIN_RESULT_THRESHOLD
             )
             if fallback_thin and settings.local_corpus and local_count:
-                warnings.append(f"Local corpus returned thin results for: {proposition}")
+                warning = f"Local corpus returned thin results for: {proposition}"
+                warnings.append(warning)
+                debug("warning", warning, level="warning", details={"source": "local_corpus"})
             elif fallback_thin and (settings.firm_authority or settings.local_corpus):
-                warnings.append(f"Selected non-live sources returned thin results for: {proposition}")
+                warning = f"Selected non-live sources returned thin results for: {proposition}"
+                warnings.append(warning)
+                debug("warning", warning, level="warning", details={"source": "non_live"})
 
             if self._should_call_courtlistener(
                 settings=settings,
@@ -791,20 +909,57 @@ class ChatLegalResearchService:
                 current_law=current_law,
             ):
                 if not self.courtlistener_token or self.courtlistener_client is None:
-                    warnings.append("CourtListener API selected but COURTLISTENER_API_TOKEN is not set.")
+                    warning = "CourtListener API selected but COURTLISTENER_API_TOKEN is not set."
+                    warnings.append(warning)
+                    debug(
+                        "warning",
+                        warning,
+                        level="warning",
+                        details={"source": "courtlistener"},
+                    )
                 else:
+                    debug(
+                        "source_search",
+                        f"Searching CourtListener API for: {proposition}",
+                        details={"source": "courtlistener", "proposition": proposition},
+                    )
                     cl_candidates, _cl_hits = self._collect_case_client(
                         self.courtlistener_client,
                         proposition=proposition,
                         source_kind="courtlistener",
                         source_label="CourtListener API",
+                        enrich_results=False,
+                        semantic_modes=(False, True),
+                        semantic_fallback_threshold=THIN_RESULT_THRESHOLD,
+                        semantic_fallback_min_overlap=COURTLISTENER_KEYWORD_MIN_OVERLAP,
                     )
                     all_candidates.extend(cl_candidates)
                     searches.append(f"CourtListener API: {proposition}")
+                    debug(
+                        "source_result",
+                        f"CourtListener API returned {len(cl_candidates)} candidate(s)",
+                        details={
+                            "source": "courtlistener",
+                            "proposition": proposition,
+                            "candidate_count": len(cl_candidates),
+                            "raw_hit_count": _cl_hits,
+                        },
+                    )
 
         unique_warnings = list(dict.fromkeys(warnings))
         unique_searches = list(dict.fromkeys(searches))
-        return _merge_candidates(all_candidates), unique_warnings, unique_searches
+        merged_candidates = _merge_candidates(all_candidates)
+        debug(
+            "candidate_summary",
+            f"Collected {len(merged_candidates)} unique candidate(s)",
+            details={
+                "candidate_count": len(merged_candidates),
+                "warning_count": len(unique_warnings),
+                "search_count": len(unique_searches),
+                "sources": list(unique_searches),
+            },
+        )
+        return merged_candidates, unique_warnings, unique_searches
 
     def _collect_firm(
         self,
@@ -848,12 +1003,22 @@ class ChatLegalResearchService:
         proposition: str,
         source_kind: str,
         source_label: str,
+        enrich_results: bool = True,
+        semantic_modes: tuple[bool, ...] = (True, False),
+        semantic_fallback_threshold: int | None = None,
+        semantic_fallback_min_overlap: float | None = None,
     ) -> tuple[list[ChatAuthorityCandidate], int]:
         if client is None:
             return [], 0
         results: list[CaseResult] = []
         hit_count = 0
-        for semantic in (True, False):
+        seen_result_keys: set[str] = set()
+        fallback_due_to_quality = False
+        uses_fallback_policy = (
+            semantic_fallback_threshold is not None
+            or semantic_fallback_min_overlap is not None
+        )
+        for semantic in semantic_modes:
             try:
                 batch = client.search_opinions(
                     proposition,
@@ -864,11 +1029,36 @@ class ChatLegalResearchService:
             except Exception:
                 batch = []
             hit_count += len(batch)
-            results.extend(batch)
+            if semantic and fallback_due_to_quality and batch:
+                results = batch + results
+            else:
+                results.extend(batch)
+            for case in batch:
+                cluster_id = str(getattr(case, "cluster_id", "") or "")
+                key = cluster_id or f"{getattr(case, 'name', '')}:{getattr(case, 'citation', '')}"
+                if key:
+                    seen_result_keys.add(key)
+            if not uses_fallback_policy:
+                continue
+            if semantic:
+                break
+            enough_results = (
+                semantic_fallback_threshold is None
+                or len(seen_result_keys) >= semantic_fallback_threshold
+            )
+            quality_ok = (
+                semantic_fallback_min_overlap is None
+                or _search_overlap_score(proposition, batch) >= semantic_fallback_min_overlap
+            )
+            if enough_results and quality_ok:
+                break
+            fallback_due_to_quality = enough_results and not quality_ok
 
         candidates: list[ChatAuthorityCandidate] = []
         seen: set[str] = set()
         for case in results:
+            if len(candidates) >= self.max_results_per_source:
+                break
             cluster_id = str(getattr(case, "cluster_id", "") or "")
             case_key = cluster_id or f"{getattr(case, 'name', '')}:{getattr(case, 'citation', '')}"
             if case_key in seen:
@@ -876,14 +1066,14 @@ class ChatLegalResearchService:
             seen.add(case_key)
 
             text = ""
-            if cluster_id:
+            if enrich_results and cluster_id:
                 try:
                     text = client.get_opinion_text(cluster_id) or ""
                 except Exception:
                     text = ""
 
             signals: dict[str, Any] = {}
-            if cluster_id and hasattr(client, "get_authority_signals"):
+            if enrich_results and cluster_id and hasattr(client, "get_authority_signals"):
                 try:
                     signals = client.get_authority_signals(cluster_id) or {}
                 except Exception:
@@ -932,7 +1122,9 @@ class ChatLegalResearchService:
             normalized_quote = _normalize_ws(quote)
             if not normalized_quote:
                 continue
-            text_match = normalized_quote in _normalize_ws(candidate.text)
+            text_match = normalized_quote in _normalize_ws(
+                candidate.text or candidate.snippet
+            )
             if not text_match:
                 continue
             if _only_unverified_firm_sources(candidate):
@@ -963,25 +1155,71 @@ class ChatLegalResearchService:
         context_text: str,
         settings: ChatResearchSettings,
         status_callback: StatusCallback = None,
+        debug_callback: DebugCallback = None,
     ) -> ChatResearchPacket:
         def status(message: str) -> None:
             if status_callback:
                 status_callback(message)
 
+        def debug(
+            phase: str,
+            message: str,
+            *,
+            level: str = "info",
+            details: dict[str, Any] | None = None,
+        ) -> None:
+            if debug_callback:
+                try:
+                    debug_callback(
+                        phase=phase,
+                        message=message,
+                        level=level,
+                        details=details or {},
+                    )
+                except Exception:
+                    pass
+
         settings = normalize_settings(settings)
         query = (user_text or "").strip()
         if context_text:
             query = f"{query}\n\nContext:\n{context_text[:50000]}"
+        debug(
+            "settings",
+            "Legal research settings resolved",
+            details={
+                "firm_authority": settings.firm_authority,
+                "local_corpus": settings.local_corpus,
+                "courtlistener_mode": settings.courtlistener_mode.value,
+                "user_text_length": len(user_text or ""),
+                "context_text_length": len(context_text or ""),
+            },
+        )
         status("Extracting legal research questions")
+        debug("extract", "Extracting legal research questions")
         propositions = self.extract_propositions(
             user_text=user_text,
             context_text=context_text,
+        )
+        debug(
+            "extract",
+            f"Extracted {len(propositions)} legal research question(s)",
+            details={"propositions": list(propositions)},
         )
         status("Searching selected legal research sources")
         candidates, warnings, searches = self.collect_candidates(
             propositions=propositions,
             settings=settings,
             original_query=query,
+            debug_callback=debug,
+        )
+        debug(
+            "candidate_summary",
+            f"Ready to select authorities from {len(candidates)} candidate(s)",
+            details={
+                "candidate_count": len(candidates),
+                "warnings": list(warnings),
+                "searches": list(searches),
+            },
         )
         selected: list[ChatSelectedAuthority] = []
         for proposition in propositions:
@@ -991,17 +1229,54 @@ class ChatLegalResearchService:
                 if candidate.proposition == proposition
             ]
             status(f"Selecting authorities for: {proposition}")
+            debug(
+                "select",
+                f"Selecting authorities for: {proposition}",
+                details={
+                    "proposition": proposition,
+                    "candidate_count": len(prop_candidates),
+                },
+            )
+            before_count = len(selected)
             selected.extend(self.select_authorities(proposition, prop_candidates))
+            debug(
+                "select_result",
+                f"Selected {len(selected) - before_count} authorit(ies) for: {proposition}",
+                details={
+                    "proposition": proposition,
+                    "selected_count": len(selected) - before_count,
+                },
+            )
         selected = self._dedupe_selected(selected)
         if not selected:
             if warnings:
+                debug(
+                    "error",
+                    "No verified legal authorities were found.",
+                    level="error",
+                    details={"warnings": list(warnings)},
+                )
                 raise ChatResearchError(
                     "No verified legal authorities were found. " + " ".join(warnings)
                 )
+            debug(
+                "error",
+                "No verified legal authorities were found for the selected research sources.",
+                level="error",
+            )
             raise ChatResearchError(
                 "No verified legal authorities were found for the selected research sources."
             )
         status("Research complete.")
+        debug(
+            "complete",
+            "Research complete.",
+            details={
+                "selected_count": len(selected),
+                "warning_count": len(warnings),
+                "search_count": len(searches),
+            },
+        )
         return ChatResearchPacket(
             query=query,
             settings=settings,

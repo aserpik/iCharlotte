@@ -159,6 +159,49 @@ class TestSearchOpinions(unittest.TestCase):
         self.assertEqual(params["page_size"], 5)
 
     @patch("icharlotte_core.legal_research.sources.courtlistener.requests.get")
+    def test_search_caps_results_when_api_ignores_page_size(self, mock_get):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = {
+            "results": [
+                {
+                    "caseName": "One v. Party",
+                    "citation": ["1 Cal.5th 1"],
+                    "dateFiled": "2020-01-01",
+                    "court": "cal",
+                    "snippet": "First result.",
+                    "absolute_url": "/opinion/1/one/",
+                    "cluster_id": 1,
+                },
+                {
+                    "caseName": "Two v. Party",
+                    "citation": ["2 Cal.5th 2"],
+                    "dateFiled": "2020-01-02",
+                    "court": "cal",
+                    "snippet": "Second result.",
+                    "absolute_url": "/opinion/2/two/",
+                    "cluster_id": 2,
+                },
+                {
+                    "caseName": "Three v. Party",
+                    "citation": ["3 Cal.5th 3"],
+                    "dateFiled": "2020-01-03",
+                    "court": "cal",
+                    "snippet": "Third result.",
+                    "absolute_url": "/opinion/3/three/",
+                    "cluster_id": 3,
+                },
+            ]
+        }
+        resp.raise_for_status = MagicMock()
+        mock_get.return_value = resp
+
+        client = self._make_client()
+        results = client.search_opinions("test", max_results=2)
+
+        self.assertEqual([case.name for case in results], ["One v. Party", "Two v. Party"])
+
+    @patch("icharlotte_core.legal_research.sources.courtlistener.requests.get")
     def test_search_prefers_california_reporter_citation(self, mock_get):
         resp = MagicMock()
         resp.status_code = 200
@@ -182,6 +225,41 @@ class TestSearchOpinions(unittest.TestCase):
         results = client.search_opinions("civil issue")
 
         self.assertEqual(results[0].citation, "10 Cal.5th 1")
+
+    @patch("icharlotte_core.legal_research.sources.courtlistener.requests.get")
+    def test_search_uses_nested_opinion_snippet_when_top_level_snippet_missing(self, mock_get):
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.json.return_value = {
+            "results": [
+                {
+                    "caseName": "Nested v. Snippet",
+                    "citation": ["10 Cal.App.5th 1"],
+                    "dateFiled": "2024-05-15",
+                    "court": "calctapp",
+                    "absolute_url": "/opinion/1/nested/",
+                    "cluster_id": 1,
+                    "opinions": [
+                        {
+                            "snippet": (
+                                "The <em>premises liability duty</em> depends "
+                                "on ownership and control."
+                            )
+                        }
+                    ],
+                }
+            ]
+        }
+        resp.raise_for_status = MagicMock()
+        mock_get.return_value = resp
+
+        client = self._make_client()
+        results = client.search_opinions("premises liability duty")
+
+        self.assertEqual(
+            results[0].snippet,
+            "The premises liability duty depends on ownership and control.",
+        )
 
 
 class TestGetCitingCases(unittest.TestCase):

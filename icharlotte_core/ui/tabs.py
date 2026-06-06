@@ -139,6 +139,88 @@ class OCRRunner(QThread):
             self.finished.emit(False, str(e), self.file_path)
 
 
+class ChatLegalResearchWorker(QThread):
+    status_update = Signal(str)
+    debug_update = Signal(str, str, str, object)  # phase, message, level, details
+    research_finished = Signal(object)
+    research_failed = Signal(str, str)  # kind, message
+
+    def __init__(
+        self,
+        *,
+        user_text,
+        file_content,
+        provider,
+        model,
+        settings,
+        research_settings,
+        parent=None,
+    ):
+        super().__init__(parent)
+        self.user_text = user_text or ""
+        self.file_content = file_content or ""
+        self.provider = provider
+        self.model = model
+        self.settings = dict(settings or {})
+        self.research_settings = research_settings
+
+    def request_stop(self):
+        self.requestInterruption()
+
+    def _raise_if_cancelled(self):
+        if self.isInterruptionRequested():
+            raise ChatResearchError("Legal research cancelled.")
+
+    def run(self):
+        from icharlotte_core.llm import LLMHandler
+
+        def llm_for_research(system_prompt, user_prompt):
+            self._raise_if_cancelled()
+            result = LLMHandler.generate(
+                provider=self.provider,
+                model=self.model,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                file_contents="",
+                settings={**self.settings, "stream": False, "temperature": 0.2},
+            )
+            self._raise_if_cancelled()
+            return result
+
+        def status(message):
+            self._raise_if_cancelled()
+            self.status_update.emit(str(message))
+
+        def debug_event(*, phase, message, level="info", details=None):
+            if self.isInterruptionRequested():
+                return
+            self.debug_update.emit(
+                str(phase),
+                str(message),
+                str(level),
+                dict(details or {}),
+            )
+
+        try:
+            service = ChatLegalResearchService.from_environment(
+                llm_callback=llm_for_research
+            )
+            self._raise_if_cancelled()
+            packet = service.research(
+                user_text=self.user_text,
+                context_text=self.file_content[:100000] if self.file_content else "",
+                settings=self.research_settings,
+                status_callback=status,
+                debug_callback=debug_event,
+            )
+            self._raise_if_cancelled()
+            self.research_finished.emit(packet)
+        except ChatResearchError as exc:
+            self.research_failed.emit("stopped", str(exc))
+        except Exception as exc:
+            self.research_failed.emit("error", str(exc))
+
+
 # --- Chat System ---
 
 
@@ -258,6 +340,7 @@ class ChatTab(QWidget):
         self.stream_start_pos = 0
         self.stream_start_time = None
         self.worker = None
+        self.chat_research_worker = None
 
         # Mediation brief state
         self.med_brief_generator = None
@@ -571,6 +654,10 @@ class ChatTab(QWidget):
         if self.worker is not None and self.worker.isRunning():
             self.worker.request_stop()
             self.worker.wait(1000)
+
+        if self.chat_research_worker is not None and self.chat_research_worker.isRunning():
+            self.chat_research_worker.request_stop()
+            self.chat_research_worker.wait(1000)
 
         if self.fetcher is not None and self.fetcher.isRunning():
             self.fetcher.wait(1000)
@@ -956,7 +1043,15 @@ class ChatTab(QWidget):
             # Restore settings
             self.provider_combo.setCurrentText(self.current_conversation.provider)
             # Model will be set after provider change triggers model fetch
-            QTimer.singleShot(500, lambda: self.model_combo.setCurrentText(self.current_conversation.model))
+            model_to_restore = self.current_conversation.model
+            def restore_model_selection(model=model_to_restore):
+                try:
+                    self.model_combo.setCurrentText(model)
+                except RuntimeError:
+                    # The tab may have been closed before the delayed model
+                    # selection fires.
+                    pass
+            QTimer.singleShot(500, restore_model_selection)
             self.system_prompt = self.current_conversation.system_prompt or self.system_prompt
             if self.current_conversation.settings:
                 self.settings.update(self.current_conversation.settings)
@@ -1727,6 +1822,15 @@ class ChatTab(QWidget):
 
     def stop_generation(self):
         """Stop the current generation."""
+        if (
+            self.chat_research_worker is not None
+            and self.chat_research_worker.isRunning()
+        ):
+            self.chat_research_worker.request_stop()
+            self.chat_history.append("<i>[Legal research stop requested]</i>")
+            self.stop_btn.setEnabled(False)
+            return
+
         if hasattr(self, 'worker') and self.worker and self.worker.isRunning():
             self.worker.request_stop()
             self.worker.wait(2000)  # Wait up to 2 seconds
@@ -1829,18 +1933,41 @@ class ChatTab(QWidget):
             audio_files = []
 
         # Legal Research: if checked, run selected research before LLM call.
-        research_packet = None
         if self.legal_research_check.isChecked():
-            research_packet = self._run_chat_legal_research(
+            self._start_chat_legal_research(
                 user_text,
                 file_content,
                 provider=current_provider,
                 model=current_model,
                 settings=current_settings,
+                attachments=attachments,
+                audio_files=audio_files,
             )
-            if research_packet is None:
-                return
+            return
 
+        self._continue_send_message_after_research(
+            user_text,
+            file_content,
+            attachments=attachments,
+            audio_files=audio_files,
+            provider=current_provider,
+            model=current_model,
+            settings=current_settings,
+            research_packet=None,
+        )
+
+    def _continue_send_message_after_research(
+        self,
+        user_text,
+        file_content,
+        *,
+        attachments,
+        audio_files,
+        provider,
+        model,
+        settings,
+        research_packet,
+    ):
         self._pending_research = research_packet
 
         # Build user message for history
@@ -1850,7 +1977,7 @@ class ChatTab(QWidget):
 
         # Save user message to persistence
         if self.persistence and self.current_conversation_id:
-            token_count = TokenCounter.estimate_tokens(full_msg, current_provider)
+            token_count = TokenCounter.estimate_tokens(full_msg, provider)
             user_message = Message(
                 role='user',
                 content=full_msg,
@@ -1866,7 +1993,7 @@ class ChatTab(QWidget):
         self.conversation_history.append({'role': 'user', 'content': full_msg})
 
         # Enable streaming
-        settings = {**current_settings, 'stream': True}
+        worker_settings = {**settings, 'stream': True}
 
         # Initialize streaming state
         self.stream_text = ""
@@ -1890,18 +2017,18 @@ class ChatTab(QWidget):
             )
 
         # Start Worker (pass media files for Gemini native upload)
-        media_for_upload = audio_files if (audio_files and current_provider == "Gemini") else None
+        media_for_upload = audio_files if (audio_files and provider == "Gemini") else None
         if media_for_upload:
             self.chat_history.append("<i>Uploading media to Gemini...</i>")
             QApplication.processEvents()
 
         self.worker = LLMWorker(
-            current_provider,
-            current_model,
+            provider,
+            model,
             effective_system_prompt,
             user_text,
             file_content,
-            settings,
+            worker_settings,
             history=list(self.conversation_history[:-1]),  # Exclude the message we just added
             media_files=media_for_upload
         )
@@ -1912,6 +2039,155 @@ class ChatTab(QWidget):
         self.worker.start()
 
         self.update_context_indicator()
+
+    def _start_chat_legal_research(
+        self,
+        user_text,
+        file_content,
+        *,
+        provider,
+        model,
+        settings,
+        attachments,
+        audio_files,
+    ):
+        from icharlotte_core import task_debug
+
+        research_settings = self._current_chat_research_settings()
+        debug_run_id = task_debug.start_run(
+            task_id="chat_legal_research",
+            task_title="Chat Legal Research",
+            source="chat.legal_research",
+            details={
+                "provider": provider,
+                "model": model,
+                "settings": dict(settings),
+                "research_settings": {
+                    "firm_authority": research_settings.firm_authority,
+                    "local_corpus": research_settings.local_corpus,
+                    "courtlistener_mode": research_settings.courtlistener_mode.value,
+                },
+                "user_text_length": len(user_text or ""),
+                "context_text_length": len(file_content or ""),
+            },
+        )
+        self.chat_history.append("<i>Researching selected legal authority</i>")
+        payload = {
+            "user_text": user_text,
+            "file_content": file_content,
+            "attachments": attachments,
+            "audio_files": audio_files,
+            "provider": provider,
+            "model": model,
+            "settings": dict(settings),
+        }
+        worker = ChatLegalResearchWorker(
+            user_text=user_text,
+            file_content=file_content,
+            provider=provider,
+            model=model,
+            settings=settings,
+            research_settings=research_settings,
+        )
+        self.chat_research_worker = worker
+        worker.status_update.connect(self._on_chat_legal_research_status)
+        worker.debug_update.connect(
+            lambda phase, message, level, details, run_id=debug_run_id: (
+                self._emit_chat_legal_research_debug(
+                    run_id,
+                    phase,
+                    message,
+                    level,
+                    details,
+                )
+            )
+        )
+        worker.research_finished.connect(
+            lambda packet, w=worker, run_id=debug_run_id, p=payload: (
+                self._on_chat_legal_research_finished(w, run_id, p, packet)
+            )
+        )
+        worker.research_failed.connect(
+            lambda kind, message, w=worker, run_id=debug_run_id: (
+                self._on_chat_legal_research_failed(w, run_id, kind, message)
+            )
+        )
+        worker.finished.connect(lambda w=worker: self._on_chat_legal_research_thread_finished(w))
+        worker.finished.connect(worker.deleteLater)
+        worker.start()
+
+    def _on_chat_legal_research_status(self, message):
+        self.chat_history.append(f"<i>  {message}</i>")
+
+    def _emit_chat_legal_research_debug(
+        self,
+        run_id,
+        phase,
+        message,
+        level="info",
+        details=None,
+    ):
+        from icharlotte_core import task_debug
+
+        task_debug.emit_event(
+            run_id,
+            "chat_legal_research",
+            "Chat Legal Research",
+            phase=phase,
+            message=message,
+            level=level,
+            source="chat.legal_research",
+            details=details or {},
+        )
+
+    def _on_chat_legal_research_finished(self, worker, run_id, payload, packet):
+        if worker is not self.chat_research_worker:
+            return
+        from icharlotte_core import task_debug
+
+        task_debug.finish_run(
+            run_id,
+            status="success",
+            message="Task complete",
+            details={
+                "selected_authority_count": len(
+                    getattr(packet, "selected_authorities", []) or []
+                ),
+                "warnings": list(getattr(packet, "warnings", []) or []),
+                "searches": list(getattr(packet, "searches", []) or []),
+            },
+        )
+        self._continue_send_message_after_research(
+            payload["user_text"],
+            payload["file_content"],
+            attachments=payload["attachments"],
+            audio_files=payload["audio_files"],
+            provider=payload["provider"],
+            model=payload["model"],
+            settings=payload["settings"],
+            research_packet=packet,
+        )
+
+    def _on_chat_legal_research_failed(self, worker, run_id, kind, message):
+        if worker is not self.chat_research_worker:
+            return
+        from icharlotte_core import task_debug
+
+        prefix = "Legal research stopped" if kind == "stopped" else "Legal research error"
+        task_debug.finish_run(
+            run_id,
+            status="error",
+            message=f"{prefix}: {message}",
+            details={"error": str(message)},
+        )
+        self._pending_research = None
+        self.chat_history.append(f"<font color='orange'>{prefix}: {message}</font>")
+        self.send_btn.setEnabled(True)
+        self.stop_btn.setEnabled(False)
+
+    def _on_chat_legal_research_thread_finished(self, worker):
+        if worker is self.chat_research_worker:
+            self.chat_research_worker = None
 
     def _run_chat_legal_research(
         self,
@@ -1924,12 +2200,30 @@ class ChatTab(QWidget):
         research_settings=None,
     ):
         from icharlotte_core.llm import LLMHandler
+        from icharlotte_core import task_debug
 
         provider = self.provider_combo.currentText() if provider is None else provider
         model = self.model_combo.currentText() if model is None else model
         settings = dict(settings) if settings is not None else dict(self.settings)
         if research_settings is None:
             research_settings = self._current_chat_research_settings()
+        debug_run_id = task_debug.start_run(
+            task_id="chat_legal_research",
+            task_title="Chat Legal Research",
+            source="chat.legal_research",
+            details={
+                "provider": provider,
+                "model": model,
+                "settings": dict(settings),
+                "research_settings": {
+                    "firm_authority": research_settings.firm_authority,
+                    "local_corpus": research_settings.local_corpus,
+                    "courtlistener_mode": research_settings.courtlistener_mode.value,
+                },
+                "user_text_length": len(user_text or ""),
+                "context_text_length": len(file_content or ""),
+            },
+        )
 
         def llm_for_research(system_prompt, user_prompt):
             return LLMHandler.generate(
@@ -1945,19 +2239,51 @@ class ChatTab(QWidget):
             self.chat_history.append(f"<i>  {message}</i>")
             QApplication.processEvents()
 
+        def debug_event(*, phase, message, level="info", details=None):
+            task_debug.emit_event(
+                debug_run_id,
+                "chat_legal_research",
+                "Chat Legal Research",
+                phase=phase,
+                message=message,
+                level=level,
+                source="chat.legal_research",
+                details=details or {},
+            )
+
         self.chat_history.append("<i>Researching selected legal authority</i>")
         QApplication.processEvents()
         try:
             service = ChatLegalResearchService.from_environment(
                 llm_callback=llm_for_research
             )
-            return service.research(
+            packet = service.research(
                 user_text=user_text,
                 context_text=file_content[:100000] if file_content else "",
                 settings=research_settings,
                 status_callback=status,
+                debug_callback=debug_event,
             )
+            task_debug.finish_run(
+                debug_run_id,
+                status="success",
+                message="Task complete",
+                details={
+                    "selected_authority_count": len(
+                        getattr(packet, "selected_authorities", []) or []
+                    ),
+                    "warnings": list(getattr(packet, "warnings", []) or []),
+                    "searches": list(getattr(packet, "searches", []) or []),
+                },
+            )
+            return packet
         except ChatResearchError as exc:
+            task_debug.finish_run(
+                debug_run_id,
+                status="error",
+                message=f"Legal research stopped: {exc}",
+                details={"error": str(exc)},
+            )
             self._pending_research = None
             self.chat_history.append(
                 f"<font color='orange'>Legal research stopped: {exc}</font>"
@@ -1966,6 +2292,12 @@ class ChatTab(QWidget):
             self.stop_btn.setEnabled(False)
             return None
         except Exception as exc:
+            task_debug.finish_run(
+                debug_run_id,
+                status="error",
+                message=f"Legal research error: {exc}",
+                details={"error": str(exc)},
+            )
             self._pending_research = None
             self.chat_history.append(
                 f"<font color='orange'>Legal research error: {exc}</font>"
@@ -2566,6 +2898,10 @@ Usage: {TokenCounter.get_usage_percentage(usage['total_tokens'], model, provider
         if self.worker is not None and self.worker.isRunning():
             self.worker.request_stop()
             self.worker.wait(1000)
+
+        if self.chat_research_worker is not None and self.chat_research_worker.isRunning():
+            self.chat_research_worker.request_stop()
+            self.chat_research_worker.wait(1000)
 
         if self.fetcher is not None and self.fetcher.isRunning():
             self.fetcher.wait(1000)

@@ -175,6 +175,7 @@ class FakeCorpusClient:
             "max_decision_date": "2026-01-01",
         }
         self.calls = []
+        self.text_calls = []
         self.signal_calls = []
 
     def search_opinions(self, query, *, semantic=False, max_results=15, published_only=True):
@@ -182,6 +183,7 @@ class FakeCorpusClient:
         return self.results
 
     def get_opinion_text(self, case_uid):
+        self.text_calls.append(case_uid)
         return self.text_by_id.get(str(case_uid), "")
 
     def get_authority_signals(self, case_uid):
@@ -276,6 +278,190 @@ def test_collect_local_only_searches_local_and_not_courtlistener():
     assert cl.calls == []
     assert warnings == []
     assert any("Local California corpus" in item for item in searches)
+
+
+def test_local_case_client_enriches_no_more_than_result_budget():
+    results = [
+        _case(
+            name=f"Live v. Case {idx}",
+            cite=f"{idx} Cal.App.5th {idx}",
+            uid=f"cl:{idx}",
+            text=f"Live authority {idx} supports the rule.",
+        )
+        for idx in range(10)
+    ]
+    local = FakeCorpusClient(
+        results=results,
+        text_by_id={
+            f"cl:{idx}": f"Live authority {idx} supports the rule."
+            for idx in range(10)
+        },
+    )
+    service = ChatLegalResearchService(
+        llm_callback=lambda _system, _user: "{}",
+        local_corpus=local,
+        max_results_per_source=3,
+    )
+
+    candidates, warnings, searches = service.collect_candidates(
+        propositions=["duty rule"],
+        settings=ChatResearchSettings(
+            firm_authority=False,
+            local_corpus=True,
+            courtlistener_mode=CourtListenerMode.OFF,
+        ),
+        original_query="duty rule",
+    )
+
+    assert len(candidates) == 3
+    assert local.text_calls == ["cl:0", "cl:1", "cl:2"]
+    assert local.signal_calls == ["cl:0", "cl:1", "cl:2"]
+    assert len(local.calls) == 2
+    assert warnings == []
+    assert searches == ["Local California corpus: duty rule"]
+
+
+def test_courtlistener_live_search_uses_keyword_first_without_bulk_enrichment():
+    results = [
+        _case(
+            name=f"Live v. Case {idx}",
+            cite=f"{idx} Cal.App.5th {idx}",
+            uid=f"cl:{idx}",
+            text=f"Live authority {idx} states the duty rule.",
+        )
+        for idx in range(10)
+    ]
+    cl = FakeCorpusClient(
+        results=results,
+        text_by_id={
+            f"cl:{idx}": f"Live authority {idx} states the duty rule."
+            for idx in range(10)
+        },
+    )
+    service = ChatLegalResearchService(
+        llm_callback=lambda _system, _user: "{}",
+        courtlistener_client=cl,
+        courtlistener_token="token",
+        max_results_per_source=3,
+    )
+
+    candidates, warnings, searches = service.collect_candidates(
+        propositions=["duty rule"],
+        settings=ChatResearchSettings(
+            firm_authority=False,
+            local_corpus=False,
+            courtlistener_mode=CourtListenerMode.ALWAYS_SEARCH,
+        ),
+        original_query="duty rule",
+    )
+
+    assert len(candidates) == 3
+    assert cl.calls == [("duty rule", False, 3, True)]
+    assert cl.text_calls == []
+    assert cl.signal_calls == []
+    assert candidates[0].text == ""
+    assert candidates[0].snippet == "Live authority 0 states the duty rule."
+    assert warnings == []
+    assert searches == ["CourtListener API: duty rule"]
+
+
+def test_courtlistener_live_search_uses_semantic_fallback_when_keyword_quality_is_weak():
+    class WeakKeywordStrongSemanticClient(FakeCorpusClient):
+        def search_opinions(self, query, *, semantic=False, max_results=15, published_only=True):
+            self.calls.append((query, semantic, max_results, published_only))
+            if semantic:
+                return [
+                    _case(
+                        name="Semantic v. Duty",
+                        cite="1 Cal.App.5th 1",
+                        uid="cl:s1",
+                        text="The premises liability duty depends on ownership and control.",
+                    ),
+                    _case(
+                        name="Semantic v. Control",
+                        cite="2 Cal.App.5th 2",
+                        uid="cl:s2",
+                        text="A landowner owes a duty to maintain property safely.",
+                    ),
+                ]
+            return [
+                _case(
+                    name=f"Keyword v. Irrelevant {idx}",
+                    cite=f"{idx} Cal.App.5th {idx}",
+                    uid=f"cl:k{idx}",
+                    text="This appeal discusses appellate procedure and waiver.",
+                )
+                for idx in range(5)
+            ]
+
+    cl = WeakKeywordStrongSemanticClient()
+    service = ChatLegalResearchService(
+        llm_callback=lambda _system, _user: "{}",
+        courtlistener_client=cl,
+        courtlistener_token="token",
+        max_results_per_source=5,
+    )
+
+    candidates, warnings, searches = service.collect_candidates(
+        propositions=["premises liability duty ownership control"],
+        settings=ChatResearchSettings(
+            firm_authority=False,
+            local_corpus=False,
+            courtlistener_mode=CourtListenerMode.ALWAYS_SEARCH,
+        ),
+        original_query="premises liability duty ownership control",
+    )
+
+    assert cl.calls == [
+        ("premises liability duty ownership control", False, 5, True),
+        ("premises liability duty ownership control", True, 5, True),
+    ]
+    assert [candidate.case_name for candidate in candidates[:2]] == [
+        "Semantic v. Duty",
+        "Semantic v. Control",
+    ]
+    assert warnings == []
+    assert searches == ["CourtListener API: premises liability duty ownership control"]
+
+
+def test_courtlistener_live_search_uses_semantic_fallback_when_keyword_is_thin():
+    class KeywordThenSemanticClient(FakeCorpusClient):
+        def search_opinions(self, query, *, semantic=False, max_results=15, published_only=True):
+            self.calls.append((query, semantic, max_results, published_only))
+            if semantic:
+                return [
+                    _case(name="Semantic v. One", cite="1 Cal.App.5th 1", uid="cl:s1"),
+                    _case(name="Semantic v. Two", cite="2 Cal.App.5th 2", uid="cl:s2"),
+                ]
+            return [_case(name="Keyword v. One", cite="3 Cal.App.5th 3", uid="cl:k1")]
+
+    cl = KeywordThenSemanticClient()
+    service = ChatLegalResearchService(
+        llm_callback=lambda _system, _user: "{}",
+        courtlistener_client=cl,
+        courtlistener_token="token",
+        max_results_per_source=4,
+    )
+
+    candidates, warnings, searches = service.collect_candidates(
+        propositions=["duty rule"],
+        settings=ChatResearchSettings(
+            firm_authority=False,
+            local_corpus=False,
+            courtlistener_mode=CourtListenerMode.ALWAYS_SEARCH,
+        ),
+        original_query="duty rule",
+    )
+
+    assert len(candidates) == 3
+    assert cl.calls == [
+        ("duty rule", False, 4, True),
+        ("duty rule", True, 4, True),
+    ]
+    assert cl.text_calls == []
+    assert cl.signal_calls == []
+    assert warnings == []
+    assert searches == ["CourtListener API: duty rule"]
 
 
 def test_collect_firm_only_uses_firm_provider():
@@ -842,6 +1028,41 @@ def test_select_authorities_rejects_unverified_firm_snippet_only_quote():
     assert selected == []
 
 
+def test_select_authorities_accepts_courtlistener_snippet_quote():
+    candidates = [
+        ChatAuthorityCandidate(
+            id="cl:snippet",
+            proposition="duty rule",
+            case_name="Live v. Care",
+            citation="55 Cal.App.5th 10",
+            year="2021",
+            text="",
+            snippet="The snippet-only CourtListener sentence supports the rule.",
+            sources=[
+                ChatResearchSource(
+                    kind="courtlistener",
+                    label="CourtListener API",
+                    verification="verified",
+                )
+            ],
+        )
+    ]
+    service = ChatLegalResearchService(
+        llm_callback=lambda _system, _user: (
+            '{"selections":[{"id":"cl:snippet","reason":"Snippet match.",'
+            '"supports":"Snippet supports duty.",'
+            '"quote":"The snippet-only CourtListener sentence supports the rule.",'
+            '"caveat":""}]}'
+        )
+    )
+
+    selected = service.select_authorities("duty rule", candidates)
+
+    assert len(selected) == 1
+    assert selected[0].case_name == "Live v. Care"
+    assert selected[0].quote == "The snippet-only CourtListener sentence supports the rule."
+
+
 def test_select_authorities_preserves_verified_firm_text_quote():
     candidates = [
         ChatAuthorityCandidate(
@@ -971,6 +1192,85 @@ def test_research_packet_contains_authority_block_and_research_basis():
     assert "Duty v. Care (2020) 30 Cal. 4th 43" in block
     assert "The duty rule controls the negligence analysis." in block
     assert any("Legal Research Basis" in line for line in html_lines)
+
+
+def test_research_emits_granular_debug_callback_events():
+    local = FakeCorpusClient(
+        results=[_case(text="The duty rule controls the negligence analysis.")],
+        text_by_id={"cap:1": "The duty rule controls the negligence analysis."},
+    )
+
+    def llm(system_prompt, user_prompt):
+        if "extracting focused" in system_prompt:
+            return '{"propositions":["duty rule"]}'
+        return (
+            '{"selections":[{"id":"cap:1","reason":"It states the governing duty rule.",'
+            '"supports":"The case supports duty.",'
+            '"quote":"The duty rule controls the negligence analysis.",'
+            '"caveat":""}]}'
+        )
+
+    events = []
+    service = ChatLegalResearchService(llm_callback=llm, local_corpus=local)
+
+    service.research(
+        user_text="research duty rule",
+        context_text="",
+        settings=ChatResearchSettings(
+            firm_authority=False,
+            local_corpus=True,
+            courtlistener_mode=CourtListenerMode.OFF,
+        ),
+        debug_callback=lambda **event: events.append(event),
+    )
+
+    assert any(event["phase"] == "extract" for event in events)
+    assert any(
+        event["phase"] == "source_search"
+        and event["details"]["source"] == "local_corpus"
+        for event in events
+    )
+    assert any(
+        event["phase"] == "candidate_summary"
+        and event["details"]["candidate_count"] >= 1
+        for event in events
+    )
+    assert events[-1]["phase"] == "complete"
+
+
+def test_research_debug_callback_failure_does_not_abort_research():
+    local = FakeCorpusClient(
+        results=[_case(text="The duty rule controls the negligence analysis.")],
+        text_by_id={"cap:1": "The duty rule controls the negligence analysis."},
+    )
+
+    def llm(system_prompt, user_prompt):
+        if "extracting focused" in system_prompt:
+            return '{"propositions":["duty rule"]}'
+        return (
+            '{"selections":[{"id":"cap:1","reason":"It states the governing duty rule.",'
+            '"supports":"The case supports duty.",'
+            '"quote":"The duty rule controls the negligence analysis.",'
+            '"caveat":""}]}'
+        )
+
+    def failing_debug_callback(**_event):
+        raise RuntimeError("debug sink failed")
+
+    service = ChatLegalResearchService(llm_callback=llm, local_corpus=local)
+
+    packet = service.research(
+        user_text="research duty rule",
+        context_text="",
+        settings=ChatResearchSettings(
+            firm_authority=False,
+            local_corpus=True,
+            courtlistener_mode=CourtListenerMode.OFF,
+        ),
+        debug_callback=failing_debug_callback,
+    )
+
+    assert len(packet.selected_authorities) == 1
 
 
 def test_research_basis_html_escapes_dynamic_text_and_omits_unsafe_links():

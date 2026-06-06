@@ -44,6 +44,18 @@ def _make_chat_tab(qtbot, monkeypatch):
     return tab
 
 
+class _SignalStub:
+    def __init__(self):
+        self._callbacks = []
+
+    def connect(self, callback):
+        self._callbacks.append(callback)
+
+    def emit(self, *args):
+        for callback in list(self._callbacks):
+            callback(*args)
+
+
 def test_chat_research_source_defaults(qtbot, monkeypatch):
     _app()
     _clear_chat_research_settings()
@@ -109,7 +121,7 @@ def test_run_chat_legal_research_passes_selected_settings(qtbot, monkeypatch):
             captured["has_llm_callback"] = callable(llm_callback)
             return cls()
 
-        def research(self, *, user_text, context_text, settings, status_callback):
+        def research(self, *, user_text, context_text, settings, status_callback, debug_callback=None):
             captured["user_text"] = user_text
             captured["context_text"] = context_text
             captured["settings"] = settings
@@ -140,6 +152,56 @@ def test_run_chat_legal_research_passes_selected_settings(qtbot, monkeypatch):
     assert packet is not None
 
 
+def test_run_chat_legal_research_records_task_debug_events(qtbot, monkeypatch, tmp_path):
+    _app()
+    _clear_chat_research_settings()
+    from icharlotte_core import task_debug
+    from icharlotte_core.ui import tabs
+
+    class FakeService:
+        @classmethod
+        def from_environment(cls, *, llm_callback):
+            return cls()
+
+        def research(
+            self,
+            *,
+            user_text,
+            context_text,
+            settings,
+            status_callback,
+            debug_callback,
+        ):
+            status_callback("fake progress")
+            debug_callback(
+                phase="source_search",
+                message="Searching CourtListener API",
+                level="info",
+                details={"source": "courtlistener"},
+            )
+            return SimpleNamespace(
+                selected_authorities=[],
+                get_known_case_names=lambda: [],
+                build_augmented_system_prompt=lambda base: base + "\nAUGMENTED",
+                format_research_basis_html=lambda: ["<b>Legal Research Basis</b>"],
+            )
+
+    monkeypatch.setattr(tabs, "ChatLegalResearchService", FakeService)
+    task_debug.reset_for_tests(trace_dir=tmp_path / "traces", max_events=20)
+    tab = _make_chat_tab(qtbot, monkeypatch)
+
+    packet = tab._run_chat_legal_research("research this", "context text")
+
+    events = task_debug.get_events()
+    assert packet is not None
+    assert [event.message for event in events] == [
+        "Task started",
+        "Searching CourtListener API",
+        "Task complete",
+    ]
+    assert events[1].details["source"] == "courtlistener"
+
+
 def test_run_chat_legal_research_llm_callback_uses_model_snapshot_during_status_events(
     qtbot,
     monkeypatch,
@@ -161,7 +223,7 @@ def test_run_chat_legal_research_llm_callback_uses_model_snapshot_during_status_
             captured["llm_callback"] = llm_callback
             return cls()
 
-        def research(self, *, user_text, context_text, settings, status_callback):
+        def research(self, *, user_text, context_text, settings, status_callback, debug_callback=None):
             status_callback("fake progress")
             captured["llm_callback"]("snapshot system", "snapshot user")
             return SimpleNamespace(
@@ -255,24 +317,44 @@ def test_send_message_uses_model_snapshot_for_final_worker_after_research_events
         def add_message(self, conversation_id, message):
             pass
 
-    class FakeService:
-        @classmethod
-        def from_environment(cls, *, llm_callback):
-            return cls()
+    def research_packet():
+        return SimpleNamespace(
+            selected_authorities=[],
+            cases=[],
+            statutes=[],
+            verification=[],
+            get_known_case_names=lambda: [],
+            build_augmented_system_prompt=lambda base: base + "\nAUGMENTED",
+            format_research_basis_html=lambda: ["<b>Legal Research Basis</b>"],
+        )
 
-        def research(self, *, user_text, context_text, settings, status_callback):
-            status_callback("fake progress")
-            return SimpleNamespace(
-                selected_authorities=[],
-                cases=[],
-                statutes=[],
-                verification=[],
-                get_known_case_names=lambda: [],
-                build_augmented_system_prompt=lambda base: base + "\nAUGMENTED",
-                format_research_basis_html=lambda: ["<b>Legal Research Basis</b>"],
-            )
+    class FakeResearchWorker:
+        def __init__(self, **_kwargs):
+            self.status_update = _SignalStub()
+            self.debug_update = _SignalStub()
+            self.research_finished = _SignalStub()
+            self.research_failed = _SignalStub()
+            self.finished = _SignalStub()
 
-    monkeypatch.setattr(tabs, "ChatLegalResearchService", FakeService)
+        def start(self):
+            self.status_update.emit("fake progress")
+            mutate_during_research()
+            self.research_finished.emit(research_packet())
+            self.finished.emit()
+
+        def isRunning(self):
+            return False
+
+        def request_stop(self):
+            pass
+
+        def wait(self, _timeout=None):
+            return True
+
+        def deleteLater(self):
+            pass
+
+    monkeypatch.setattr(tabs, "ChatLegalResearchWorker", FakeResearchWorker)
     monkeypatch.setattr(tabs, "LLMWorker", FakeWorker)
     tab = _make_chat_tab(qtbot, monkeypatch)
     tab.persistence = FakePersistence()
@@ -293,19 +375,13 @@ def test_send_message_uses_model_snapshot_for_final_worker_after_research_events
     tab.get_attachment_info = lambda: []
     tab._get_checked_audio_files = lambda: []
 
-    original_process_events = QApplication.processEvents
-
-    def mutate_during_events():
+    def mutate_during_research():
         tab.provider_combo.setCurrentText("OpenAI")
         tab.model_combo.setCurrentText("gpt-live")
         tab.settings["max_tokens"] = 999
         tab.settings["thinking_level"] = "High"
 
-    monkeypatch.setattr(QApplication, "processEvents", mutate_during_events)
-    try:
-        tab.send_message()
-    finally:
-        monkeypatch.setattr(QApplication, "processEvents", original_process_events)
+    tab.send_message()
 
     assert worker_args["started"] is True
     assert worker_args["provider"] == "Gemini"
@@ -314,6 +390,94 @@ def test_send_message_uses_model_snapshot_for_final_worker_after_research_events
     assert worker_args["settings"]["thinking_level"] == "Low"
     assert worker_args["settings"]["stream"] is True
     assert worker_args["media_files"] is None
+
+
+def test_send_message_dispatches_legal_research_in_background(qtbot, monkeypatch):
+    _app()
+    _clear_chat_research_settings()
+    from icharlotte_core.ui import tabs
+
+    captured = {}
+
+    class FakePersistence:
+        def add_message(self, conversation_id, message):
+            pass
+
+    class BlockingService:
+        @classmethod
+        def from_environment(cls, *, llm_callback):
+            return cls()
+
+        def research(self, **_kwargs):
+            raise AssertionError("legal research ran on the UI thread")
+
+    class FakeResearchWorker:
+        def __init__(
+            self,
+            *,
+            user_text,
+            file_content,
+            provider,
+            model,
+            settings,
+            research_settings,
+        ):
+            captured.update(
+                user_text=user_text,
+                file_content=file_content,
+                provider=provider,
+                model=model,
+                settings=settings,
+                research_settings=research_settings,
+            )
+            self.status_update = _SignalStub()
+            self.debug_update = _SignalStub()
+            self.research_finished = _SignalStub()
+            self.research_failed = _SignalStub()
+            self.finished = _SignalStub()
+
+        def start(self):
+            captured["research_worker_started"] = True
+
+        def isRunning(self):
+            return True
+
+        def request_stop(self):
+            captured["research_worker_stopped"] = True
+
+        def wait(self, _timeout=None):
+            return True
+
+        def deleteLater(self):
+            pass
+
+    monkeypatch.setattr(tabs, "ChatLegalResearchService", BlockingService)
+    monkeypatch.setattr(tabs, "ChatLegalResearchWorker", FakeResearchWorker, raising=False)
+    tab = _make_chat_tab(qtbot, monkeypatch)
+    tab.persistence = FakePersistence()
+    tab.current_conversation_id = "conversation-1"
+    tab.provider_combo.setCurrentText("Gemini")
+    tab.model_combo.addItems(["gemini-snapshot"])
+    tab.model_combo.setCurrentText("gemini-snapshot")
+    tab.settings = {"temperature": 0.6, "top_p": 0.8, "max_tokens": 2048}
+    tab.legal_research_check.setChecked(True)
+    tab.chat_input.setPlainText("research this")
+    tab.read_files_content = lambda: ""
+    tab.read_library_content = lambda: "context text"
+    tab.get_attachment_info = lambda: []
+    tab._get_checked_audio_files = lambda: []
+
+    tab.send_message()
+
+    assert captured["research_worker_started"] is True
+    assert captured["user_text"] == "research this"
+    assert captured["file_content"] == "context text"
+    assert captured["provider"] == "Gemini"
+    assert captured["model"] == "gemini-snapshot"
+    assert captured["settings"]["max_tokens"] == 2048
+    assert captured["research_settings"].courtlistener_mode == CourtListenerMode.FALLBACK_CURRENT_LAW
+    assert tab.send_btn.isEnabled() is False
+    assert tab.stop_btn.isEnabled() is True
 
 
 def test_run_chat_legal_research_fail_closed_restores_buttons(qtbot, monkeypatch):
@@ -327,7 +491,7 @@ def test_run_chat_legal_research_fail_closed_restores_buttons(qtbot, monkeypatch
         def from_environment(cls, *, llm_callback):
             return cls()
 
-        def research(self, *, user_text, context_text, settings, status_callback):
+        def research(self, *, user_text, context_text, settings, status_callback, debug_callback=None):
             raise ChatResearchError("No verified legal authorities were found.")
 
     monkeypatch.setattr(tabs, "ChatLegalResearchService", FakeService)

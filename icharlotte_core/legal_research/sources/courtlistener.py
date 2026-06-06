@@ -159,9 +159,10 @@ class CourtListenerClient:
         citations = r.get("citation") or []
         citation_str = preferred_california_citation(citations)
 
-        # Strip HTML tags from snippet
-        snippet_raw = r.get("snippet") or ""
-        snippet_clean = re.sub(r"<[^>]+>", "", snippet_raw)
+        # Strip HTML tags from the search snippet. CourtListener v4 often
+        # nests snippets under opinions rather than on the cluster result.
+        snippet_raw = r.get("snippet") or _first_opinion_snippet(r)
+        snippet_clean = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", snippet_raw)).strip()
 
         full_url = opinion_url_for_cluster(r)
 
@@ -274,7 +275,7 @@ class CourtListenerClient:
             )
             resp.raise_for_status()
             data = resp.json()
-            return [self._parse_result(r) for r in data.get("results", [])]
+            return [self._parse_result(r) for r in data.get("results", [])[:max_results]]
         except Exception:
             logger.warning("CourtListener search failed for query: %s", query, exc_info=True)
             return []
@@ -429,6 +430,16 @@ class CourtListenerClient:
 # ---------------------------------------------------------------------------
 # Text-extraction helpers
 # ---------------------------------------------------------------------------
+
+
+def _first_opinion_snippet(result: dict) -> str:
+    opinions = result.get("opinions") if isinstance(result, dict) else None
+    if not isinstance(opinions, list):
+        return ""
+    for opinion in opinions:
+        if isinstance(opinion, dict) and opinion.get("snippet"):
+            return str(opinion.get("snippet") or "")
+    return ""
 
 # Fields to try in order. CourtListener stores opinion bodies in multiple
 # columns depending on the ingestion source (Resource.org, Columbia,
