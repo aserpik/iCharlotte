@@ -50,6 +50,7 @@ class LocalCaseCorpus:
         con = getattr(self._local, "con", None)
         if con is None:
             con = schema.connect(self.db_path)
+            schema.create_schema(con)
             self._local.con = con
         return con
 
@@ -70,14 +71,43 @@ class LocalCaseCorpus:
     # ---- retrieval arms -------------------------------------------------
     def _bm25_case_ranking(self, query: str, limit: int) -> list[str]:
         con = self._conn()
-        rows = con.execute(
-            "SELECT p.case_uid AS uid, bm25(passages_fts) AS score "
-            "FROM passages_fts JOIN passages p ON p.vec_row = passages_fts.rowid - 1 "
-            "WHERE passages_fts MATCH ? ORDER BY score LIMIT ?",
-            (_fts_query(query), limit),
-        ).fetchall()
+        try:
+            rows = con.execute(
+                "SELECT p.case_uid AS uid, bm25(passages_fts) AS score "
+                "FROM passages_fts JOIN passages p ON p.vec_row = passages_fts.rowid - 1 "
+                "WHERE p.passage_type='opinion' AND passages_fts MATCH ? "
+                "ORDER BY score LIMIT ?",
+                (_fts_query(query), limit),
+            ).fetchall()
+        except sqlite3.OperationalError:
+            logger.debug("opinion-only BM25 failed; falling back to all passages", exc_info=True)
+            rows = con.execute(
+                "SELECT p.case_uid AS uid, bm25(passages_fts) AS score "
+                "FROM passages_fts JOIN passages p ON p.vec_row = passages_fts.rowid - 1 "
+                "WHERE passages_fts MATCH ? ORDER BY score LIMIT ?",
+                (_fts_query(query), limit),
+            ).fetchall()
         seen, order = set(), []
         for r in rows:                       # bm25() ascending = best first
+            if r["uid"] not in seen:
+                seen.add(r["uid"]); order.append(r["uid"])
+        return order
+
+    def _parenthetical_case_ranking(self, query: str, limit: int) -> list[str]:
+        con = self._conn()
+        try:
+            rows = con.execute(
+                "SELECT p.case_uid AS uid, bm25(passages_fts) AS score "
+                "FROM passages_fts JOIN passages p ON p.vec_row = passages_fts.rowid - 1 "
+                "WHERE p.passage_type='parenthetical' AND passages_fts MATCH ? "
+                "ORDER BY score LIMIT ?",
+                (_fts_query(query), limit),
+            ).fetchall()
+        except sqlite3.OperationalError:
+            logger.debug("parenthetical ranking skipped; schema lacks passage_type", exc_info=True)
+            return []
+        seen, order = set(), []
+        for r in rows:
             if r["uid"] not in seen:
                 seen.add(r["uid"]); order.append(r["uid"])
         return order
@@ -88,13 +118,28 @@ class LocalCaseCorpus:
             return []
         from icharlotte_core.legal_research.local_corpus.embedder import cosine_topk
         qv = self.embedder.encode([query])[0].astype(np.float32)
-        idx, _scores = cosine_topk(qv, vecs.astype(np.float32), k=limit)
         con = self._conn()
+        rows = con.execute(
+            "SELECT vec_row, case_uid FROM passages "
+            "WHERE passage_type='opinion' AND vec_row IS NOT NULL ORDER BY vec_row"
+        ).fetchall()
+        opinion_rows: list[int] = []
+        case_by_vec_row: dict[int, str] = {}
+        for row in rows:
+            vec_row = int(row["vec_row"])
+            if 0 <= vec_row < vecs.shape[0]:
+                opinion_rows.append(vec_row)
+                case_by_vec_row[vec_row] = row["case_uid"]
+        if not opinion_rows:
+            return []
+        matrix = vecs[np.asarray(opinion_rows, dtype=np.int64)].astype(np.float32)
+        idx, _scores = cosine_topk(qv, matrix, k=limit)
         order, seen = [], set()
-        for vec_row in idx.tolist():
-            row = con.execute("SELECT case_uid FROM passages WHERE vec_row=?", (int(vec_row),)).fetchone()
-            if row and row["case_uid"] not in seen:
-                seen.add(row["case_uid"]); order.append(row["case_uid"])
+        for matrix_row in idx.tolist():
+            vec_row = opinion_rows[int(matrix_row)]
+            case_uid = case_by_vec_row[vec_row]
+            if case_uid not in seen:
+                seen.add(case_uid); order.append(case_uid)
         return order
 
     @staticmethod
@@ -109,25 +154,68 @@ class LocalCaseCorpus:
     def search_opinions(self, query: str, *, semantic: bool = False,
                         max_results: int = 15, published_only: bool = True) -> list[CaseResult]:
         bm25 = self._bm25_case_ranking(query, _CANDIDATES)
-        rankings = [bm25]
+        semantic_ranking: list[str] = []
+        parenthetical = self._parenthetical_case_ranking(query, _CANDIDATES)
         if semantic:
             try:
-                rankings.append(self._semantic_case_ranking(query, _CANDIDATES))
+                semantic_ranking = self._semantic_case_ranking(query, _CANDIDATES)
             except Exception:
                 logger.warning("semantic ranking failed; BM25 only", exc_info=True)
-        fused = self._rrf(*rankings)[:max_results]
-        return [self._case_result(uid, query) for uid in fused]
+        bm25_cases = set(bm25)
+        opinion_fused = self._rrf(bm25, semantic_ranking) if semantic else bm25
+        bm25_hits = [case_uid for case_uid in opinion_fused if case_uid in bm25_cases]
+        semantic_only = [
+            case_uid for case_uid in opinion_fused if case_uid not in bm25_cases
+        ]
+        parenthetical_recall = [
+            case_uid for case_uid in parenthetical
+            if case_uid not in bm25_cases
+        ]
+        recall_cases = set(parenthetical_recall)
+        semantic_only = [
+            case_uid for case_uid in semantic_only if case_uid not in recall_cases
+        ]
+        ordered: list[str] = []
+        seen: set[str] = set()
+        for case_uid in bm25_hits + parenthetical_recall + semantic_only:
+            if case_uid not in seen:
+                seen.add(case_uid)
+                ordered.append(case_uid)
+        return [self._case_result(uid, query) for uid in ordered[:max_results]]
+
+    def _best_passage_for_query(self, case_uid: str, query: str):
+        con = self._conn()
+        try:
+            row = con.execute(
+                "SELECT p.text, p.passage_type, p.parenthetical_id "
+                "FROM passages_fts JOIN passages p ON p.vec_row = passages_fts.rowid - 1 "
+                "WHERE p.case_uid=? AND passages_fts MATCH ? "
+                "ORDER BY bm25(passages_fts) LIMIT 1",
+                (case_uid, _fts_query(query)),
+            ).fetchone()
+            if row:
+                return row
+        except sqlite3.Error:
+            logger.debug("best passage lookup failed for %s", case_uid, exc_info=True)
+        return con.execute(
+            "SELECT text, passage_type, parenthetical_id FROM passages "
+            "WHERE case_uid=? AND passage_type='opinion' ORDER BY ordinal LIMIT 1",
+            (case_uid,),
+        ).fetchone()
 
     def _case_result(self, case_uid: str, query: str) -> CaseResult:
         con = self._conn()
         c = con.execute("SELECT * FROM cases WHERE case_uid=?", (case_uid,)).fetchone()
         snippet = ""
+        snippet_source = ""
+        snippet_parenthetical_id = ""
         display_name = ""
         if c:
-            p = con.execute(
-                "SELECT text FROM passages WHERE case_uid=? ORDER BY ordinal LIMIT 1", (case_uid,)
-            ).fetchone()
+            p = self._best_passage_for_query(case_uid, query)
             snippet = (p["text"][:400] if p else (c["full_text"] or "")[:400])
+            if p:
+                snippet_source = p["passage_type"] or ""
+                snippet_parenthetical_id = p["parenthetical_id"] or ""
             # Prefer the Bluebook short name (CAP name_abbreviation, e.g.
             # "Engalla v. Permanente Medical Group, Inc.") over the full party
             # caption stored in `name`. The caption is hundreds of chars long,
@@ -138,6 +226,8 @@ class LocalCaseCorpus:
             name=display_name, citation=c["citation"] if c else "",
             date=c["decision_date"] if c else "", court=c["court"] if c else "",
             snippet=snippet, url=c["url"] if c else "", cluster_id=case_uid,
+            snippet_source=snippet_source,
+            snippet_parenthetical_id=snippet_parenthetical_id,
         )
 
     def get_opinion_text(self, case_uid: str | int) -> str | None:

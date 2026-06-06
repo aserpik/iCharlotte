@@ -40,3 +40,43 @@ def test_supported_when_text_supports(monkeypatch):
     assert cv.verdict == "SUPPORTED"
     assert cv.cluster_id == "cap:1"
     assert cv.citation_count == 9
+
+
+def test_verifier_uses_full_text_not_parenthetical_context(monkeypatch):
+    import icharlotte_core.opposition.local_case_verifier as mod
+    monkeypatch.setattr(mod, "get_prompt", lambda *_a, **_k: "{authority_text}")
+    captured = {}
+
+    def llm(_sys, user):
+        captured["user"] = user
+        return json.dumps({
+            "verdict": "NOT_SUPPORTED",
+            "evidence": "",
+            "note": "parenthetical text is not in the opinion",
+        })
+
+    found = {
+        "case_uid": "cap:1",
+        "full_text": "primary opinion text only",
+        "snippet": "summary judgment burden from parenthetical",
+        "snippet_source": "parenthetical",
+        "snippet_parenthetical_id": "900",
+        "name": "Aguilar v. Atlantic Richfield Co.",
+        "url": "u",
+        "court": "Cal.",
+        "decision_date": "2001-06-14",
+    }
+    verifier = LocalCaseVerifier(corpus=_FakeCorpus(found), llm_callback=llm)
+    citation = Citation(
+        kind="case",
+        raw_text="25 Cal. 4th 826",
+        normalized="25 Cal. 4th 826",
+        reporter_citation="25 Cal. 4th 826",
+        proposition="summary judgment burden",
+    )
+
+    cv = verifier.verify(citation)
+
+    assert "primary opinion text only" in captured["user"]
+    assert "summary judgment burden from parenthetical" not in captured["user"]
+    assert cv.verdict == "NOT_SUPPORTED"

@@ -69,6 +69,27 @@ class TestLegalResearchEngine(unittest.TestCase):
         self.assertEqual(key1, key2)
         self.assertNotEqual(key1, key3)
 
+    def test_from_cache_preserves_snippet_provenance(self):
+        result = self.engine._from_cache({
+            "query": "summary judgment",
+            "cases": [
+                {
+                    "name": "Aguilar v. Atlantic Richfield Co.",
+                    "citation": "25 Cal. 4th 826",
+                    "date": "2001-06-14",
+                    "court": "Cal.",
+                    "snippet": "describing Aguilar as allocating the summary judgment burden",
+                    "snippet_source": "parenthetical",
+                    "snippet_parenthetical_id": "900",
+                    "url": "u",
+                    "cluster_id": "cap:aguilar",
+                }
+            ],
+        })
+
+        self.assertEqual(result.cases[0].snippet_source, "parenthetical")
+        self.assertEqual(result.cases[0].snippet_parenthetical_id, "900")
+
 
 if __name__ == "__main__":
     unittest.main()

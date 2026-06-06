@@ -71,6 +71,36 @@ build.build_from_cl_streams(
 > re-streams (true byte-offset resume over bz2 is infeasible); re-running is safe
 > (idempotent — dedup by citation, CAP wins overlap).
 
+### CourtListener parenthetical ingest
+
+Parentheticals are secondary descriptions written by one opinion about another.
+They are indexed as `passage_type='parenthetical'` rows under cases already in
+the local CA corpus. They improve retrieval recall, but they are not appended to
+`cases.full_text` and are not treated as quoted support from the described case.
+
+```powershell
+# First run for a snapshot normally needs the opinion-id map.
+python -m icharlotte_core.legal_research.local_corpus.build `
+  --source parentheticals `
+  --cl-date 2026-03-31 `
+  --refresh-opinion-map
+
+# Later re-runs of the same snapshot can reuse the cached opinion map.
+python -m icharlotte_core.legal_research.local_corpus.build `
+  --source parentheticals `
+  --cl-date 2026-03-31
+```
+
+Defaults:
+- `--parentheticals-min-score 0.5`
+- `--parentheticals-max-per-case 25`
+- Parenthetical vectors are keyword-only by default. Use
+  `--embed-parentheticals` to generate semantic vectors during ingest.
+
+The parenthetical file is much smaller than the opinions file, but the first
+map-building run may stream the matching opinions snapshot to cache
+`opinion_id -> cluster_id`. The opinions file is streamed and not stored.
+
 ## Quarterly refresh
 
 CAP is frozen, so `--source cap` re-fetches nothing. To pick up new CA appellate
