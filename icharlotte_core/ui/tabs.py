@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QSizePolicy, QSlider
 )
 from PySide6.QtCore import Qt, Signal, QThread, QFileInfo, QTimer, QSettings, QEvent
-from PySide6.QtGui import QTextCursor, QDragEnterEvent, QDropEvent, QAction, QPixmap, QBrush
+from PySide6.QtGui import QTextCursor, QTextDocument, QDragEnterEvent, QDropEvent, QAction, QActionGroup, QPixmap, QBrush
 
 from ..config import API_KEYS, SCRIPTS_DIR, GEMINI_DATA_DIR
 from ..utils import log_event
@@ -27,7 +27,18 @@ from .chat_widgets import (
     ConversationSidebar, ResizableInputArea, ContextIndicator,
     MessageWidget, SearchResultsWidget, get_theme, THEMES
 )
-from ..chat import ChatPersistence, TokenCounter, Message, Conversation, BUILTIN_PROMPTS, TRANSCRIBE_PROMPT
+from ..chat import (
+    ChatPersistence,
+    TokenCounter,
+    Message,
+    Conversation,
+    BUILTIN_PROMPTS,
+    TRANSCRIBE_PROMPT,
+    ChatResearchError,
+    ChatResearchSettings,
+    CourtListenerMode,
+)
+from ..chat.legal_research import ChatLegalResearchService
 from ..chat.markdown_render import render_markdown, CHAT_MARKDOWN_CSS
 from ..mediation_brief import (
     MediationBriefGenerator, MediationBriefWorker, RefinementWorker,
@@ -483,6 +494,12 @@ class ChatTab(QWidget):
             "Search CA case law and statutes, inject verified citations into response"
         )
         toolbar_layout.addWidget(self.legal_research_check)
+
+        self.research_sources_btn = QToolButton()
+        self.research_sources_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.research_sources_btn.setToolTip("Choose legal research sources")
+        self._build_research_sources_menu()
+        toolbar_layout.addWidget(self.research_sources_btn)
 
         toolbar_layout.addStretch()
 
@@ -1788,6 +1805,8 @@ class ChatTab(QWidget):
         # Detect audio/video attachments
         audio_files = self._get_checked_audio_files()
         current_provider = self.provider_combo.currentText()
+        current_model = self.model_combo.currentText()
+        current_settings = dict(self.settings)
 
         # Safety: warn for non-Gemini providers (they can't process media)
         if audio_files and current_provider != "Gemini":
@@ -1809,56 +1828,20 @@ class ChatTab(QWidget):
             # User chose No — clear audio_files so we don't try to upload
             audio_files = []
 
-        # Legal Research: if checked, run research before LLM call
-        research_result = None
+        # Legal Research: if checked, run selected research before LLM call.
+        research_packet = None
         if self.legal_research_check.isChecked():
-            engine = self._get_legal_research_engine()
-            if engine:
-                self.chat_history.append("<i>Researching legal authority...</i>")
-                QApplication.processEvents()
+            research_packet = self._run_chat_legal_research(
+                user_text,
+                file_content,
+                provider=current_provider,
+                model=current_model,
+                settings=current_settings,
+            )
+            if research_packet is None:
+                return
 
-                # Extract focused legal questions instead of sending raw prompt
-                from icharlotte_core.legal_research.prompts import QUERY_EXTRACTION_PROMPT
-                self.chat_history.append("<i>  Extracting legal questions...</i>")
-                QApplication.processEvents()
-                research_query = _llm_for_research(
-                    QUERY_EXTRACTION_PROMPT,
-                    (user_text + ("\n\nContext:\n" + file_content[:100000] if file_content else ""))[:100000]
-                )
-                if not research_query or len(research_query.strip()) < 20:
-                    research_query = user_text
-                    if file_content:
-                        research_query += "\n\nContext:\n" + file_content[:100000]
-
-                def _llm_for_research(system_prompt, user_prompt):
-                    from icharlotte_core.llm import LLMHandler
-                    return LLMHandler.generate(
-                        provider=self.provider_combo.currentText(),
-                        model=self.model_combo.currentText(),
-                        system_prompt=system_prompt,
-                        user_prompt=user_prompt,
-                        file_contents="",
-                        settings={**self.settings, 'stream': False, 'temperature': 0.3},
-                    )
-
-                try:
-                    # Pass the original user text so the engine can extract
-                    # specific case names that QUERY_EXTRACTION_PROMPT may
-                    # have stripped out.
-                    _orig = (user_text + ("\n\n" + file_content[:100000] if file_content else ""))[:100000]
-                    research_result = engine.research(
-                        query=research_query,
-                        llm_callback=_llm_for_research,
-                        status_callback=lambda msg: (
-                            self.chat_history.append(f"<i>  {msg}</i>"),
-                            QApplication.processEvents(),
-                        ),
-                        original_prompt=_orig,
-                    )
-                except Exception as e:
-                    self.chat_history.append(f"<font color='orange'>Research error: {e}</font>")
-
-        self._pending_research = research_result
+        self._pending_research = research_packet
 
         # Build user message for history
         full_msg = user_text
@@ -1867,7 +1850,7 @@ class ChatTab(QWidget):
 
         # Save user message to persistence
         if self.persistence and self.current_conversation_id:
-            token_count = TokenCounter.estimate_tokens(full_msg, self.provider_combo.currentText())
+            token_count = TokenCounter.estimate_tokens(full_msg, current_provider)
             user_message = Message(
                 role='user',
                 content=full_msg,
@@ -1883,7 +1866,7 @@ class ChatTab(QWidget):
         self.conversation_history.append({'role': 'user', 'content': full_msg})
 
         # Enable streaming
-        settings = {**self.settings, 'stream': True}
+        settings = {**current_settings, 'stream': True}
 
         # Initialize streaming state
         self.stream_text = ""
@@ -1901,12 +1884,9 @@ class ChatTab(QWidget):
 
         # Build system prompt (augment with legal authority if research was done)
         effective_system_prompt = self.system_prompt
-        if research_result:
-            from icharlotte_core.legal_research.prompts import build_augmented_system_prompt
-            authority = research_result.format_authority_block()
-            memo = research_result.memo or ""
-            effective_system_prompt = build_augmented_system_prompt(
-                self.system_prompt, authority, research_memo=memo
+        if research_packet:
+            effective_system_prompt = research_packet.build_augmented_system_prompt(
+                self.system_prompt
             )
 
         # Start Worker (pass media files for Gemini native upload)
@@ -1917,7 +1897,7 @@ class ChatTab(QWidget):
 
         self.worker = LLMWorker(
             current_provider,
-            self.model_combo.currentText(),
+            current_model,
             effective_system_prompt,
             user_text,
             file_content,
@@ -1933,16 +1913,66 @@ class ChatTab(QWidget):
 
         self.update_context_indicator()
 
-    def _get_legal_research_engine(self):
-        """Lazy-initialize the legal research engine."""
-        if not hasattr(self, '_legal_research_engine') or self._legal_research_engine is None:
-            import os
-            from icharlotte_core.legal_research.engine import LegalResearchEngine
-            token = os.environ.get("COURTLISTENER_API_TOKEN", "")
-            if not token:
-                return None
-            self._legal_research_engine = LegalResearchEngine(courtlistener_token=token)
-        return self._legal_research_engine
+    def _run_chat_legal_research(
+        self,
+        user_text,
+        file_content,
+        *,
+        provider=None,
+        model=None,
+        settings=None,
+        research_settings=None,
+    ):
+        from icharlotte_core.llm import LLMHandler
+
+        provider = self.provider_combo.currentText() if provider is None else provider
+        model = self.model_combo.currentText() if model is None else model
+        settings = dict(settings) if settings is not None else dict(self.settings)
+        if research_settings is None:
+            research_settings = self._current_chat_research_settings()
+
+        def llm_for_research(system_prompt, user_prompt):
+            return LLMHandler.generate(
+                provider=provider,
+                model=model,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                file_contents="",
+                settings={**settings, "stream": False, "temperature": 0.2},
+            )
+
+        def status(message):
+            self.chat_history.append(f"<i>  {message}</i>")
+            QApplication.processEvents()
+
+        self.chat_history.append("<i>Researching selected legal authority</i>")
+        QApplication.processEvents()
+        try:
+            service = ChatLegalResearchService.from_environment(
+                llm_callback=llm_for_research
+            )
+            return service.research(
+                user_text=user_text,
+                context_text=file_content[:100000] if file_content else "",
+                settings=research_settings,
+                status_callback=status,
+            )
+        except ChatResearchError as exc:
+            self._pending_research = None
+            self.chat_history.append(
+                f"<font color='orange'>Legal research stopped: {exc}</font>"
+            )
+            self.send_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
+            return None
+        except Exception as exc:
+            self._pending_research = None
+            self.chat_history.append(
+                f"<font color='orange'>Legal research error: {exc}</font>"
+            )
+            self.send_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
+            return None
 
     def _get_checked_audio_files(self):
         """Return list of checked audio/video file paths."""
@@ -2002,12 +2032,23 @@ class ChatTab(QWidget):
         self.send_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
 
+    @staticmethod
+    def _research_basis_html_block(lines):
+        return "".join(f"<div>{line}</div>" for line in lines)
+
+    @staticmethod
+    def _research_basis_plain_text(html_block):
+        doc = QTextDocument()
+        doc.setHtml(html_block)
+        return doc.toPlainText().strip()
+
     def finalize_response(self, text: str):
         """Finalize the response with markdown rendering and save to persistence."""
         # Remember whether the user is following the bottom BEFORE we mutate the
         # document, so a scrolled-up reader isn't yanked down when the final
         # formatted text and separators are appended.
         follow = self._chat_is_at_bottom()
+        pending_research = getattr(self, '_pending_research', None)
 
         # Calculate response time
         response_time = int((time.time() - self.stream_start_time) * 1000) if self.stream_start_time else 0
@@ -2019,17 +2060,16 @@ class ChatTab(QWidget):
         cursor.removeSelectedText()
 
         # Apply deterministic citation cross-check if legal research was done
-        if hasattr(self, '_pending_research') and self._pending_research:
-            rr = self._pending_research
-            if rr.cases:
-                try:
+        if pending_research:
+            try:
+                known_names = pending_research.get_known_case_names()
+                if known_names:
                     from icharlotte_core.legal_research.engine import LegalResearchEngine
-                    known_names = rr.get_known_case_names()
                     text = LegalResearchEngine._deterministic_citation_check(
                         text, known_names
                     )
-                except Exception as e:
-                    print(f"[ChatTab] Deterministic citation check failed: {e}")
+            except Exception as e:
+                print(f"[ChatTab] Deterministic citation check failed: {e}")
 
         # Convert markdown to HTML (tables, fenced code, GFM line breaks, lists)
         try:
@@ -2038,45 +2078,34 @@ class ChatTab(QWidget):
             log_event(f"Markdown conversion failed: {e}", "error")
             html_text = text.replace('\n', '<br>')
 
+        research_basis_html = ""
+        research_basis_plain = ""
+        if pending_research:
+            try:
+                research_basis_html = self._research_basis_html_block(
+                    pending_research.format_research_basis_html()
+                )
+                research_basis_plain = self._research_basis_plain_text(research_basis_html)
+            except Exception as e:
+                print(f"[ChatTab] Research basis display failed: {e}")
+            self._pending_research = None
+
         cursor.insertHtml(html_text)
+        if research_basis_html:
+            cursor.insertBlock()
+            cursor.insertHtml(research_basis_html)
         self.chat_history.append("")  # New line
         self.chat_history.append("-" * 50)
 
-        # Show legal research sources if available
-        if hasattr(self, '_pending_research') and self._pending_research:
-            rr = self._pending_research
-            sources_parts = []
-            sources_parts.append("<b>Legal Sources Found</b>")
-            if rr.verification:
-                pass_count = sum(1 for v in rr.verification if v.status == "PASS")
-                fixed_count = sum(1 for v in rr.verification if v.status == "FIXED")
-                flagged_count = sum(1 for v in rr.verification if v.status == "FLAGGED")
-                parts = []
-                if pass_count: parts.append(f"verified:{pass_count}")
-                if fixed_count: parts.append(f"fixed:{fixed_count}")
-                if flagged_count: parts.append(f"flagged:{flagged_count}")
-                if parts:
-                    sources_parts.append(f"<i>Citations: {', '.join(parts)}</i>")
-            for c in rr.cases:
-                line = f"- <b>{c.formatted_citation}</b>"
-                if c.url:
-                    line += f' -- <a href="{c.url}">View</a>'
-                sources_parts.append(line)
-            for s in rr.statutes:
-                line = f"- <b>{s.formatted_citation}</b>"
-                if s.url:
-                    line += f' -- <a href="{s.url}">View</a>'
-                sources_parts.append(line)
-            for line in sources_parts:
-                self.chat_history.append(line)
-            self._pending_research = None
-
         # Save assistant message to persistence
+        saved_text = text
+        if research_basis_plain:
+            saved_text = f"{text.rstrip()}\n\n{research_basis_plain}"
         if self.persistence and self.current_conversation_id:
-            token_count = TokenCounter.estimate_tokens(text, self.provider_combo.currentText())
+            token_count = TokenCounter.estimate_tokens(saved_text, self.provider_combo.currentText())
             assistant_message = Message(
                 role='assistant',
-                content=text,
+                content=saved_text,
                 token_count=token_count,
                 model_used=self.model_combo.currentText(),
                 response_time_ms=response_time
@@ -2087,7 +2116,7 @@ class ChatTab(QWidget):
             log_event(f"WARNING: Cannot save assistant message - persistence={self.persistence is not None}, conv_id={self.current_conversation_id}", "warning")
 
         # Update legacy history
-        self.conversation_history.append({'role': 'assistant', 'content': text})
+        self.conversation_history.append({'role': 'assistant', 'content': saved_text})
 
         if follow:
             self._chat_scroll_to_bottom()
@@ -2096,6 +2125,7 @@ class ChatTab(QWidget):
 
     def on_error(self, err: str):
         """Handle generation error."""
+        self._pending_research = None
         self.chat_history.append(f"<font color='red'>Error: {err}</font>")
         self.chat_history.append("-" * 50)
         self.send_btn.setEnabled(True)
@@ -2115,6 +2145,125 @@ class ChatTab(QWidget):
 
         # Save sidebar visibility state
         self._save_sidebar_state()
+
+    # --- Chat Legal Research Source Persistence ---
+
+    def _load_chat_research_settings(self):
+        settings = QSettings("iCharlotte", "iCharlotte")
+        return ChatResearchSettings.from_values(
+            firm_authority=settings.value("chat_tab/legal_research_firm_authority", True),
+            local_corpus=settings.value("chat_tab/legal_research_local_corpus", True),
+            courtlistener_mode=settings.value(
+                "chat_tab/legal_research_courtlistener_mode",
+                CourtListenerMode.FALLBACK_CURRENT_LAW.value,
+            ),
+        )
+
+    def _save_chat_research_settings(self, research_settings):
+        settings = QSettings("iCharlotte", "iCharlotte")
+        settings.setValue(
+            "chat_tab/legal_research_firm_authority",
+            research_settings.firm_authority,
+        )
+        settings.setValue(
+            "chat_tab/legal_research_local_corpus",
+            research_settings.local_corpus,
+        )
+        settings.setValue(
+            "chat_tab/legal_research_courtlistener_mode",
+            research_settings.courtlistener_mode.value,
+        )
+
+    def _build_research_sources_menu(self):
+        menu = QMenu(self.research_sources_btn)
+        current = self._load_chat_research_settings()
+
+        self.firm_authority_action = QAction("Firm/sample-motion authority", menu)
+        self.firm_authority_action.setCheckable(True)
+        self.firm_authority_action.setChecked(current.firm_authority)
+
+        self.local_corpus_action = QAction("Local California corpus", menu)
+        self.local_corpus_action.setCheckable(True)
+        self.local_corpus_action.setChecked(current.local_corpus)
+
+        menu.addAction(self.firm_authority_action)
+        menu.addAction(self.local_corpus_action)
+        menu.addSeparator()
+
+        mode_group = QActionGroup(menu)
+        mode_group.setExclusive(True)
+        self.courtlistener_off_action = QAction("CourtListener API: Off", menu)
+        self.courtlistener_fallback_action = QAction(
+            "CourtListener API: Fallback/current-law",
+            menu,
+        )
+        self.courtlistener_always_action = QAction("CourtListener API: Always search", menu)
+        for action in (
+            self.courtlistener_off_action,
+            self.courtlistener_fallback_action,
+            self.courtlistener_always_action,
+        ):
+            action.setCheckable(True)
+            mode_group.addAction(action)
+            menu.addAction(action)
+
+        if current.courtlistener_mode == CourtListenerMode.OFF:
+            self.courtlistener_off_action.setChecked(True)
+        elif current.courtlistener_mode == CourtListenerMode.ALWAYS_SEARCH:
+            self.courtlistener_always_action.setChecked(True)
+        else:
+            self.courtlistener_fallback_action.setChecked(True)
+
+        for action in (
+            self.firm_authority_action,
+            self.local_corpus_action,
+            self.courtlistener_off_action,
+            self.courtlistener_fallback_action,
+            self.courtlistener_always_action,
+        ):
+            action.triggered.connect(self._on_research_source_changed)
+
+        self.research_sources_btn.setMenu(menu)
+        self._refresh_research_sources_label()
+
+    def _current_chat_research_settings(self):
+        if self.courtlistener_off_action.isChecked():
+            mode = CourtListenerMode.OFF
+        elif self.courtlistener_always_action.isChecked():
+            mode = CourtListenerMode.ALWAYS_SEARCH
+        else:
+            mode = CourtListenerMode.FALLBACK_CURRENT_LAW
+        return ChatResearchSettings.from_values(
+            firm_authority=self.firm_authority_action.isChecked(),
+            local_corpus=self.local_corpus_action.isChecked(),
+            courtlistener_mode=mode.value,
+        )
+
+    def _on_research_source_changed(self):
+        current = self._current_chat_research_settings()
+        if current.courtlistener_mode == CourtListenerMode.ALWAYS_SEARCH:
+            self.courtlistener_always_action.setChecked(True)
+        elif current.courtlistener_mode == CourtListenerMode.OFF:
+            self.courtlistener_off_action.setChecked(True)
+        else:
+            self.courtlistener_fallback_action.setChecked(True)
+        self._save_chat_research_settings(current)
+        self._refresh_research_sources_label()
+
+    def _refresh_research_sources_label(self):
+        current = self._current_chat_research_settings()
+        parts = []
+        if current.firm_authority:
+            parts.append("Firm")
+        if current.local_corpus:
+            parts.append("Local")
+        if current.courtlistener_mode == CourtListenerMode.FALLBACK_CURRENT_LAW:
+            parts.append("CL Fallback")
+        elif current.courtlistener_mode == CourtListenerMode.ALWAYS_SEARCH:
+            parts.append("CL Always")
+        else:
+            parts.append("CL Off")
+        self.research_sources_btn.setText("Sources: " + " + ".join(parts))
 
     # --- Splitter Persistence ---
 
