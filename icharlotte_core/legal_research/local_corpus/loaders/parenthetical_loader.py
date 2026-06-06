@@ -132,6 +132,13 @@ def _float_score(value: str) -> float:
         return 0.0
 
 
+def _id_sort_key(value: str) -> tuple[int, int, str]:
+    value = value or ""
+    if value.isdigit():
+        return (0, int(value), value)
+    return (1, 0, value)
+
+
 def iter_parenthetical_passages(
     *,
     parentheticals_stream: TextIO,
@@ -175,7 +182,7 @@ def iter_parenthetical_passages(
     for case_uid in sorted(buckets):
         selected = sorted(
             buckets[case_uid],
-            key=lambda item: (-item[0], item[1]),
+            key=lambda item: (-item[0], _id_sort_key(item[1])),
         )[:max_per_case]
         for offset, (_score, _pid, passage) in enumerate(selected):
             passage.ordinal = _PARENTHETICAL_ORDINAL_BASE + offset

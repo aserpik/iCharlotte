@@ -221,3 +221,23 @@ def test_iter_parenthetical_passages_tie_cap_keeps_lowest_ids():
     )
 
     assert [p.parenthetical_id for p in rows] == ["1", "2"]
+
+
+def test_iter_parenthetical_passages_tie_cap_sorts_numeric_ids_numerically():
+    parentheticals = _csv([
+        {"id": "2", "text": "score nine two", "score": "0.9", "described_opinion_id": "10", "describing_opinion_id": "20", "group_id": ""},
+        {"id": "10", "text": "score nine ten", "score": "0.9", "described_opinion_id": "10", "describing_opinion_id": "20", "group_id": ""},
+        {"id": "3", "text": "score nine three", "score": "0.9", "described_opinion_id": "10", "describing_opinion_id": "20", "group_id": ""},
+    ])
+
+    rows = list(
+        parenthetical_loader.iter_parenthetical_passages(
+            parentheticals_stream=parentheticals,
+            opinion_cluster_map={"10": "300", "20": "200"},
+            cluster_case_map={"300": "cap:aguilar"},
+            min_score=0.0,
+            max_per_case=2,
+        )
+    )
+
+    assert [p.parenthetical_id for p in rows] == ["2", "3"]
