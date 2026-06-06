@@ -32,6 +32,14 @@ class WizardTaskRoutingTests(unittest.TestCase):
         self.assertTrue(is_in_process_task("oppose_motion"))
         self.assertFalse(is_in_process_task("summarize_documents"))
 
+    def test_case_intake_docket_uses_in_process_route_without_file_picker(self):
+        self.assertEqual(
+            get_in_process_task_builder_name("case_intake_docket"),
+            "build_case_intake_docket_tab",
+        )
+        self.assertTrue(is_in_process_task("case_intake_docket"))
+        self.assertFalse(requires_initial_file_picker("case_intake_docket"))
+
     def test_depo_prep_opens_settings_without_picker(self):
         # Depo Prep's Settings page has its own source pickers, so the generic
         # pre-Settings file picker must be skipped (otherwise its selection is
