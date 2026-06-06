@@ -27,6 +27,31 @@ def test_spec_property_returns_spec(qtbot):
     assert tab.spec is spec
 
 
+def test_proceed_uses_files_added_on_settings_page(qtbot, tmp_path, monkeypatch):
+    tab = TaskTab(
+        get_task("summarize_documents"),
+        files=[],
+        case_path=str(tmp_path),
+        file_number="0000.000",
+    )
+    qtbot.addWidget(tab)
+    selected = str(tmp_path / "selected.pdf")
+    tab.settings_page._files = [selected]
+    tab.settings_page._refresh_files_list()
+    captured = {}
+
+    def fake_start_run(settings_dict):
+        captured["files"] = tab.files
+        captured["settings"] = settings_dict
+
+    monkeypatch.setattr(tab, "_start_run", fake_start_run)
+
+    tab._on_proceed({"custom": "value"})
+
+    assert captured["files"] == [selected]
+    assert captured["settings"] == {"custom": "value"}
+
+
 # ---- Worker selection ----
 
 

@@ -16,7 +16,12 @@ _IN_PROCESS_TASK_BUILDERS = {
 # the generic pre-Settings file picker and open the Settings screen directly —
 # the page provides its own (often multi-bucket) file pickers, so a single
 # pre-Settings picker would be redundant and its selection would be dropped.
-_SETTINGS_MANAGED_SOURCE_TASKS = frozenset({"depo_prep"})
+_SETTINGS_MANAGED_SOURCE_TASKS = frozenset({
+    "depo_prep",
+    "summarize_documents",
+    "summarize_discovery",
+    "summarize_depositions",
+})
 
 
 def get_in_process_task_builder_name(task_id: str) -> str | None:

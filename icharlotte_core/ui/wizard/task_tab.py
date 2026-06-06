@@ -86,6 +86,7 @@ class TaskTab(WizardTaskContainer):
     # ---- Transitions ----
 
     def _on_proceed(self, settings_dict: dict) -> None:
+        self._files = list(self.settings_page.files)
         self.status_page.reset()
         self.setCurrentIndex(PAGE_STATUS)
         self._start_run(settings_dict)

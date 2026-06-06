@@ -1467,7 +1467,8 @@ class MainWindow(QMainWindow):
             # the settings page. Without this, a restored tab on PAGE_SETTINGS
             # shows "Discovering topics…" at 0% forever — no worker is alive.
             if (task_id in ("summarize_depositions", "med_chron_analysis")
-                    and tab.currentIndex() == PAGE_SETTINGS):
+                    and tab.currentIndex() == PAGE_SETTINGS
+                    and tab.files):
                 try:
                     tab.start_speculative_run()
                 except Exception as e:

@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import theme
+from ..file_picker import resolve_default_folder
 from ..registry import TaskSpec
 
 
@@ -133,7 +134,7 @@ class SettingsPage(QWidget):
         self.remove_btn.setEnabled(len(self.files_list.selectedItems()) > 0)
 
     def _on_add_files(self) -> None:
-        start_dir = self._case_root or ""
+        start_dir = self._file_dialog_start_dir()
         paths, _ = QFileDialog.getOpenFileNames(
             self, "Add files", start_dir, "All files (*.*)"
         )
@@ -143,6 +144,11 @@ class SettingsPage(QWidget):
                 self._files.append(p)
                 existing.add(p)
         self._refresh_files_list()
+
+    def _file_dialog_start_dir(self) -> str:
+        if not self._case_root:
+            return ""
+        return resolve_default_folder(self._case_root, self._spec.default_folders)
 
     def _on_remove_files(self) -> None:
         selected_rows = {idx.row() for idx in self.files_list.selectedIndexes()}

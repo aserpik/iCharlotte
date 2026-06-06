@@ -24,9 +24,17 @@ class WizardTaskRoutingTests(unittest.TestCase):
         self.assertTrue(is_in_process_task("med_record_extractor"))
         self.assertFalse(requires_initial_file_picker("med_record_extractor"))
 
-    def test_document_summary_still_uses_initial_file_picker(self):
+    def test_summarize_tasks_open_settings_without_picker(self):
+        # These tasks all have a Files box on Settings, so the launcher should
+        # open Settings directly and let Add Files handle source selection.
         self.assertIsNone(get_in_process_task_builder_name("summarize_documents"))
-        self.assertTrue(requires_initial_file_picker("summarize_documents"))
+        for task_id in (
+            "summarize_documents",
+            "summarize_discovery",
+            "summarize_depositions",
+        ):
+            self.assertTrue(opens_settings_without_picker(task_id))
+            self.assertFalse(requires_initial_file_picker(task_id))
 
     def test_oppose_motion_is_in_process_task(self):
         self.assertTrue(is_in_process_task("oppose_motion"))
@@ -42,8 +50,7 @@ class WizardTaskRoutingTests(unittest.TestCase):
         self.assertFalse(is_in_process_task("depo_prep"))
 
     def test_other_tasks_do_not_skip_picker(self):
-        self.assertFalse(opens_settings_without_picker("summarize_documents"))
-        self.assertFalse(opens_settings_without_picker("summarize_depositions"))
+        self.assertFalse(opens_settings_without_picker("medical_records"))
 
 
 if __name__ == "__main__":

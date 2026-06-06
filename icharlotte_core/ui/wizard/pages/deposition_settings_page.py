@@ -20,6 +20,7 @@ from typing import Optional
 
 from PySide6.QtCore import Qt, QSettings, Signal
 from PySide6.QtWidgets import (
+    QFileDialog,
     QHBoxLayout,
     QLabel,
     QProgressBar,
@@ -31,6 +32,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..file_picker import resolve_default_folder
 from ..registry import TaskSpec
 from .settings_page import SettingsPage
 
@@ -56,6 +58,7 @@ class DepositionSettingsPage(SettingsPage):
     # Emitted when the user has committed config and Phase 2 should start.
     # Carries the session_path string.
     phase2_requested = Signal(str)
+    restart_phase1_requested = Signal(list)
 
     def __init__(
         self,
@@ -68,6 +71,7 @@ class DepositionSettingsPage(SettingsPage):
 
         self._session_path: Optional[str] = None
         self._form = None  # DepoSummaryConfigForm; created on phase1 complete
+        self._prep_file: Optional[str] = self._files[0] if self._files else None
 
         # ------------------------------------------------------------------ #
         # Strip everything from the base-class layout so we can rebuild it
@@ -191,6 +195,8 @@ class DepositionSettingsPage(SettingsPage):
 
         # Proceed starts disabled — enabled after Phase 1 completes.
         self.proceed_btn.setEnabled(False)
+        if not self._files:
+            self._reset_to_discovering_state("Add a transcript to continue.")
 
     # ---- Splitter persistence ----
 
@@ -211,11 +217,66 @@ class DepositionSettingsPage(SettingsPage):
 
     def attach_worker(self, worker) -> bool:
         """Wire Phase 1 status/progress/awaiting_input to our inline UI."""
+        if getattr(worker, "files", None):
+            self._prep_file = worker.files[0]
         worker.status.connect(self._small_status.setText)
         worker.progress.connect(self._progress.setValue)
         worker.awaiting_input.connect(self._on_phase1_complete)
         worker.failed.connect(self._on_phase1_failed)
         return True
+
+    # ---- File-swap handling ----
+
+    def _on_add_files(self) -> None:
+        """Pick one transcript for this tab and start/restart Phase 1.
+
+        The underlying interactive deposition script is one-transcript per
+        session, so replacing the slot keeps the existing per-tab behavior from
+        the old launcher while allowing the user to choose the file on Settings.
+        """
+        start_dir = ""
+        if self._case_root:
+            start_dir = resolve_default_folder(
+                self._case_root, self._spec.default_folders
+            )
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Select deposition transcript", start_dir, "All files (*.*)"
+        )
+        if not paths:
+            return
+        new_file = paths[0]
+        if self._files == [new_file]:
+            return
+        self._files = [new_file]
+        self._refresh_files_list()
+        self._maybe_restart_phase1()
+
+    def _on_remove_files(self) -> None:
+        super()._on_remove_files()
+        self._maybe_restart_phase1()
+
+    def _maybe_restart_phase1(self) -> None:
+        current_first = self._files[0] if self._files else None
+        if current_first == self._prep_file:
+            return
+        if current_first is None:
+            self._reset_to_discovering_state("Add a transcript to continue.")
+            self.restart_phase1_requested.emit([])
+            return
+        self._reset_to_discovering_state("Discovering topics...")
+        self.restart_phase1_requested.emit(list(self._files))
+
+    def _reset_to_discovering_state(self, message: str = "") -> None:
+        if self._form is not None:
+            self._form.setParent(None)
+            self._form.deleteLater()
+            self._form = None
+        self._session_path = None
+        self._progress.setValue(0)
+        self._small_status.setStyleSheet("color: #555; font-size: 11px;")
+        self._small_status.setText(message)
+        self._stack.setCurrentIndex(0)
+        self.proceed_btn.setEnabled(False)
 
     # ---- Phase 1 completion ----
 
