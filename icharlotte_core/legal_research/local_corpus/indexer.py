@@ -109,6 +109,32 @@ class CorpusIndexer:
                 self._flush()
         return True
 
+    def add_passages(self, passages: Iterable[PassageRecord], *, embed: bool = True) -> int:
+        """Buffer passages for cases that already exist in the corpus.
+
+        Returns the number of newly buffered passages. Existing passage_uid rows
+        are skipped, which makes parenthetical snapshot re-runs idempotent.
+        """
+        added = 0
+        for p in passages:
+            exists = self.con.execute(
+                "SELECT 1 FROM passages WHERE passage_uid=?",
+                (p.passage_uid,),
+            ).fetchone()
+            if exists:
+                continue
+            case_exists = self.con.execute(
+                "SELECT 1 FROM cases WHERE case_uid=?",
+                (p.case_uid,),
+            ).fetchone()
+            if not case_exists:
+                continue
+            self._pending.append((p, bool(embed)))
+            added += 1
+            if len(self._pending) >= _BATCH:
+                self._flush()
+        return added
+
     def _flush(self) -> None:
         if not self._pending:
             return
@@ -129,9 +155,26 @@ class CorpusIndexer:
             vec_row = self._next_vec_row
             self._next_vec_row += 1
             self.con.execute(
-                "INSERT OR REPLACE INTO passages (passage_uid, case_uid, ordinal, text, page_label, vec_row) "
-                "VALUES (?,?,?,?,?,?)",
-                (p.passage_uid, p.case_uid, p.ordinal, p.text, p.page_label, vec_row),
+                "INSERT OR REPLACE INTO passages ("
+                "passage_uid, case_uid, ordinal, text, page_label, vec_row, "
+                "passage_type, source, parenthetical_id, parenthetical_score, "
+                "described_opinion_id, describing_opinion_id, describing_cluster_id"
+                ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    p.passage_uid,
+                    p.case_uid,
+                    p.ordinal,
+                    p.text,
+                    p.page_label,
+                    vec_row,
+                    p.passage_type,
+                    p.source,
+                    p.parenthetical_id,
+                    p.parenthetical_score,
+                    p.described_opinion_id,
+                    p.describing_opinion_id,
+                    p.describing_cluster_id,
+                ),
             )
             self.con.execute(
                 "INSERT INTO passages_fts (rowid, text) VALUES (?, ?)",

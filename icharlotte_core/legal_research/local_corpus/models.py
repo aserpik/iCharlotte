@@ -74,9 +74,16 @@ class CaseRecord:
 
 @dataclass
 class PassageRecord:
-    passage_uid: str          # f"{case_uid}#{ordinal}"
+    passage_uid: str          # f"{case_uid}#{ordinal}" or f"{case_uid}#parenthetical:{id}"
     case_uid: str
     ordinal: int
     text: str
     page_label: str = ""      # reporter page this passage starts on (pin-cite)
     vec_row: int | None = None  # row index into vectors.f16 (set by indexer)
+    passage_type: str = "opinion"
+    source: str = ""
+    parenthetical_id: str = ""
+    parenthetical_score: float | None = None
+    described_opinion_id: str = ""
+    describing_opinion_id: str = ""
+    describing_cluster_id: str = ""
