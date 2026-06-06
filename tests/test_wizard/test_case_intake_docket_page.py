@@ -1,6 +1,4 @@
 import os
-import time
-from pathlib import Path
 
 from icharlotte_core.ui.wizard.pages.case_intake_docket_page import (
     REVIEW_FIELDS,
@@ -79,8 +77,9 @@ def test_find_latest_docket_pdf_returns_newest(tmp_path):
     older = out_dir / "Docket_2026.01.01.pdf"
     newer = out_dir / "Docket_2026.02.01.pdf"
     older.write_bytes(b"old")
-    time.sleep(0.01)
     newer.write_bytes(b"new")
+    os.utime(older, (100, 100))
+    os.utime(newer, (200, 200))
 
     assert find_latest_docket_pdf(str(tmp_path)) == str(newer)
 
@@ -92,6 +91,38 @@ def test_find_complaint_candidate_prefers_pleadings(tmp_path):
     complaint.write_bytes(b"%PDF")
 
     assert find_complaint_candidate(str(tmp_path)) == str(complaint)
+
+
+def test_find_complaint_candidate_prefers_complaint_over_newer_summons_and_service(tmp_path):
+    pleadings = tmp_path / "PLEADINGS"
+    pleadings.mkdir()
+    complaint = pleadings / "Complaint.pdf"
+    summons = pleadings / "Summons.pdf"
+    proof = pleadings / "Proof of Service Summons.pdf"
+    service = pleadings / "Service of Summons.pdf"
+    complaint.write_bytes(b"%PDF")
+    summons.write_bytes(b"%PDF")
+    proof.write_bytes(b"%PDF")
+    service.write_bytes(b"%PDF")
+    os.utime(complaint, (100, 100))
+    os.utime(summons, (200, 200))
+    os.utime(proof, (300, 300))
+    os.utime(service, (400, 400))
+
+    assert find_complaint_candidate(str(tmp_path)) == str(complaint)
+
+
+def test_find_complaint_candidate_prefers_amended_score_over_newer_generic(tmp_path):
+    pleadings = tmp_path / "PLEADINGS"
+    pleadings.mkdir()
+    generic = pleadings / "Complaint.pdf"
+    amended = pleadings / "Second Amended Complaint.pdf"
+    generic.write_bytes(b"%PDF")
+    amended.write_bytes(b"%PDF")
+    os.utime(amended, (100, 100))
+    os.utime(generic, (200, 200))
+
+    assert find_complaint_candidate(str(tmp_path)) == str(amended)
 
 
 def test_build_output_summary_marks_no_docket_pdf_as_partial(tmp_path):
@@ -114,7 +145,45 @@ def test_build_output_summary_marks_no_docket_pdf_as_partial(tmp_path):
     )
 
     assert summary["success"] is True
+    assert summary["state"] == "partial"
+    assert "no docket pdf" in summary["warning"].lower()
     assert summary["docket_pdf"] == ""
     assert summary["variables_docx"] == str(variables_docx)
     assert "No docket PDF was found" in summary["status"]
     assert summary["trial_date"] == "2026-09-01"
+
+
+def test_build_output_summary_marks_success_when_docket_pdf_exists(tmp_path):
+    out_dir = tmp_path / "NOTES" / "AI OUTPUT"
+    out_dir.mkdir(parents=True)
+    docket_pdf = out_dir / "Docket_2026.02.01.pdf"
+    docket_pdf.write_bytes(b"%PDF")
+
+    summary = build_output_summary(
+        str(tmp_path),
+        "1234.001",
+        manager=FakeManager(),
+        master_db=None,
+        success=True,
+    )
+
+    assert summary["success"] is True
+    assert summary["state"] == "success"
+    assert summary["warning"] == ""
+    assert summary["docket_pdf"] == str(docket_pdf)
+
+
+def test_build_output_summary_marks_failed_when_process_fails(tmp_path):
+    summary = build_output_summary(
+        str(tmp_path),
+        "1234.001",
+        manager=FakeManager(),
+        master_db=None,
+        recent_lines=["scraper traceback"],
+        success=False,
+    )
+
+    assert summary["success"] is False
+    assert summary["state"] == "failed"
+    assert "failed" in summary["warning"]
+    assert summary["recent_lines"] == ["scraper traceback"]
