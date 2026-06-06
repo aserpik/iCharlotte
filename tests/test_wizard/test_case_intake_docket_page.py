@@ -1,6 +1,12 @@
 import os
 
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLineEdit, QPlainTextEdit
+
 from icharlotte_core.ui.wizard.pages.case_intake_docket_page import (
+    CaseIntakeDocketOutputPage,
+    CaseIntakeSettingsPage,
+    CaseMetadataReviewPage,
     REVIEW_FIELDS,
     build_output_summary,
     find_complaint_candidate,
@@ -187,3 +193,125 @@ def test_build_output_summary_marks_failed_when_process_fails(tmp_path):
     assert summary["state"] == "failed"
     assert "failed" in summary["warning"]
     assert summary["recent_lines"] == ["scraper traceback"]
+
+
+def test_review_page_round_trips_metadata_and_complaint_file(qtbot):
+    page = CaseMetadataReviewPage()
+    qtbot.addWidget(page)
+    complaint = r"C:\cases\pleadings\Complaint.pdf"
+
+    page.load_metadata(
+        {
+            "case_number": "23STCV00123",
+            "venue_county": "Los Angeles",
+            "plaintiffs": ["Alice Smith", "Bob Smith"],
+            "defendants": "Acme Corp\nDriver Doe",
+            "causes_of_action": "Negligence; Premises Liability",
+        },
+        complaint_file=complaint,
+    )
+
+    assert set(REVIEW_FIELDS) == set(page._field_widgets)
+    assert isinstance(page._field_widgets["case_number"], QLineEdit)
+    assert isinstance(page._field_widgets["plaintiffs"], QPlainTextEdit)
+
+    payload = page.to_dict()
+    assert payload["case_number"] == "23STCV00123"
+    assert payload["venue_county"] == "Los Angeles"
+    assert payload["plaintiffs"] == ["Alice Smith", "Bob Smith"]
+    assert payload["defendants"] == ["Acme Corp", "Driver Doe"]
+    assert payload["causes_of_action"] == ["Negligence", "Premises Liability"]
+    assert payload["complaint_file"] == complaint
+
+    restored = CaseMetadataReviewPage()
+    qtbot.addWidget(restored)
+    restored.from_dict(payload)
+
+    assert restored.to_dict() == payload
+
+
+def test_review_page_requires_case_number_and_venue_county(qtbot):
+    page = CaseMetadataReviewPage()
+    qtbot.addWidget(page)
+
+    assert page.run_docket_btn.isEnabled() is False
+
+    page._field_widgets["case_number"].setText("23STCV00123")
+    assert page.run_docket_btn.isEnabled() is False
+
+    page._field_widgets["venue_county"].setText("Los Angeles")
+    assert page.run_docket_btn.isEnabled() is True
+
+    page._field_widgets["case_number"].clear()
+    assert page.run_docket_btn.isEnabled() is False
+
+
+def test_run_docket_click_emits_normalized_metadata(qtbot):
+    page = CaseMetadataReviewPage()
+    qtbot.addWidget(page)
+    page.load_metadata(
+        {
+            "case_number": " 23STCV00123 ",
+            "venue_county": " Los Angeles ",
+            "plaintiffs": " Alice Smith \n Bob Smith ",
+            "defendants": "Acme Corp",
+            "causes_of_action": "Negligence; Battery",
+        },
+        complaint_file="Complaint.pdf",
+    )
+
+    with qtbot.waitSignal(page.run_docket_requested, timeout=500) as blocker:
+        qtbot.mouseClick(page.run_docket_btn, Qt.MouseButton.LeftButton)
+
+    payload = blocker.args[0]
+    assert payload["case_number"] == "23STCV00123"
+    assert payload["venue_county"] == "Los Angeles"
+    assert payload["plaintiffs"] == ["Alice Smith", "Bob Smith"]
+    assert payload["defendants"] == ["Acme Corp"]
+    assert payload["causes_of_action"] == ["Negligence", "Battery"]
+    assert payload["complaint_file"] == "Complaint.pdf"
+
+
+def test_output_page_shows_summary_output_path_warning_and_recent_lines(qtbot):
+    page = CaseIntakeDocketOutputPage()
+    qtbot.addWidget(page)
+    summary = {
+        "state": "partial",
+        "status": "Docket finished with no PDF.",
+        "warning": "No docket PDF was found.",
+        "docket_pdf": "",
+        "variables_docx": r"C:\cases\NOTES\AI OUTPUT\variables.docx",
+        "trial_date": "2026-09-01",
+        "other_hearings": "CMC on 2026-07-01",
+        "procedural_history": "Complaint filed.",
+        "recent_lines": ["Venue unsupported.", "Skipped docket download."],
+    }
+
+    page.show_summary(summary)
+
+    assert page.output_path == summary["variables_docx"]
+    assert page.summary == summary
+    text = page.summary_view.toPlainText()
+    assert "partial" in text
+    assert summary["variables_docx"] in text
+    assert "No docket PDF was found." in text
+    assert "Venue unsupported." in text
+    assert "Skipped docket download." in text
+
+    summary["status"] = "mutated"
+    assert page.summary["status"] == "Docket finished with no PDF."
+
+
+def test_settings_page_disables_run_without_file_number_and_emits_when_present(qtbot):
+    empty_page = CaseIntakeSettingsPage("")
+    qtbot.addWidget(empty_page)
+    assert empty_page.run_complaint_btn.isEnabled() is False
+    assert empty_page.to_dict() == {}
+    empty_page.from_dict({"ignored": True})
+
+    page = CaseIntakeSettingsPage("1234.001")
+    qtbot.addWidget(page)
+    assert page.run_complaint_btn.isEnabled() is True
+
+    with qtbot.waitSignal(page.run_complaint_requested, timeout=500):
+        qtbot.mouseClick(page.run_complaint_btn, Qt.MouseButton.LeftButton)
