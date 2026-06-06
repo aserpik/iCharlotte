@@ -46,6 +46,28 @@ def test_default_folders_per_task():
     assert get_task("medical_records").default_folders == ["RECORDS"]
 
 
+def test_case_intake_docket_registry_spec():
+    spec = get_task("case_intake_docket")
+    assert spec.title == "Case Intake & Docket"
+    assert (
+        spec.description
+        == "Extract complaint metadata, review case details, then download and process the court docket."
+    )
+    assert spec.icon_glyph == "\U0001F5C2"
+    assert spec.script_name == ""
+    assert spec.category == "General"
+    assert spec.default_folders == []
+    assert {
+        "complaint",
+        "docket",
+        "case number",
+        "venue",
+        "intake",
+        "hearing",
+        "trial",
+    } <= set(spec.keywords)
+
+
 def test_get_task_unknown_raises():
     with pytest.raises(KeyError):
         get_task("not_a_real_task")
