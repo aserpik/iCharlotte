@@ -373,6 +373,95 @@ def test_opinion_text_hit_ranks_before_parenthetical_only_hit(tmp_path):
     assert tight_results[0].snippet_source == "opinion"
 
 
+def test_all_opinion_text_hits_rank_before_parenthetical_only_hit(tmp_path):
+    db = str(tmp_path / "c.db")
+    vec = str(tmp_path / "v.f16")
+    con = schema.connect(db)
+    schema.create_schema(con)
+    emb = FakeEmbedder(dim=64)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb)
+    for case_uid, citation, text in [
+        (
+            "cap:opinion-strong",
+            "10 Cal. 5th 10",
+            "summary judgment burden causation appears directly in this opinion text.",
+        ),
+        (
+            "cap:opinion-weaker",
+            "11 Cal. 5th 11",
+            "summary judgment burden causation appears directly in this opinion text.",
+        ),
+    ]:
+        idx.add(
+            CaseRecord(
+                case_uid=case_uid,
+                source="cap",
+                name=case_uid,
+                citation=citation,
+                full_text=text,
+            ),
+            [
+                PassageRecord(
+                    passage_uid=f"{case_uid}#0",
+                    case_uid=case_uid,
+                    ordinal=0,
+                    text=text,
+                )
+            ],
+        )
+    idx.add(
+        CaseRecord(
+            case_uid="cap:parenthetical-only",
+            source="cap",
+            name="Parenthetical Only",
+            citation="2 Cal. 5th 2",
+            full_text="This opinion discusses unrelated procedure.",
+        ),
+        [
+            PassageRecord(
+                passage_uid="cap:parenthetical-only#0",
+                case_uid="cap:parenthetical-only",
+                ordinal=0,
+                text="This opinion discusses unrelated procedure.",
+            )
+        ],
+    )
+    idx.finalize()
+    con.close()
+
+    con = schema.connect(db)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb, resume=True)
+    idx.add_passages(
+        [
+            PassageRecord(
+                passage_uid="cap:parenthetical-only#parenthetical:906",
+                case_uid="cap:parenthetical-only",
+                ordinal=1_000_000,
+                text="summary judgment burden causation",
+                passage_type="parenthetical",
+                parenthetical_id="906",
+            )
+        ],
+        embed=False,
+    )
+    idx.finalize()
+    con.close()
+
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    results = corpus.search_opinions(
+        "summary judgment burden causation",
+        semantic=False,
+        max_results=5,
+    )
+
+    assert [r.cluster_id for r in results[:3]] == [
+        "cap:opinion-strong",
+        "cap:opinion-weaker",
+        "cap:parenthetical-only",
+    ]
+    assert results[2].snippet_source == "parenthetical"
+
+
 def test_parenthetical_does_not_add_duplicate_vote_for_existing_keyword_hit(tmp_path):
     db = str(tmp_path / "c.db")
     vec = str(tmp_path / "v.f16")

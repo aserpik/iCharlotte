@@ -161,23 +161,27 @@ class LocalCaseCorpus:
                 semantic_ranking = self._semantic_case_ranking(query, _CANDIDATES)
             except Exception:
                 logger.warning("semantic ranking failed; BM25 only", exc_info=True)
-        preliminary = set(self._rrf(bm25, semantic_ranking)[:max_results])
         bm25_cases = set(bm25)
+        opinion_fused = self._rrf(bm25, semantic_ranking) if semantic else bm25
+        bm25_hits = [case_uid for case_uid in opinion_fused if case_uid in bm25_cases]
+        semantic_only = [
+            case_uid for case_uid in opinion_fused if case_uid not in bm25_cases
+        ]
         parenthetical_recall = [
             case_uid for case_uid in parenthetical
-            if case_uid not in preliminary and case_uid not in bm25_cases
+            if case_uid not in bm25_cases
         ]
-        rankings = [bm25]
-        if parenthetical_recall:
-            rankings.append(parenthetical_recall)
-            recall_cases = set(parenthetical_recall)
-            semantic_ranking = [
-                case_uid for case_uid in semantic_ranking if case_uid not in recall_cases
-            ]
-        if semantic:
-            rankings.append(semantic_ranking)
-        fused = self._rrf(*rankings)[:max_results]
-        return [self._case_result(uid, query) for uid in fused]
+        recall_cases = set(parenthetical_recall)
+        semantic_only = [
+            case_uid for case_uid in semantic_only if case_uid not in recall_cases
+        ]
+        ordered: list[str] = []
+        seen: set[str] = set()
+        for case_uid in bm25_hits + parenthetical_recall + semantic_only:
+            if case_uid not in seen:
+                seen.add(case_uid)
+                ordered.append(case_uid)
+        return [self._case_result(uid, query) for uid in ordered[:max_results]]
 
     def _best_passage_for_query(self, case_uid: str, query: str):
         con = self._conn()
