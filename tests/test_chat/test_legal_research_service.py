@@ -4,6 +4,7 @@ from icharlotte_core.chat.legal_research import (
     ChatLegalResearchService,
     ChatResearchSettings,
     CourtListenerMode,
+    THIN_RESULT_THRESHOLD,
     is_current_law_query,
     normalize_settings,
 )
@@ -459,6 +460,45 @@ def test_courtlistener_fallback_does_not_call_live_when_firm_results_are_not_thi
         "Beta v. Rule",
         "Gamma v. Rule",
     }
+    assert cl.calls == []
+    assert warnings == []
+    assert searches == ["Firm/sample-motion authority: firm-supported issue"]
+
+
+def test_courtlistener_fallback_ignores_unselected_stale_local_corpus_when_firm_results_are_not_thin():
+    firm = FakeFirmProvider(
+        candidates=[
+            {
+                "cluster_id": f"firm:{idx}",
+                "case_name": f"Firm Case {idx}",
+                "citation": f"{idx} Cal.App.5th {idx}",
+                "year": "2024",
+                "text": "Firm authority supports the rule.",
+            }
+            for idx in range(1, THIN_RESULT_THRESHOLD + 1)
+        ]
+    )
+    stale_local = FakeCorpusClient(
+        results=[_case()],
+        metadata={"source_counts": {"cl": 1}, "max_decision_date": "2020-01-01"},
+    )
+    cl = FakeCorpusClient(
+        results=[_case(name="Live v. Case", cite="55 Cal.App.5th 10", uid="cl:1")]
+    )
+    service = _service_for_sources(local=stale_local, firm=firm, courtlistener=cl)
+
+    candidates, warnings, searches = service.collect_candidates(
+        propositions=["firm-supported issue"],
+        settings=ChatResearchSettings(
+            firm_authority=True,
+            local_corpus=False,
+            courtlistener_mode=CourtListenerMode.FALLBACK_CURRENT_LAW,
+        ),
+        original_query="firm-supported issue",
+    )
+
+    assert len(candidates) == THIN_RESULT_THRESHOLD
+    assert stale_local.calls == []
     assert cl.calls == []
     assert warnings == []
     assert searches == ["Firm/sample-motion authority: firm-supported issue"]

@@ -423,7 +423,7 @@ class ChatLegalResearchService:
         searches: list[str] = []
         all_candidates: list[ChatAuthorityCandidate] = []
         current_law = is_current_law_query(original_query)
-        local_warning = _local_freshness_warning(self.local_corpus)
+        local_warning = _local_freshness_warning(self.local_corpus) if settings.local_corpus else ""
 
         for proposition in propositions:
             local_count = 0
