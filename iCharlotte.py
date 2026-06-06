@@ -1097,21 +1097,50 @@ class MainWindow(QMainWindow):
             task_id = tab.spec.task_id
             # Determine page label.
             page_idx = tab.currentIndex()
+            case_intake_metadata = {}
             if task_id == "case_intake_docket":
                 from icharlotte_core.ui.wizard.pages.case_intake_docket_page import (
                     TASK_PAGE_COMPLAINT_STATUS,
                     TASK_PAGE_DOCKET_STATUS,
+                    TASK_PAGE_REVIEW,
+                    TASK_PAGE_SETTINGS as CASE_INTAKE_DOCKET_PAGE_SETTINGS,
                     TASK_PAGE_OUTPUT as CASE_INTAKE_DOCKET_PAGE_OUTPUT,
+                )
+
+                case_intake_metadata = dict(getattr(tab, "_last_metadata", {}) or {})
+                if not case_intake_metadata and page_idx in (
+                    TASK_PAGE_REVIEW,
+                    CASE_INTAKE_DOCKET_PAGE_OUTPUT,
+                ) and hasattr(tab, "review_page"):
+                    try:
+                        case_intake_metadata = dict(tab.review_page.to_dict())
+                    except Exception:
+                        case_intake_metadata = {}
+                has_review_metadata = any(
+                    bool(value)
+                    for key, value in case_intake_metadata.items()
+                    if key != "complaint_file"
                 )
 
                 if page_idx == CASE_INTAKE_DOCKET_PAGE_OUTPUT:
                     page = "output"
-                elif page_idx in (TASK_PAGE_COMPLAINT_STATUS, TASK_PAGE_DOCKET_STATUS):
+                elif page_idx == TASK_PAGE_REVIEW:
+                    page = "review"
+                elif page_idx == TASK_PAGE_DOCKET_STATUS:
                     if cancel_running and getattr(tab, "_worker", None) is not None:
                         try:
                             tab._worker.cancel()
                         except Exception:
                             pass
+                    page = "review" if has_review_metadata else "settings"
+                elif page_idx == TASK_PAGE_COMPLAINT_STATUS:
+                    if cancel_running and getattr(tab, "_worker", None) is not None:
+                        try:
+                            tab._worker.cancel()
+                        except Exception:
+                            pass
+                    page = "settings"
+                elif page_idx == CASE_INTAKE_DOCKET_PAGE_SETTINGS:
                     page = "settings"
                 else:
                     page = "settings"
@@ -1141,14 +1170,8 @@ class MainWindow(QMainWindow):
                 "output_path": output_path_rel,
             }
             if task_id == "case_intake_docket":
-                metadata = dict(getattr(tab, "_last_metadata", {}) or {})
-                if not metadata and hasattr(tab, "review_page"):
-                    try:
-                        metadata = dict(tab.review_page.to_dict())
-                    except Exception:
-                        metadata = {}
-                snapshot["settings"] = dict(metadata)
-                snapshot["metadata"] = dict(metadata)
+                snapshot["settings"] = dict(case_intake_metadata)
+                snapshot["metadata"] = dict(case_intake_metadata)
                 snapshot["summary"] = dict(getattr(tab.output_page, "summary", {}) or {})
             snapshots.append(snapshot)
         return snapshots
@@ -1342,6 +1365,7 @@ class MainWindow(QMainWindow):
                 CaseIntakeDocketTaskTab,
                 TASK_PAGE_OUTPUT,
                 TASK_PAGE_REVIEW,
+                TASK_PAGE_SETTINGS,
             )
 
             metadata = dict(entry.get("metadata") or entry.get("settings") or {})
@@ -1351,17 +1375,18 @@ class MainWindow(QMainWindow):
                 file_number=self.file_number,
                 parent=self,
             )
-            task_tab.load_review_state(metadata)
+            if metadata:
+                task_tab.load_review_state(metadata)
             summary = dict(entry.get("summary") or {})
             for key in ("docket_pdf", "variables_docx"):
                 path = str(summary.get(key) or "")
                 if path and self.case_path and not os.path.isabs(path):
                     summary[key] = os.path.join(self.case_path, path)
             if summary:
-                task_tab.load_output_summary(summary, metadata=metadata)
+                task_tab.load_output_summary(summary, metadata=metadata or None)
                 restored_summary = True
             output_page = TASK_PAGE_OUTPUT
-            settings_page = TASK_PAGE_REVIEW
+            settings_page = TASK_PAGE_REVIEW if metadata else TASK_PAGE_SETTINGS
         else:
             task_tab = TaskTab(
                 spec=spec,
@@ -1499,6 +1524,7 @@ class MainWindow(QMainWindow):
                     CaseIntakeDocketTaskTab,
                     TASK_PAGE_OUTPUT,
                     TASK_PAGE_REVIEW,
+                    TASK_PAGE_SETTINGS,
                 )
 
                 metadata = dict(entry.get("metadata") or settings_dict or {})
@@ -1508,17 +1534,24 @@ class MainWindow(QMainWindow):
                     file_number=self.file_number,
                     parent=self,
                 )
-                tab.load_review_state(metadata)
+                if metadata:
+                    tab.load_review_state(metadata)
                 summary = dict(entry.get("summary") or {})
                 for key in ("docket_pdf", "variables_docx"):
                     path = str(summary.get(key) or "")
                     if path and self.case_path and not os.path.isabs(path):
                         summary[key] = os.path.join(self.case_path, path)
                 if summary:
-                    tab.load_output_summary(summary, metadata=metadata)
+                    tab.load_output_summary(summary, metadata=metadata or None)
                     restored_summary = True
                 output_page = TASK_PAGE_OUTPUT
-                settings_page = TASK_PAGE_REVIEW
+                saved_page = entry.get("page", "settings")
+                if saved_page == "review":
+                    settings_page = TASK_PAGE_REVIEW
+                elif saved_page == "settings":
+                    settings_page = TASK_PAGE_SETTINGS
+                else:
+                    settings_page = TASK_PAGE_REVIEW if metadata else TASK_PAGE_SETTINGS
             else:
                 tab = TaskTab(
                     spec=spec,

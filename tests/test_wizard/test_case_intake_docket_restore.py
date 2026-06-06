@@ -66,6 +66,87 @@ def _summary(docket_pdf, variables_docx):
     }
 
 
+def _case_intake_tab(case_path, file_number="0000.000", parent=None):
+    from icharlotte_core.ui.wizard.pages.case_intake_docket_page import (
+        CaseIntakeDocketTaskTab,
+    )
+    from icharlotte_core.ui.wizard.registry import get_task
+
+    tab = CaseIntakeDocketTaskTab(
+        get_task("case_intake_docket"),
+        case_path,
+        file_number,
+        parent=parent,
+    )
+    tab.setProperty("wizard_task_id", "case_intake_docket")
+    tab.setProperty("wizard_instance_suffix", "")
+    return tab
+
+
+def _snapshot_case_intake_tab(qtbot, tmp_path, tab):
+    stub = _Stub(str(tmp_path))
+    qtbot.addWidget(stub)
+    tab.setParent(stub)
+    stub.tabs.addTab(tab, "Case Intake & Docket")
+    _bind(stub, "_iter_task_tabs", "_relpath_under", "_snapshot_open_task_tabs")
+    return stub._snapshot_open_task_tabs(cancel_running=False)
+
+
+def _restore_case_intake_snapshot(qtbot, tmp_path, snapshots):
+    from icharlotte_core.ui.wizard.persistence import WizardStatePersistence
+
+    case_path = str(tmp_path)
+    p = WizardStatePersistence(case_path)
+    p.set_open_tabs(snapshots)
+    p.save()
+
+    stub = _Stub(case_path)
+    qtbot.addWidget(stub)
+    _bind(stub, "_restore_task_tabs_for_case")
+    stub._restore_task_tabs_for_case()
+    return stub
+
+
+def test_snapshot_restore_keeps_case_intake_initial_settings_page(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.case_intake_docket_page import TASK_PAGE_SETTINGS
+
+    tab = _case_intake_tab(str(tmp_path), parent=None)
+    tab.setCurrentIndex(TASK_PAGE_SETTINGS)
+
+    snapshots = _snapshot_case_intake_tab(qtbot, tmp_path, tab)
+
+    assert snapshots[0]["page"] == "settings"
+
+    restored = _restore_case_intake_snapshot(qtbot, tmp_path, snapshots)
+
+    assert restored.tabs.count() == 1
+    restored_tab = restored.tabs.widget(0)
+    assert type(restored_tab).__name__ == "CaseIntakeDocketTaskTab"
+    assert restored_tab.currentIndex() == TASK_PAGE_SETTINGS
+
+
+def test_snapshot_restore_keeps_case_intake_review_page_with_metadata(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.case_intake_docket_page import TASK_PAGE_REVIEW
+
+    metadata = _metadata()
+    tab = _case_intake_tab(str(tmp_path), parent=None)
+    tab.load_review_state(metadata)
+
+    snapshots = _snapshot_case_intake_tab(qtbot, tmp_path, tab)
+
+    assert snapshots[0]["page"] == "review"
+
+    restored = _restore_case_intake_snapshot(qtbot, tmp_path, snapshots)
+
+    assert restored.tabs.count() == 1
+    restored_tab = restored.tabs.widget(0)
+    assert type(restored_tab).__name__ == "CaseIntakeDocketTaskTab"
+    assert restored_tab.currentIndex() == TASK_PAGE_REVIEW
+    reviewed = restored_tab.review_page.to_dict()
+    assert reviewed["case_number"] == metadata["case_number"]
+    assert reviewed["venue_county"] == metadata["venue_county"]
+
+
 def test_restore_reloads_case_intake_docket_output_state(qtbot, tmp_path):
     from icharlotte_core.ui.wizard.pages.case_intake_docket_page import TASK_PAGE_OUTPUT
     from icharlotte_core.ui.wizard.persistence import WizardStatePersistence
@@ -143,9 +224,7 @@ def test_reopen_recent_reloads_case_intake_docket_output_state(qtbot, tmp_path):
 def test_snapshot_includes_case_intake_docket_summary_and_metadata(qtbot, tmp_path):
     from icharlotte_core.ui.wizard.pages.case_intake_docket_page import (
         TASK_PAGE_OUTPUT,
-        CaseIntakeDocketTaskTab,
     )
-    from icharlotte_core.ui.wizard.registry import get_task
 
     case_path = str(tmp_path)
     docket_pdf, variables_docx = _write_outputs(tmp_path)
@@ -154,14 +233,7 @@ def test_snapshot_includes_case_intake_docket_summary_and_metadata(qtbot, tmp_pa
 
     stub = _Stub(case_path)
     qtbot.addWidget(stub)
-    tab = CaseIntakeDocketTaskTab(
-        get_task("case_intake_docket"),
-        case_path,
-        stub.file_number,
-        parent=stub,
-    )
-    tab.setProperty("wizard_task_id", "case_intake_docket")
-    tab.setProperty("wizard_instance_suffix", "")
+    tab = _case_intake_tab(case_path, stub.file_number, parent=stub)
     tab.load_output_summary(summary, metadata=metadata)
     stub.tabs.addTab(tab, "Case Intake & Docket")
     _bind(stub, "_iter_task_tabs", "_relpath_under", "_snapshot_open_task_tabs")
