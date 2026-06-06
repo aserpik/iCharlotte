@@ -83,8 +83,7 @@ def connect(db_path: str) -> sqlite3.Connection:
 
 
 def create_schema(con: sqlite3.Connection) -> None:
-    con.executescript(_DDL)
-    con.commit()
+    ensure_runtime_schema(con)
 
 
 def ensure_runtime_schema(con: sqlite3.Connection) -> None:

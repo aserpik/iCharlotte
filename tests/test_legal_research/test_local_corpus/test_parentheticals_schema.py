@@ -89,6 +89,61 @@ def test_ensure_runtime_schema_migrates_old_passages_table():
     assert "idx_passages_parenthetical" in indexes
 
 
+def test_create_schema_migrates_old_passages_table():
+    con = sqlite3.connect(":memory:")
+    con.executescript(
+        """
+        CREATE TABLE cases (
+            case_uid TEXT PRIMARY KEY,
+            source TEXT NOT NULL,
+            citation TEXT,
+            full_text TEXT
+        );
+        CREATE TABLE passages (
+            passage_uid  TEXT PRIMARY KEY,
+            case_uid     TEXT NOT NULL,
+            ordinal      INTEGER NOT NULL,
+            text         TEXT NOT NULL,
+            page_label   TEXT,
+            vec_row      INTEGER
+        );
+        CREATE INDEX idx_passages_case ON passages(case_uid);
+        CREATE INDEX idx_passages_vec ON passages(vec_row);
+        CREATE VIRTUAL TABLE passages_fts USING fts5(text, content='');
+        CREATE TABLE ingested_volumes (name TEXT PRIMARY KEY);
+        """
+    )
+
+    schema.create_schema(con)
+
+    passage_columns = {
+        row[1] for row in con.execute("PRAGMA table_info(passages)").fetchall()
+    }
+    assert {
+        "passage_type",
+        "source",
+        "parenthetical_id",
+        "parenthetical_score",
+        "described_opinion_id",
+        "describing_opinion_id",
+        "describing_cluster_id",
+    }.issubset(passage_columns)
+
+    tables = {
+        row[0]
+        for row in con.execute(
+            "SELECT name FROM sqlite_master WHERE type IN ('table','view')"
+        ).fetchall()
+    }
+    assert "courtlistener_opinion_map" in tables
+
+    indexes = {
+        row[1] for row in con.execute("PRAGMA index_list(passages)").fetchall()
+    }
+    assert "idx_passages_type" in indexes
+    assert "idx_passages_parenthetical" in indexes
+
+
 def test_passage_record_accepts_parenthetical_metadata():
     passage = PassageRecord(
         passage_uid="cap:1#parenthetical:900",
