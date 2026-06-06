@@ -193,6 +193,34 @@ def test_ensure_runtime_schema_migrates_old_opinion_map_primary_key():
     ]
 
 
+def test_ensure_runtime_schema_handles_two_column_legacy_opinion_map():
+    con = sqlite3.connect(":memory:")
+    con.executescript(
+        """
+        CREATE TABLE courtlistener_opinion_map (
+            opinion_id TEXT PRIMARY KEY,
+            cluster_id TEXT NOT NULL
+        );
+        INSERT INTO courtlistener_opinion_map VALUES ('10', '100');
+        """
+    )
+
+    schema.ensure_runtime_schema(con)
+    columns = [
+        row[1] for row in con.execute("PRAGMA table_info(courtlistener_opinion_map)")
+    ]
+    con.execute(
+        "INSERT INTO courtlistener_opinion_map VALUES (?,?,?)",
+        ("10", "101", "2026-06-30"),
+    )
+    rows = con.execute(
+        "SELECT opinion_id, cluster_id, snapshot_date FROM courtlistener_opinion_map"
+    ).fetchall()
+
+    assert columns == ["opinion_id", "cluster_id", "snapshot_date"]
+    assert [tuple(row) for row in rows] == [("10", "101", "2026-06-30")]
+
+
 def test_passage_record_accepts_parenthetical_metadata():
     passage = PassageRecord(
         passage_uid="cap:1#parenthetical:900",

@@ -137,6 +137,10 @@ def _ensure_opinion_map_schema(con: sqlite3.Connection) -> None:
     ]
     if pk_columns != ["opinion_id", "snapshot_date"]:
         con.execute("ALTER TABLE courtlistener_opinion_map RENAME TO courtlistener_opinion_map_old")
+        old_columns = {
+            row[1]
+            for row in con.execute("PRAGMA table_info(courtlistener_opinion_map_old)").fetchall()
+        }
         con.execute(
             "CREATE TABLE courtlistener_opinion_map ("
             "opinion_id TEXT NOT NULL, "
@@ -144,14 +148,15 @@ def _ensure_opinion_map_schema(con: sqlite3.Connection) -> None:
             "snapshot_date TEXT NOT NULL, "
             "PRIMARY KEY (opinion_id, snapshot_date))"
         )
-        con.execute(
-            "INSERT OR REPLACE INTO courtlistener_opinion_map "
-            "(opinion_id, cluster_id, snapshot_date) "
-            "SELECT opinion_id, cluster_id, snapshot_date "
-            "FROM courtlistener_opinion_map_old "
-            "WHERE opinion_id IS NOT NULL AND opinion_id != '' "
-            "AND snapshot_date IS NOT NULL AND snapshot_date != ''"
-        )
+        if "snapshot_date" in old_columns:
+            con.execute(
+                "INSERT OR REPLACE INTO courtlistener_opinion_map "
+                "(opinion_id, cluster_id, snapshot_date) "
+                "SELECT opinion_id, cluster_id, snapshot_date "
+                "FROM courtlistener_opinion_map_old "
+                "WHERE opinion_id IS NOT NULL AND opinion_id != '' "
+                "AND snapshot_date IS NOT NULL AND snapshot_date != ''"
+            )
         con.execute("DROP TABLE courtlistener_opinion_map_old")
 
     con.execute(

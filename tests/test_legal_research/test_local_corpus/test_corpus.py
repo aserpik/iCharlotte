@@ -6,6 +6,28 @@ from icharlotte_core.legal_research.local_corpus.corpus import LocalCaseCorpus
 from icharlotte_core.legal_research.models import CaseResult
 
 
+class RankedEmbedder:
+    dim = 2
+
+    def encode(self, texts):
+        import math
+        import re
+
+        rows = []
+        for text in texts:
+            if text == "needle":
+                rows.append([1.0, 0.0])
+                continue
+            match = re.search(r"rank(\d+)", text or "")
+            rank = int(match.group(1)) if match else 999
+            score = max(0.0, 1.0 - (rank / 1000.0))
+            rows.append([score, math.sqrt(max(0.0, 1.0 - score * score))])
+
+        import numpy as np
+
+        return np.asarray(rows, dtype=np.float32)
+
+
 def _build(tmp_path):
     db = str(tmp_path / "c.db"); vec = str(tmp_path / "v.f16")
     con = schema.connect(db); schema.create_schema(con)
@@ -415,6 +437,78 @@ def test_parenthetical_does_not_add_duplicate_vote_for_existing_keyword_hit(tmp_
     )
 
     assert [r.cluster_id for r in results[:2]] == ["cap:strong", "cap:duplicate"]
+
+
+def test_semantic_search_does_not_suppress_parenthetical_recall(tmp_path):
+    db = str(tmp_path / "c.db")
+    vec = str(tmp_path / "v.f16")
+    con = schema.connect(db)
+    schema.create_schema(con)
+    emb = RankedEmbedder()
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb)
+    for rank in range(1, 106):
+        case_uid = f"cap:semantic-{rank:03d}"
+        idx.add(
+            CaseRecord(
+                case_uid=case_uid,
+                source="cap",
+                name=f"Semantic Rank {rank}",
+                citation=f"{rank} Cal. 5th {rank}",
+                full_text=f"rank{rank:03d} unrelated opinion text",
+            ),
+            [
+                PassageRecord(
+                    passage_uid=f"{case_uid}#0",
+                    case_uid=case_uid,
+                    ordinal=0,
+                    text=f"rank{rank:03d} unrelated opinion text",
+                )
+            ],
+        )
+    idx.add(
+        CaseRecord(
+            case_uid="cap:parenthetical-needle",
+            source="cap",
+            name="Parenthetical Needle",
+            citation="999 Cal. 5th 999",
+            full_text="rank099 non-query opinion text",
+        ),
+        [
+            PassageRecord(
+                passage_uid="cap:parenthetical-needle#0",
+                case_uid="cap:parenthetical-needle",
+                ordinal=0,
+                text="rank099 non-query opinion text",
+            )
+        ],
+    )
+    idx.finalize()
+    con.close()
+
+    con = schema.connect(db)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb, resume=True)
+    idx.add_passages(
+        [
+            PassageRecord(
+                passage_uid="cap:parenthetical-needle#parenthetical:904",
+                case_uid="cap:parenthetical-needle",
+                ordinal=1_000_000,
+                text="needle appears only in this parenthetical recall passage",
+                passage_type="parenthetical",
+                parenthetical_id="904",
+            )
+        ],
+        embed=False,
+    )
+    idx.finalize()
+    con.close()
+
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    results = corpus.search_opinions("needle", semantic=True, max_results=5)
+
+    assert results[0].cluster_id == "cap:parenthetical-needle"
+    assert results[0].snippet_source == "parenthetical"
+    assert results[0].snippet_parenthetical_id == "904"
 
 
 def test_search_opinions_migrates_pre_parenthetical_schema(tmp_path):
