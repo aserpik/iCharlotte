@@ -49,11 +49,15 @@ class CaseAgentWorker(BaseWorker):
     def command_argv(self) -> list[str]:
         return [self._script_path(), self.file_number, "--headless", *self._extra_flags]
 
-    def _script_path(self) -> str:
+    def _repo_root(self) -> str:
         here = os.path.abspath(__file__)
         repo_root = here
         for _ in range(5):
             repo_root = os.path.dirname(repo_root)
+        return repo_root
+
+    def _script_path(self) -> str:
+        repo_root = self._repo_root()
         return os.path.join(repo_root, "Scripts", self._script_name)
 
     def start(self) -> None:
@@ -67,6 +71,7 @@ class CaseAgentWorker(BaseWorker):
         )
         self._process = QProcess(self)
         self._process.setProcessChannelMode(QProcess.ProcessChannelMode.MergedChannels)
+        self._process.setWorkingDirectory(self._repo_root())
         self._process.readyReadStandardOutput.connect(self._drain_stdout)
         self._process.finished.connect(self._on_process_finished)
         self._process.errorOccurred.connect(self._on_process_error)
