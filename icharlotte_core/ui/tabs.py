@@ -1805,6 +1805,8 @@ class ChatTab(QWidget):
         # Detect audio/video attachments
         audio_files = self._get_checked_audio_files()
         current_provider = self.provider_combo.currentText()
+        current_model = self.model_combo.currentText()
+        current_settings = dict(self.settings)
 
         # Safety: warn for non-Gemini providers (they can't process media)
         if audio_files and current_provider != "Gemini":
@@ -1829,7 +1831,13 @@ class ChatTab(QWidget):
         # Legal Research: if checked, run selected research before LLM call.
         research_packet = None
         if self.legal_research_check.isChecked():
-            research_packet = self._run_chat_legal_research(user_text, file_content)
+            research_packet = self._run_chat_legal_research(
+                user_text,
+                file_content,
+                provider=current_provider,
+                model=current_model,
+                settings=current_settings,
+            )
             if research_packet is None:
                 return
 
@@ -1842,7 +1850,7 @@ class ChatTab(QWidget):
 
         # Save user message to persistence
         if self.persistence and self.current_conversation_id:
-            token_count = TokenCounter.estimate_tokens(full_msg, self.provider_combo.currentText())
+            token_count = TokenCounter.estimate_tokens(full_msg, current_provider)
             user_message = Message(
                 role='user',
                 content=full_msg,
@@ -1858,7 +1866,7 @@ class ChatTab(QWidget):
         self.conversation_history.append({'role': 'user', 'content': full_msg})
 
         # Enable streaming
-        settings = {**self.settings, 'stream': True}
+        settings = {**current_settings, 'stream': True}
 
         # Initialize streaming state
         self.stream_text = ""
@@ -1889,7 +1897,7 @@ class ChatTab(QWidget):
 
         self.worker = LLMWorker(
             current_provider,
-            self.model_combo.currentText(),
+            current_model,
             effective_system_prompt,
             user_text,
             file_content,
@@ -1905,17 +1913,32 @@ class ChatTab(QWidget):
 
         self.update_context_indicator()
 
-    def _run_chat_legal_research(self, user_text, file_content):
+    def _run_chat_legal_research(
+        self,
+        user_text,
+        file_content,
+        *,
+        provider=None,
+        model=None,
+        settings=None,
+        research_settings=None,
+    ):
         from icharlotte_core.llm import LLMHandler
+
+        provider = self.provider_combo.currentText() if provider is None else provider
+        model = self.model_combo.currentText() if model is None else model
+        settings = dict(settings) if settings is not None else dict(self.settings)
+        if research_settings is None:
+            research_settings = self._current_chat_research_settings()
 
         def llm_for_research(system_prompt, user_prompt):
             return LLMHandler.generate(
-                provider=self.provider_combo.currentText(),
-                model=self.model_combo.currentText(),
+                provider=provider,
+                model=model,
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 file_contents="",
-                settings={**self.settings, "stream": False, "temperature": 0.2},
+                settings={**settings, "stream": False, "temperature": 0.2},
             )
 
         def status(message):
@@ -1931,10 +1954,11 @@ class ChatTab(QWidget):
             return service.research(
                 user_text=user_text,
                 context_text=file_content[:100000] if file_content else "",
-                settings=self._current_chat_research_settings(),
+                settings=research_settings,
                 status_callback=status,
             )
         except ChatResearchError as exc:
+            self._pending_research = None
             self.chat_history.append(
                 f"<font color='orange'>Legal research stopped: {exc}</font>"
             )
@@ -1942,6 +1966,7 @@ class ChatTab(QWidget):
             self.stop_btn.setEnabled(False)
             return None
         except Exception as exc:
+            self._pending_research = None
             self.chat_history.append(
                 f"<font color='orange'>Legal research error: {exc}</font>"
             )

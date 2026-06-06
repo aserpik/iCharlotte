@@ -140,6 +140,182 @@ def test_run_chat_legal_research_passes_selected_settings(qtbot, monkeypatch):
     assert packet is not None
 
 
+def test_run_chat_legal_research_llm_callback_uses_model_snapshot_during_status_events(
+    qtbot,
+    monkeypatch,
+):
+    _app()
+    _clear_chat_research_settings()
+    from icharlotte_core import llm
+    from icharlotte_core.ui import tabs
+
+    captured = {}
+
+    def fake_generate(**kwargs):
+        captured["llm_kwargs"] = kwargs
+        return "research synthesis"
+
+    class FakeService:
+        @classmethod
+        def from_environment(cls, *, llm_callback):
+            captured["llm_callback"] = llm_callback
+            return cls()
+
+        def research(self, *, user_text, context_text, settings, status_callback):
+            status_callback("fake progress")
+            captured["llm_callback"]("snapshot system", "snapshot user")
+            return SimpleNamespace(
+                selected_authorities=[],
+                get_known_case_names=lambda: [],
+                build_augmented_system_prompt=lambda base: base + "\nAUGMENTED",
+                format_research_basis_html=lambda: ["<b>Legal Research Basis</b>"],
+            )
+
+    monkeypatch.setattr(tabs, "ChatLegalResearchService", FakeService)
+    monkeypatch.setattr(llm.LLMHandler, "generate", fake_generate)
+    tab = _make_chat_tab(qtbot, monkeypatch)
+    tab.provider_combo.setCurrentText("Gemini")
+    tab.model_combo.addItems(["gemini-snapshot", "gpt-live"])
+    tab.model_combo.setCurrentText("gemini-snapshot")
+    tab.settings = {
+        "temperature": 0.6,
+        "top_p": 0.8,
+        "max_tokens": 2048,
+        "thinking_level": "Low",
+    }
+
+    original_process_events = QApplication.processEvents
+
+    def mutate_during_events():
+        tab.provider_combo.setCurrentText("OpenAI")
+        tab.model_combo.setCurrentText("gpt-live")
+        tab.settings["max_tokens"] = 999
+        tab.settings["thinking_level"] = "High"
+
+    monkeypatch.setattr(QApplication, "processEvents", mutate_during_events)
+    try:
+        packet = tab._run_chat_legal_research("research this", "context text")
+    finally:
+        monkeypatch.setattr(QApplication, "processEvents", original_process_events)
+
+    llm_kwargs = captured["llm_kwargs"]
+    assert packet is not None
+    assert llm_kwargs["provider"] == "Gemini"
+    assert llm_kwargs["model"] == "gemini-snapshot"
+    assert llm_kwargs["settings"]["max_tokens"] == 2048
+    assert llm_kwargs["settings"]["thinking_level"] == "Low"
+    assert llm_kwargs["settings"]["stream"] is False
+    assert llm_kwargs["settings"]["temperature"] == 0.2
+
+
+def test_send_message_uses_model_snapshot_for_final_worker_after_research_events(
+    qtbot,
+    monkeypatch,
+):
+    _app()
+    _clear_chat_research_settings()
+    from icharlotte_core.ui import tabs
+
+    worker_args = {}
+
+    class FakeSignal:
+        def connect(self, callback):
+            pass
+
+    class FakeWorker:
+        def __init__(
+            self,
+            provider,
+            model,
+            system,
+            user,
+            files,
+            settings,
+            history=None,
+            media_files=None,
+        ):
+            worker_args.update(
+                provider=provider,
+                model=model,
+                system=system,
+                user=user,
+                files=files,
+                settings=settings,
+                history=history,
+                media_files=media_files,
+            )
+            self.new_token = FakeSignal()
+            self.finished = FakeSignal()
+            self.error = FakeSignal()
+
+        def start(self):
+            worker_args["started"] = True
+
+    class FakePersistence:
+        def add_message(self, conversation_id, message):
+            pass
+
+    class FakeService:
+        @classmethod
+        def from_environment(cls, *, llm_callback):
+            return cls()
+
+        def research(self, *, user_text, context_text, settings, status_callback):
+            status_callback("fake progress")
+            return SimpleNamespace(
+                selected_authorities=[],
+                cases=[],
+                statutes=[],
+                verification=[],
+                get_known_case_names=lambda: [],
+                build_augmented_system_prompt=lambda base: base + "\nAUGMENTED",
+                format_research_basis_html=lambda: ["<b>Legal Research Basis</b>"],
+            )
+
+    monkeypatch.setattr(tabs, "ChatLegalResearchService", FakeService)
+    monkeypatch.setattr(tabs, "LLMWorker", FakeWorker)
+    tab = _make_chat_tab(qtbot, monkeypatch)
+    tab.persistence = FakePersistence()
+    tab.current_conversation_id = "conversation-1"
+    tab.provider_combo.setCurrentText("Gemini")
+    tab.model_combo.addItems(["gemini-snapshot", "gpt-live"])
+    tab.model_combo.setCurrentText("gemini-snapshot")
+    tab.settings = {
+        "temperature": 0.6,
+        "top_p": 0.8,
+        "max_tokens": 2048,
+        "thinking_level": "Low",
+    }
+    tab.legal_research_check.setChecked(True)
+    tab.chat_input.setPlainText("research this")
+    tab.read_files_content = lambda: ""
+    tab.read_library_content = lambda: ""
+    tab.get_attachment_info = lambda: []
+    tab._get_checked_audio_files = lambda: []
+
+    original_process_events = QApplication.processEvents
+
+    def mutate_during_events():
+        tab.provider_combo.setCurrentText("OpenAI")
+        tab.model_combo.setCurrentText("gpt-live")
+        tab.settings["max_tokens"] = 999
+        tab.settings["thinking_level"] = "High"
+
+    monkeypatch.setattr(QApplication, "processEvents", mutate_during_events)
+    try:
+        tab.send_message()
+    finally:
+        monkeypatch.setattr(QApplication, "processEvents", original_process_events)
+
+    assert worker_args["started"] is True
+    assert worker_args["provider"] == "Gemini"
+    assert worker_args["model"] == "gemini-snapshot"
+    assert worker_args["settings"]["max_tokens"] == 2048
+    assert worker_args["settings"]["thinking_level"] == "Low"
+    assert worker_args["settings"]["stream"] is True
+    assert worker_args["media_files"] is None
+
+
 def test_run_chat_legal_research_fail_closed_restores_buttons(qtbot, monkeypatch):
     _app()
     _clear_chat_research_settings()
@@ -158,10 +334,12 @@ def test_run_chat_legal_research_fail_closed_restores_buttons(qtbot, monkeypatch
     tab = _make_chat_tab(qtbot, monkeypatch)
     tab.send_btn.setEnabled(False)
     tab.stop_btn.setEnabled(True)
+    tab._pending_research = object()
 
     packet = tab._run_chat_legal_research("research this", "")
 
     assert packet is None
+    assert tab._pending_research is None
     assert "No verified legal authorities were found." in tab.chat_history.toPlainText()
     assert tab.send_btn.isEnabled() is True
     assert tab.stop_btn.isEnabled() is False
