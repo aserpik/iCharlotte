@@ -237,7 +237,7 @@ Rules:
 """
 
 CURRENT_LAW_RE = re.compile(
-    r"\b(most recent|recent|current law|new cases|latest|up to date|updated authority)\b",
+    r"\b(most recent|recent|current law|current authority|new cases|latest|up[- ]to[- ]date|updated authority)\b",
     re.I,
 )
 

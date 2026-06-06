@@ -147,6 +147,8 @@ def test_extract_propositions_limits_to_five_items_and_drops_blanks():
         "What is the current law on arbitration unconscionability?",
         "Are there any new cases about negligent hiring?",
         "Use up to date authority on premises liability",
+        "Use current authority on premises liability",
+        "Use up-to-date authority on premises liability",
     ],
 )
 def test_current_law_query_detection_positive(query):
