@@ -4,6 +4,12 @@
 from .persistence import ChatPersistence
 from .token_counter import TokenCounter
 from .models import Conversation, Message, QuickPrompt, BUILTIN_PROMPTS, TRANSCRIBE_PROMPT
+from .legal_research import (
+    ChatResearchError,
+    ChatResearchPacket,
+    ChatResearchSettings,
+    CourtListenerMode,
+)
 
 __all__ = [
     'ChatPersistence',
@@ -12,5 +18,9 @@ __all__ = [
     'Message',
     'QuickPrompt',
     'BUILTIN_PROMPTS',
-    'TRANSCRIBE_PROMPT'
+    'TRANSCRIBE_PROMPT',
+    'ChatResearchError',
+    'ChatResearchPacket',
+    'ChatResearchSettings',
+    'CourtListenerMode',
 ]
