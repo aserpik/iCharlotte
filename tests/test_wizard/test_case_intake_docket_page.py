@@ -46,6 +46,12 @@ def test_normalize_review_value_splits_list_fields():
     assert normalize_review_value("case_number", " 23STCV00123 ") == "23STCV00123"
 
 
+def test_normalize_review_value_drops_placeholder_values():
+    assert normalize_review_value("case_number", "None") == ""
+    assert normalize_review_value("venue_county", " n/a ") == ""
+    assert normalize_review_value("plaintiffs", "Alice\nnull\nN/A") == ["Alice"]
+
+
 def test_load_case_metadata_reads_review_fields():
     manager = FakeManager({
         "case_number": "23STCV00123",
@@ -195,6 +201,30 @@ def test_build_output_summary_marks_failed_when_process_fails(tmp_path):
     assert summary["recent_lines"] == ["scraper traceback"]
 
 
+def test_build_output_summary_failure_does_not_expose_stale_docket_pdf(tmp_path):
+    out_dir = tmp_path / "NOTES" / "AI OUTPUT"
+    out_dir.mkdir(parents=True)
+    stale_docket = out_dir / "Docket_2026.02.01.pdf"
+    variables_docx = out_dir / "variables.docx"
+    stale_docket.write_bytes(b"%PDF")
+    variables_docx.write_bytes(b"docx")
+
+    summary = build_output_summary(
+        str(tmp_path),
+        "1234.001",
+        manager=FakeManager(),
+        master_db=None,
+        recent_lines=["current run failed"],
+        success=False,
+    )
+
+    assert summary["success"] is False
+    assert summary["state"] == "failed"
+    assert summary["docket_pdf"] == ""
+    assert summary["variables_docx"] == str(variables_docx)
+    assert "failed" in summary["status"].lower()
+
+
 def test_review_page_round_trips_metadata_and_complaint_file(qtbot):
     page = CaseMetadataReviewPage()
     qtbot.addWidget(page)
@@ -243,6 +273,16 @@ def test_review_page_requires_case_number_and_venue_county(qtbot):
     assert page.run_docket_btn.isEnabled() is True
 
     page._field_widgets["case_number"].clear()
+    assert page.run_docket_btn.isEnabled() is False
+
+
+def test_review_page_placeholders_do_not_enable_run_docket(qtbot):
+    page = CaseMetadataReviewPage()
+    qtbot.addWidget(page)
+
+    page._field_widgets["case_number"].setText("None")
+    page._field_widgets["venue_county"].setText("n/a")
+
     assert page.run_docket_btn.isEnabled() is False
 
 
@@ -300,6 +340,30 @@ def test_output_page_shows_summary_output_path_warning_and_recent_lines(qtbot):
 
     summary["status"] = "mutated"
     assert page.summary["status"] == "Docket finished with no PDF."
+
+
+def test_output_page_load_output_routes_variables_docx_to_variables(qtbot, tmp_path):
+    page = CaseIntakeDocketOutputPage()
+    qtbot.addWidget(page)
+    variables_docx = tmp_path / "NOTES" / "AI OUTPUT" / "variables.docx"
+    variables_docx.parent.mkdir(parents=True)
+    variables_docx.write_bytes(b"docx")
+
+    page.show_summary({
+        "state": "partial",
+        "status": "No docket PDF was found.",
+        "docket_pdf": "",
+        "variables_docx": "",
+    })
+    page.load_output(str(variables_docx))
+
+    summary = page.summary
+    text = page.summary_view.toPlainText()
+    assert summary["variables_docx"] == str(variables_docx)
+    assert summary.get("docket_pdf", "") != str(variables_docx)
+    assert page.output_path == str(variables_docx)
+    assert f"Docket PDF: (not found)" in text
+    assert f"Variables: {variables_docx}" in text
 
 
 def test_settings_page_disables_run_without_file_number_and_emits_when_present(qtbot):

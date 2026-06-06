@@ -67,6 +67,7 @@ COMPLAINT_REJECT_TERMS = [
 ]
 
 COMPLAINT_EXTENSIONS = (".pdf", ".docx")
+PLACEHOLDER_VALUES = {"none", "null", "n/a", "na"}
 
 
 def _review_label(key: str) -> str:
@@ -82,13 +83,24 @@ def _case_manager():
 def normalize_review_value(key: str, value: Any) -> Any:
     if key in LIST_FIELDS:
         if isinstance(value, list):
-            return [str(v).strip() for v in value if str(v).strip()]
+            return [
+                text
+                for v in value
+                if (text := str(v).strip()) and text.lower() not in PLACEHOLDER_VALUES
+            ]
         text = "" if value is None else str(value)
         parts = re.split(r"[\n;]+", text)
-        return [p.strip() for p in parts if p.strip()]
+        return [
+            part
+            for p in parts
+            if (part := p.strip()) and part.lower() not in PLACEHOLDER_VALUES
+        ]
     if value is None:
         return ""
-    return str(value).strip()
+    text = str(value).strip()
+    if text.lower() in PLACEHOLDER_VALUES:
+        return ""
+    return text
 
 
 class CaseIntakeSettingsPage(QWidget):
@@ -293,7 +305,12 @@ class CaseIntakeDocketOutputPage(QWidget):
 
     def load_output(self, output_path: str) -> None:
         summary = self.summary
-        summary["docket_pdf"] = str(output_path or "")
+        path = str(output_path or "").strip()
+        lower_path = path.lower()
+        if lower_path.endswith(".pdf"):
+            summary["docket_pdf"] = path
+        elif lower_path.endswith(".docx") or os.path.basename(lower_path) == "variables.docx":
+            summary["variables_docx"] = path
         self.show_summary(summary)
 
     @staticmethod
@@ -448,7 +465,7 @@ def build_output_summary(
     success: bool = True,
 ) -> dict[str, Any]:
     mgr = manager or _case_manager()
-    docket_pdf = find_latest_docket_pdf(case_path)
+    docket_pdf = "" if not success else find_latest_docket_pdf(case_path)
     variables_docx = find_variables_docx(case_path)
     case_row = None
     if master_db is not None:
