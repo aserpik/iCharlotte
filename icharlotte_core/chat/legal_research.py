@@ -223,3 +223,64 @@ def _loads_json(text: str) -> dict[str, Any]:
 
 def _normalize_ws(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "")).strip().lower()
+
+
+PROPOSITION_EXTRACTION_PROMPT = """You are extracting focused California legal research questions for a litigation attorney.
+
+Read the user's request and context. Return 1 to 5 propositions or legal questions that should be researched.
+
+Rules:
+- Focus on California legal doctrine, elements, defenses, standards, and procedural rules.
+- Do not include party names unless needed to identify a specific case.
+- Do not include drafting instructions or formatting instructions.
+- Return strict JSON only: {"propositions":["landlord duty to repair stairs"]}.
+"""
+
+CURRENT_LAW_RE = re.compile(
+    r"\b(most recent|recent|current law|new cases|latest|up to date|updated authority)\b",
+    re.I,
+)
+
+
+def is_current_law_query(text: str) -> bool:
+    return bool(CURRENT_LAW_RE.search(text or ""))
+
+
+class ChatLegalResearchService:
+    def __init__(
+        self,
+        *,
+        llm_callback: LLMCallback,
+        local_corpus: Any = None,
+        firm_provider: Any = None,
+        courtlistener_client: Any = None,
+        courtlistener_token: str = "",
+        max_results_per_source: int = 8,
+    ) -> None:
+        self.llm_callback = llm_callback
+        self.local_corpus = local_corpus
+        self.firm_provider = firm_provider
+        self.courtlistener_client = courtlistener_client
+        self.courtlistener_token = courtlistener_token
+        self.max_results_per_source = max_results_per_source
+
+    def extract_propositions(self, *, user_text: str, context_text: str) -> list[str]:
+        research_input = (
+            f"USER REQUEST:\n{user_text or ''}\n\n"
+            f"CONTEXT:\n{(context_text or '')[:50000]}"
+        )
+        try:
+            raw = self.llm_callback(PROPOSITION_EXTRACTION_PROMPT, research_input) or ""
+        except Exception:
+            raw = ""
+        data = _loads_json(raw)
+        values = data.get("propositions") if isinstance(data, dict) else None
+        if isinstance(values, list):
+            propositions = [str(item).strip() for item in values if str(item).strip()]
+        else:
+            propositions = []
+        if not propositions:
+            fallback = (user_text or "").strip()
+            if fallback:
+                propositions = [fallback]
+        return propositions[:5]
