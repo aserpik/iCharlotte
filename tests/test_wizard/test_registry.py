@@ -25,6 +25,7 @@ def test_initial_tasks_registered():
         "oppose_motion",
         "generate_motion",
         "mediation_brief",
+        "case_intake_docket",
         "chat",
     }
 
@@ -43,6 +44,28 @@ def test_default_folders_per_task():
     assert get_task("summarize_discovery").default_folders == ["DISCOVERY/RESPONSES", "DISCOVERY"]
     assert get_task("summarize_depositions").default_folders == ["DISCOVERY/TRANSCRIPTS", "DISCOVERY"]
     assert get_task("medical_records").default_folders == ["RECORDS"]
+
+
+def test_case_intake_docket_registry_spec():
+    spec = get_task("case_intake_docket")
+    assert spec.title == "Case Intake & Docket"
+    assert (
+        spec.description
+        == "Extract complaint metadata, review case details, then download and process the court docket."
+    )
+    assert spec.icon_glyph == "\U0001F5C2"
+    assert spec.script_name == ""
+    assert spec.category == "General"
+    assert spec.default_folders == []
+    assert {
+        "complaint",
+        "docket",
+        "case number",
+        "venue",
+        "intake",
+        "hearing",
+        "trial",
+    } <= set(spec.keywords)
 
 
 def test_get_task_unknown_raises():

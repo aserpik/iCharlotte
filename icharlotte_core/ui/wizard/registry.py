@@ -248,6 +248,16 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         ],
         default_folders=[],
     ),
+    "case_intake_docket": TaskSpec(
+        task_id="case_intake_docket",
+        title="Case Intake & Docket",
+        description="Extract complaint metadata, review case details, then download and process the court docket.",
+        icon_glyph="\U0001F5C2",
+        script_name="",
+        category="General",
+        keywords=["complaint", "docket", "case number", "venue", "intake", "hearing", "trial"],
+        default_folders=[],
+    ),
     "chat": TaskSpec(
         task_id="chat",
         title="Chat",

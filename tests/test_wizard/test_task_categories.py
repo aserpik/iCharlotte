@@ -32,6 +32,7 @@ def test_expected_category_assignments():
     # General
     assert TASK_REGISTRY["chat"].category == "General"
     assert TASK_REGISTRY["separate"].category == "General"
+    assert TASK_REGISTRY["case_intake_docket"].category == "General"
     # Summarize
     assert TASK_REGISTRY["summarize_documents"].category == "Summarize"
     assert TASK_REGISTRY["summarize_discovery"].category == "Summarize"
@@ -57,7 +58,7 @@ def test_empty_query_returns_all_tasks_grouped_in_category_order():
     total = sum(len(v) for v in grouped.values())
     assert total == len(list_tasks())
     # Per-category counts per the spec.
-    assert len(grouped["General"]) == 2
+    assert len(grouped["General"]) == 3
     assert len(grouped["Summarize"]) == 3
     assert len(grouped["Discovery"]) == 2
     assert len(grouped["Medical"]) == 4

@@ -1094,10 +1094,58 @@ class MainWindow(QMainWindow):
                 # Chat tabs are case-scoped but not snapshot/restored — each
                 # session starts fresh; conversations live in chat persistence.
                 continue
+            task_id = tab.spec.task_id
             # Determine page label.
             page_idx = tab.currentIndex()
-            if page_idx == 1:  # PAGE_STATUS — store as settings (no live worker
-                               # survives a restart, so it can't be restored).
+            case_intake_metadata = {}
+            if task_id == "case_intake_docket":
+                from icharlotte_core.ui.wizard.pages.case_intake_docket_page import (
+                    TASK_PAGE_COMPLAINT_STATUS,
+                    TASK_PAGE_DOCKET_STATUS,
+                    TASK_PAGE_REVIEW,
+                    TASK_PAGE_SETTINGS as CASE_INTAKE_DOCKET_PAGE_SETTINGS,
+                    TASK_PAGE_OUTPUT as CASE_INTAKE_DOCKET_PAGE_OUTPUT,
+                )
+
+                case_intake_metadata = dict(getattr(tab, "_last_metadata", {}) or {})
+                if not case_intake_metadata and page_idx in (
+                    TASK_PAGE_REVIEW,
+                    CASE_INTAKE_DOCKET_PAGE_OUTPUT,
+                ) and hasattr(tab, "review_page"):
+                    try:
+                        case_intake_metadata = dict(tab.review_page.to_dict())
+                    except Exception:
+                        case_intake_metadata = {}
+                has_review_metadata = any(
+                    bool(value)
+                    for key, value in case_intake_metadata.items()
+                    if key != "complaint_file"
+                )
+
+                if page_idx == CASE_INTAKE_DOCKET_PAGE_OUTPUT:
+                    page = "output"
+                elif page_idx == TASK_PAGE_REVIEW:
+                    page = "review"
+                elif page_idx == TASK_PAGE_DOCKET_STATUS:
+                    if cancel_running and getattr(tab, "_worker", None) is not None:
+                        try:
+                            tab._worker.cancel()
+                        except Exception:
+                            pass
+                    page = "review" if has_review_metadata else "settings"
+                elif page_idx == TASK_PAGE_COMPLAINT_STATUS:
+                    if cancel_running and getattr(tab, "_worker", None) is not None:
+                        try:
+                            tab._worker.cancel()
+                        except Exception:
+                            pass
+                    page = "settings"
+                elif page_idx == CASE_INTAKE_DOCKET_PAGE_SETTINGS:
+                    page = "settings"
+                else:
+                    page = "settings"
+            elif page_idx == 1:  # PAGE_STATUS — store as settings (no live worker
+                                 # survives a restart, so it can't be restored).
                 if cancel_running and getattr(tab, "_worker", None) is not None:
                     try:
                         tab._worker.cancel()
@@ -1112,15 +1160,20 @@ class MainWindow(QMainWindow):
             files_rel = [self._relpath_under(self.case_path, f) for f in tab.files]
             output_path = tab.output_page.output_path if page == "output" else None
             output_path_rel = self._relpath_under(self.case_path, output_path) if output_path else None
-
-            snapshots.append({
-                "task_id": tab.spec.task_id,
+            settings = tab.settings_page.to_dict()
+            snapshot = {
+                "task_id": task_id,
                 "instance_suffix": tab.property("wizard_instance_suffix") or "",
                 "files": files_rel,
-                "settings": tab.settings_page.to_dict(),
+                "settings": settings,
                 "page": page,
                 "output_path": output_path_rel,
-            })
+            }
+            if task_id == "case_intake_docket":
+                snapshot["settings"] = dict(case_intake_metadata)
+                snapshot["metadata"] = dict(case_intake_metadata)
+                snapshot["summary"] = dict(getattr(tab.output_page, "summary", {}) or {})
+            snapshots.append(snapshot)
         return snapshots
 
     def _remove_all_task_tabs(self) -> None:
@@ -1228,7 +1281,12 @@ class MainWindow(QMainWindow):
         title = f"{spec.title} {suffix}".strip()
 
         builder_name = get_in_process_task_builder_name(task_id)
-        if builder_name and builder_name not in ("build_oppose_motion_tab", "build_mediation_brief_tab", "build_generate_motion_tab"):
+        if builder_name and builder_name not in (
+            "build_oppose_motion_tab",
+            "build_mediation_brief_tab",
+            "build_generate_motion_tab",
+            "build_case_intake_docket_tab",
+        ):
             # In-process custom tabs (e.g. Separate) own their source selection;
             # reopening re-runs the builder's picker. Analysis output is
             # ephemeral, so there's nothing to restore beyond the tab itself.
@@ -1248,7 +1306,8 @@ class MainWindow(QMainWindow):
             self._hide_fixed_close_buttons()
             return
 
-        if get_in_process_task_builder_name(task_id) == "build_oppose_motion_tab":
+        restored_summary = False
+        if builder_name == "build_oppose_motion_tab":
             from icharlotte_core.ui.wizard.pages.oppose_motion_page import (
                 OpposeMotionTaskTab,
                 TASK_PAGE_OUTPUT,
@@ -1269,7 +1328,7 @@ class MainWindow(QMainWindow):
             task_tab.settings_page.from_dict(settings)
             output_page = TASK_PAGE_OUTPUT
             settings_page = TASK_PAGE_SETTINGS
-        elif get_in_process_task_builder_name(task_id) == "build_generate_motion_tab":
+        elif builder_name == "build_generate_motion_tab":
             from icharlotte_core.ui.wizard.pages.generate_motion_page import (
                 GenerateMotionTaskTab,
                 TASK_PAGE_OUTPUT,
@@ -1286,7 +1345,7 @@ class MainWindow(QMainWindow):
             task_tab.settings_page.from_dict(settings)
             output_page = TASK_PAGE_OUTPUT
             settings_page = TASK_PAGE_SETTINGS
-        elif get_in_process_task_builder_name(task_id) == "build_mediation_brief_tab":
+        elif builder_name == "build_mediation_brief_tab":
             from icharlotte_core.ui.wizard.pages.mediation_brief_page import (
                 MediationBriefTaskTab,
                 TASK_PAGE_OUTPUT,
@@ -1301,6 +1360,33 @@ class MainWindow(QMainWindow):
             )
             output_page = TASK_PAGE_OUTPUT
             settings_page = TASK_PAGE_SETTINGS
+        elif builder_name == "build_case_intake_docket_tab":
+            from icharlotte_core.ui.wizard.pages.case_intake_docket_page import (
+                CaseIntakeDocketTaskTab,
+                TASK_PAGE_OUTPUT,
+                TASK_PAGE_REVIEW,
+                TASK_PAGE_SETTINGS,
+            )
+
+            metadata = dict(entry.get("metadata") or entry.get("settings") or {})
+            task_tab = CaseIntakeDocketTaskTab(
+                spec=spec,
+                case_path=self.case_path,
+                file_number=self.file_number,
+                parent=self,
+            )
+            if metadata:
+                task_tab.load_review_state(metadata)
+            summary = dict(entry.get("summary") or {})
+            for key in ("docket_pdf", "variables_docx"):
+                path = str(summary.get(key) or "")
+                if path and self.case_path and not os.path.isabs(path):
+                    summary[key] = os.path.join(self.case_path, path)
+            if summary:
+                task_tab.load_output_summary(summary, metadata=metadata or None)
+                restored_summary = True
+            output_page = TASK_PAGE_OUTPUT
+            settings_page = TASK_PAGE_REVIEW if metadata else TASK_PAGE_SETTINGS
         else:
             task_tab = TaskTab(
                 spec=spec,
@@ -1324,6 +1410,8 @@ class MainWindow(QMainWindow):
         if out_abs and os.path.exists(out_abs):
             if hasattr(task_tab.output_page, "load_output"):
                 task_tab.output_page.load_output(out_abs)
+            task_tab.setCurrentIndex(output_page)
+        elif restored_summary:
             task_tab.setCurrentIndex(output_page)
         else:
             QMessageBox.information(
@@ -1356,7 +1444,12 @@ class MainWindow(QMainWindow):
             ]
             settings_dict = entry.get("settings") or {}
             builder_name = get_in_process_task_builder_name(task_id)
-            if builder_name and builder_name not in ("build_oppose_motion_tab", "build_mediation_brief_tab", "build_generate_motion_tab"):
+            if builder_name and builder_name not in (
+                "build_oppose_motion_tab",
+                "build_mediation_brief_tab",
+                "build_generate_motion_tab",
+                "build_case_intake_docket_tab",
+            ):
                 # In-process custom tabs (e.g. Separate) re-pick their source on
                 # restore; skip silently if the user cancels the picker.
                 # (Mediation Brief is excluded above so its saved brief is reloaded.)
@@ -1374,7 +1467,8 @@ class MainWindow(QMainWindow):
                 self.tabs.addTab(tab, f"{spec.title} {suffix}".strip())
                 continue
 
-            if get_in_process_task_builder_name(task_id) == "build_oppose_motion_tab":
+            restored_summary = False
+            if builder_name == "build_oppose_motion_tab":
                 from icharlotte_core.ui.wizard.pages.oppose_motion_page import (
                     OpposeMotionTaskTab,
                     TASK_PAGE_OUTPUT,
@@ -1395,7 +1489,7 @@ class MainWindow(QMainWindow):
                 )
                 output_page = TASK_PAGE_OUTPUT
                 settings_page = TASK_PAGE_SETTINGS
-            elif get_in_process_task_builder_name(task_id) == "build_generate_motion_tab":
+            elif builder_name == "build_generate_motion_tab":
                 from icharlotte_core.ui.wizard.pages.generate_motion_page import (
                     GenerateMotionTaskTab,
                     TASK_PAGE_OUTPUT,
@@ -1410,7 +1504,7 @@ class MainWindow(QMainWindow):
                 )
                 output_page = TASK_PAGE_OUTPUT
                 settings_page = TASK_PAGE_SETTINGS
-            elif get_in_process_task_builder_name(task_id) == "build_mediation_brief_tab":
+            elif builder_name == "build_mediation_brief_tab":
                 from icharlotte_core.ui.wizard.pages.mediation_brief_page import (
                     MediationBriefTaskTab,
                     TASK_PAGE_OUTPUT,
@@ -1425,6 +1519,39 @@ class MainWindow(QMainWindow):
                 )
                 output_page = TASK_PAGE_OUTPUT
                 settings_page = TASK_PAGE_SETTINGS
+            elif builder_name == "build_case_intake_docket_tab":
+                from icharlotte_core.ui.wizard.pages.case_intake_docket_page import (
+                    CaseIntakeDocketTaskTab,
+                    TASK_PAGE_OUTPUT,
+                    TASK_PAGE_REVIEW,
+                    TASK_PAGE_SETTINGS,
+                )
+
+                metadata = dict(entry.get("metadata") or settings_dict or {})
+                tab = CaseIntakeDocketTaskTab(
+                    spec=spec,
+                    case_path=self.case_path,
+                    file_number=self.file_number,
+                    parent=self,
+                )
+                if metadata:
+                    tab.load_review_state(metadata)
+                summary = dict(entry.get("summary") or {})
+                for key in ("docket_pdf", "variables_docx"):
+                    path = str(summary.get(key) or "")
+                    if path and self.case_path and not os.path.isabs(path):
+                        summary[key] = os.path.join(self.case_path, path)
+                if summary:
+                    tab.load_output_summary(summary, metadata=metadata or None)
+                    restored_summary = True
+                output_page = TASK_PAGE_OUTPUT
+                saved_page = entry.get("page", "settings")
+                if saved_page == "review":
+                    settings_page = TASK_PAGE_REVIEW
+                elif saved_page == "settings":
+                    settings_page = TASK_PAGE_SETTINGS
+                else:
+                    settings_page = TASK_PAGE_REVIEW if metadata else TASK_PAGE_SETTINGS
             else:
                 tab = TaskTab(
                     spec=spec,
@@ -1457,6 +1584,8 @@ class MainWindow(QMainWindow):
                 if out_abs and os.path.exists(out_abs):
                     if hasattr(tab.output_page, "load_output"):
                         tab.output_page.load_output(out_abs)
+                    tab.setCurrentIndex(output_page)
+                elif restored_summary:
                     tab.setCurrentIndex(output_page)
                 else:
                     tab.setCurrentIndex(settings_page)

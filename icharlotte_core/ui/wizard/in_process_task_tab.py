@@ -513,3 +513,16 @@ def build_mediation_brief_tab(
         file_number=file_number,
         parent=parent,
     )
+
+
+def build_case_intake_docket_tab(
+    spec,
+    case_path: str,
+    file_number: str,
+    parent: QWidget | None,
+):
+    from icharlotte_core.ui.wizard.pages.case_intake_docket_page import (
+        build_case_intake_docket_tab as _build,
+    )
+
+    return _build(spec=spec, case_path=case_path, file_number=file_number, parent=parent)
