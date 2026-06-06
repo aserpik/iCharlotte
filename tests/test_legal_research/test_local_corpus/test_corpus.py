@@ -274,6 +274,80 @@ def test_opinion_text_hit_ranks_before_parenthetical_only_hit(tmp_path):
     assert results[1].snippet_source == "parenthetical"
 
 
+def test_parenthetical_does_not_add_duplicate_vote_for_existing_keyword_hit(tmp_path):
+    db = str(tmp_path / "c.db")
+    vec = str(tmp_path / "v.f16")
+    con = schema.connect(db)
+    schema.create_schema(con)
+    emb = FakeEmbedder(dim=64)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb)
+    idx.add(
+        CaseRecord(
+            case_uid="cap:strong",
+            source="cap",
+            name="Strong Opinion Hit",
+            citation="4 Cal. 5th 4",
+            full_text="summary judgment burden causation allocation appears in the opinion text.",
+        ),
+        [
+            PassageRecord(
+                passage_uid="cap:strong#0",
+                case_uid="cap:strong",
+                ordinal=0,
+                text="summary judgment burden causation allocation appears in the opinion text.",
+            )
+        ],
+    )
+    idx.add(
+        CaseRecord(
+            case_uid="cap:duplicate",
+            source="cap",
+            name="Duplicate Parenthetical Hit",
+            citation="5 Cal. 5th 5",
+            full_text="summary judgment appears in the opinion text.",
+        ),
+        [
+            PassageRecord(
+                passage_uid="cap:duplicate#0",
+                case_uid="cap:duplicate",
+                ordinal=0,
+                text="summary judgment appears in the opinion text.",
+            )
+        ],
+    )
+    idx.finalize()
+    con.close()
+    con = schema.connect(db)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb, resume=True)
+    idx.add_passages(
+        [
+            PassageRecord(
+                passage_uid="cap:duplicate#parenthetical:902",
+                case_uid="cap:duplicate",
+                ordinal=1_000_000,
+                text=(
+                    "summary judgment burden causation allocation "
+                    "summary judgment burden causation allocation"
+                ),
+                passage_type="parenthetical",
+                parenthetical_id="902",
+            )
+        ],
+        embed=False,
+    )
+    idx.finalize()
+    con.close()
+
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    results = corpus.search_opinions(
+        "summary judgment burden causation allocation",
+        semantic=False,
+        max_results=5,
+    )
+
+    assert [r.cluster_id for r in results[:2]] == ["cap:strong", "cap:duplicate"]
+
+
 def test_search_opinions_migrates_pre_parenthetical_schema(tmp_path):
     db = str(tmp_path / "legacy.db")
     vec = str(tmp_path / "legacy.f16")

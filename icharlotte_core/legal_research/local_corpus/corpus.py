@@ -141,13 +141,17 @@ class LocalCaseCorpus:
         bm25 = self._bm25_case_ranking(query, _CANDIDATES)
         rankings = [bm25]
         parenthetical = self._parenthetical_case_ranking(query, _CANDIDATES)
-        if parenthetical:
-            rankings.append(parenthetical)
         if semantic:
             try:
                 rankings.append(self._semantic_case_ranking(query, _CANDIDATES))
             except Exception:
                 logger.warning("semantic ranking failed; BM25 only", exc_info=True)
+        ranked_cases = {case_uid for ranking in rankings for case_uid in ranking}
+        parenthetical_recall = [
+            case_uid for case_uid in parenthetical if case_uid not in ranked_cases
+        ]
+        if parenthetical_recall:
+            rankings.append(parenthetical_recall)
         fused = self._rrf(*rankings)[:max_results]
         return [self._case_result(uid, query) for uid in fused]
 
