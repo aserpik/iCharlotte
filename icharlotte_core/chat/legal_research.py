@@ -8,9 +8,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+import html as html_lib
 import json
 import re
 from typing import Any, Callable, Iterable, Optional
+from urllib.parse import urlparse
 
 from icharlotte_core.legal_research.models import CaseResult
 
@@ -191,13 +193,21 @@ class ChatResearchPacket:
                 source_labels = ", ".join(s.label for s in authority.sources) or "unknown source"
                 lines.append(f"- {authority.formatted_citation}")
                 lines.append(f"  Proposition: {authority.proposition}")
-                lines.append(f"  Selected because: {authority.reason}")
-                lines.append(f"  Supports: {authority.supports}")
+                if authority.reason:
+                    lines.append(
+                        f"  Untrusted selector reason: {_sanitize_selector_text(authority.reason)}"
+                    )
+                if authority.supports:
+                    lines.append(
+                        f"  Untrusted selector support summary: {_sanitize_selector_text(authority.supports)}"
+                    )
                 lines.append(f"  Source: {source_labels}")
                 if authority.quote:
                     lines.append(f"  Quote: \"{authority.quote}\"")
                 if authority.caveat:
-                    lines.append(f"  Caveat: {authority.caveat}")
+                    lines.append(
+                        f"  Untrusted selector caveat: {_sanitize_selector_text(authority.caveat)}"
+                    )
                 if authority.url:
                     lines.append(f"  URL: {authority.url}")
         if self.warnings:
@@ -213,23 +223,27 @@ class ChatResearchPacket:
         if self.searches:
             lines.append("<i>Searches run:</i>")
             for item in self.searches:
-                lines.append(f"- {item}")
+                lines.append(f"- {_escape_html(item)}")
         if self.selected_authorities:
             lines.append("<i>Authorities selected:</i>")
             for authority in self.selected_authorities:
                 source_labels = ", ".join(s.label for s in authority.sources) or "unknown source"
-                line = f"- <b>{authority.formatted_citation}</b> [{source_labels}]"
-                if authority.url:
-                    line += f' <a href="{authority.url}">View</a>'
+                line = (
+                    f"- <b>{_escape_html(authority.formatted_citation)}</b> "
+                    f"[{_escape_html(source_labels)}]"
+                )
+                safe_url = _safe_http_url(authority.url)
+                if safe_url:
+                    line += f' <a href="{_escape_html(safe_url)}">View</a>'
                 lines.append(line)
                 if authority.reason:
-                    lines.append(f"  Why: {authority.reason}")
+                    lines.append(f"  Why: {_escape_html(authority.reason)}")
                 if authority.quote:
-                    lines.append(f"  Quote: &quot;{authority.quote}&quot;")
+                    lines.append(f"  Quote: &quot;{_escape_html(authority.quote)}&quot;")
         if self.warnings:
             lines.append("<i>Warnings:</i>")
             for warning in self.warnings:
-                lines.append(f"- {warning}")
+                lines.append(f"- {_escape_html(warning)}")
         return lines
 
     def build_augmented_system_prompt(self, base_system_prompt: str) -> str:
@@ -258,6 +272,44 @@ def _loads_json(text: str) -> dict[str, Any]:
 
 def _normalize_ws(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "")).strip().lower()
+
+
+def _escape_html(text: str) -> str:
+    return html_lib.escape(str(text or ""), quote=True)
+
+
+def _safe_http_url(url: str) -> str:
+    value = str(url or "").strip()
+    if not value:
+        return ""
+    parsed = urlparse(value)
+    if parsed.scheme.lower() not in {"http", "https"}:
+        return ""
+    if not parsed.netloc:
+        return ""
+    return value
+
+
+PROMPT_CONTROL_MARKER_RE = re.compile(
+    r"[\[\(<{]\s*/?\s*(?:system|assistant|user|developer|instruction|instructions|prompt|"
+    r"chat\s+legal\s+research\s+authority)[^\]\)>}]*[\]\)>}]",
+    re.I,
+)
+PROMPT_CONTROL_PHRASE_RE = re.compile(
+    r"\b(?:ignore|disregard|override)\s+(?:all\s+)?(?:previous|prior|earlier|above)\s+"
+    r"(?:instructions?|prompts?|messages?)\b",
+    re.I,
+)
+
+
+def _sanitize_selector_text(text: str, *, max_chars: int = 600) -> str:
+    cleaned = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]+", " ", str(text or ""))
+    cleaned = PROMPT_CONTROL_MARKER_RE.sub("[removed prompt-control marker]", cleaned)
+    cleaned = PROMPT_CONTROL_PHRASE_RE.sub("[removed prompt-control phrase]", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if len(cleaned) > max_chars:
+        return cleaned[: max_chars - 3].rstrip() + "..."
+    return cleaned
 
 
 def _relevant_excerpt(text: str, proposition: str, *, max_chars: int = 3500) -> str:
@@ -359,6 +411,17 @@ def _candidate_key(candidate: ChatAuthorityCandidate) -> str:
         return f"id:{candidate.id}"
     name = re.sub(r"[^a-z0-9]+", "", (candidate.case_name or "").lower())
     return f"name:{name}:{candidate.year}"
+
+
+def _only_unverified_firm_sources(candidate: ChatAuthorityCandidate) -> bool:
+    if not candidate.sources:
+        return False
+    for source in candidate.sources:
+        if source.kind != "firm":
+            return False
+        if str(source.verification or "").lower() != "unverified_firm":
+            return False
+    return True
 
 
 def _case_result_candidate(
@@ -708,8 +771,9 @@ class ChatLegalResearchService:
             if not normalized_quote:
                 continue
             text_match = normalized_quote in _normalize_ws(candidate.text)
-            snippet_match = normalized_quote in _normalize_ws(candidate.snippet)
-            if not text_match and not snippet_match:
+            if not text_match:
+                continue
+            if _only_unverified_firm_sources(candidate):
                 continue
             selected.append(
                 ChatSelectedAuthority(
@@ -792,7 +856,9 @@ class ChatLegalResearchService:
         seen: set[str] = set()
         out: list[ChatSelectedAuthority] = []
         for authority in authorities:
-            key = re.sub(r"[^a-z0-9]+", "", authority.citation.lower()) or authority.id
+            citation_key = re.sub(r"[^a-z0-9]+", "", authority.citation.lower()) or authority.id
+            proposition_key = _normalize_ws(authority.proposition)
+            key = f"{citation_key}:{proposition_key}"
             if key in seen:
                 continue
             seen.add(key)
