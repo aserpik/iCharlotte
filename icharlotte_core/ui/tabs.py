@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QSizePolicy, QSlider
 )
 from PySide6.QtCore import Qt, Signal, QThread, QFileInfo, QTimer, QSettings, QEvent
-from PySide6.QtGui import QTextCursor, QDragEnterEvent, QDropEvent, QAction, QPixmap, QBrush
+from PySide6.QtGui import QTextCursor, QDragEnterEvent, QDropEvent, QAction, QActionGroup, QPixmap, QBrush
 
 from ..config import API_KEYS, SCRIPTS_DIR, GEMINI_DATA_DIR
 from ..utils import log_event
@@ -27,7 +27,16 @@ from .chat_widgets import (
     ConversationSidebar, ResizableInputArea, ContextIndicator,
     MessageWidget, SearchResultsWidget, get_theme, THEMES
 )
-from ..chat import ChatPersistence, TokenCounter, Message, Conversation, BUILTIN_PROMPTS, TRANSCRIBE_PROMPT
+from ..chat import (
+    ChatPersistence,
+    TokenCounter,
+    Message,
+    Conversation,
+    BUILTIN_PROMPTS,
+    TRANSCRIBE_PROMPT,
+    ChatResearchSettings,
+    CourtListenerMode,
+)
 from ..chat.markdown_render import render_markdown, CHAT_MARKDOWN_CSS
 from ..mediation_brief import (
     MediationBriefGenerator, MediationBriefWorker, RefinementWorker,
@@ -483,6 +492,12 @@ class ChatTab(QWidget):
             "Search CA case law and statutes, inject verified citations into response"
         )
         toolbar_layout.addWidget(self.legal_research_check)
+
+        self.research_sources_btn = QToolButton()
+        self.research_sources_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.research_sources_btn.setToolTip("Choose legal research sources")
+        self._build_research_sources_menu()
+        toolbar_layout.addWidget(self.research_sources_btn)
 
         toolbar_layout.addStretch()
 
@@ -2115,6 +2130,125 @@ class ChatTab(QWidget):
 
         # Save sidebar visibility state
         self._save_sidebar_state()
+
+    # --- Chat Legal Research Source Persistence ---
+
+    def _load_chat_research_settings(self):
+        settings = QSettings("iCharlotte", "iCharlotte")
+        return ChatResearchSettings.from_values(
+            firm_authority=settings.value("chat_tab/legal_research_firm_authority", True),
+            local_corpus=settings.value("chat_tab/legal_research_local_corpus", True),
+            courtlistener_mode=settings.value(
+                "chat_tab/legal_research_courtlistener_mode",
+                CourtListenerMode.FALLBACK_CURRENT_LAW.value,
+            ),
+        )
+
+    def _save_chat_research_settings(self, research_settings):
+        settings = QSettings("iCharlotte", "iCharlotte")
+        settings.setValue(
+            "chat_tab/legal_research_firm_authority",
+            research_settings.firm_authority,
+        )
+        settings.setValue(
+            "chat_tab/legal_research_local_corpus",
+            research_settings.local_corpus,
+        )
+        settings.setValue(
+            "chat_tab/legal_research_courtlistener_mode",
+            research_settings.courtlistener_mode.value,
+        )
+
+    def _build_research_sources_menu(self):
+        menu = QMenu(self.research_sources_btn)
+        current = self._load_chat_research_settings()
+
+        self.firm_authority_action = QAction("Firm/sample-motion authority", menu)
+        self.firm_authority_action.setCheckable(True)
+        self.firm_authority_action.setChecked(current.firm_authority)
+
+        self.local_corpus_action = QAction("Local California corpus", menu)
+        self.local_corpus_action.setCheckable(True)
+        self.local_corpus_action.setChecked(current.local_corpus)
+
+        menu.addAction(self.firm_authority_action)
+        menu.addAction(self.local_corpus_action)
+        menu.addSeparator()
+
+        mode_group = QActionGroup(menu)
+        mode_group.setExclusive(True)
+        self.courtlistener_off_action = QAction("CourtListener API: Off", menu)
+        self.courtlistener_fallback_action = QAction(
+            "CourtListener API: Fallback/current-law",
+            menu,
+        )
+        self.courtlistener_always_action = QAction("CourtListener API: Always search", menu)
+        for action in (
+            self.courtlistener_off_action,
+            self.courtlistener_fallback_action,
+            self.courtlistener_always_action,
+        ):
+            action.setCheckable(True)
+            mode_group.addAction(action)
+            menu.addAction(action)
+
+        if current.courtlistener_mode == CourtListenerMode.OFF:
+            self.courtlistener_off_action.setChecked(True)
+        elif current.courtlistener_mode == CourtListenerMode.ALWAYS_SEARCH:
+            self.courtlistener_always_action.setChecked(True)
+        else:
+            self.courtlistener_fallback_action.setChecked(True)
+
+        for action in (
+            self.firm_authority_action,
+            self.local_corpus_action,
+            self.courtlistener_off_action,
+            self.courtlistener_fallback_action,
+            self.courtlistener_always_action,
+        ):
+            action.triggered.connect(self._on_research_source_changed)
+
+        self.research_sources_btn.setMenu(menu)
+        self._refresh_research_sources_label()
+
+    def _current_chat_research_settings(self):
+        if self.courtlistener_off_action.isChecked():
+            mode = CourtListenerMode.OFF
+        elif self.courtlistener_always_action.isChecked():
+            mode = CourtListenerMode.ALWAYS_SEARCH
+        else:
+            mode = CourtListenerMode.FALLBACK_CURRENT_LAW
+        return ChatResearchSettings.from_values(
+            firm_authority=self.firm_authority_action.isChecked(),
+            local_corpus=self.local_corpus_action.isChecked(),
+            courtlistener_mode=mode.value,
+        )
+
+    def _on_research_source_changed(self):
+        current = self._current_chat_research_settings()
+        if current.courtlistener_mode == CourtListenerMode.ALWAYS_SEARCH:
+            self.courtlistener_always_action.setChecked(True)
+        elif current.courtlistener_mode == CourtListenerMode.OFF:
+            self.courtlistener_off_action.setChecked(True)
+        else:
+            self.courtlistener_fallback_action.setChecked(True)
+        self._save_chat_research_settings(current)
+        self._refresh_research_sources_label()
+
+    def _refresh_research_sources_label(self):
+        current = self._current_chat_research_settings()
+        parts = []
+        if current.firm_authority:
+            parts.append("Firm")
+        if current.local_corpus:
+            parts.append("Local")
+        if current.courtlistener_mode == CourtListenerMode.FALLBACK_CURRENT_LAW:
+            parts.append("CL Fallback")
+        elif current.courtlistener_mode == CourtListenerMode.ALWAYS_SEARCH:
+            parts.append("CL Always")
+        else:
+            parts.append("CL Off")
+        self.research_sources_btn.setText("Sources: " + " + ".join(parts))
 
     # --- Splitter Persistence ---
 
