@@ -250,6 +250,7 @@ def is_current_law_query(text: str) -> bool:
 
 FRESHNESS_MAX_AGE_DAYS = 548
 THIN_RESULT_THRESHOLD = 2
+_MISSING = object()
 
 
 def _year(value: str) -> str:
@@ -427,7 +428,7 @@ class ChatLegalResearchService:
         for proposition in propositions:
             local_count = 0
             if settings.firm_authority:
-                firm_candidates = self._collect_firm(proposition)
+                firm_candidates = self._collect_firm(proposition, settings=settings)
                 all_candidates.extend(firm_candidates)
                 searches.append(f"Firm/sample-motion authority: {proposition}")
                 if self.firm_provider is None:
@@ -436,18 +437,21 @@ class ChatLegalResearchService:
                     )
 
             if settings.local_corpus:
-                local_candidates, local_hits = self._collect_case_client(
+                local_candidates, _local_hits = self._collect_case_client(
                     self.local_corpus,
                     proposition=proposition,
                     source_kind="local_corpus",
                     source_label="Local California corpus",
                 )
-                local_count = local_hits
+                local_count = len(local_candidates)
                 all_candidates.extend(local_candidates)
                 searches.append(f"Local California corpus: {proposition}")
                 if self.local_corpus is None:
                     warnings.append("Local California corpus selected but the local corpus is unavailable.")
-                elif local_count < THIN_RESULT_THRESHOLD:
+                elif local_count == 0 or (
+                    settings.courtlistener_mode == CourtListenerMode.FALLBACK_CURRENT_LAW
+                    and local_count < THIN_RESULT_THRESHOLD
+                ):
                     warnings.append(f"Local corpus returned thin results for: {proposition}")
                 if local_warning:
                     warnings.append(local_warning)
@@ -474,9 +478,24 @@ class ChatLegalResearchService:
         unique_searches = list(dict.fromkeys(searches))
         return _merge_candidates(all_candidates), unique_warnings, unique_searches
 
-    def _collect_firm(self, proposition: str) -> list[ChatAuthorityCandidate]:
+    def _collect_firm(
+        self,
+        proposition: str,
+        *,
+        settings: ChatResearchSettings,
+    ) -> list[ChatAuthorityCandidate]:
         if self.firm_provider is None:
             return []
+        restore_cl_client = _MISSING
+        if settings.courtlistener_mode == CourtListenerMode.OFF and hasattr(
+            self.firm_provider,
+            "cl_client",
+        ):
+            try:
+                restore_cl_client = self.firm_provider.cl_client
+                self.firm_provider.cl_client = None
+            except Exception:
+                restore_cl_client = _MISSING
         try:
             rows = self.firm_provider.candidates_for(
                 proposition,
@@ -486,6 +505,12 @@ class ChatLegalResearchService:
             ) or []
         except Exception:
             return []
+        finally:
+            if restore_cl_client is not _MISSING:
+                try:
+                    self.firm_provider.cl_client = restore_cl_client
+                except Exception:
+                    pass
         return [_firm_candidate(row, proposition=proposition) for row in rows]
 
     def _collect_case_client(

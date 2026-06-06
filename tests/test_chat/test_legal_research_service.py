@@ -196,6 +196,27 @@ class FakeFirmProvider:
         return self.candidates
 
 
+class FakeFirmProviderWithLiveFallback(FakeFirmProvider):
+    def __init__(self, *, cl_client, candidates=None):
+        super().__init__(candidates=candidates)
+        self.cl_client = cl_client
+
+    def candidates_for(self, proposition, *, motion_type, side, limit=6):
+        if self.cl_client is not None:
+            self.cl_client.search_opinions(
+                proposition,
+                semantic=True,
+                max_results=limit,
+                published_only=True,
+            )
+        return super().candidates_for(
+            proposition,
+            motion_type=motion_type,
+            side=side,
+            limit=limit,
+        )
+
+
 def _case(
     name="Duty v. Care",
     cite="30 Cal. 4th 43",
@@ -287,6 +308,46 @@ def test_collect_firm_only_uses_firm_provider():
     assert searches == ["Firm/sample-motion authority: meet and confer required"]
 
 
+def test_collect_firm_with_courtlistener_off_disables_provider_live_fallback():
+    live_fallback = FakeCorpusClient(
+        results=[_case(name="Live v. Case", cite="55 Cal.App.5th 10", uid="cl:1")]
+    )
+    firm = FakeFirmProviderWithLiveFallback(
+        cl_client=live_fallback,
+        candidates=[
+            {
+                "cluster_id": "cap:firm",
+                "case_name": "Townsend v. Superior Court",
+                "citation": "61 Cal.App.4th 1431",
+                "year": "1998",
+                "text": "The court required a good faith effort.",
+                "source": "firm",
+                "verification": "local",
+                "source_brief": "sample.pdf",
+                "passage": "good faith effort",
+                "proposition": "meet and confer required",
+            }
+        ],
+    )
+    service = _service_for_sources(firm=firm)
+
+    candidates, warnings, searches = service.collect_candidates(
+        propositions=["meet and confer required"],
+        settings=ChatResearchSettings(
+            firm_authority=True,
+            local_corpus=False,
+            courtlistener_mode=CourtListenerMode.OFF,
+        ),
+        original_query="meet and confer required",
+    )
+
+    assert len(candidates) == 1
+    assert live_fallback.calls == []
+    assert firm.cl_client is live_fallback
+    assert warnings == []
+    assert searches == ["Firm/sample-motion authority: meet and confer required"]
+
+
 def test_courtlistener_off_never_calls_live_client_even_with_thin_local_results():
     local = FakeCorpusClient(results=[])
     cl = FakeCorpusClient(
@@ -349,6 +410,35 @@ def test_courtlistener_fallback_calls_live_when_local_results_are_thin():
 
     assert any(candidate.case_name == "Live v. Case" for candidate in candidates)
     assert cl.calls
+    assert any("CourtListener API" in item for item in searches)
+
+
+def test_courtlistener_fallback_counts_deduped_local_candidates_for_thinness():
+    local = FakeCorpusClient(
+        results=[_case(name="Local v. Case", cite="10 Cal.App.5th 1", uid="cap:local")],
+        text_by_id={"cap:local": "Local authority supports the rule."},
+    )
+    cl = FakeCorpusClient(
+        results=[_case(name="Live v. Case", cite="55 Cal.App.5th 10", uid="cl:1")],
+        text_by_id={"cl:1": "Live authority supports the rule."},
+    )
+    service = _service_for_sources(local=local, courtlistener=cl)
+
+    candidates, warnings, searches = service.collect_candidates(
+        propositions=["thin issue"],
+        settings=ChatResearchSettings(
+            firm_authority=False,
+            local_corpus=True,
+            courtlistener_mode=CourtListenerMode.FALLBACK_CURRENT_LAW,
+        ),
+        original_query="thin issue",
+    )
+
+    assert any(candidate.case_name == "Local v. Case" for candidate in candidates)
+    assert any(candidate.case_name == "Live v. Case" for candidate in candidates)
+    assert len(local.calls) == 2
+    assert cl.calls
+    assert any("Local corpus returned thin results" in warning for warning in warnings)
     assert any("CourtListener API" in item for item in searches)
 
 
