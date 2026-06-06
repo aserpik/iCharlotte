@@ -345,9 +345,18 @@ def test_run_chat_legal_research_fail_closed_restores_buttons(qtbot, monkeypatch
     assert tab.stop_btn.isEnabled() is False
 
 
-def test_finalize_response_appends_research_basis_for_packet(qtbot, monkeypatch):
+def test_on_error_clears_pending_research_packet(qtbot, monkeypatch):
     _app()
     _clear_chat_research_settings()
+    tab = _make_chat_tab(qtbot, monkeypatch)
+    tab._pending_research = object()
+
+    tab.on_error("LLM failed")
+
+    assert tab._pending_research is None
+
+
+def _make_research_packet(*, quote="The duty rule controls the negligence analysis."):
     from icharlotte_core.chat.legal_research import (
         ChatResearchPacket,
         ChatResearchSettings,
@@ -355,10 +364,7 @@ def test_finalize_response_appends_research_basis_for_packet(qtbot, monkeypatch)
         ChatSelectedAuthority,
     )
 
-    tab = _make_chat_tab(qtbot, monkeypatch)
-    tab.stream_start_time = 1.0
-    tab.stream_start_pos = tab.chat_history.textCursor().position()
-    tab._pending_research = ChatResearchPacket(
+    return ChatResearchPacket(
         query="duty rule",
         settings=ChatResearchSettings.default(),
         selected_authorities=[
@@ -370,7 +376,7 @@ def test_finalize_response_appends_research_basis_for_packet(qtbot, monkeypatch)
                 year="2020",
                 reason="It states the governing duty rule.",
                 supports="Duty controls negligence.",
-                quote="The duty rule controls the negligence analysis.",
+                quote=quote,
                 sources=[
                     ChatResearchSource(
                         kind="local_corpus",
@@ -381,6 +387,15 @@ def test_finalize_response_appends_research_basis_for_packet(qtbot, monkeypatch)
         ],
     )
 
+
+def test_finalize_response_appends_research_basis_for_packet(qtbot, monkeypatch):
+    _app()
+    _clear_chat_research_settings()
+    tab = _make_chat_tab(qtbot, monkeypatch)
+    tab.stream_start_time = 1.0
+    tab.stream_start_pos = tab.chat_history.textCursor().position()
+    tab._pending_research = _make_research_packet()
+
     tab.finalize_response("Duty is governed by Duty v. Care (2020) 30 Cal. 4th 43.")
 
     plain = tab.chat_history.toPlainText()
@@ -388,3 +403,66 @@ def test_finalize_response_appends_research_basis_for_packet(qtbot, monkeypatch)
     assert "It states the governing duty rule." in plain
     assert "The duty rule controls the negligence analysis." in plain
     assert tab._pending_research is None
+
+
+def test_finalize_response_keeps_research_basis_before_separator(qtbot, monkeypatch):
+    _app()
+    _clear_chat_research_settings()
+    tab = _make_chat_tab(qtbot, monkeypatch)
+    tab.stream_start_time = 1.0
+    tab.stream_start_pos = tab.chat_history.textCursor().position()
+    tab._pending_research = _make_research_packet()
+
+    tab.finalize_response("Assistant answer.")
+
+    plain = tab.chat_history.toPlainText()
+    assert plain.index("Assistant answer.") < plain.index("Legal Research Basis")
+    assert plain.index("Legal Research Basis") < plain.index("-" * 50)
+    assert plain.count("-" * 50) == 1
+
+
+def test_finalize_response_renders_research_basis_html_entities(qtbot, monkeypatch):
+    _app()
+    _clear_chat_research_settings()
+    tab = _make_chat_tab(qtbot, monkeypatch)
+    tab.stream_start_time = 1.0
+    tab.stream_start_pos = tab.chat_history.textCursor().position()
+    quote = 'The court said "quoted" & binding <rule>.'
+    tab._pending_research = _make_research_packet(quote=quote)
+
+    tab.finalize_response("Assistant answer.")
+
+    plain = tab.chat_history.toPlainText()
+    assert "&quot;" not in plain
+    assert quote in plain
+
+
+def test_finalize_response_persists_research_basis_with_assistant_message(
+    qtbot,
+    monkeypatch,
+):
+    _app()
+    _clear_chat_research_settings()
+
+    class FakePersistence:
+        def __init__(self):
+            self.messages = []
+
+        def add_message(self, conversation_id, message):
+            self.messages.append((conversation_id, message))
+
+    tab = _make_chat_tab(qtbot, monkeypatch)
+    tab.persistence = FakePersistence()
+    tab.current_conversation_id = "conversation-1"
+    tab.stream_start_time = 1.0
+    tab.stream_start_pos = tab.chat_history.textCursor().position()
+    quote = 'The court said "quoted" & binding <rule>.'
+    tab._pending_research = _make_research_packet(quote=quote)
+
+    tab.finalize_response("Assistant answer.")
+
+    conversation_id, message = tab.persistence.messages[0]
+    assert conversation_id == "conversation-1"
+    assert "Assistant answer." in message.content
+    assert "Legal Research Basis" in message.content
+    assert quote in message.content

@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QSizePolicy, QSlider
 )
 from PySide6.QtCore import Qt, Signal, QThread, QFileInfo, QTimer, QSettings, QEvent
-from PySide6.QtGui import QTextCursor, QDragEnterEvent, QDropEvent, QAction, QActionGroup, QPixmap, QBrush
+from PySide6.QtGui import QTextCursor, QTextDocument, QDragEnterEvent, QDropEvent, QAction, QActionGroup, QPixmap, QBrush
 
 from ..config import API_KEYS, SCRIPTS_DIR, GEMINI_DATA_DIR
 from ..utils import log_event
@@ -2032,12 +2032,23 @@ class ChatTab(QWidget):
         self.send_btn.setEnabled(True)
         self.stop_btn.setEnabled(False)
 
+    @staticmethod
+    def _research_basis_html_block(lines):
+        return "".join(f"<div>{line}</div>" for line in lines)
+
+    @staticmethod
+    def _research_basis_plain_text(html_block):
+        doc = QTextDocument()
+        doc.setHtml(html_block)
+        return doc.toPlainText().strip()
+
     def finalize_response(self, text: str):
         """Finalize the response with markdown rendering and save to persistence."""
         # Remember whether the user is following the bottom BEFORE we mutate the
         # document, so a scrolled-up reader isn't yanked down when the final
         # formatted text and separators are appended.
         follow = self._chat_is_at_bottom()
+        pending_research = getattr(self, '_pending_research', None)
 
         # Calculate response time
         response_time = int((time.time() - self.stream_start_time) * 1000) if self.stream_start_time else 0
@@ -2049,10 +2060,9 @@ class ChatTab(QWidget):
         cursor.removeSelectedText()
 
         # Apply deterministic citation cross-check if legal research was done
-        if hasattr(self, '_pending_research') and self._pending_research:
-            packet = self._pending_research
+        if pending_research:
             try:
-                known_names = packet.get_known_case_names()
+                known_names = pending_research.get_known_case_names()
                 if known_names:
                     from icharlotte_core.legal_research.engine import LegalResearchEngine
                     text = LegalResearchEngine._deterministic_citation_check(
@@ -2068,26 +2078,34 @@ class ChatTab(QWidget):
             log_event(f"Markdown conversion failed: {e}", "error")
             html_text = text.replace('\n', '<br>')
 
-        cursor.insertHtml(html_text)
-        self.chat_history.append("")  # New line
-        self.chat_history.append("-" * 50)
-
-        # Show legal research basis if available
-        if hasattr(self, '_pending_research') and self._pending_research:
-            packet = self._pending_research
+        research_basis_html = ""
+        research_basis_plain = ""
+        if pending_research:
             try:
-                for line in packet.format_research_basis_html():
-                    self.chat_history.append(line)
+                research_basis_html = self._research_basis_html_block(
+                    pending_research.format_research_basis_html()
+                )
+                research_basis_plain = self._research_basis_plain_text(research_basis_html)
             except Exception as e:
                 print(f"[ChatTab] Research basis display failed: {e}")
             self._pending_research = None
 
+        cursor.insertHtml(html_text)
+        if research_basis_html:
+            cursor.insertBlock()
+            cursor.insertHtml(research_basis_html)
+        self.chat_history.append("")  # New line
+        self.chat_history.append("-" * 50)
+
         # Save assistant message to persistence
+        saved_text = text
+        if research_basis_plain:
+            saved_text = f"{text.rstrip()}\n\n{research_basis_plain}"
         if self.persistence and self.current_conversation_id:
-            token_count = TokenCounter.estimate_tokens(text, self.provider_combo.currentText())
+            token_count = TokenCounter.estimate_tokens(saved_text, self.provider_combo.currentText())
             assistant_message = Message(
                 role='assistant',
-                content=text,
+                content=saved_text,
                 token_count=token_count,
                 model_used=self.model_combo.currentText(),
                 response_time_ms=response_time
@@ -2098,7 +2116,7 @@ class ChatTab(QWidget):
             log_event(f"WARNING: Cannot save assistant message - persistence={self.persistence is not None}, conv_id={self.current_conversation_id}", "warning")
 
         # Update legacy history
-        self.conversation_history.append({'role': 'assistant', 'content': text})
+        self.conversation_history.append({'role': 'assistant', 'content': saved_text})
 
         if follow:
             self._chat_scroll_to_bottom()
@@ -2107,6 +2125,7 @@ class ChatTab(QWidget):
 
     def on_error(self, err: str):
         """Handle generation error."""
+        self._pending_research = None
         self.chat_history.append(f"<font color='red'>Error: {err}</font>")
         self.chat_history.append("-" * 50)
         self.send_btn.setEnabled(True)
