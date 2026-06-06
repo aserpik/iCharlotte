@@ -85,9 +85,9 @@ from icharlotte_core.opposition.argument_research import research_argument
 from icharlotte_core.legal_research.models import CaseResult
 
 
-def _case(cluster_id, name="A v. B", citation="2 Cal.5th 2"):
+def _case(cluster_id, name="A v. B", citation="2 Cal.5th 2", snippet="snip"):
     return CaseResult(name=name, citation=citation, date="2015-01-01", court="cal",
-                      snippet="snip", url=f"https://cl/opinion/{cluster_id}/", cluster_id=cluster_id)
+                      snippet=snippet, url=f"https://cl/opinion/{cluster_id}/", cluster_id=cluster_id)
 
 
 def test_research_argument_happy_path(tmp_path):
@@ -108,7 +108,7 @@ def test_research_argument_happy_path(tmp_path):
     assert out[0].argument_text == "The motion is untimely"
 
 
-def test_research_argument_unions_semantic_and_keyword(tmp_path):
+def test_research_argument_live_courtlistener_uses_keyword_first(tmp_path):
     cl = MagicMock()
     cl.search_opinions.return_value = [_case(111), _case(222)]
     cl.get_opinion_text.return_value = "text"
@@ -121,7 +121,112 @@ def test_research_argument_unions_semantic_and_keyword(tmp_path):
     # run ("arg" + "q1"), each firing a semantic and a keyword pass = 4 calls.
     assert cl.search_opinions.call_count == 4
     first_kwargs = cl.search_opinions.call_args_list[0].kwargs
-    assert first_kwargs.get("semantic") is True  # semantic pass fires first
+    assert first_kwargs.get("semantic") is False  # live CourtListener keyword pass fires first
+
+
+def test_research_argument_live_courtlistener_skips_semantic_when_keyword_is_good(tmp_path):
+    cl = MagicMock()
+    cl.search_opinions.return_value = [
+        _case(
+            111,
+            snippet=(
+                "California premises liability duty depends on ownership, "
+                "control, and dangerous condition notice."
+            ),
+        ),
+        _case(
+            222,
+            snippet=(
+                "Premises liability control and dangerous condition evidence "
+                "can establish duty."
+            ),
+        ),
+        _case(
+            333,
+            snippet="Ownership and control are central to premises liability duty.",
+        ),
+    ]
+    cl.get_opinion_text.return_value = "The court held discretion is broad here."
+    query_llm = MagicMock(return_value='{"queries": []}')
+    rerank_llm = MagicMock(return_value='{"selections": [{"id": "111", "supports": "s", '
+                                        '"passage": "The court held discretion is broad here."}]}')
+
+    out = research_argument(
+        "California premises liability duty ownership control dangerous condition",
+        cl_client=cl,
+        query_llm=query_llm,
+        rerank_llm=rerank_llm,
+        cache_dir=str(tmp_path),
+    )
+
+    assert [a.cluster_id for a in out] == ["111"]
+    assert [call.kwargs["semantic"] for call in cl.search_opinions.call_args_list] == [False]
+
+
+def test_research_argument_live_courtlistener_uses_semantic_fallback_for_weak_keyword(tmp_path):
+    keyword_cases = [
+        _case(111, name="Procedural Case", snippet="unrelated procedural background"),
+        _case(222, name="Another Case", snippet="another unrelated discussion"),
+        _case(333, name="Third Case", snippet="contract interpretation only"),
+    ]
+    semantic_cases = [
+        _case(
+            444,
+            name="Premises Duty Case",
+            snippet="Premises liability duty turns on ownership and control.",
+        )
+    ]
+    cl = MagicMock()
+    cl.search_opinions.side_effect = [keyword_cases, semantic_cases]
+    cl.get_opinion_text.return_value = "The selected premises liability passage."
+    query_llm = MagicMock(return_value='{"queries": []}')
+    rerank_llm = MagicMock(return_value='{"selections": [{"id": "444", "supports": "s", '
+                                        '"passage": "The selected premises liability passage."}]}')
+
+    out = research_argument(
+        "California premises liability duty ownership control dangerous condition",
+        cl_client=cl,
+        query_llm=query_llm,
+        rerank_llm=rerank_llm,
+        cache_dir=str(tmp_path),
+    )
+
+    assert [call.kwargs["semantic"] for call in cl.search_opinions.call_args_list] == [False, True]
+    assert [a.cluster_id for a in out] == ["444"]
+
+
+def test_research_argument_local_corpus_keeps_semantic_first(tmp_path):
+    class LocalLikeClient:
+        def __init__(self):
+            self.db_path = str(tmp_path / "corpus.db")
+            self.vectors_path = str(tmp_path / "vectors.f16")
+            (tmp_path / "corpus.db").write_text("db", encoding="utf-8")
+            (tmp_path / "vectors.f16").write_bytes(b"vec")
+            self.calls = []
+
+        def search_opinions(self, query, **kwargs):
+            self.calls.append((query, kwargs))
+            return [_case(111), _case(222)]
+
+        def get_opinion_text(self, _cluster_id):
+            return "text"
+
+        def get_authority_signals(self, _cluster_id):
+            return {}
+
+    cl = LocalLikeClient()
+    query_llm = MagicMock(return_value='{"queries": ["q1"]}')
+    rerank_llm = MagicMock(return_value='{"selections": []}')
+
+    research_argument(
+        "arg",
+        cl_client=cl,
+        query_llm=query_llm,
+        rerank_llm=rerank_llm,
+        cache_dir=str(tmp_path),
+    )
+
+    assert [kwargs["semantic"] for _query, kwargs in cl.calls[:2]] == [True, False]
 
 
 def test_research_argument_empty_retries_once(tmp_path):

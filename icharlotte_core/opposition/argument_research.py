@@ -428,9 +428,98 @@ def _strip_boolean_ops(query: str) -> str:
     return q or (query or "")
 
 
-def _hybrid_search(cl_client, query: str, max_results: int) -> list:
-    """Union semantic + keyword results by cluster_id, semantic first."""
+_LIVE_KEYWORD_MIN_RESULTS = 3
+_LIVE_KEYWORD_MIN_OVERLAP = 0.35
+_SEARCH_QUALITY_STOPWORDS = {
+    "about",
+    "after",
+    "against",
+    "also",
+    "because",
+    "before",
+    "between",
+    "california",
+    "case",
+    "cases",
+    "claim",
+    "claims",
+    "court",
+    "defendant",
+    "defendants",
+    "evidence",
+    "from",
+    "legal",
+    "motion",
+    "must",
+    "party",
+    "plaintiff",
+    "plaintiffs",
+    "rule",
+    "show",
+    "standard",
+    "that",
+    "their",
+    "under",
+    "when",
+    "where",
+    "with",
+}
+
+
+def _is_local_research_client(cl_client) -> bool:
+    module = getattr(cl_client.__class__, "__module__", "")
+    if "legal_research.local_corpus" in module:
+        return True
+    db_path = getattr(cl_client, "db_path", None)
+    vectors_path = getattr(cl_client, "vectors_path", None)
+    return isinstance(db_path, str) and isinstance(vectors_path, str)
+
+
+def _search_quality_terms(query: str) -> set[str]:
+    text = _strip_boolean_ops(query).lower()
+    terms = {
+        token
+        for token in re.findall(r"[a-z][a-z0-9]{3,}", text)
+        if token not in _SEARCH_QUALITY_STOPWORDS
+    }
+    return terms
+
+
+def _case_search_text(case: Any) -> str:
+    return " ".join(
+        str(part or "")
+        for part in (
+            getattr(case, "name", ""),
+            getattr(case, "citation", ""),
+            getattr(case, "snippet", ""),
+            getattr(case, "court", ""),
+        )
+    ).lower()
+
+
+def _search_overlap_score(query: str, cases: list, *, top_n: int = 3) -> float:
+    terms = _search_quality_terms(query)
+    if not terms:
+        return 1.0
+    haystack = " ".join(_case_search_text(case) for case in cases[:top_n])
+    if not haystack:
+        return 0.0
+    matched = {term for term in terms if term in haystack}
+    return len(matched) / max(len(terms), 1)
+
+
+def _dedupe_cases(cases: list) -> list:
     found: dict[str, Any] = {}
+    for case in cases:
+        key = str(getattr(case, "cluster_id", "") or "")
+        if key and key not in found:
+            found[key] = case
+    return list(found.values())
+
+
+def _semantic_first_hybrid_search(cl_client, query: str, max_results: int) -> list:
+    """Union semantic + keyword results by cluster_id, semantic first."""
+    cases: list = []
     semantic_query = _strip_boolean_ops(query)
     for semantic in (True, False):
         q = semantic_query if semantic else query
@@ -441,11 +530,44 @@ def _hybrid_search(cl_client, query: str, max_results: int) -> list:
         except Exception:
             logger.warning("search failed (semantic=%s)", semantic, exc_info=True)
             results = []
-        for r in results:
-            key = str(getattr(r, "cluster_id", "") or "")
-            if key and key not in found:
-                found[key] = r
-    return list(found.values())
+        cases.extend(results)
+    return _dedupe_cases(cases)
+
+
+def _live_keyword_first_hybrid_search(cl_client, query: str, max_results: int) -> list:
+    """Use fast CourtListener keyword search first, with semantic fallback."""
+    try:
+        keyword_results = cl_client.search_opinions(
+            query, semantic=False, max_results=max_results, published_only=True
+        ) or []
+    except Exception:
+        logger.warning("search failed (semantic=False)", exc_info=True)
+        keyword_results = []
+
+    keyword_unique = _dedupe_cases(keyword_results)
+    enough_results = len(keyword_unique) >= _LIVE_KEYWORD_MIN_RESULTS
+    quality_ok = _search_overlap_score(query, keyword_unique) >= _LIVE_KEYWORD_MIN_OVERLAP
+    if enough_results and quality_ok:
+        return keyword_unique
+
+    semantic_query = _strip_boolean_ops(query)
+    try:
+        semantic_results = cl_client.search_opinions(
+            semantic_query, semantic=True, max_results=max_results, published_only=True
+        ) or []
+    except Exception:
+        logger.warning("search failed (semantic=True)", exc_info=True)
+        semantic_results = []
+
+    if enough_results and not quality_ok:
+        return _dedupe_cases(list(semantic_results) + keyword_unique)
+    return _dedupe_cases(keyword_unique + list(semantic_results))
+
+
+def _hybrid_search(cl_client, query: str, max_results: int) -> list:
+    if _is_local_research_client(cl_client):
+        return _semantic_first_hybrid_search(cl_client, query, max_results)
+    return _live_keyword_first_hybrid_search(cl_client, query, max_results)
 
 
 def _broaden(query: str) -> str:
