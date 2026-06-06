@@ -1,5 +1,6 @@
 import csv
 import io
+import sys
 
 import numpy as np
 
@@ -44,6 +45,178 @@ def _seed_corpus(db, vec, emb):
     )
     idx.finalize()
     con.close()
+
+
+class _TrackedStream(io.StringIO):
+    def __init__(self, name):
+        super().__init__("")
+        self.name = name
+
+
+def test_run_parenthetical_append_without_refresh_skips_opinions_and_closes_streams(monkeypatch):
+    opened = []
+    captured = {}
+
+    def fake_stream(name, date):
+        stream = _TrackedStream(name)
+        opened.append(stream)
+        return stream
+
+    def fake_append(**kwargs):
+        captured.update(kwargs)
+        return {"added": 3}
+
+    monkeypatch.setattr(build, "_stream_cl_bulk", fake_stream)
+    monkeypatch.setattr(build, "append_parentheticals_to_corpus", fake_append)
+
+    summary = build.run_parenthetical_append(
+        db_path="corpus.db",
+        vectors_path="vectors.f16",
+        embedder=FakeEmbedder(dim=16),
+        date="2026-03-31",
+        refresh_opinion_map=False,
+    )
+
+    assert summary == {"added": 3}
+    assert [stream.name for stream in opened] == ["parentheticals", "citations"]
+    assert captured["opinions_stream"] is None
+    assert all(stream.closed for stream in opened)
+
+
+def test_run_parenthetical_append_with_refresh_opens_opinions_and_closes_streams(monkeypatch):
+    opened = []
+    captured = {}
+
+    def fake_stream(name, date):
+        stream = _TrackedStream(name)
+        opened.append(stream)
+        return stream
+
+    def fake_append(**kwargs):
+        captured.update(kwargs)
+        return {"added": 2}
+
+    monkeypatch.setattr(build, "_stream_cl_bulk", fake_stream)
+    monkeypatch.setattr(build, "append_parentheticals_to_corpus", fake_append)
+
+    summary = build.run_parenthetical_append(
+        db_path="corpus.db",
+        vectors_path="vectors.f16",
+        embedder=FakeEmbedder(dim=16),
+        date="2026-03-31",
+        refresh_opinion_map=True,
+    )
+
+    assert summary == {"added": 2}
+    assert [stream.name for stream in opened] == ["parentheticals", "opinions", "citations"]
+    assert captured["opinions_stream"].name == "opinions"
+    assert all(stream.closed for stream in opened)
+
+
+def test_main_source_all_does_not_run_parenthetical_append(monkeypatch, tmp_path):
+    calls = []
+
+    monkeypatch.setattr(sys, "argv", [
+        "build.py",
+        "--source",
+        "all",
+        "--data-dir",
+        str(tmp_path),
+        "--fts-only",
+    ])
+    monkeypatch.setattr(build, "OnnxEmbedder", lambda: FakeEmbedder(dim=16))
+    monkeypatch.setattr(build, "_download_cap_volumes", lambda scratch: ["cap.zip"])
+    monkeypatch.setattr(
+        build,
+        "build_from_cap_zips",
+        lambda *args, **kwargs: calls.append("cap") or {"cases": 1},
+    )
+    monkeypatch.setattr(
+        build,
+        "run_cl_append",
+        lambda *args, **kwargs: calls.append("cl") or {"added": 1},
+    )
+    monkeypatch.setattr(
+        build,
+        "run_parenthetical_append",
+        lambda *args, **kwargs: calls.append("parentheticals") or {"added": 1},
+    )
+
+    build.main()
+
+    assert calls == ["cap", "cl"]
+
+
+def test_append_parentheticals_closes_indexer_and_connection_on_error(monkeypatch, tmp_path):
+    db = str(tmp_path / "corpus.db")
+    vec = str(tmp_path / "vectors.f16")
+    emb = FakeEmbedder(dim=16)
+    _seed_corpus(db, vec, emb)
+    real_connect = schema.connect
+    wrappers = []
+    indexers = []
+
+    class ConnectionWrapper:
+        def __init__(self, con):
+            self._con = con
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+            self._con.close()
+
+        def __getattr__(self, name):
+            return getattr(self._con, name)
+
+    class FailingIndexer:
+        def __init__(self, con, *, vectors_path, embedder, embed, resume):
+            self._vec_fh = open(vectors_path, "ab")
+            indexers.append(self)
+
+        def add_passages(self, passages, *, embed):
+            raise RuntimeError("boom")
+
+    def tracking_connect(path):
+        wrapper = ConnectionWrapper(real_connect(path))
+        wrappers.append(wrapper)
+        return wrapper
+
+    monkeypatch.setattr(build.schema, "connect", tracking_connect)
+    monkeypatch.setattr(build.parenthetical_loader, "load_opinion_cluster_map", lambda *args, **kwargs: {})
+    monkeypatch.setattr(build.parenthetical_loader, "build_cluster_case_map", lambda *args, **kwargs: {})
+    monkeypatch.setattr(
+        build.parenthetical_loader,
+        "iter_parenthetical_passages",
+        lambda **kwargs: [
+            PassageRecord(
+                passage_uid="cap:aguilar#parenthetical:900",
+                case_uid="cap:aguilar",
+                ordinal=1_000_000,
+                text="summary judgment burden",
+                passage_type="parenthetical",
+                parenthetical_id="900",
+            )
+        ],
+    )
+    monkeypatch.setattr(build, "CorpusIndexer", FailingIndexer)
+
+    try:
+        build.append_parentheticals_to_corpus(
+            parentheticals_stream=io.StringIO(""),
+            opinions_stream=None,
+            citations_stream=io.StringIO(""),
+            db_path=db,
+            vectors_path=vec,
+            embedder=emb,
+            snapshot_date="2026-03-31",
+        )
+    except RuntimeError as exc:
+        assert str(exc) == "boom"
+    else:
+        raise AssertionError("append_parentheticals_to_corpus should have raised")
+
+    assert wrappers[0].closed
+    assert indexers[0]._vec_fh.closed
 
 
 def test_append_parentheticals_adds_rows_and_metadata(tmp_path):

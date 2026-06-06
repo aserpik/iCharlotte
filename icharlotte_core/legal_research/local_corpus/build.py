@@ -8,6 +8,7 @@ filtered to CA + post-cutoff. Both feed the same DB + vectors.f16 via CorpusInde
 from __future__ import annotations
 
 import argparse
+import contextlib
 import io
 import json
 import logging
@@ -35,40 +36,6 @@ CAP_REPORTERS = {
     "cal-app": 140, "cal-app-2d": 276, "cal-app-3d": 235, "cal-app-4th": 248,
     "cal-app-5th": 11, "cal-rptr-3d": 56, "cal-unrep": 7,
 }
-
-
-def _install_metadata_helpers() -> None:
-    if hasattr(schema, "get_meta") and hasattr(schema, "set_meta"):
-        return
-
-    def _ensure_meta_table(con) -> None:
-        con.execute(
-            "CREATE TABLE IF NOT EXISTS corpus_metadata ("
-            "key TEXT PRIMARY KEY, "
-            "value TEXT NOT NULL)"
-        )
-
-    def get_meta(con) -> dict[str, str]:
-        _ensure_meta_table(con)
-        return {
-            str(row["key"]): str(row["value"])
-            for row in con.execute("SELECT key, value FROM corpus_metadata")
-        }
-
-    def set_meta(con, **values: str) -> None:
-        _ensure_meta_table(con)
-        for key, value in values.items():
-            con.execute(
-                "INSERT OR REPLACE INTO corpus_metadata (key, value) VALUES (?, ?)",
-                (str(key), "" if value is None else str(value)),
-            )
-        con.commit()
-
-    schema.get_meta = get_meta
-    schema.set_meta = set_meta
-
-
-_install_metadata_helpers()
 
 
 def _write_corpus_metadata(con, *, vectors_path: str, cl_snapshot_date: str = "") -> None:
@@ -262,51 +229,62 @@ def append_parentheticals_to_corpus(
             "append_parentheticals_to_corpus requires an existing published corpus "
             f"({db_path} + {vectors_path}); build CAP/CL cases first."
         )
-    con = schema.connect(db_path)
-    schema.create_schema(con)
-    opinion_map = parenthetical_loader.load_opinion_cluster_map(
-        con,
-        opinions_stream=opinions_stream,
-        snapshot_date=snapshot_date,
-        refresh=refresh_opinion_map,
-    )
-    cluster_case_map = parenthetical_loader.build_cluster_case_map(
-        con,
-        citations_stream=citations_stream,
-    )
-    passages = parenthetical_loader.iter_parenthetical_passages(
-        parentheticals_stream=parentheticals_stream,
-        opinion_cluster_map=opinion_map,
-        cluster_case_map=cluster_case_map,
-        min_score=min_score,
-        max_per_case=max_per_case,
-    )
+    con = None
+    idx = None
+    finalized = False
+    try:
+        con = schema.connect(db_path)
+        schema.create_schema(con)
+        opinion_map = parenthetical_loader.load_opinion_cluster_map(
+            con,
+            opinions_stream=opinions_stream,
+            snapshot_date=snapshot_date,
+            refresh=refresh_opinion_map,
+        )
+        cluster_case_map = parenthetical_loader.build_cluster_case_map(
+            con,
+            citations_stream=citations_stream,
+        )
+        passages = parenthetical_loader.iter_parenthetical_passages(
+            parentheticals_stream=parentheticals_stream,
+            opinion_cluster_map=opinion_map,
+            cluster_case_map=cluster_case_map,
+            min_score=min_score,
+            max_per_case=max_per_case,
+        )
 
-    idx = CorpusIndexer(
-        con,
-        vectors_path=vectors_path,
-        embedder=embedder,
-        embed=True,
-        resume=True,
-    )
-    added = idx.add_passages(passages, embed=embed)
-    idx.finalize()
-    schema.set_meta(
-        con,
-        parentheticals_snapshot_date=snapshot_date,
-        parentheticals_count=str(
-            con.execute(
-                "SELECT COUNT(*) FROM passages WHERE passage_type='parenthetical'"
-            ).fetchone()[0]
-        ),
-        parentheticals_min_score=str(float(min_score)),
-        parentheticals_max_per_case=str(int(max_per_case)),
-    )
-    _write_corpus_metadata(con, vectors_path=vectors_path)
-    con.commit()
-    con.close()
-    logger.info("CL parentheticals: DONE - %d new passages", added)
-    return {"added": added}
+        idx = CorpusIndexer(
+            con,
+            vectors_path=vectors_path,
+            embedder=embedder,
+            embed=True,
+            resume=True,
+        )
+        added = idx.add_passages(passages, embed=embed)
+        idx.finalize()
+        finalized = True
+        schema.set_meta(
+            con,
+            parentheticals_snapshot_date=snapshot_date,
+            parentheticals_count=str(
+                con.execute(
+                    "SELECT COUNT(*) FROM passages WHERE passage_type='parenthetical'"
+                ).fetchone()[0]
+            ),
+            parentheticals_min_score=str(float(min_score)),
+            parentheticals_max_per_case=str(int(max_per_case)),
+        )
+        _write_corpus_metadata(con, vectors_path=vectors_path)
+        con.commit()
+        logger.info("CL parentheticals: DONE - %d new passages", added)
+        return {"added": added}
+    finally:
+        if idx is not None and not finalized:
+            vec_fh = getattr(idx, "_vec_fh", None)
+            if vec_fh is not None and not vec_fh.closed:
+                vec_fh.close()
+        if con is not None:
+            con.close()
 
 
 def _download_cap_volumes(scratch_dir: str, reporters: dict | None = None) -> list[str]:
@@ -467,23 +445,29 @@ def run_parenthetical_append(
     embed: bool = False,
     refresh_opinion_map: bool = False,
 ) -> dict[str, Any]:  # pragma: no cover - network
-    return append_parentheticals_to_corpus(
-        parentheticals_stream=_stream_cl_bulk("parentheticals", date),
-        opinions_stream=(
-            _stream_cl_bulk("opinions", date)
+    with contextlib.ExitStack() as stack:
+        parentheticals_stream = stack.enter_context(
+            _stream_cl_bulk("parentheticals", date)
+        )
+        opinions_stream = (
+            stack.enter_context(_stream_cl_bulk("opinions", date))
             if refresh_opinion_map
             else None
-        ),
-        citations_stream=_stream_cl_bulk("citations", date),
-        db_path=db_path,
-        vectors_path=vectors_path,
-        embedder=embedder,
-        snapshot_date=date,
-        min_score=min_score,
-        max_per_case=max_per_case,
-        embed=embed,
-        refresh_opinion_map=refresh_opinion_map,
-    )
+        )
+        citations_stream = stack.enter_context(_stream_cl_bulk("citations", date))
+        return append_parentheticals_to_corpus(
+            parentheticals_stream=parentheticals_stream,
+            opinions_stream=opinions_stream,
+            citations_stream=citations_stream,
+            db_path=db_path,
+            vectors_path=vectors_path,
+            embedder=embedder,
+            snapshot_date=date,
+            min_score=min_score,
+            max_per_case=max_per_case,
+            embed=embed,
+            refresh_opinion_map=refresh_opinion_map,
+        )
 
 
 def main() -> None:  # pragma: no cover - CLI wrapper

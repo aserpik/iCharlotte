@@ -70,6 +70,11 @@ CREATE VIRTUAL TABLE IF NOT EXISTS passages_fts USING fts5(
 CREATE TABLE IF NOT EXISTS ingested_volumes (
     name TEXT PRIMARY KEY
 );
+
+CREATE TABLE IF NOT EXISTS corpus_meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 
@@ -85,6 +90,32 @@ def connect(db_path: str) -> sqlite3.Connection:
 
 def create_schema(con: sqlite3.Connection) -> None:
     ensure_runtime_schema(con)
+
+
+def get_meta(con: sqlite3.Connection) -> dict[str, str]:
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS corpus_meta ("
+        "key TEXT PRIMARY KEY, "
+        "value TEXT NOT NULL)"
+    )
+    return {
+        str(row[0]): str(row[1])
+        for row in con.execute("SELECT key, value FROM corpus_meta").fetchall()
+    }
+
+
+def set_meta(con: sqlite3.Connection, **items) -> None:
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS corpus_meta ("
+        "key TEXT PRIMARY KEY, "
+        "value TEXT NOT NULL)"
+    )
+    for key, value in items.items():
+        con.execute(
+            "INSERT OR REPLACE INTO corpus_meta (key, value) VALUES (?, ?)",
+            (str(key), "" if value is None else str(value)),
+        )
+    con.commit()
 
 
 def _ensure_opinion_map_schema(con: sqlite3.Connection) -> None:
@@ -186,6 +217,11 @@ def ensure_runtime_schema(con: sqlite3.Connection) -> None:
 
         CREATE TABLE IF NOT EXISTS ingested_volumes (
             name TEXT PRIMARY KEY
+        );
+
+        CREATE TABLE IF NOT EXISTS corpus_meta (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
         );
         """
     )

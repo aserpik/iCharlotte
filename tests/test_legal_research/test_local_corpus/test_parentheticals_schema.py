@@ -32,6 +32,26 @@ def test_schema_creates_parenthetical_passage_columns_and_opinion_map():
         ).fetchall()
     }
     assert "courtlistener_opinion_map" in tables
+    assert "corpus_meta" in tables
+
+
+def test_schema_metadata_helpers_do_not_require_build_import():
+    con = sqlite3.connect(":memory:")
+    con.row_factory = sqlite3.Row
+    schema.create_schema(con)
+
+    schema.set_meta(con, cl_snapshot_date="2026-03-31", parentheticals_count=1)
+
+    assert schema.get_meta(con) == {
+        "cl_snapshot_date": "2026-03-31",
+        "parentheticals_count": "1",
+    }
+    assert con.execute(
+        "SELECT value FROM corpus_meta WHERE key='cl_snapshot_date'"
+    ).fetchone()[0] == "2026-03-31"
+    assert con.execute(
+        "SELECT name FROM sqlite_master WHERE name='corpus_metadata'"
+    ).fetchone() is None
 
 
 def test_ensure_runtime_schema_migrates_old_passages_table():
