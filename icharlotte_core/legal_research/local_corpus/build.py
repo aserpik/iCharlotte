@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import json
 import logging
 import os
 import time
@@ -18,7 +19,11 @@ from icharlotte_core.legal_research.local_corpus import schema
 from icharlotte_core.legal_research.local_corpus.authority_signals import build_signals
 from icharlotte_core.legal_research.local_corpus.embedder import Embedder, OnnxEmbedder
 from icharlotte_core.legal_research.local_corpus.indexer import CorpusIndexer
-from icharlotte_core.legal_research.local_corpus.loaders import cap_loader, cl_bulk_loader
+from icharlotte_core.legal_research.local_corpus.loaders import (
+    cap_loader,
+    cl_bulk_loader,
+    parenthetical_loader,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +35,63 @@ CAP_REPORTERS = {
     "cal-app": 140, "cal-app-2d": 276, "cal-app-3d": 235, "cal-app-4th": 248,
     "cal-app-5th": 11, "cal-rptr-3d": 56, "cal-unrep": 7,
 }
+
+
+def _install_metadata_helpers() -> None:
+    if hasattr(schema, "get_meta") and hasattr(schema, "set_meta"):
+        return
+
+    def _ensure_meta_table(con) -> None:
+        con.execute(
+            "CREATE TABLE IF NOT EXISTS corpus_metadata ("
+            "key TEXT PRIMARY KEY, "
+            "value TEXT NOT NULL)"
+        )
+
+    def get_meta(con) -> dict[str, str]:
+        _ensure_meta_table(con)
+        return {
+            str(row["key"]): str(row["value"])
+            for row in con.execute("SELECT key, value FROM corpus_metadata")
+        }
+
+    def set_meta(con, **values: str) -> None:
+        _ensure_meta_table(con)
+        for key, value in values.items():
+            con.execute(
+                "INSERT OR REPLACE INTO corpus_metadata (key, value) VALUES (?, ?)",
+                (str(key), "" if value is None else str(value)),
+            )
+        con.commit()
+
+    schema.get_meta = get_meta
+    schema.set_meta = set_meta
+
+
+_install_metadata_helpers()
+
+
+def _write_corpus_metadata(con, *, vectors_path: str, cl_snapshot_date: str = "") -> None:
+    existing = schema.get_meta(con)
+    counts = {
+        str(row["source"] or ""): int(row["n"])
+        for row in con.execute("SELECT source, COUNT(*) AS n FROM cases GROUP BY source")
+    }
+    max_date = con.execute(
+        "SELECT MAX(decision_date) FROM cases WHERE decision_date IS NOT NULL AND decision_date<>''"
+    ).fetchone()[0] or ""
+    case_count = con.execute("SELECT COUNT(*) FROM cases").fetchone()[0]
+    passage_count = con.execute("SELECT COUNT(*) FROM passages").fetchone()[0]
+    schema.set_meta(
+        con,
+        built_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        source_counts=json.dumps(counts, sort_keys=True),
+        max_decision_date=max_date,
+        case_count=str(case_count),
+        passage_count=str(passage_count),
+        vector_bytes=str(os.path.getsize(vectors_path) if os.path.exists(vectors_path) else 0),
+        cl_snapshot_date=cl_snapshot_date or existing.get("cl_snapshot_date", ""),
+    )
 
 
 def _default_paths() -> tuple[str, str]:
@@ -180,6 +242,73 @@ def append_cl_to_corpus(*, citations_stream, clusters_stream, opinions_stream,
     return {"added": n}
 
 
+def append_parentheticals_to_corpus(
+    *,
+    parentheticals_stream,
+    opinions_stream,
+    citations_stream,
+    db_path: str,
+    vectors_path: str,
+    embedder: Embedder,
+    snapshot_date: str,
+    min_score: float = 0.5,
+    max_per_case: int = 25,
+    embed: bool = False,
+    refresh_opinion_map: bool = False,
+) -> dict[str, Any]:
+    """Append CL parentheticals to existing local corpus cases, in place."""
+    if not (os.path.exists(db_path) and os.path.exists(vectors_path)):
+        raise FileNotFoundError(
+            "append_parentheticals_to_corpus requires an existing published corpus "
+            f"({db_path} + {vectors_path}); build CAP/CL cases first."
+        )
+    con = schema.connect(db_path)
+    schema.create_schema(con)
+    opinion_map = parenthetical_loader.load_opinion_cluster_map(
+        con,
+        opinions_stream=opinions_stream,
+        snapshot_date=snapshot_date,
+        refresh=refresh_opinion_map,
+    )
+    cluster_case_map = parenthetical_loader.build_cluster_case_map(
+        con,
+        citations_stream=citations_stream,
+    )
+    passages = parenthetical_loader.iter_parenthetical_passages(
+        parentheticals_stream=parentheticals_stream,
+        opinion_cluster_map=opinion_map,
+        cluster_case_map=cluster_case_map,
+        min_score=min_score,
+        max_per_case=max_per_case,
+    )
+
+    idx = CorpusIndexer(
+        con,
+        vectors_path=vectors_path,
+        embedder=embedder,
+        embed=True,
+        resume=True,
+    )
+    added = idx.add_passages(passages, embed=embed)
+    idx.finalize()
+    schema.set_meta(
+        con,
+        parentheticals_snapshot_date=snapshot_date,
+        parentheticals_count=str(
+            con.execute(
+                "SELECT COUNT(*) FROM passages WHERE passage_type='parenthetical'"
+            ).fetchone()[0]
+        ),
+        parentheticals_min_score=str(float(min_score)),
+        parentheticals_max_per_case=str(int(max_per_case)),
+    )
+    _write_corpus_metadata(con, vectors_path=vectors_path)
+    con.commit()
+    con.close()
+    logger.info("CL parentheticals: DONE - %d new passages", added)
+    return {"added": added}
+
+
 def _download_cap_volumes(scratch_dir: str, reporters: dict | None = None) -> list[str]:
     """Download every CA reporter volume ZIP to scratch_dir; skip existing.
 
@@ -327,11 +456,41 @@ def run_cl_append(*, db_path: str, vectors_path: str, embedder: Embedder,
     )
 
 
+def run_parenthetical_append(
+    *,
+    db_path: str,
+    vectors_path: str,
+    embedder: Embedder,
+    date: str = CL_BULK_DATE,
+    min_score: float = 0.5,
+    max_per_case: int = 25,
+    embed: bool = False,
+    refresh_opinion_map: bool = False,
+) -> dict[str, Any]:  # pragma: no cover - network
+    return append_parentheticals_to_corpus(
+        parentheticals_stream=_stream_cl_bulk("parentheticals", date),
+        opinions_stream=(
+            _stream_cl_bulk("opinions", date)
+            if refresh_opinion_map
+            else None
+        ),
+        citations_stream=_stream_cl_bulk("citations", date),
+        db_path=db_path,
+        vectors_path=vectors_path,
+        embedder=embedder,
+        snapshot_date=date,
+        min_score=min_score,
+        max_per_case=max_per_case,
+        embed=embed,
+        refresh_opinion_map=refresh_opinion_map,
+    )
+
+
 def main() -> None:  # pragma: no cover - CLI wrapper
     ap = argparse.ArgumentParser(
         description="Build the local CA case-law corpus. Re-run after an "
         "interruption to RESUME automatically (volume-checkpointed).")
-    ap.add_argument("--source", choices=["cap", "cl", "all"], default="all")
+    ap.add_argument("--source", choices=["cap", "cl", "parentheticals", "all"], default="all")
     ap.add_argument("--data-dir", default=None)
     ap.add_argument("--fts-only", action="store_true",
                     help="Skip semantic embedding (BM25 keyword search only; builds in minutes).")
@@ -344,6 +503,10 @@ def main() -> None:  # pragma: no cover - CLI wrapper
                     help="Only ingest CL cases decided on/after this date (fills the gap above CAP).")
     ap.add_argument("--cl-embed", action="store_true",
                     help="Semantically embed the CL recent cases too (~hours). Default: keyword-only.")
+    ap.add_argument("--parentheticals-min-score", type=float, default=0.5)
+    ap.add_argument("--parentheticals-max-per-case", type=int, default=25)
+    ap.add_argument("--embed-parentheticals", action="store_true")
+    ap.add_argument("--refresh-opinion-map", action="store_true")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -377,6 +540,27 @@ def main() -> None:  # pragma: no cover - CLI wrapper
             date=args.cl_date, cutoff_date=args.cl_cutoff, embed=args.cl_embed,
         )
         logger.info("CL append: %s new CA cases", summary["added"])
+    if args.source == "parentheticals":
+        logger.info(
+            "CL parentheticals: streaming bulk snapshot %s, min_score=%s, "
+            "max_per_case=%s, embed=%s, refresh_opinion_map=%s",
+            args.cl_date,
+            args.parentheticals_min_score,
+            args.parentheticals_max_per_case,
+            args.embed_parentheticals,
+            args.refresh_opinion_map,
+        )
+        summary = run_parenthetical_append(
+            db_path=db_path,
+            vectors_path=vectors_path,
+            embedder=embedder,
+            date=args.cl_date,
+            min_score=args.parentheticals_min_score,
+            max_per_case=args.parentheticals_max_per_case,
+            embed=args.embed_parentheticals,
+            refresh_opinion_map=args.refresh_opinion_map,
+        )
+        logger.info("CL parentheticals: %s new passages", summary["added"])
 
 
 if __name__ == "__main__":  # pragma: no cover
