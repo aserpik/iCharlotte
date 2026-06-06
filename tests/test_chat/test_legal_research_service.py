@@ -573,6 +573,66 @@ def test_courtlistener_fallback_counts_deduped_local_candidates_for_thinness():
     assert any("CourtListener API" in item for item in searches)
 
 
+def test_collect_candidates_retains_same_case_for_different_propositions_until_selection():
+    local = FakeCorpusClient(
+        results=[_case(name="Shared v. Rule", cite="10 Cal.App.5th 1", uid="cap:shared")],
+        text_by_id={"cap:shared": "Shared authority supports both requested rules."},
+    )
+    service = _service_for_sources(local=local)
+
+    candidates, _warnings, _searches = service.collect_candidates(
+        propositions=["duty rule", "breach rule"],
+        settings=ChatResearchSettings(
+            firm_authority=False,
+            local_corpus=True,
+            courtlistener_mode=CourtListenerMode.OFF,
+        ),
+        original_query="duty and breach rules",
+    )
+
+    shared = [candidate for candidate in candidates if candidate.citation == "10 Cal.App.5th 1"]
+
+    assert [candidate.proposition for candidate in shared] == ["duty rule", "breach rule"]
+
+
+def test_collect_candidates_dedupes_exact_same_citation_and_proposition():
+    firm = FakeFirmProvider(
+        candidates=[
+            {
+                "cluster_id": "firm:shared",
+                "case_name": "Shared v. Rule",
+                "citation": "10 Cal.App.5th 1",
+                "year": "2020",
+                "text": "Shared authority supports the requested rule.",
+                "source_brief": "first.pdf",
+            },
+            {
+                "cluster_id": "firm:shared-duplicate",
+                "case_name": "Shared v. Rule",
+                "citation": "10 Cal.App.5th 1",
+                "year": "2020",
+                "text": "Shared authority supports the requested rule.",
+                "source_brief": "second.pdf",
+            },
+        ]
+    )
+    service = _service_for_sources(firm=firm)
+
+    candidates, _warnings, _searches = service.collect_candidates(
+        propositions=["duty rule"],
+        settings=ChatResearchSettings(
+            firm_authority=True,
+            local_corpus=False,
+            courtlistener_mode=CourtListenerMode.OFF,
+        ),
+        original_query="duty rule",
+    )
+
+    assert len(candidates) == 1
+    assert candidates[0].proposition == "duty rule"
+    assert {source.reference for source in candidates[0].sources} == {"first.pdf", "second.pdf"}
+
+
 def test_courtlistener_fallback_calls_live_for_stale_local_metadata():
     local = FakeCorpusClient(
         results=[_case()],

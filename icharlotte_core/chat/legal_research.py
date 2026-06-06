@@ -404,13 +404,15 @@ def _year(value: str) -> str:
 
 
 def _candidate_key(candidate: ChatAuthorityCandidate) -> str:
+    proposition = _normalize_ws(candidate.proposition)
+    proposition_part = f":prop:{proposition}" if proposition else ""
     cite = re.sub(r"[^a-z0-9]+", "", (candidate.citation or "").lower())
     if cite:
-        return f"cite:{cite}"
+        return f"cite:{cite}{proposition_part}"
     if candidate.id:
-        return f"id:{candidate.id}"
+        return f"id:{candidate.id}{proposition_part}"
     name = re.sub(r"[^a-z0-9]+", "", (candidate.case_name or "").lower())
-    return f"name:{name}:{candidate.year}"
+    return f"name:{name}:{candidate.year}{proposition_part}"
 
 
 def _only_unverified_firm_sources(candidate: ChatAuthorityCandidate) -> bool:
