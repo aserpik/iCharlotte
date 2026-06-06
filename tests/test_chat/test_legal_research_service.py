@@ -106,6 +106,17 @@ def test_extract_propositions_from_json_response():
     assert "Plaintiff fell on stairs" in calls[0][1]
 
 
+def test_extract_propositions_accepts_positional_llm_callback():
+    service = ChatLegalResearchService(lambda _system, _user: "{}")
+
+    props = service.extract_propositions(
+        user_text="What is the California rule for negligent hiring?",
+        context_text="",
+    )
+
+    assert props == ["What is the California rule for negligent hiring?"]
+
+
 def test_extract_propositions_falls_back_to_user_text_when_llm_returns_bad_json():
     service = ChatLegalResearchService(llm_callback=lambda _system, _user: "not json")
 

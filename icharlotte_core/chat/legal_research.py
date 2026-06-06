@@ -249,8 +249,8 @@ def is_current_law_query(text: str) -> bool:
 class ChatLegalResearchService:
     def __init__(
         self,
-        *,
         llm_callback: LLMCallback,
+        *,
         local_corpus: Any = None,
         firm_provider: Any = None,
         courtlistener_client: Any = None,
