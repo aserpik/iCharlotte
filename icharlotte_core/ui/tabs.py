@@ -34,9 +34,11 @@ from ..chat import (
     Conversation,
     BUILTIN_PROMPTS,
     TRANSCRIBE_PROMPT,
+    ChatResearchError,
     ChatResearchSettings,
     CourtListenerMode,
 )
+from ..chat.legal_research import ChatLegalResearchService
 from ..chat.markdown_render import render_markdown, CHAT_MARKDOWN_CSS
 from ..mediation_brief import (
     MediationBriefGenerator, MediationBriefWorker, RefinementWorker,
@@ -1824,56 +1826,14 @@ class ChatTab(QWidget):
             # User chose No — clear audio_files so we don't try to upload
             audio_files = []
 
-        # Legal Research: if checked, run research before LLM call
-        research_result = None
+        # Legal Research: if checked, run selected research before LLM call.
+        research_packet = None
         if self.legal_research_check.isChecked():
-            engine = self._get_legal_research_engine()
-            if engine:
-                self.chat_history.append("<i>Researching legal authority...</i>")
-                QApplication.processEvents()
+            research_packet = self._run_chat_legal_research(user_text, file_content)
+            if research_packet is None:
+                return
 
-                # Extract focused legal questions instead of sending raw prompt
-                from icharlotte_core.legal_research.prompts import QUERY_EXTRACTION_PROMPT
-                self.chat_history.append("<i>  Extracting legal questions...</i>")
-                QApplication.processEvents()
-                research_query = _llm_for_research(
-                    QUERY_EXTRACTION_PROMPT,
-                    (user_text + ("\n\nContext:\n" + file_content[:100000] if file_content else ""))[:100000]
-                )
-                if not research_query or len(research_query.strip()) < 20:
-                    research_query = user_text
-                    if file_content:
-                        research_query += "\n\nContext:\n" + file_content[:100000]
-
-                def _llm_for_research(system_prompt, user_prompt):
-                    from icharlotte_core.llm import LLMHandler
-                    return LLMHandler.generate(
-                        provider=self.provider_combo.currentText(),
-                        model=self.model_combo.currentText(),
-                        system_prompt=system_prompt,
-                        user_prompt=user_prompt,
-                        file_contents="",
-                        settings={**self.settings, 'stream': False, 'temperature': 0.3},
-                    )
-
-                try:
-                    # Pass the original user text so the engine can extract
-                    # specific case names that QUERY_EXTRACTION_PROMPT may
-                    # have stripped out.
-                    _orig = (user_text + ("\n\n" + file_content[:100000] if file_content else ""))[:100000]
-                    research_result = engine.research(
-                        query=research_query,
-                        llm_callback=_llm_for_research,
-                        status_callback=lambda msg: (
-                            self.chat_history.append(f"<i>  {msg}</i>"),
-                            QApplication.processEvents(),
-                        ),
-                        original_prompt=_orig,
-                    )
-                except Exception as e:
-                    self.chat_history.append(f"<font color='orange'>Research error: {e}</font>")
-
-        self._pending_research = research_result
+        self._pending_research = research_packet
 
         # Build user message for history
         full_msg = user_text
@@ -1916,12 +1876,9 @@ class ChatTab(QWidget):
 
         # Build system prompt (augment with legal authority if research was done)
         effective_system_prompt = self.system_prompt
-        if research_result:
-            from icharlotte_core.legal_research.prompts import build_augmented_system_prompt
-            authority = research_result.format_authority_block()
-            memo = research_result.memo or ""
-            effective_system_prompt = build_augmented_system_prompt(
-                self.system_prompt, authority, research_memo=memo
+        if research_packet:
+            effective_system_prompt = research_packet.build_augmented_system_prompt(
+                self.system_prompt
             )
 
         # Start Worker (pass media files for Gemini native upload)
@@ -1948,16 +1905,49 @@ class ChatTab(QWidget):
 
         self.update_context_indicator()
 
-    def _get_legal_research_engine(self):
-        """Lazy-initialize the legal research engine."""
-        if not hasattr(self, '_legal_research_engine') or self._legal_research_engine is None:
-            import os
-            from icharlotte_core.legal_research.engine import LegalResearchEngine
-            token = os.environ.get("COURTLISTENER_API_TOKEN", "")
-            if not token:
-                return None
-            self._legal_research_engine = LegalResearchEngine(courtlistener_token=token)
-        return self._legal_research_engine
+    def _run_chat_legal_research(self, user_text, file_content):
+        from icharlotte_core.llm import LLMHandler
+
+        def llm_for_research(system_prompt, user_prompt):
+            return LLMHandler.generate(
+                provider=self.provider_combo.currentText(),
+                model=self.model_combo.currentText(),
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                file_contents="",
+                settings={**self.settings, "stream": False, "temperature": 0.2},
+            )
+
+        def status(message):
+            self.chat_history.append(f"<i>  {message}</i>")
+            QApplication.processEvents()
+
+        self.chat_history.append("<i>Researching selected legal authority</i>")
+        QApplication.processEvents()
+        try:
+            service = ChatLegalResearchService.from_environment(
+                llm_callback=llm_for_research
+            )
+            return service.research(
+                user_text=user_text,
+                context_text=file_content[:100000] if file_content else "",
+                settings=self._current_chat_research_settings(),
+                status_callback=status,
+            )
+        except ChatResearchError as exc:
+            self.chat_history.append(
+                f"<font color='orange'>Legal research stopped: {exc}</font>"
+            )
+            self.send_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
+            return None
+        except Exception as exc:
+            self.chat_history.append(
+                f"<font color='orange'>Legal research error: {exc}</font>"
+            )
+            self.send_btn.setEnabled(True)
+            self.stop_btn.setEnabled(False)
+            return None
 
     def _get_checked_audio_files(self):
         """Return list of checked audio/video file paths."""
