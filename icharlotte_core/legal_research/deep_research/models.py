@@ -322,6 +322,16 @@ class ResearchPacket:
     def known_reporter_citations(self) -> list[str]:
         return [authority.citation for authority in self.selected_authorities if authority.citation]
 
+    def to_prompt_block(self) -> str:
+        from .packets import packet_to_prompt_block
+
+        return packet_to_prompt_block(self)
+
+    def to_research_basis_markdown(self) -> str:
+        from .packets import packet_to_research_basis_markdown
+
+        return packet_to_research_basis_markdown(self)
+
 
 @dataclass
 class ResearchRun:

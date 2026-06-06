@@ -22,6 +22,7 @@ from .models import (
     TreatmentSignal,
     normalize_source_policy,
 )
+from .packets import packet_to_prompt_block, packet_to_research_basis_markdown
 
 __all__ = [
     "AuthorityCandidate",
@@ -45,4 +46,6 @@ __all__ = [
     "TreatmentClassification",
     "TreatmentSignal",
     "normalize_source_policy",
+    "packet_to_prompt_block",
+    "packet_to_research_basis_markdown",
 ]
