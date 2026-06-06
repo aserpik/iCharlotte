@@ -23,6 +23,7 @@ from .models import (
     normalize_source_policy,
 )
 from .packets import packet_to_prompt_block, packet_to_research_basis_markdown
+from .orchestrator import run_deep_research
 from .verification import audit_citations_against_packet, contains_verbatim_quote
 
 __all__ = [
@@ -47,6 +48,7 @@ __all__ = [
     "TreatmentClassification",
     "TreatmentSignal",
     "normalize_source_policy",
+    "run_deep_research",
     "audit_citations_against_packet",
     "contains_verbatim_quote",
     "packet_to_prompt_block",
