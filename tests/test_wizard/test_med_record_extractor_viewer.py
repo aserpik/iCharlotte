@@ -115,6 +115,41 @@ def test_chronology_row_heights_auto_fit_wrapped_text(qtbot, tmp_path):
     )
 
 
+def test_chronology_column_resize_debounces_save_and_row_autofit(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+):
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    source = _build_chronology_docx(tmp_path / "chronology.docx")
+    page = MedChronologySelectionPage(str(tmp_path), "5800.013", str(source))
+    qtbot.addWidget(page)
+
+    calls = []
+    monkeypatch.setattr(
+        page.table_panel,
+        "save_column_widths",
+        lambda: calls.append("save"),
+    )
+    monkeypatch.setattr(
+        page.table_panel,
+        "resizeRowsToContents",
+        lambda: calls.append("resize"),
+    )
+
+    page.table_panel._on_section_resized(4, 520, 640)
+
+    assert calls == []
+    assert page.table_panel._resize_commit_timer.isActive()
+
+    page.table_panel._commit_column_resize()
+
+    assert calls == ["save", "resize"]
+
+
 def test_selection_page_uses_brief_synopsis_and_chronology_row_tabs(qtbot):
     from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
         MedChronologySelectionPage,

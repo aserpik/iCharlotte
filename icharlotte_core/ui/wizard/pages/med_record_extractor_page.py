@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtCore import QSettings, Qt, Signal
+from PySide6.QtCore import QSettings, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFrame,
@@ -127,6 +127,10 @@ class ChronologyTablePanel(QTableWidget):
                 QHeaderView.ResizeMode.Interactive,
             )
         self.restore_column_widths()
+        self._resize_commit_timer = QTimer(self)
+        self._resize_commit_timer.setSingleShot(True)
+        self._resize_commit_timer.setInterval(150)
+        self._resize_commit_timer.timeout.connect(self._commit_column_resize)
         self.horizontalHeader().sectionResized.connect(self._on_section_resized)
         self.cellChanged.connect(self._on_cell_changed)
 
@@ -151,6 +155,9 @@ class ChronologyTablePanel(QTableWidget):
         settings.sync()
 
     def _on_section_resized(self, logical_index: int, old_size: int, new_size: int) -> None:
+        self._resize_commit_timer.start()
+
+    def _commit_column_resize(self) -> None:
         self.save_column_widths()
         self.resizeRowsToContents()
 
