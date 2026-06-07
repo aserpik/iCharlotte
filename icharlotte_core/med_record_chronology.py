@@ -4,10 +4,13 @@ from __future__ import annotations
 import hashlib
 import os
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Literal
 
 from docx import Document
+from docx.table import Table
+from docx.text.paragraph import Paragraph
 
 from icharlotte_core.med_record_extractor import _parse_page_no
 
@@ -67,8 +70,6 @@ _SYNOPSIS_HEADING_RE = re.compile(
     r"^BRIEF\s+SYNOPSIS\s+OF\s+POST[-\s]INJURY\s+MEDICAL\s+RECORD:?\s*$",
     re.I,
 )
-_MAJOR_HEADING_RE = re.compile(r"^[A-Z0-9][A-Z0-9\s/&.,'()-]{4,}:?$")
-_DATE_RE = re.compile(r"\b(\d{1,2}/\d{1,2}/\d{2,4})\b")
 _CHRON_HEADERS = ("date", "pageno", "provider", "description", "redflagscomments")
 
 
@@ -94,8 +95,13 @@ def _parse_synopsis(path: str) -> list[SynopsisParagraph]:
     doc = Document(path)
     in_synopsis = False
     paragraphs: list[SynopsisParagraph] = []
-    for para in doc.paragraphs:
-        text = _collapse(para.text)
+    for block in _iter_body_blocks(doc):
+        if isinstance(block, Table):
+            if in_synopsis and _is_chronology_table(block):
+                break
+            continue
+
+        text = _collapse(block.text)
         if not text:
             continue
         if _SYNOPSIS_HEADING_RE.match(text):
@@ -103,27 +109,22 @@ def _parse_synopsis(path: str) -> list[SynopsisParagraph]:
             continue
         if not in_synopsis:
             continue
-        if _MAJOR_HEADING_RE.match(text) and not _DATE_RE.search(text):
-            break
-        if _DATE_RE.search(text):
-            order = len(paragraphs)
-            paragraphs.append(
-                SynopsisParagraph(
-                    id=_stable_id("syn", order, text),
-                    order=order,
-                    text=text,
-                )
+
+        order = len(paragraphs)
+        paragraphs.append(
+            SynopsisParagraph(
+                id=_stable_id("syn", order, text),
+                order=order,
+                text=text,
             )
+        )
     return paragraphs
 
 
 def _parse_rows(path: str) -> list[SelectableChronologyRow]:
     doc = Document(path)
     for table in doc.tables:
-        if not table.rows or len(table.rows[0].cells) != 5:
-            continue
-        headers = [_normalize_header(cell.text) for cell in table.rows[0].cells]
-        if not all(expected in headers[index] for index, expected in enumerate(_CHRON_HEADERS)):
+        if not _is_chronology_table(table):
             continue
 
         rows: list[SelectableChronologyRow] = []
@@ -155,6 +156,24 @@ def _parse_rows(path: str) -> list[SelectableChronologyRow]:
             )
         return rows
     return []
+
+
+def _iter_body_blocks(doc) -> Iterator[Paragraph | Table]:
+    for child in doc.element.body.iterchildren():
+        if child.tag.endswith("}p"):
+            yield Paragraph(child, doc)
+        elif child.tag.endswith("}tbl"):
+            yield Table(child, doc)
+
+
+def _is_chronology_table(table: Table) -> bool:
+    if not table.rows or len(table.rows[0].cells) != 5:
+        return False
+    headers = [_normalize_header(cell.text) for cell in table.rows[0].cells]
+    return all(
+        expected in headers[index]
+        for index, expected in enumerate(_CHRON_HEADERS)
+    )
 
 
 def _collapse(text: str) -> str:

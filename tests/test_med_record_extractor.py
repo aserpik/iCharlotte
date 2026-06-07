@@ -1,4 +1,4 @@
-"""Tests for icharlotte_core.med_record_extractor._parse_page_no."""
+"""Tests for med record extractor page parsing and chronology document parsing."""
 
 import tempfile
 import unittest
@@ -66,6 +66,12 @@ def _build_chronology_docx(
     *,
     include_synopsis: bool = True,
     flags_header: str = "Red Flags/Comments",
+    synopsis_extra_paragraphs: tuple[str, ...] = (),
+    first_page_no: str = (
+        "Hall - Doc Produced HALL 000001 to 002530 7-21-2023\n\n"
+        "Pg No: 599-604/2530"
+    ),
+    after_table_paragraphs: tuple[str, ...] = (),
 ) -> Path:
     doc = Document()
     doc.add_paragraph("CHRONOLOGICAL MEDICAL SUMMARY")
@@ -76,6 +82,8 @@ def _build_chronology_docx(
             "On 09/21/2020, Test Plaintiff presented to Kaiser Permanente. "
             "She was evaluated by Henry Louis Marr, DO, for a right ankle injury."
         )
+        for paragraph in synopsis_extra_paragraphs:
+            doc.add_paragraph(paragraph)
         doc.add_paragraph(
             "On 09/21/2020, she had an X-ray performed by James Michael Erskine, MD."
         )
@@ -88,7 +96,7 @@ def _build_chronology_docx(
         cell.text = "POST-INJURY MEDICAL RECORDS"
     row = table.add_row().cells
     row[0].text = "09/21/2020"
-    row[1].text = "Hall - Doc Produced HALL 000001 to 002530 7-21-2023\n\nPg No: 599-604/2530"
+    row[1].text = first_page_no
     row[2].text = "Kaiser Permanente\nHenry Louis Marr, DO"
     row[3].text = "EMERGENCY DEPARTMENT NOTE\nChief Complaint: Ankle injury."
     row[4].text = ""
@@ -98,6 +106,8 @@ def _build_chronology_docx(
     row[2].text = "Kaiser Permanente\nJames Michael Erskine, MD"
     row[3].text = "RADIOLOGY REPORT\nX-ray right ankle."
     row[4].text = ""
+    for paragraph in after_table_paragraphs:
+        doc.add_paragraph(paragraph)
     doc.save(path)
     return path
 
@@ -118,6 +128,58 @@ class TestChronologyDocumentParser(unittest.TestCase):
         self.assertEqual(parsed.rows[0].page_end, 604)
         self.assertEqual(parsed.rows[0].record_filename, "Hall - Doc Produced HALL 000001 to 002530 7-21-2023")
         self.assertFalse(parsed.blocking_errors)
+
+    def test_parse_chronology_document_collects_synopsis_continuation_paragraph(self):
+        from icharlotte_core.med_record_chronology import parse_chronology_document
+
+        with tempfile.TemporaryDirectory() as td:
+            source = _build_chronology_docx(
+                Path(td) / "chronology.docx",
+                synopsis_extra_paragraphs=(
+                    "She returned home with crutches and follow-up instructions.",
+                ),
+            )
+            parsed = parse_chronology_document(str(source))
+
+        self.assertEqual(len(parsed.synopsis_paragraphs), 3)
+        self.assertEqual(
+            parsed.synopsis_paragraphs[1].text,
+            "She returned home with crutches and follow-up instructions.",
+        )
+
+    def test_parse_chronology_document_stops_synopsis_at_table_boundary(self):
+        from icharlotte_core.med_record_chronology import parse_chronology_document
+
+        with tempfile.TemporaryDirectory() as td:
+            source = _build_chronology_docx(
+                Path(td) / "chronology.docx",
+                after_table_paragraphs=(
+                    "On 10/01/2020, this footer-style note should not be selectable.",
+                ),
+            )
+            parsed = parse_chronology_document(str(source))
+
+        self.assertEqual(len(parsed.synopsis_paragraphs), 2)
+        self.assertNotIn(
+            "10/01/2020",
+            "\n".join(paragraph.text for paragraph in parsed.synopsis_paragraphs),
+        )
+
+    def test_parse_chronology_document_warns_when_page_no_is_malformed(self):
+        from icharlotte_core.med_record_chronology import parse_chronology_document
+
+        with tempfile.TemporaryDirectory() as td:
+            source = _build_chronology_docx(
+                Path(td) / "chronology.docx",
+                first_page_no=(
+                    "Hall - Doc Produced HALL 000001 to 002530 7-21-2023\n\nPg No: 17-"
+                ),
+            )
+            parsed = parse_chronology_document(str(source))
+
+        self.assertEqual(len(parsed.rows), 2)
+        self.assertFalse(parsed.rows[0].extractable)
+        self.assertIn("Could not parse record/pages from PAGE NO:", parsed.rows[0].warning)
 
     def test_parse_chronology_document_warns_when_synopsis_missing(self):
         from icharlotte_core.med_record_chronology import parse_chronology_document
