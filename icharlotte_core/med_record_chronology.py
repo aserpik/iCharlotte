@@ -12,7 +12,7 @@ from docx import Document
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 
-from icharlotte_core.med_record_extractor import _parse_page_no
+from icharlotte_core.med_record_extractor import _normalize_date, _parse_page_no
 
 
 MatchStatus = Literal["confident", "ambiguous", "none"]
@@ -58,6 +58,43 @@ class ChronologyDocument:
     blocking_errors: list[str] = field(default_factory=list)
 
 
+@dataclass
+class SelectionState:
+    selected_paragraph_ids: set[str] = field(default_factory=set)
+    _row_sources: dict[str, set[str]] = field(default_factory=dict, repr=False)
+
+    def select_paragraph(self, paragraph_id: str) -> None:
+        self.selected_paragraph_ids.add(paragraph_id)
+
+    def deselect_paragraph(self, paragraph_id: str) -> None:
+        self.selected_paragraph_ids.discard(paragraph_id)
+        self.clear_source(paragraph_id)
+
+    def select_row(self, row_id: str, *, source: str = "manual") -> None:
+        self._row_sources.setdefault(row_id, set()).add(source)
+
+    def deselect_row(self, row_id: str, *, source: str = "manual") -> None:
+        sources = self._row_sources.get(row_id)
+        if not sources:
+            return
+        sources.discard(source)
+        if not sources:
+            del self._row_sources[row_id]
+
+    def clear_source(self, source: str) -> None:
+        self.selected_paragraph_ids.discard(source)
+        for row_id, sources in list(self._row_sources.items()):
+            sources.discard(source)
+            if not sources:
+                del self._row_sources[row_id]
+
+    def is_row_selected(self, row_id: str) -> bool:
+        return row_id in self._row_sources
+
+    def selected_row_ids(self) -> list[str]:
+        return list(self._row_sources)
+
+
 @dataclass(frozen=True)
 class MatchResult:
     status: MatchStatus
@@ -77,6 +114,46 @@ _CHRON_HEADER_ALIASES = (
     frozenset({"description"}),
     frozenset({"redflagscomments", "redflagcomments"}),
 )
+_DATE_RE = re.compile(
+    r"\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{4}[./-]\d{1,2}[./-]\d{1,2})\b"
+)
+_CREDENTIAL_RE = re.compile(
+    r"\b[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){1,4},?\s*"
+    r"(?:M\.?D\.?|D\.?O\.?|D\.?C\.?|P\.?A\.?-?C|N\.?P\.?|"
+    r"D\.?P\.?T\.?|P\.?T\.?|R\.?N\.?|FNP|PA-C)\b"
+)
+_PROVIDER_CONTEXT_RE = re.compile(
+    r"\b(?:presented to|reported to|returned to|treated at|treated by|"
+    r"evaluated by|examined by|seen by|consulted with|followed up with|"
+    r"followed up at|visited|saw|with|at|to|by|from)\s+"
+    r"([A-Z][^.;:]+?)(?=(?:\s+for\b|\s+regarding\b|\s+where\b|[.;:]|$))",
+    re.I,
+)
+_PROVIDER_TOKEN_STOPWORDS = {
+    "a",
+    "an",
+    "and",
+    "by",
+    "care",
+    "dr",
+    "for",
+    "from",
+    "he",
+    "her",
+    "him",
+    "injury",
+    "medical",
+    "mr",
+    "mrs",
+    "ms",
+    "on",
+    "plaintiff",
+    "she",
+    "test",
+    "the",
+    "to",
+    "was",
+}
 
 
 def parse_chronology_document(path: str) -> ChronologyDocument:
@@ -95,6 +172,108 @@ def parse_chronology_document(path: str) -> ChronologyDocument:
         warnings=warnings,
         blocking_errors=blocking_errors,
     )
+
+
+def match_synopsis_to_rows(
+    paragraph: SynopsisParagraph,
+    rows: list[SelectableChronologyRow],
+) -> MatchResult:
+    dates = {_normalize_date(match.group(0)) for match in _DATE_RE.finditer(paragraph.text)}
+    dates.discard("")
+    if not dates:
+        return MatchResult(status="none", reason="No date found in synopsis paragraph.")
+
+    same_date_rows = [row for row in rows if _normalize_date(row.date) in dates]
+    if not same_date_rows:
+        return MatchResult(status="none", reason="No chronology rows share the synopsis date.")
+
+    candidates = _provider_candidates(paragraph.text)
+    if not candidates:
+        return MatchResult(
+            status="ambiguous",
+            candidate_row_ids=tuple(row.id for row in same_date_rows),
+            reason="No distinct provider candidate found in synopsis paragraph.",
+        )
+
+    scored_rows: list[tuple[int, SelectableChronologyRow]] = []
+    for row in same_date_rows:
+        score = sum(_provider_score(candidate, row.provider) for candidate in candidates)
+        if score > 0:
+            scored_rows.append((score, row))
+
+    if not scored_rows:
+        return MatchResult(status="none", reason="No same-date row provider matched the synopsis.")
+
+    scored_rows.sort(key=lambda item: (-item[0], item[1].order))
+    best_score, best_row = scored_rows[0]
+    second_score = scored_rows[1][0] if len(scored_rows) > 1 else 0
+    if best_score >= 80 and best_score >= second_score + 40:
+        return MatchResult(
+            status="confident",
+            row_ids=(best_row.id,),
+            reason="One same-date provider row was the distinct strongest match.",
+        )
+
+    return MatchResult(
+        status="ambiguous",
+        candidate_row_ids=tuple(row.id for _, row in scored_rows),
+        reason="Multiple same-date rows were plausible provider matches.",
+    )
+
+
+def _provider_candidates(text: str) -> tuple[str, ...]:
+    candidates: list[str] = []
+    seen: set[str] = set()
+    for pattern in (_CREDENTIAL_RE, _PROVIDER_CONTEXT_RE):
+        for match in pattern.finditer(text or ""):
+            candidate = _clean_provider_candidate(match.group(1) if match.groups() else match.group(0))
+            key = _provider_key(candidate)
+            if candidate and key not in seen:
+                seen.add(key)
+                candidates.append(candidate)
+    return tuple(candidates)
+
+
+def _clean_provider_candidate(text: str) -> str:
+    candidate = _collapse(text)
+    candidate = re.sub(r"^(?:the\s+|dr\.?\s+)", "", candidate, flags=re.I)
+    candidate = re.sub(r"\s+(?:for|regarding|where)\b.*$", "", candidate, flags=re.I)
+    candidate = candidate.strip(" ,.;:-")
+    if len(candidate) < 3:
+        return ""
+    key = _provider_key(candidate)
+    tokens = key.split()
+    if not tokens or all(token in _PROVIDER_TOKEN_STOPWORDS for token in tokens):
+        return ""
+    return candidate
+
+
+def _provider_score(candidate: str, provider: str) -> int:
+    candidate_key = _provider_key(candidate)
+    provider_key = _provider_key(provider)
+    if not candidate_key or not provider_key:
+        return 0
+    if candidate_key == provider_key:
+        return 140
+    if candidate_key in provider_key:
+        return 100 + min(40, len(candidate_key) // 3)
+
+    candidate_tokens = [
+        token
+        for token in candidate_key.split()
+        if len(token) > 1 and token not in _PROVIDER_TOKEN_STOPWORDS
+    ]
+    if not candidate_tokens:
+        return 0
+    provider_tokens = set(provider_key.split())
+    overlap = [token for token in candidate_tokens if token in provider_tokens]
+    if not overlap:
+        return 0
+    if len(overlap) == len(candidate_tokens):
+        return 80 + (len(overlap) * 5)
+    if len(overlap) >= 2 and len(overlap) / len(candidate_tokens) >= 0.67:
+        return 50 + int(30 * (len(overlap) / len(candidate_tokens)))
+    return 0
 
 
 def _parse_synopsis(path: str) -> list[SynopsisParagraph]:
@@ -196,6 +375,10 @@ def _collapse(text: str) -> str:
 
 def _normalize_header(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", _collapse(text).lower())
+
+
+def _provider_key(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", _collapse(text).lower()).strip()
 
 
 def _stable_id(prefix: str, order: int, text: str) -> str:

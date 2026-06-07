@@ -274,5 +274,71 @@ class TestChronologyDocumentParser(unittest.TestCase):
         self.assertIn("No usable 5-column chronology table found.", parsed.blocking_errors)
 
 
+class TestSynopsisMatching(unittest.TestCase):
+    def _parsed(self):
+        from icharlotte_core.med_record_chronology import parse_chronology_document
+
+        td = tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        source = _build_chronology_docx(Path(td.name) / "chronology.docx")
+        return parse_chronology_document(str(source))
+
+    def test_synopsis_match_confident_by_date_and_provider(self):
+        from icharlotte_core.med_record_chronology import match_synopsis_to_rows
+
+        parsed = self._parsed()
+        result = match_synopsis_to_rows(parsed.synopsis_paragraphs[0], parsed.rows)
+
+        self.assertEqual(result.status, "confident")
+        self.assertEqual(result.row_ids, (parsed.rows[0].id,))
+        self.assertEqual(result.candidate_row_ids, ())
+
+    def test_synopsis_match_ambiguous_when_provider_is_not_distinct(self):
+        from icharlotte_core.med_record_chronology import SynopsisParagraph, match_synopsis_to_rows
+
+        parsed = self._parsed()
+        paragraph = SynopsisParagraph(
+            id="syn-x",
+            order=0,
+            text="On 09/21/2020, she presented to Kaiser Permanente for ankle care.",
+        )
+        result = match_synopsis_to_rows(paragraph, parsed.rows)
+
+        self.assertEqual(result.status, "ambiguous")
+        self.assertEqual(set(result.candidate_row_ids), {row.id for row in parsed.rows})
+
+    def test_synopsis_match_none_without_same_date(self):
+        from icharlotte_core.med_record_chronology import SynopsisParagraph, match_synopsis_to_rows
+
+        parsed = self._parsed()
+        paragraph = SynopsisParagraph(
+            id="syn-x",
+            order=0,
+            text="On 12/31/2021, she saw Kaiser Permanente for unrelated care.",
+        )
+        result = match_synopsis_to_rows(paragraph, parsed.rows)
+
+        self.assertEqual(result.status, "none")
+        self.assertEqual(result.row_ids, ())
+
+
+class TestSelectionState(unittest.TestCase):
+    def test_selection_state_removes_only_paragraph_owned_rows(self):
+        from icharlotte_core.med_record_chronology import SelectionState
+
+        state = SelectionState()
+        state.select_row("row-manual", source="manual")
+        state.select_row("row-shared", source="syn-a")
+        state.select_row("row-shared", source="syn-b")
+        state.select_row("row-only-a", source="syn-a")
+
+        state.clear_source("syn-a")
+
+        self.assertTrue(state.is_row_selected("row-manual"))
+        self.assertTrue(state.is_row_selected("row-shared"))
+        self.assertFalse(state.is_row_selected("row-only-a"))
+        self.assertEqual(state.selected_row_ids(), ["row-manual", "row-shared"])
+
+
 if __name__ == "__main__":
     unittest.main()
