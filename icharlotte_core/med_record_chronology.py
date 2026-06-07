@@ -234,7 +234,8 @@ def match_synopsis_to_rows(
     paragraph: SynopsisParagraph,
     rows: list[SelectableChronologyRow],
 ) -> MatchResult:
-    dates = {_normalize_date(match.group(0)) for match in _DATE_RE.finditer(paragraph.text)}
+    paragraph_text = _collapse(paragraph.text)
+    dates = {_normalize_date(match.group(0)) for match in _DATE_RE.finditer(paragraph_text)}
     dates.discard("")
     if not dates:
         return MatchResult(status="none", reason="No date found in synopsis paragraph.")
@@ -243,7 +244,7 @@ def match_synopsis_to_rows(
     if not same_date_rows:
         return MatchResult(status="none", reason="No chronology rows share the synopsis date.")
 
-    candidates = _provider_candidates(paragraph.text)
+    candidates = _provider_candidates(paragraph_text)
     if not candidates:
         return MatchResult(
             status="ambiguous",
@@ -374,10 +375,11 @@ def _parse_synopsis(path: str) -> list[SynopsisParagraph]:
                 break
             continue
 
-        text = _collapse(block.text)
-        if not text:
+        display_text = block.text
+        match_text = _collapse(display_text)
+        if not match_text:
             continue
-        if _SYNOPSIS_HEADING_RE.match(text):
+        if _SYNOPSIS_HEADING_RE.match(match_text):
             in_synopsis = True
             continue
         if not in_synopsis:
@@ -386,9 +388,9 @@ def _parse_synopsis(path: str) -> list[SynopsisParagraph]:
         order = len(paragraphs)
         paragraphs.append(
             SynopsisParagraph(
-                id=_stable_id("syn", order, text),
+                id=_stable_id("syn", order, match_text),
                 order=order,
-                text=text,
+                text=display_text,
             )
         )
     return paragraphs
@@ -402,12 +404,13 @@ def _parse_rows(path: str) -> list[SelectableChronologyRow]:
 
         rows: list[SelectableChronologyRow] = []
         for raw_row in table.rows[1:]:
-            cells = [_collapse(cell.text) for cell in raw_row.cells]
+            raw_cells = [cell.text for cell in raw_row.cells]
+            cells = [_collapse(text) for text in raw_cells]
             if not cells[0]:
                 continue
             if len(set(cells)) == 1:
                 continue
-            record_filename, page_start, page_end = _parse_page_no(raw_row.cells[1].text)
+            record_filename, page_start, page_end = _parse_page_no(raw_cells[1])
             warning = ""
             if not _is_extractable_page_range(record_filename, page_start, page_end):
                 warning = f"Could not parse record/pages from PAGE NO: {cells[1][:80]}"
@@ -416,11 +419,11 @@ def _parse_rows(path: str) -> list[SelectableChronologyRow]:
                 SelectableChronologyRow(
                     id=_stable_id("row", order, "|".join(cells[:4])),
                     order=order,
-                    date=cells[0],
-                    page_no=raw_row.cells[1].text.strip(),
-                    provider=cells[2],
-                    description=cells[3],
-                    flags=cells[4],
+                    date=raw_cells[0],
+                    page_no=raw_cells[1],
+                    provider=raw_cells[2],
+                    description=raw_cells[3],
+                    flags=raw_cells[4],
                     record_filename=record_filename,
                     page_start=page_start,
                     page_end=page_end,

@@ -139,6 +139,28 @@ def _build_chronology_docx(
 
 
 class TestChronologyDocumentParser(unittest.TestCase):
+    def _build_verbatim_synopsis_docx(self, path: Path) -> Path:
+        doc = Document()
+        doc.add_paragraph("BRIEF SYNOPSIS OF POST-INJURY MEDICAL RECORD:")
+        paragraph = doc.add_paragraph()
+        run = paragraph.add_run(
+            "On 09/21/2020, Test Plaintiff presented to Kaiser Permanente."
+        )
+        run.add_break()
+        paragraph.add_run("She was evaluated by Henry Louis Marr, DO.")
+        table = doc.add_table(rows=1, cols=5)
+        headers = ["DATE", "PAGE NO", "PROVIDER", "DESCRIPTION", "Red Flags/Comments"]
+        for index, header in enumerate(headers):
+            table.rows[0].cells[index].text = header
+        row = table.add_row().cells
+        row[0].text = "09/21/2020"
+        row[1].text = "Record\n\nPg No: 1/2"
+        row[2].text = "Kaiser Permanente\nHenry Louis Marr, DO"
+        row[3].text = "Emergency note"
+        row[4].text = ""
+        doc.save(path)
+        return path
+
     def test_parse_chronology_document_extracts_synopsis_and_rows(self):
         from icharlotte_core.med_record_chronology import parse_chronology_document
 
@@ -267,6 +289,55 @@ class TestChronologyDocumentParser(unittest.TestCase):
 
         self.assertEqual(parsed.rows, [])
         self.assertIn("No usable 5-column chronology table found.", parsed.blocking_errors)
+
+    def test_parse_chronology_document_preserves_verbatim_synopsis_text(self):
+        from icharlotte_core.med_record_chronology import parse_chronology_document
+
+        with tempfile.TemporaryDirectory() as td:
+            source = self._build_verbatim_synopsis_docx(Path(td) / "chronology.docx")
+            parsed = parse_chronology_document(str(source))
+
+        self.assertEqual(
+            parsed.synopsis_paragraphs[0].text,
+            "On 09/21/2020, Test Plaintiff presented to Kaiser Permanente.\n"
+            "She was evaluated by Henry Louis Marr, DO.",
+        )
+
+    def test_parse_chronology_document_preserves_verbatim_row_cells(self):
+        from icharlotte_core.med_record_chronology import parse_chronology_document
+
+        with tempfile.TemporaryDirectory() as td:
+            source = _build_chronology_docx(Path(td) / "chronology.docx")
+            parsed = parse_chronology_document(str(source))
+
+        self.assertEqual(
+            parsed.rows[0].page_no,
+            "Hall - Doc Produced HALL 000001 to 002530 7-21-2023\n\n"
+            "Pg No: 599-604/2530",
+        )
+        self.assertEqual(
+            parsed.rows[0].provider,
+            "Kaiser Permanente\nHenry Louis Marr, DO",
+        )
+        self.assertEqual(
+            parsed.rows[0].description,
+            "EMERGENCY DEPARTMENT NOTE\nChief Complaint: Ankle injury.",
+        )
+
+    def test_synopsis_matching_still_handles_verbatim_line_breaks(self):
+        from icharlotte_core.med_record_chronology import (
+            match_synopsis_to_rows,
+            parse_chronology_document,
+        )
+
+        with tempfile.TemporaryDirectory() as td:
+            source = self._build_verbatim_synopsis_docx(Path(td) / "chronology.docx")
+            parsed = parse_chronology_document(str(source))
+
+        result = match_synopsis_to_rows(parsed.synopsis_paragraphs[0], parsed.rows)
+
+        self.assertEqual(result.status, "confident")
+        self.assertEqual(result.row_ids, (parsed.rows[0].id,))
 
     def test_parse_chronology_document_blocks_when_flags_header_missing(self):
         from icharlotte_core.med_record_chronology import parse_chronology_document
