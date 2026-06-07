@@ -42,10 +42,10 @@ class SelectableChronologyRow:
 
     @property
     def extractable(self) -> bool:
-        return bool(
-            self.record_filename
-            and self.page_start > 0
-            and self.page_end >= self.page_start
+        return _is_extractable_page_range(
+            self.record_filename,
+            self.page_start,
+            self.page_end,
         )
 
 
@@ -70,7 +70,13 @@ _SYNOPSIS_HEADING_RE = re.compile(
     r"^BRIEF\s+SYNOPSIS\s+OF\s+POST[-\s]INJURY\s+MEDICAL\s+RECORD:?\s*$",
     re.I,
 )
-_CHRON_HEADERS = ("date", "pageno", "provider", "description", "redflagscomments")
+_CHRON_HEADER_ALIASES = (
+    frozenset({"date"}),
+    frozenset({"pageno", "pgno", "pagenumber"}),
+    frozenset({"provider"}),
+    frozenset({"description"}),
+    frozenset({"redflagscomments", "redflagcomments"}),
+)
 
 
 def parse_chronology_document(path: str) -> ChronologyDocument:
@@ -136,7 +142,7 @@ def _parse_rows(path: str) -> list[SelectableChronologyRow]:
                 continue
             record_filename, page_start, page_end = _parse_page_no(raw_row.cells[1].text)
             warning = ""
-            if not record_filename or page_start <= 0:
+            if not _is_extractable_page_range(record_filename, page_start, page_end):
                 warning = f"Could not parse record/pages from PAGE NO: {cells[1][:80]}"
             order = len(rows)
             rows.append(
@@ -171,9 +177,17 @@ def _is_chronology_table(table: Table) -> bool:
         return False
     headers = [_normalize_header(cell.text) for cell in table.rows[0].cells]
     return all(
-        expected in headers[index]
-        for index, expected in enumerate(_CHRON_HEADERS)
+        headers[index] in aliases
+        for index, aliases in enumerate(_CHRON_HEADER_ALIASES)
     )
+
+
+def _is_extractable_page_range(
+    record_filename: str,
+    page_start: int,
+    page_end: int,
+) -> bool:
+    return bool(record_filename and page_start > 0 and page_end >= page_start)
 
 
 def _collapse(text: str) -> str:

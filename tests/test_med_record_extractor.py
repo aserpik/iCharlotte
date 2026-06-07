@@ -71,6 +71,7 @@ def _build_chronology_docx(
         "Hall - Doc Produced HALL 000001 to 002530 7-21-2023\n\n"
         "Pg No: 599-604/2530"
     ),
+    include_decoy_table: bool = False,
     after_table_paragraphs: tuple[str, ...] = (),
 ) -> Path:
     doc = Document()
@@ -87,6 +88,23 @@ def _build_chronology_docx(
         doc.add_paragraph(
             "On 09/21/2020, she had an X-ray performed by James Michael Erskine, MD."
         )
+    if include_decoy_table:
+        table = doc.add_table(rows=1, cols=5)
+        headers = [
+            "Updated Date",
+            "Pageno Notes",
+            "Provider",
+            "Description",
+            "Red Flags/Comments",
+        ]
+        for index, header in enumerate(headers):
+            table.rows[0].cells[index].text = header
+        row = table.add_row().cells
+        row[0].text = "01/01/1999"
+        row[1].text = "Decoy Record\n\nPg No: 1/1"
+        row[2].text = "Wrong Provider"
+        row[3].text = "Not a chronology table."
+        row[4].text = ""
     table = doc.add_table(rows=1, cols=5)
     headers = ["DATE", "PAGE NO", "PROVIDER", "DESCRIPTION", flags_header]
     for index, header in enumerate(headers):
@@ -178,6 +196,42 @@ class TestChronologyDocumentParser(unittest.TestCase):
             parsed = parse_chronology_document(str(source))
 
         self.assertEqual(len(parsed.rows), 2)
+        self.assertFalse(parsed.rows[0].extractable)
+        self.assertIn("Could not parse record/pages from PAGE NO:", parsed.rows[0].warning)
+
+    def test_parse_chronology_document_skips_decoy_table_before_real_chronology(self):
+        from icharlotte_core.med_record_chronology import parse_chronology_document
+
+        with tempfile.TemporaryDirectory() as td:
+            source = _build_chronology_docx(
+                Path(td) / "chronology.docx",
+                include_decoy_table=True,
+            )
+            parsed = parse_chronology_document(str(source))
+
+        self.assertEqual(len(parsed.rows), 2)
+        self.assertEqual(parsed.rows[0].date, "09/21/2020")
+        self.assertEqual(
+            parsed.rows[0].record_filename,
+            "Hall - Doc Produced HALL 000001 to 002530 7-21-2023",
+        )
+        self.assertFalse(parsed.blocking_errors)
+
+    def test_parse_chronology_document_warns_when_page_range_is_invalid(self):
+        from icharlotte_core.med_record_chronology import parse_chronology_document
+
+        with tempfile.TemporaryDirectory() as td:
+            source = _build_chronology_docx(
+                Path(td) / "chronology.docx",
+                first_page_no=(
+                    "Hall - Doc Produced HALL 000001 to 002530 7-21-2023\n\n"
+                    "Pg No: 10-5/20"
+                ),
+            )
+            parsed = parse_chronology_document(str(source))
+
+        self.assertEqual(parsed.rows[0].page_start, 10)
+        self.assertEqual(parsed.rows[0].page_end, 5)
         self.assertFalse(parsed.rows[0].extractable)
         self.assertIn("Could not parse record/pages from PAGE NO:", parsed.rows[0].warning)
 
