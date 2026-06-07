@@ -61,6 +61,14 @@ class TestParsePageNo(unittest.TestCase):
         self.assertEqual(end, 0)
 
 
+class TestNormalizeDate(unittest.TestCase):
+    def test_two_digit_year_uses_1950s_1960s_as_past_dates(self):
+        from icharlotte_core.med_record_extractor import _normalize_date
+
+        self.assertEqual(_normalize_date("09/21/68"), "09/21/1968")
+        self.assertEqual(_normalize_date("September 21, 68"), "09/21/1968")
+
+
 def _build_chronology_docx(
     path: Path,
     *,
@@ -321,6 +329,68 @@ class TestSynopsisMatching(unittest.TestCase):
         self.assertEqual(result.status, "none")
         self.assertEqual(result.row_ids, ())
 
+    def test_synopsis_match_accepts_two_digit_year(self):
+        from icharlotte_core.med_record_chronology import SynopsisParagraph, match_synopsis_to_rows
+
+        parsed = self._parsed()
+        paragraph = SynopsisParagraph(
+            id="syn-x",
+            order=0,
+            text="On 09/21/20, she was evaluated by Henry Louis Marr, DO.",
+        )
+        result = match_synopsis_to_rows(paragraph, parsed.rows)
+
+        self.assertEqual(result.status, "confident")
+        self.assertEqual(result.row_ids, (parsed.rows[0].id,))
+
+    def test_synopsis_match_accepts_month_name_date(self):
+        from icharlotte_core.med_record_chronology import SynopsisParagraph, match_synopsis_to_rows
+
+        parsed = self._parsed()
+        paragraph = SynopsisParagraph(
+            id="syn-x",
+            order=0,
+            text="On September 21, 2020, she was evaluated by Henry Louis Marr, DO.",
+        )
+        result = match_synopsis_to_rows(paragraph, parsed.rows)
+
+        self.assertEqual(result.status, "confident")
+        self.assertEqual(result.row_ids, (parsed.rows[0].id,))
+
+    def test_synopsis_match_accepts_doctor_before_verb(self):
+        from icharlotte_core.med_record_chronology import SynopsisParagraph, match_synopsis_to_rows
+
+        parsed = self._parsed()
+        paragraph = SynopsisParagraph(
+            id="syn-x",
+            order=0,
+            text="On 09/21/2020, Dr. Marr evaluated her for ankle pain.",
+        )
+        result = match_synopsis_to_rows(paragraph, parsed.rows)
+
+        self.assertEqual(result.status, "confident")
+        self.assertEqual(result.row_ids, (parsed.rows[0].id,))
+
+    def test_synopsis_match_does_not_confidently_select_generic_provider_token(self):
+        from dataclasses import replace
+
+        from icharlotte_core.med_record_chronology import SynopsisParagraph, match_synopsis_to_rows
+
+        parsed = self._parsed()
+        rows = [
+            replace(parsed.rows[0], provider="Kaiser Clinic\nHenry Louis Marr, DO"),
+            parsed.rows[1],
+        ]
+        paragraph = SynopsisParagraph(
+            id="syn-x",
+            order=0,
+            text="On 09/21/2020, she presented to clinic for follow-up care.",
+        )
+        result = match_synopsis_to_rows(paragraph, rows)
+
+        self.assertEqual(result.status, "ambiguous")
+        self.assertEqual(set(result.candidate_row_ids), {row.id for row in rows})
+
 
 class TestSelectionState(unittest.TestCase):
     def test_selection_state_removes_only_paragraph_owned_rows(self):
@@ -338,6 +408,19 @@ class TestSelectionState(unittest.TestCase):
         self.assertTrue(state.is_row_selected("row-shared"))
         self.assertFalse(state.is_row_selected("row-only-a"))
         self.assertEqual(state.selected_row_ids(), ["row-manual", "row-shared"])
+
+    def test_selection_state_manual_deselect_preserves_synopsis_owned_row(self):
+        from icharlotte_core.med_record_chronology import SelectionState
+
+        state = SelectionState()
+        state.select_row("row-shared", source="syn-a")
+        state.select_row("row-shared", source="manual")
+
+        state.deselect_row("row-shared", source="manual")
+
+        self.assertTrue(state.is_row_selected("row-shared"))
+        state.clear_source("syn-a")
+        self.assertFalse(state.is_row_selected("row-shared"))
 
 
 if __name__ == "__main__":

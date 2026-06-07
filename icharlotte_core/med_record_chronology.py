@@ -114,13 +114,26 @@ _CHRON_HEADER_ALIASES = (
     frozenset({"description"}),
     frozenset({"redflagscomments", "redflagcomments"}),
 )
+_MONTH_NAME_RE = (
+    r"(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|"
+    r"Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?\.?|"
+    r"Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)"
+)
 _DATE_RE = re.compile(
-    r"\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{4}[./-]\d{1,2}[./-]\d{1,2})\b"
+    rf"\b(?:\d{{1,2}}[/-]\d{{1,2}}[/-]\d{{2,4}}|"
+    rf"\d{{4}}[./-]\d{{1,2}}[./-]\d{{1,2}}|"
+    rf"{_MONTH_NAME_RE}\s+\d{{1,2}},?\s+\d{{2,4}})\b",
+    re.I,
 )
 _CREDENTIAL_RE = re.compile(
     r"\b[A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){1,4},?\s*"
     r"(?:M\.?D\.?|D\.?O\.?|D\.?C\.?|P\.?A\.?-?C|N\.?P\.?|"
     r"D\.?P\.?T\.?|P\.?T\.?|R\.?N\.?|FNP|PA-C)\b"
+)
+_DOCTOR_BEFORE_VERB_RE = re.compile(
+    r"\bDr\.?\s+([A-Z][A-Za-z.'-]+(?:\s+[A-Z][A-Za-z.'-]+){0,3})"
+    r"(?=\s+(?:evaluated|examined|treated|saw|performed|ordered|"
+    r"diagnosed|recommended|noted|reviewed|prescribed)\b|[,.;:])"
 )
 _PROVIDER_CONTEXT_RE = re.compile(
     r"\b(?:presented to|reported to|returned to|treated at|treated by|"
@@ -154,6 +167,39 @@ _PROVIDER_TOKEN_STOPWORDS = {
     "to",
     "was",
 }
+_PROVIDER_CREDENTIAL_TOKENS = {
+    "c",
+    "dc",
+    "do",
+    "dpt",
+    "fnp",
+    "md",
+    "np",
+    "pa",
+    "pt",
+    "rn",
+}
+_GENERIC_PROVIDER_TOKENS = {
+    "care",
+    "center",
+    "centre",
+    "clinic",
+    "department",
+    "facility",
+    "group",
+    "health",
+    "hospital",
+    "medical",
+    "office",
+    "permanente",
+    "system",
+    "urgent",
+}
+_PROVIDER_CREDENTIAL_RE = re.compile(
+    r"(?:M\.?D\.?|D\.?O\.?|D\.?C\.?|P\.?A\.?-?C|N\.?P\.?|"
+    r"D\.?P\.?T\.?|P\.?T\.?|R\.?N\.?|FNP|PA-C)\b",
+    re.I,
+)
 
 
 def parse_chronology_document(path: str) -> ChronologyDocument:
@@ -224,7 +270,7 @@ def match_synopsis_to_rows(
 def _provider_candidates(text: str) -> tuple[str, ...]:
     candidates: list[str] = []
     seen: set[str] = set()
-    for pattern in (_CREDENTIAL_RE, _PROVIDER_CONTEXT_RE):
+    for pattern in (_CREDENTIAL_RE, _DOCTOR_BEFORE_VERB_RE, _PROVIDER_CONTEXT_RE):
         for match in pattern.finditer(text or ""):
             candidate = _clean_provider_candidate(match.group(1) if match.groups() else match.group(0))
             key = _provider_key(candidate)
@@ -243,7 +289,12 @@ def _clean_provider_candidate(text: str) -> str:
         return ""
     key = _provider_key(candidate)
     tokens = key.split()
-    if not tokens or all(token in _PROVIDER_TOKEN_STOPWORDS for token in tokens):
+    if not tokens or all(
+        token in _PROVIDER_TOKEN_STOPWORDS
+        or token in _PROVIDER_CREDENTIAL_TOKENS
+        or token in _GENERIC_PROVIDER_TOKENS
+        for token in tokens
+    ):
         return ""
     return candidate
 
@@ -253,18 +304,16 @@ def _provider_score(candidate: str, provider: str) -> int:
     provider_key = _provider_key(provider)
     if not candidate_key or not provider_key:
         return 0
+    candidate_tokens = _meaningful_provider_tokens(candidate_key)
+    if not candidate_tokens:
+        return 0
+    if len(candidate_tokens) == 1:
+        return _single_token_provider_score(candidate_tokens[0], provider)
     if candidate_key == provider_key:
         return 140
     if candidate_key in provider_key:
         return 100 + min(40, len(candidate_key) // 3)
 
-    candidate_tokens = [
-        token
-        for token in candidate_key.split()
-        if len(token) > 1 and token not in _PROVIDER_TOKEN_STOPWORDS
-    ]
-    if not candidate_tokens:
-        return 0
     provider_tokens = set(provider_key.split())
     overlap = [token for token in candidate_tokens if token in provider_tokens]
     if not overlap:
@@ -274,6 +323,35 @@ def _provider_score(candidate: str, provider: str) -> int:
     if len(overlap) >= 2 and len(overlap) / len(candidate_tokens) >= 0.67:
         return 50 + int(30 * (len(overlap) / len(candidate_tokens)))
     return 0
+
+
+def _meaningful_provider_tokens(provider_key: str) -> list[str]:
+    return [
+        token
+        for token in provider_key.split()
+        if len(token) > 1
+        and token not in _PROVIDER_TOKEN_STOPWORDS
+        and token not in _PROVIDER_CREDENTIAL_TOKENS
+        and token not in _GENERIC_PROVIDER_TOKENS
+    ]
+
+
+def _single_token_provider_score(candidate_token: str, provider: str) -> int:
+    provider_key = _provider_key(provider)
+    if candidate_token not in set(provider_key.split()):
+        return 0
+    if _credential_last_name_matches(candidate_token, provider):
+        return 90
+    return 75
+
+
+def _credential_last_name_matches(candidate_token: str, provider: str) -> bool:
+    for match in _PROVIDER_CREDENTIAL_RE.finditer(provider or ""):
+        before_credential = provider[: match.start()]
+        words = re.findall(r"[A-Za-z][A-Za-z.'-]*", before_credential)
+        if words and _provider_key(words[-1]) == candidate_token:
+            return True
+    return False
 
 
 def _parse_synopsis(path: str) -> list[SynopsisParagraph]:

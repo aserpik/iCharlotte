@@ -9,6 +9,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass, field
+from datetime import datetime
 from difflib import SequenceMatcher
 from typing import List, Optional, Tuple
 
@@ -24,6 +25,11 @@ DATE_PATTERN = re.compile(r'(\d{4})[.\-](\d{2})[.\-](\d{2})')
 PAGE_SPEC_RE = re.compile(r'Pg\.?\s*(?:No)?:?\s*(\d+)(?:\s*-\s*(\d+))?/(\d+)', re.IGNORECASE)
 # Fallback: bare "number/total" with no Pg prefix
 BARE_PAGE_RE = re.compile(r'^(\d+)(?:\s*-\s*(\d+))?/(\d+)$')
+
+
+def _expand_two_digit_year(year: str) -> str:
+    value = int(year)
+    return str(2000 + value if value < 50 else 1900 + value)
 
 
 @dataclass
@@ -61,6 +67,35 @@ class ExtractionResult:
 def _normalize_date(date_str: str) -> str:
     """Normalize various date formats to MM/DD/YYYY for comparison."""
     date_str = date_str.strip()
+    normalized = re.sub(r'\s+', ' ', date_str)
+    normalized = re.sub(r'\b([A-Za-z]{3,9})\.', r'\1', normalized)
+    normalized = re.sub(r'\bSept\b', 'Sep', normalized, flags=re.IGNORECASE)
+    m = re.match(r'^(\d{1,2})[/-](\d{1,2})[/-](\d{2})$', normalized)
+    if m:
+        return f"{int(m.group(1)):02d}/{int(m.group(2)):02d}/{_expand_two_digit_year(m.group(3))}"
+    m = re.match(r'^([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{2})$', normalized)
+    if m:
+        expanded = f"{m.group(1)} {int(m.group(2))} {_expand_two_digit_year(m.group(3))}"
+        for fmt in ('%B %d %Y', '%b %d %Y'):
+            try:
+                return datetime.strptime(expanded, fmt).strftime('%m/%d/%Y')
+            except ValueError:
+                pass
+    for fmt in (
+        '%m/%d/%Y',
+        '%m-%d-%Y',
+        '%Y-%m-%d',
+        '%Y/%m/%d',
+        '%Y.%m.%d',
+        '%B %d, %Y',
+        '%B %d %Y',
+        '%b %d, %Y',
+        '%b %d %Y',
+    ):
+        try:
+            return datetime.strptime(normalized, fmt).strftime('%m/%d/%Y')
+        except ValueError:
+            pass
     # Already MM/DD/YYYY
     if re.match(r'^\d{2}/\d{2}/\d{4}$', date_str):
         return date_str
