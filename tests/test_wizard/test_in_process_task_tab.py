@@ -213,6 +213,57 @@ def test_success_path_serializes_selected_rows_in_completed_settings(qtbot, tmp_
     ]
 
 
+def test_success_path_merges_settings_page_state_in_completed_entry(qtbot, tmp_path):
+    from icharlotte_core.med_record_chronology import SelectableChronologyRow
+    from icharlotte_core.ui.wizard.pages.output_page import OutputPage
+
+    class StatefulSettings(_SettingsWidget):
+        def to_dict(self):
+            return {
+                "selected_row_sources": {"row-1": ["manual", "syn-1"]},
+                "selected_paragraph_ids": ["syn-1"],
+            }
+
+    output_file = tmp_path / "preview.docx"
+    output_file.write_bytes(b"x")
+    row = SelectableChronologyRow(
+        id="row-1",
+        order=0,
+        date="09/21/2020",
+        page_no="source\n\nPg No: 2/3",
+        provider="Kaiser Permanente",
+        description="Emergency department note",
+        flags="",
+        record_filename="source",
+        page_start=2,
+        page_end=2,
+    )
+    out = OutputPage()
+    settings = StatefulSettings()
+    tab = _make_tab(
+        qtbot,
+        settings_widget=settings,
+        output_widget=out,
+        ok=True,
+        payload=str(output_file),
+    )
+
+    with qtbot.waitSignal(tab.task_completed, timeout=2000) as blocker:
+        settings.run_requested.emit(
+            {
+                "chronology_path": str(tmp_path / "summary.docx"),
+                "selected_rows": [row],
+            }
+        )
+
+    entry = blocker.args[0]
+    assert entry["settings"]["selected_rows"][0]["id"] == "row-1"
+    assert entry["settings"]["selected_row_sources"] == {
+        "row-1": ["manual", "syn-1"],
+    }
+    assert entry["settings"]["selected_paragraph_ids"] == ["syn-1"]
+
+
 def test_failure_path_stays_on_status(qtbot):
     from icharlotte_core.ui.wizard.pages.output_page import OutputPage
     out = OutputPage()

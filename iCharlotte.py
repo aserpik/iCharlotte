@@ -1177,7 +1177,11 @@ class MainWindow(QMainWindow):
                 page = "settings"
 
             files_rel = [self._relpath_under(self.case_path, f) for f in tab.files]
-            output_path = tab.output_page.output_path if page == "output" else None
+            output_path = (
+                getattr(tab.output_page, "output_path", None)
+                if page == "output"
+                else None
+            )
             output_path_rel = self._relpath_under(self.case_path, output_path) if output_path else None
             settings = tab.settings_page.to_dict()
             snapshot = {
@@ -1320,9 +1324,24 @@ class MainWindow(QMainWindow):
             # (Mediation Brief is excluded above so its saved brief is reloaded.)
             from icharlotte_core.ui.wizard import in_process_task_tab
             builder = getattr(in_process_task_tab, builder_name)
-            task_tab = builder(
-                spec=spec, case_path=self.case_path,
-                file_number=self.file_number, parent=self)
+            builder_kwargs = {
+                "spec": spec,
+                "case_path": self.case_path,
+                "file_number": self.file_number,
+                "parent": self,
+            }
+            if builder_name == "build_med_extractor_tab":
+                settings = dict(entry.get("settings") or {})
+                chronology_path = settings.get("chronology_path") or (files[0] if files else "")
+                if chronology_path and self.case_path and not os.path.isabs(chronology_path):
+                    chronology_path = os.path.join(self.case_path, chronology_path)
+                if chronology_path:
+                    chronology_path = os.path.normpath(chronology_path)
+                if chronology_path:
+                    settings["chronology_path"] = chronology_path
+                builder_kwargs["chronology_path"] = chronology_path
+                builder_kwargs["initial_settings"] = settings
+            task_tab = builder(**builder_kwargs)
             if task_tab is None:
                 return
             task_tab.setProperty("wizard_task_id", spec.task_id)
@@ -1482,9 +1501,26 @@ class MainWindow(QMainWindow):
                 # (Mediation Brief is excluded above so its saved brief is reloaded.)
                 from icharlotte_core.ui.wizard import in_process_task_tab
                 builder = getattr(in_process_task_tab, builder_name)
-                tab = builder(
-                    spec=spec, case_path=self.case_path,
-                    file_number=self.file_number, parent=self)
+                builder_kwargs = {
+                    "spec": spec,
+                    "case_path": self.case_path,
+                    "file_number": self.file_number,
+                    "parent": self,
+                }
+                if builder_name == "build_med_extractor_tab":
+                    settings_dict = dict(settings_dict)
+                    chronology_path = settings_dict.get("chronology_path") or (
+                        files_abs[0] if files_abs else ""
+                    )
+                    if chronology_path and self.case_path and not os.path.isabs(chronology_path):
+                        chronology_path = os.path.join(self.case_path, chronology_path)
+                    if chronology_path:
+                        chronology_path = os.path.normpath(chronology_path)
+                    if chronology_path:
+                        settings_dict["chronology_path"] = chronology_path
+                    builder_kwargs["chronology_path"] = chronology_path
+                    builder_kwargs["initial_settings"] = settings_dict
+                tab = builder(**builder_kwargs)
                 if tab is None:
                     continue
                 suffix = entry.get("instance_suffix", "") or ""

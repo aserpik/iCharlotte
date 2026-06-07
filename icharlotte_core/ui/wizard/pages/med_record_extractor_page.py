@@ -202,6 +202,49 @@ class MedChronologySelectionPage(QWidget):
     def is_row_checked(self, row_id: str) -> bool:
         return self.table_panel.is_row_checked(row_id)
 
+    def to_dict(self) -> dict:
+        return {
+            "chronology_path": self.chronology_path,
+            "selected_paragraph_ids": sorted(self.selection.selected_paragraph_ids),
+            "selected_row_ids": self.selection.selected_row_ids(),
+            "selected_row_sources": self.selection.selected_row_sources(),
+        }
+
+    def from_dict(self, data: dict) -> None:
+        self._clear_selection()
+
+        for paragraph_id in data.get("selected_paragraph_ids", []):
+            if paragraph_id in self._paragraphs:
+                self.set_paragraph_checked(paragraph_id, True)
+
+        row_sources = data.get("selected_row_sources")
+        if isinstance(row_sources, dict):
+            for row_id, sources in row_sources.items():
+                row = self._rows.get(str(row_id))
+                if row is None or not row.extractable:
+                    continue
+                for source in _saved_sources(sources):
+                    self.selection.select_row(row.id, source=source)
+        else:
+            for row_id in data.get("selected_row_ids", []):
+                row = self._rows.get(str(row_id))
+                if row is not None and row.extractable:
+                    self.selection.select_row(row.id, source="manual")
+
+        self._sync_table_checks()
+        self._refresh_match_status()
+        self._refresh_extract_state()
+
+    def _clear_selection(self) -> None:
+        self.selection.clear()
+        self._paragraph_match_status.clear()
+        self.synopsis_panel.blockSignals(True)
+        for paragraph_id in self._paragraphs:
+            self.synopsis_panel.set_paragraph_checked(paragraph_id, False)
+        self.synopsis_panel.blockSignals(False)
+        for row_id in self._rows:
+            self.table_panel.set_row_checked(row_id, False, emit=False)
+
     def _load_document(self, chronology_path: str) -> ChronologyDocument:
         try:
             return parse_chronology_document(chronology_path)
@@ -229,6 +272,7 @@ class MedChronologySelectionPage(QWidget):
         ))
 
         self.message_label = theme.error_text(_status_message(self.document))
+        self.warning_label = self.message_label
         self.message_label.setVisible(bool(self.message_label.text()))
         layout.addWidget(self.message_label)
 
@@ -395,6 +439,14 @@ def _page_display(row: SelectableChronologyRow) -> str:
 
 def _row_label(row: SelectableChronologyRow) -> str:
     return f"{row.date} {row.provider}".strip()
+
+
+def _saved_sources(value) -> list[str]:
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, (list, tuple, set)):
+        return [str(source) for source in value if source]
+    return []
 
 
 def _status_message(document: ChronologyDocument) -> str:

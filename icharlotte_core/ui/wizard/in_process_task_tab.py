@@ -166,6 +166,18 @@ class InProcessTaskTab(WizardTaskContainer):
         self._worker = worker
         worker.start()
 
+    def _completion_settings(self) -> dict:
+        settings = dict(getattr(self, "_last_settings", {}) or {})
+        to_dict = getattr(self.settings_page, "to_dict", None)
+        if callable(to_dict):
+            try:
+                page_settings = to_dict()
+            except Exception:
+                page_settings = {}
+            if isinstance(page_settings, dict):
+                settings.update(page_settings)
+        return settings
+
     def _on_worker_finished(self, success: bool, output_or_error: str) -> None:
         from datetime import datetime
         worker = self._worker
@@ -184,7 +196,7 @@ class InProcessTaskTab(WizardTaskContainer):
             )
             return
 
-        settings = getattr(self, "_last_settings", {}) or {}
+        settings = self._completion_settings()
         if hasattr(self.output_page, "set_save_as_defaults"):
             default_dir = settings.get("save_default_dir", "")
             suggested_filename = settings.get("suggested_filename", "")
@@ -212,7 +224,7 @@ class InProcessTaskTab(WizardTaskContainer):
             if chronology_path not in entry_files:
                 entry_files.append(chronology_path)
 
-        entry_settings = _json_safe_settings(getattr(self, "_last_settings", {}))
+        entry_settings = _json_safe_settings(settings)
         entry = {
             "task_id": self._spec.task_id,
             "title": self._spec.title,
@@ -392,7 +404,15 @@ def build_subpoena_tab(spec, case_path: str, file_number: str, parent: QWidget |
     )
 
 
-def build_med_extractor_tab(spec, case_path: str, file_number: str, parent: QWidget | None) -> InProcessTaskTab | None:
+def build_med_extractor_tab(
+    spec,
+    case_path: str,
+    file_number: str,
+    parent: QWidget | None,
+    *,
+    chronology_path: str = "",
+    initial_settings: dict | None = None,
+) -> InProcessTaskTab | None:
     from icharlotte_core.med_record_extractor import MedRecordExtractorWorker
     from icharlotte_core.ui.wizard.file_picker import (
         find_medical_summary_folder,
@@ -402,18 +422,29 @@ def build_med_extractor_tab(spec, case_path: str, file_number: str, parent: QWid
         MedChronologySelectionPage,
     )
 
-    start_dir = find_medical_summary_folder(case_path) or resolve_default_folder(
-        case_path,
-        ["RECORDS"],
-    )
-    chronology_path, _ = QFileDialog.getOpenFileName(
-        parent,
-        "Select medical chronology summary",
-        start_dir,
-        "Word Documents (*.docx)",
-    )
+    settings = dict(initial_settings or {})
+    chronology_path = chronology_path or str(settings.get("chronology_path") or "")
+    if chronology_path and case_path and not os.path.isabs(chronology_path):
+        chronology_path = os.path.join(case_path, chronology_path)
+
     if not chronology_path:
-        return None
+        start_dir = find_medical_summary_folder(case_path) or resolve_default_folder(
+            case_path,
+            ["RECORDS"],
+        )
+        chronology_path, _ = QFileDialog.getOpenFileName(
+            parent,
+            "Select medical chronology summary",
+            start_dir,
+            "Word Documents (*.docx)",
+        )
+        if not chronology_path:
+            return None
+
+    settings["chronology_path"] = chronology_path
+    settings_widget = MedChronologySelectionPage(case_path, file_number, chronology_path)
+    if settings:
+        settings_widget.from_dict(settings)
 
     def factory(cp, fn, settings, p):
         return MedRecordExtractorWorker(
@@ -428,13 +459,12 @@ def build_med_extractor_tab(spec, case_path: str, file_number: str, parent: QWid
         spec=spec,
         case_path=case_path,
         file_number=file_number,
-        settings_widget=MedChronologySelectionPage(case_path, file_number, chronology_path),
+        settings_widget=settings_widget,
         output_widget=MedExtractorOutputPage(case_path),
         worker_factory=factory,
         auto_run=False,
         parent=parent,
     )
-
 
 def build_respond_to_discovery_tab(
     spec,

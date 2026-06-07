@@ -94,6 +94,16 @@ class SelectionState:
     def selected_row_ids(self) -> list[str]:
         return list(self._row_sources)
 
+    def selected_row_sources(self) -> dict[str, list[str]]:
+        return {
+            row_id: sorted(sources)
+            for row_id, sources in self._row_sources.items()
+        }
+
+    def clear(self) -> None:
+        self.selected_paragraph_ids.clear()
+        self._row_sources.clear()
+
 
 @dataclass(frozen=True)
 class MatchResult:
