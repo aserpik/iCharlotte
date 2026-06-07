@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSettings, Qt, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QFrame,
@@ -31,6 +31,10 @@ from icharlotte_core.med_record_chronology import (
     parse_chronology_document,
 )
 from icharlotte_core.ui.wizard import theme
+
+
+TABLE_COLUMN_WIDTHS_KEY = "wizard/med_record_extractor/chronology_table_column_widths"
+DEFAULT_TABLE_COLUMN_WIDTHS = [56, 96, 240, 260, 520, 180]
 
 
 class BriefSynopsisPanel(QListWidget):
@@ -116,16 +120,39 @@ class ChronologyTablePanel(QTableWidget):
         self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.setAlternatingRowColors(True)
         self.verticalHeader().setVisible(False)
-        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        self.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        self.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        self.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        self.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
-        self.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+        self.horizontalHeader().setStretchLastSection(False)
+        for column in range(self.columnCount()):
+            self.horizontalHeader().setSectionResizeMode(
+                column,
+                QHeaderView.ResizeMode.Interactive,
+            )
+        self.restore_column_widths()
+        self.horizontalHeader().sectionResized.connect(self._on_section_resized)
         self.cellChanged.connect(self._on_cell_changed)
 
     def count(self) -> int:
         return self.rowCount()
+
+    def restore_column_widths(self) -> None:
+        widths = _coerce_column_widths(
+            QSettings("iCharlotte", "iCharlotte").value(TABLE_COLUMN_WIDTHS_KEY),
+            self.columnCount(),
+        )
+        if widths is None:
+            widths = DEFAULT_TABLE_COLUMN_WIDTHS[: self.columnCount()]
+        for column, width in enumerate(widths):
+            self.setColumnWidth(column, width)
+        self.resizeRowsToContents()
+
+    def save_column_widths(self) -> None:
+        widths = [self.columnWidth(column) for column in range(self.columnCount())]
+        settings = QSettings("iCharlotte", "iCharlotte")
+        settings.setValue(TABLE_COLUMN_WIDTHS_KEY, widths)
+        settings.sync()
+
+    def _on_section_resized(self, logical_index: int, old_size: int, new_size: int) -> None:
+        self.save_column_widths()
+        self.resizeRowsToContents()
 
     def load_rows(self, rows: list[SelectableChronologyRow]) -> None:
         self.blockSignals(True)
@@ -469,6 +496,29 @@ class MedChronologySelectionPage(QWidget):
 
 def _row_label(row: SelectableChronologyRow) -> str:
     return f"{row.date} {row.provider}".strip()
+
+
+def _coerce_column_widths(value, expected_count: int) -> list[int] | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        parts = [part.strip() for part in value.split(",")]
+    elif isinstance(value, (list, tuple)):
+        parts = list(value)
+    else:
+        return None
+    widths: list[int] = []
+    for part in parts:
+        try:
+            width = int(part)
+        except (TypeError, ValueError):
+            return None
+        if width < 24:
+            return None
+        widths.append(width)
+    if len(widths) != expected_count:
+        return None
+    return widths
 
 
 def _saved_sources(value) -> list[str]:

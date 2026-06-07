@@ -7,11 +7,25 @@ from unittest.mock import patch
 
 import pytest
 from docx import Document
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSettings, Qt
 
 pytest.importorskip("pytestqt")
 
 from tests.test_med_record_extractor import _build_chronology_docx
+
+
+@pytest.fixture(autouse=True)
+def isolated_qsettings(tmp_path):
+    previous_default_format = QSettings.defaultFormat()
+    QSettings.setPath(
+        QSettings.Format.IniFormat,
+        QSettings.Scope.UserScope,
+        str(tmp_path),
+    )
+    QSettings.setDefaultFormat(QSettings.Format.IniFormat)
+    yield
+    QSettings("iCharlotte", "iCharlotte").sync()
+    QSettings.setDefaultFormat(previous_default_format)
 
 
 def test_selection_page_loads_chronology_document(qtbot):
@@ -31,6 +45,74 @@ def test_selection_page_loads_chronology_document(qtbot):
         assert page.selected_count_label.text() == "0 rows selected"
         assert page.synopsis_panel.count() == 2
         assert page.table_panel.count() == 2
+
+
+def test_chronology_column_widths_persist_globally(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    first_source = _build_chronology_docx(tmp_path / "first_chronology.docx")
+    second_source = _build_chronology_docx(tmp_path / "second_chronology.docx")
+    first = MedChronologySelectionPage(
+        case_path=str(tmp_path / "first_case"),
+        file_number="5800.013",
+        chronology_path=str(first_source),
+    )
+    qtbot.addWidget(first)
+
+    first.table_panel.setColumnWidth(4, 640)
+    first.table_panel.save_column_widths()
+
+    second = MedChronologySelectionPage(
+        case_path=str(tmp_path / "second_case"),
+        file_number="5800.014",
+        chronology_path=str(second_source),
+    )
+    qtbot.addWidget(second)
+
+    assert second.table_panel.columnWidth(4) == 640
+
+
+def test_chronology_row_heights_auto_fit_wrapped_text(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    source = tmp_path / "chronology.docx"
+    doc = Document()
+    doc.add_paragraph("BRIEF SYNOPSIS OF POST-INJURY MEDICAL RECORD:")
+    doc.add_paragraph("On 09/21/2020, Test Plaintiff saw Kaiser Permanente.")
+    table = doc.add_table(rows=1, cols=5)
+    for index, header in enumerate([
+        "DATE",
+        "PAGE NO",
+        "PROVIDER",
+        "DESCRIPTION",
+        "Red Flags/Comments",
+    ]):
+        table.rows[0].cells[index].text = header
+    row = table.add_row().cells
+    row[0].text = "09/21/2020"
+    row[1].text = "Record\n\nPg No: 1/2"
+    row[2].text = "Kaiser Permanente"
+    row[3].text = (
+        "EMERGENCY DEPARTMENT NOTE\n"
+        "This description is intentionally long enough to wrap across several "
+        "visual lines when the description column is narrowed for review."
+    )
+    row[4].text = ""
+    doc.save(source)
+
+    page = MedChronologySelectionPage(str(tmp_path), "5800.013", str(source))
+    qtbot.addWidget(page)
+    page.table_panel.setColumnWidth(4, 120)
+    page.table_panel.resizeRowsToContents()
+
+    assert (
+        page.table_panel.rowHeight(0)
+        > page.table_panel.verticalHeader().defaultSectionSize()
+    )
 
 
 def test_selection_page_uses_brief_synopsis_and_chronology_row_tabs(qtbot):
