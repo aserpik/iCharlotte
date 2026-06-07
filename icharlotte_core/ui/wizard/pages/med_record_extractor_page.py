@@ -73,6 +73,9 @@ class BriefSynopsisPanel(QListWidget):
             item.setToolTip(message)
 
     def mousePressEvent(self, event) -> None:
+        if event.button() != Qt.MouseButton.LeftButton:
+            super().mousePressEvent(event)
+            return
         item = self.itemAt(event.position().toPoint())
         if item is not None:
             checked = item.checkState() == Qt.CheckState.Checked
@@ -165,6 +168,9 @@ class ChronologyTablePanel(QTableWidget):
         return item is not None and item.checkState() == Qt.CheckState.Checked
 
     def mousePressEvent(self, event) -> None:
+        if event.button() != Qt.MouseButton.LeftButton:
+            super().mousePressEvent(event)
+            return
         row_index = self.rowAt(event.position().toPoint().y())
         row_id = self._ids_by_row.get(row_index)
         if row_id is not None:

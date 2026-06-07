@@ -90,6 +90,33 @@ def test_clicking_synopsis_text_toggles_entry_selection(qtbot):
         assert not page.is_row_checked(page.document.rows[0].id)
 
 
+def test_right_clicking_synopsis_text_does_not_toggle_entry_selection(qtbot):
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    with tempfile.TemporaryDirectory() as td:
+        source = _build_chronology_docx(Path(td) / "chronology.docx")
+        page = MedChronologySelectionPage(
+            case_path=td,
+            file_number="5800.013",
+            chronology_path=str(source),
+        )
+        qtbot.addWidget(page)
+
+        item = page.synopsis_panel.item(0)
+        click_pos = page.synopsis_panel.visualItemRect(item).center()
+
+        qtbot.mouseClick(
+            page.synopsis_panel.viewport(),
+            Qt.MouseButton.RightButton,
+            pos=click_pos,
+        )
+
+        assert item.checkState() == Qt.CheckState.Unchecked
+        assert not page.is_row_checked(page.document.rows[0].id)
+
+
 def test_clicking_chronology_row_text_toggles_row_selection(qtbot):
     from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
         MedChronologySelectionPage,
@@ -103,6 +130,7 @@ def test_clicking_chronology_row_text_toggles_row_selection(qtbot):
             chronology_path=str(source),
         )
         qtbot.addWidget(page)
+        page.tab_widget.setCurrentIndex(1)
 
         click_pos = page.table_panel.visualRect(
             page.table_panel.model().index(0, 4)
@@ -120,6 +148,35 @@ def test_clicking_chronology_row_text_toggles_row_selection(qtbot):
         qtbot.mouseClick(
             page.table_panel.viewport(),
             Qt.MouseButton.LeftButton,
+            pos=click_pos,
+        )
+
+        assert not page.is_row_checked(page.document.rows[0].id)
+        assert page.selected_count_label.text() == "0 rows selected"
+
+
+def test_right_clicking_chronology_row_text_does_not_toggle_row_selection(qtbot):
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    with tempfile.TemporaryDirectory() as td:
+        source = _build_chronology_docx(Path(td) / "chronology.docx")
+        page = MedChronologySelectionPage(
+            case_path=td,
+            file_number="5800.013",
+            chronology_path=str(source),
+        )
+        qtbot.addWidget(page)
+        page.tab_widget.setCurrentIndex(1)
+
+        click_pos = page.table_panel.visualRect(
+            page.table_panel.model().index(0, 4)
+        ).center()
+
+        qtbot.mouseClick(
+            page.table_panel.viewport(),
+            Qt.MouseButton.RightButton,
             pos=click_pos,
         )
 
