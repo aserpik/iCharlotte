@@ -10,6 +10,7 @@ and custom task builders). Worker contract:
 """
 from __future__ import annotations
 
+from dataclasses import asdict, is_dataclass
 import os
 from typing import Callable, Optional
 
@@ -39,6 +40,25 @@ PAGE_OUTPUT = 2
 
 # WorkerFactory signature: (case_path, file_number, settings_dict, parent) -> QThread
 WorkerFactory = Callable[[str, str, dict, Optional[QWidget]], QThread]
+
+
+def _json_safe_value(value):
+    if is_dataclass(value):
+        return asdict(value)
+    if isinstance(value, dict):
+        return {str(key): _json_safe_value(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_safe_value(item) for item in value]
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def _json_safe_settings(settings: dict) -> dict:
+    return {
+        str(key): _json_safe_value(value)
+        for key, value in dict(settings or {}).items()
+    }
 
 
 class InProcessTaskTab(WizardTaskContainer):
@@ -182,11 +202,22 @@ class InProcessTaskTab(WizardTaskContainer):
             self.output_page.load_output(output_or_error)
         self.setCurrentIndex(PAGE_OUTPUT)
 
+        entry_files = []
+        settings_files = settings.get("files")
+        if isinstance(settings_files, list):
+            entry_files.extend(str(path) for path in settings_files if path)
+        chronology_path = settings.get("chronology_path")
+        if chronology_path:
+            chronology_path = str(chronology_path)
+            if chronology_path not in entry_files:
+                entry_files.append(chronology_path)
+
+        entry_settings = _json_safe_settings(getattr(self, "_last_settings", {}))
         entry = {
             "task_id": self._spec.task_id,
             "title": self._spec.title,
-            "files": [],
-            "settings": getattr(self, "_last_settings", {}),
+            "files": entry_files,
+            "settings": entry_settings,
             "output_path": output_or_error if os.path.isfile(output_or_error or "") else "",
             "completed_at": datetime.now().isoformat(timespec="seconds"),
         }
@@ -361,17 +392,43 @@ def build_subpoena_tab(spec, case_path: str, file_number: str, parent: QWidget |
     )
 
 
-def build_med_extractor_tab(spec, case_path: str, file_number: str, parent: QWidget | None) -> InProcessTaskTab:
+def build_med_extractor_tab(spec, case_path: str, file_number: str, parent: QWidget | None) -> InProcessTaskTab | None:
     from icharlotte_core.med_record_extractor import MedRecordExtractorWorker
+    from icharlotte_core.ui.wizard.file_picker import (
+        find_medical_summary_folder,
+        resolve_default_folder,
+    )
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    start_dir = find_medical_summary_folder(case_path) or resolve_default_folder(
+        case_path,
+        ["RECORDS"],
+    )
+    chronology_path, _ = QFileDialog.getOpenFileName(
+        parent,
+        "Select medical chronology summary",
+        start_dir,
+        "Word Documents (*.docx)",
+    )
+    if not chronology_path:
+        return None
 
     def factory(cp, fn, settings, p):
-        return MedRecordExtractorWorker(cp, fn, settings.get("text", ""), parent=p)
+        return MedRecordExtractorWorker(
+            cp,
+            fn,
+            parent=p,
+            chronology_path=settings.get("chronology_path", chronology_path),
+            selected_rows=settings.get("selected_rows", []),
+        )
 
     return InProcessTaskTab(
         spec=spec,
         case_path=case_path,
         file_number=file_number,
-        settings_widget=MedExtractorSettingsPage(),
+        settings_widget=MedChronologySelectionPage(case_path, file_number, chronology_path),
         output_widget=MedExtractorOutputPage(case_path),
         worker_factory=factory,
         auto_run=False,

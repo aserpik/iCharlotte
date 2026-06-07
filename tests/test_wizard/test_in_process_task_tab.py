@@ -1,4 +1,5 @@
 """Smoke tests for InProcessTaskTab and its settings widgets."""
+import json
 import os
 import pytest
 from unittest.mock import patch
@@ -11,7 +12,6 @@ from icharlotte_core.ui.wizard.registry import get_task
 from icharlotte_core.ui.wizard.in_process_task_tab import (
     InProcessTaskTab,
     MedExtractorOutputPage,
-    MedExtractorSettingsPage,
     SubpoenaSettingsPage,
     PAGE_OUTPUT,
     PAGE_SETTINGS,
@@ -65,29 +65,6 @@ def test_subpoena_settings_emits_run_requested(qtbot):
     with qtbot.waitSignal(w.run_requested, timeout=500) as blocker:
         w.run_btn.click()
     assert blocker.args[0] == {}
-
-
-def test_med_extractor_settings_rejects_empty(qtbot):
-    w = MedExtractorSettingsPage()
-    qtbot.addWidget(w)
-    # No text → run_requested must NOT fire. (A QMessageBox pops; pytest-qt
-    # auto-dismisses if we patch QMessageBox, but easier: just wait briefly and
-    # confirm no signal.)
-    from unittest.mock import patch
-    with patch("icharlotte_core.ui.wizard.in_process_task_tab.QMessageBox.warning"):
-        signal_received = []
-        w.run_requested.connect(lambda d: signal_received.append(d))
-        w.extract_btn.click()
-    assert signal_received == []
-
-
-def test_med_extractor_settings_emits_text(qtbot):
-    w = MedExtractorSettingsPage()
-    qtbot.addWidget(w)
-    w.text_input.setPlainText("On Jan 1 2025, Plaintiff saw Dr. Smith at City Hospital.")
-    with qtbot.waitSignal(w.run_requested, timeout=500) as blocker:
-        w.extract_btn.click()
-    assert blocker.args[0]["text"].startswith("On Jan 1 2025")
 
 
 def test_success_path_transitions_to_output(qtbot, tmp_path):
@@ -149,6 +126,91 @@ def test_success_path_applies_save_as_defaults_from_settings(qtbot, tmp_path):
     assert mock_dialog.call_args.args[2] == str(
         tmp_path / "DISCOVERY" / "RESPONSES" / suggested_filename
     )
+
+
+def test_success_path_records_settings_files_in_completed_entry(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.output_page import OutputPage
+
+    output_file = tmp_path / "preview.docx"
+    output_file.write_bytes(b"x")
+    chronology_path = tmp_path / "RECORDS" / "summary.docx"
+    chronology_path.parent.mkdir()
+    chronology_path.write_bytes(b"x")
+    out = OutputPage()
+    settings = _SettingsWidget()
+    tab = _make_tab(
+        qtbot,
+        settings_widget=settings,
+        output_widget=out,
+        ok=True,
+        payload=str(output_file),
+    )
+
+    with qtbot.waitSignal(tab.task_completed, timeout=2000) as blocker:
+        settings.run_requested.emit(
+            {
+                "chronology_path": str(chronology_path),
+                "files": [str(tmp_path / "other.pdf")],
+            }
+        )
+
+    entry = blocker.args[0]
+    assert entry["files"] == [str(tmp_path / "other.pdf"), str(chronology_path)]
+
+
+def test_success_path_serializes_selected_rows_in_completed_settings(qtbot, tmp_path):
+    from icharlotte_core.med_record_chronology import SelectableChronologyRow
+    from icharlotte_core.ui.wizard.pages.output_page import OutputPage
+
+    output_file = tmp_path / "preview.docx"
+    output_file.write_bytes(b"x")
+    row = SelectableChronologyRow(
+        id="row-1",
+        order=0,
+        date="09/21/2020",
+        page_no="source\n\nPg No: 2/3",
+        provider="Kaiser Permanente",
+        description="Emergency department note",
+        flags="",
+        record_filename="source",
+        page_start=2,
+        page_end=2,
+    )
+    out = OutputPage()
+    settings = _SettingsWidget()
+    tab = _make_tab(
+        qtbot,
+        settings_widget=settings,
+        output_widget=out,
+        ok=True,
+        payload=str(output_file),
+    )
+
+    with qtbot.waitSignal(tab.task_completed, timeout=2000) as blocker:
+        settings.run_requested.emit(
+            {
+                "chronology_path": str(tmp_path / "summary.docx"),
+                "selected_rows": [row],
+            }
+        )
+
+    entry = blocker.args[0]
+    json.dumps(entry)
+    assert entry["settings"]["selected_rows"] == [
+        {
+            "id": "row-1",
+            "order": 0,
+            "date": "09/21/2020",
+            "page_no": "source\n\nPg No: 2/3",
+            "provider": "Kaiser Permanente",
+            "description": "Emergency department note",
+            "flags": "",
+            "record_filename": "source",
+            "page_start": 2,
+            "page_end": 2,
+            "warning": "",
+        }
+    ]
 
 
 def test_failure_path_stays_on_status(qtbot):

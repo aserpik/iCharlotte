@@ -276,6 +276,51 @@ def test_failed_synopsis_match_updates_visible_status(qtbot):
         assert page.match_status_label.isHidden() is False
 
 
+def test_build_med_extractor_tab_uses_docx_picker_and_summary_folder(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.in_process_task_tab import build_med_extractor_tab
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+    from icharlotte_core.ui.wizard.registry import get_task
+
+    summary_dir = tmp_path / "RECORDS" / "Medical Summary - DO NOT PRODUCE"
+    summary_dir.mkdir(parents=True)
+    source = _build_chronology_docx(summary_dir / "chronology.docx")
+
+    with patch(
+        "icharlotte_core.ui.wizard.in_process_task_tab.QFileDialog.getOpenFileName",
+        return_value=(str(source), "Word Documents (*.docx)"),
+    ) as picker:
+        tab = build_med_extractor_tab(
+            get_task("med_record_extractor"),
+            case_path=str(tmp_path),
+            file_number="5800.013",
+            parent=None,
+        )
+
+    qtbot.addWidget(tab)
+    assert isinstance(tab.settings_page, MedChronologySelectionPage)
+    assert picker.call_args.args[2] == str(summary_dir)
+
+
+def test_build_med_extractor_tab_cancel_returns_none(tmp_path):
+    from icharlotte_core.ui.wizard.in_process_task_tab import build_med_extractor_tab
+    from icharlotte_core.ui.wizard.registry import get_task
+
+    with patch(
+        "icharlotte_core.ui.wizard.in_process_task_tab.QFileDialog.getOpenFileName",
+        return_value=("", ""),
+    ):
+        tab = build_med_extractor_tab(
+            get_task("med_record_extractor"),
+            case_path=str(tmp_path),
+            file_number="5800.013",
+            parent=None,
+        )
+
+    assert tab is None
+
+
 def test_match_status_reflects_checked_failed_synopsis_paragraphs(qtbot):
     from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
         MedChronologySelectionPage,
