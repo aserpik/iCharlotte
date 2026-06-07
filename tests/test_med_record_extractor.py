@@ -423,5 +423,187 @@ class TestSelectionState(unittest.TestCase):
         self.assertFalse(state.is_row_selected("row-shared"))
 
 
+class TestSelectedRowExtractionWorker(unittest.TestCase):
+    def test_worker_uses_selected_rows_without_llm_or_auto_chron_lookup(self):
+        from unittest.mock import patch
+
+        from icharlotte_core.med_record_chronology import SelectableChronologyRow
+        from icharlotte_core.med_record_extractor import MedRecordExtractorWorker
+
+        row = SelectableChronologyRow(
+            id="row-1",
+            order=0,
+            date="09/21/2020",
+            page_no="source\n\nPg No: 2/3",
+            provider="Kaiser Permanente",
+            description="Emergency department note",
+            flags="",
+            record_filename="source",
+            page_start=2,
+            page_end=2,
+        )
+        worker = MedRecordExtractorWorker(
+            case_path="C:/case",
+            file_number="5800.013",
+            chronology_path="C:/case/RECORDS/summary.docx",
+            selected_rows=[row],
+        )
+
+        with patch.object(worker, "_parse_entries", side_effect=AssertionError("LLM path should not run")), \
+             patch("icharlotte_core.med_record_extractor._find_most_recent_med_chron", side_effect=AssertionError("Auto chronology lookup should not run")), \
+             patch("icharlotte_core.med_record_extractor._parse_med_chron_table", side_effect=AssertionError("Chronology table parsing should not run")), \
+             patch("icharlotte_core.med_record_extractor._build_file_index", return_value={"source": "C:/case/RECORDS/source.pdf"}), \
+             patch("icharlotte_core.med_record_extractor._extract_pages") as extract_pages, \
+             patch("icharlotte_core.med_record_extractor._ocr_pdf_if_needed", return_value=False), \
+             patch("icharlotte_core.med_record_extractor._update_index_document"):
+            results = worker._execute()
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(
+            results[0].output_path.replace("\\", "/"),
+            "C:/case/NOTES/AI OUTPUT/Med Record Extracts/09-21-2020 - Kaiser Permanente - p2.pdf",
+        )
+        extract_pages.assert_called_once()
+
+    def test_selected_row_output_names_are_windows_safe_and_unique(self):
+        from pathlib import PureWindowsPath
+        from unittest.mock import patch
+
+        from icharlotte_core.med_record_chronology import SelectableChronologyRow
+        from icharlotte_core.med_record_extractor import MedRecordExtractorWorker
+
+        rows = [
+            SelectableChronologyRow(
+                id="row-1",
+                order=0,
+                date="09/21/2020",
+                page_no="source one\n\nPg No: 2/3",
+                provider='Kaiser: Permanente? "Clinic"',
+                description="Emergency department note",
+                flags="",
+                record_filename="source one",
+                page_start=2,
+                page_end=2,
+            ),
+            SelectableChronologyRow(
+                id="row-2",
+                order=1,
+                date="09/21/2020",
+                page_no="source two\n\nPg No: 2/3",
+                provider='Kaiser: Permanente? "Clinic"',
+                description="Follow-up note",
+                flags="",
+                record_filename="source two",
+                page_start=2,
+                page_end=2,
+            ),
+        ]
+        worker = MedRecordExtractorWorker(
+            case_path="C:/case",
+            file_number="5800.013",
+            chronology_path="C:/case/RECORDS/summary.docx",
+            selected_rows=rows,
+        )
+
+        file_index = {
+            "source one": "C:/case/RECORDS/source one.pdf",
+            "source two": "C:/case/RECORDS/source two.pdf",
+        }
+        with patch("icharlotte_core.med_record_extractor._build_file_index", return_value=file_index), \
+             patch("icharlotte_core.med_record_extractor._extract_pages") as extract_pages, \
+             patch("icharlotte_core.med_record_extractor._ocr_pdf_if_needed", return_value=False), \
+             patch("icharlotte_core.med_record_extractor._update_index_document"):
+            worker._execute()
+
+        output_names = [
+            PureWindowsPath(call.args[3]).name
+            for call in extract_pages.call_args_list
+        ]
+        self.assertEqual(len(output_names), 2)
+        self.assertEqual(len(set(output_names)), 2)
+        invalid_chars = set('<>:"/\\|?*')
+        for name in output_names:
+            self.assertFalse(invalid_chars.intersection(name))
+
+    def test_update_index_document_validates_after_save(self):
+        from unittest.mock import patch
+
+        from icharlotte_core.med_record_chronology import SelectableChronologyRow
+        from icharlotte_core.med_record_extractor import _update_index_document
+
+        row = SelectableChronologyRow(
+            id="row-1",
+            order=0,
+            date="09/21/2020",
+            page_no="source\n\nPg No: 2/3",
+            provider="Kaiser Permanente",
+            description="Emergency department note",
+            flags="",
+            record_filename="source",
+            page_start=2,
+            page_end=2,
+        )
+        with tempfile.TemporaryDirectory() as td, \
+             patch("icharlotte_core.med_record_extractor.validate_index_docx") as validate:
+            validate.return_value.has_errors = False
+            _update_index_document(td, [row])
+
+        validate.assert_called_once()
+
+    def test_empty_selected_rows_still_bypasses_pasted_text_path(self):
+        from unittest.mock import patch
+
+        from icharlotte_core.med_record_extractor import MedRecordExtractorWorker
+
+        worker = MedRecordExtractorWorker(
+            case_path="C:/case",
+            file_number="5800.013",
+            user_text="09/21/2020 Kaiser Permanente",
+            selected_rows=[],
+        )
+
+        with patch.object(worker, "_parse_entries", side_effect=AssertionError("LLM path should not run")), \
+             patch("icharlotte_core.med_record_extractor._build_file_index", return_value={}):
+            results = worker._execute()
+
+        self.assertEqual(results, [])
+
+    def test_run_formats_row_only_failures(self):
+        from unittest.mock import patch
+
+        from icharlotte_core.med_record_chronology import SelectableChronologyRow
+        from icharlotte_core.med_record_extractor import ExtractionResult, MedRecordExtractorWorker
+
+        row = SelectableChronologyRow(
+            id="row-1",
+            order=0,
+            date="09/21/2020",
+            page_no="source\n\nPg No: 2/3",
+            provider="Kaiser Permanente",
+            description="Emergency department note",
+            flags="",
+            record_filename="source",
+            page_start=2,
+            page_end=2,
+        )
+        worker = MedRecordExtractorWorker(
+            case_path="C:/case",
+            file_number="5800.013",
+            chronology_path="C:/case/RECORDS/summary.docx",
+            selected_rows=[row],
+        )
+        emitted = []
+        worker.finished_result.connect(lambda success, message: emitted.append((success, message)))
+
+        with patch.object(
+            worker,
+            "_execute",
+            return_value=[ExtractionResult(matched_row=row, error="PDF not found: source")],
+        ):
+            worker.run()
+
+        self.assertEqual(emitted, [(True, "1 failed\n  - 09/21/2020 Kaiser Permanente: PDF not found: source")])
+
+
 if __name__ == "__main__":
     unittest.main()

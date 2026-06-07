@@ -11,13 +11,14 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from difflib import SequenceMatcher
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 import fitz  # PyMuPDF
 from docx import Document
 from PySide6.QtCore import QThread, Signal
 
 from icharlotte_core.subpoena_tracker import _find_folder_ci
+from icharlotte_core.word_validator import validate_index_docx
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +26,40 @@ DATE_PATTERN = re.compile(r'(\d{4})[.\-](\d{2})[.\-](\d{2})')
 PAGE_SPEC_RE = re.compile(r'Pg\.?\s*(?:No)?:?\s*(\d+)(?:\s*-\s*(\d+))?/(\d+)', re.IGNORECASE)
 # Fallback: bare "number/total" with no Pg prefix
 BARE_PAGE_RE = re.compile(r'^(\d+)(?:\s*-\s*(\d+))?/(\d+)$')
+WINDOWS_FILENAME_INVALID_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
 
 
 def _expand_two_digit_year(year: str) -> str:
     value = int(year)
     return str(2000 + value if value < 50 else 1900 + value)
+
+
+def _safe_filename_part(value: str, *, max_length: int = 40, fallback: str = "record") -> str:
+    safe = WINDOWS_FILENAME_INVALID_RE.sub("-", value or "")
+    safe = re.sub(r"\s+", " ", safe).strip(" .-")
+    if not safe:
+        safe = fallback
+    return safe[:max_length].strip(" .-") or fallback
+
+
+def _unique_output_path(output_dir: str, out_name: str, used_paths: set[str], row: Any) -> str:
+    out_path = os.path.join(output_dir, out_name)
+    if out_path not in used_paths:
+        used_paths.add(out_path)
+        return out_path
+
+    stem, ext = os.path.splitext(out_name)
+    row_suffix = _safe_filename_part(
+        getattr(row, "id", "") or f"row-{getattr(row, 'order', 0) + 1}",
+        max_length=24,
+    )
+    candidate = os.path.join(output_dir, f"{stem} - {row_suffix}{ext}")
+    counter = 2
+    while candidate in used_paths:
+        candidate = os.path.join(output_dir, f"{stem} - {row_suffix}-{counter}{ext}")
+        counter += 1
+    used_paths.add(candidate)
+    return candidate
 
 
 @dataclass
@@ -57,9 +87,9 @@ class ParsedEntry:
 
 @dataclass
 class ExtractionResult:
-    """Result of extracting pages for one entry."""
-    entry: ParsedEntry
-    matched_row: Optional[MedChronRow] = None
+    """Result of extracting pages for one entry or selected chronology row."""
+    entry: Optional[ParsedEntry] = None
+    matched_row: Optional[object] = None
     output_path: Optional[str] = None
     error: Optional[str] = None
 
@@ -406,7 +436,7 @@ INDEX_DOC_NAME = "Index of Extracted Records.docx"
 HEADER_ROW = ["DATE", "PAGE NO", "PROVIDER", "DESCRIPTION"]
 
 
-def _update_index_document(output_dir: str, new_rows: List[MedChronRow]) -> None:
+def _update_index_document(output_dir: str, new_rows: List[Any]) -> None:
     """Create or append to the cumulative index document in the output folder."""
     index_path = os.path.join(output_dir, INDEX_DOC_NAME)
 
@@ -467,6 +497,10 @@ def _update_index_document(output_dir: str, new_rows: List[MedChronRow]) -> None
 
     _apply_col_widths(table)
     doc.save(index_path)
+    result = validate_index_docx(index_path)
+    if result.has_errors:
+        result.print_summary()
+        raise ValueError(f"Index validation failed: {result.error_count} error(s) in {index_path}")
 
 
 def _extract_pages(pdf_path: str, page_start: int, page_end: int, output_path: str) -> None:
@@ -498,11 +532,23 @@ class MedRecordExtractorWorker(QThread):
     finished_result = Signal(bool, str)
     warning = Signal(str)
 
-    def __init__(self, case_path: str, file_number: str, user_text: str, parent=None):
+    def __init__(
+        self,
+        case_path: str,
+        file_number: str,
+        user_text: str = "",
+        parent=None,
+        *,
+        chronology_path: str = "",
+        selected_rows: Optional[List[Any]] = None,
+    ):
         super().__init__(parent)
         self.case_path = case_path
         self.file_number = file_number
         self.user_text = user_text
+        self.chronology_path = chronology_path
+        self._selected_rows_provided = selected_rows is not None
+        self.selected_rows = list(selected_rows or [])
 
     def run(self):
         try:
@@ -515,13 +561,22 @@ class MedRecordExtractorWorker(QThread):
             if failures:
                 summary_parts.append(f"{len(failures)} failed")
                 for f in failures:
-                    summary_parts.append(f"  - {f.entry.date} {f.entry.provider}: {f.error}")
+                    row = f.matched_row
+                    if row is not None:
+                        summary_parts.append(f"  - {row.date} {row.provider}: {f.error}")
+                    elif f.entry is not None:
+                        summary_parts.append(f"  - {f.entry.date} {f.entry.provider}: {f.error}")
+                    else:
+                        summary_parts.append(f"  - {f.error}")
             self.finished_result.emit(True, "\n".join(summary_parts) if summary_parts else "No entries processed")
         except Exception as e:
             logger.exception("Med record extraction failed")
             self.finished_result.emit(False, str(e))
 
     def _execute(self) -> List[ExtractionResult]:
+        if self._selected_rows_provided:
+            return self._execute_selected_rows(self.selected_rows)
+
         # Step 1: Parse entries from prose using LLM
         self.progress.emit("Parsing entries from text...")
         entries = self._parse_entries(self.user_text)
@@ -618,6 +673,60 @@ class MedRecordExtractorWorker(QThread):
                 self.warning.emit(f"Failed to update index document: {e}")
                 logger.exception("Index document update failed")
 
+        return results
+
+    def _execute_selected_rows(self, selected_rows: List[Any]) -> List[ExtractionResult]:
+        self.progress.emit(f"Preparing to extract {len(selected_rows)} selected chronology row(s)...")
+        file_index = _build_file_index(self.case_path)
+        output_dir = os.path.join(self.case_path, "NOTES", "AI OUTPUT", "Med Record Extracts")
+        os.makedirs(output_dir, exist_ok=True)
+
+        results: List[ExtractionResult] = []
+        used_output_paths: set[str] = set()
+        for i, row in enumerate(selected_rows, 1):
+            self.progress.emit(f"Processing row {i}/{len(selected_rows)}: {row.date} - {row.provider}")
+            result = ExtractionResult(matched_row=row)
+            if not row.record_filename or row.page_start <= 0:
+                result.error = f"Could not parse record/pages from PAGE NO: {row.page_no[:60]}"
+                results.append(result)
+                continue
+
+            pdf_path = _lookup_file(file_index, row.record_filename)
+            if not pdf_path:
+                result.error = f"PDF not found: {row.record_filename}"
+                results.append(result)
+                self.warning.emit(f"PDF not found: {row.record_filename}")
+                continue
+
+            provider_short = _safe_filename_part(row.provider, max_length=40, fallback="provider")
+            date_safe = _normalize_date(row.date).replace("/", "-")
+            page_label = f"p{row.page_start}" if row.page_start == row.page_end else f"pp{row.page_start}-{row.page_end}"
+            out_name = f"{date_safe} - {provider_short} - {page_label}.pdf"
+            out_path = _unique_output_path(output_dir, out_name, used_output_paths, row)
+            out_name = os.path.basename(out_path)
+
+            try:
+                _extract_pages(pdf_path, row.page_start, row.page_end, out_path)
+                result.output_path = out_path
+                self.progress.emit(f"Extracted: {out_name}")
+                try:
+                    if _ocr_pdf_if_needed(out_path):
+                        self.progress.emit(f"OCR applied: {out_name}")
+                except Exception as ocr_err:
+                    self.warning.emit(f"OCR failed for {out_name}: {ocr_err}")
+            except Exception as exc:
+                result.error = f"Page extraction failed: {exc}"
+                self.warning.emit(f"Extraction error for {row.date}: {exc}")
+            results.append(result)
+
+        matched_rows = [r.matched_row for r in results if r.matched_row and not r.error]
+        if matched_rows:
+            self.progress.emit("Updating index document...")
+            try:
+                _update_index_document(output_dir, matched_rows)
+            except Exception as exc:
+                self.warning.emit(f"Failed to update index document: {exc}")
+                logger.exception("Index document update failed")
         return results
 
     def _parse_entries(self, text: str) -> List[ParsedEntry]:
