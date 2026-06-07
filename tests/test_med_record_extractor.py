@@ -61,7 +61,12 @@ class TestParsePageNo(unittest.TestCase):
         self.assertEqual(end, 0)
 
 
-def _build_chronology_docx(path: Path, *, include_synopsis: bool = True) -> Path:
+def _build_chronology_docx(
+    path: Path,
+    *,
+    include_synopsis: bool = True,
+    flags_header: str = "Red Flags/Comments",
+) -> Path:
     doc = Document()
     doc.add_paragraph("CHRONOLOGICAL MEDICAL SUMMARY")
     doc.add_paragraph("Client Name: Test Plaintiff")
@@ -75,7 +80,7 @@ def _build_chronology_docx(path: Path, *, include_synopsis: bool = True) -> Path
             "On 09/21/2020, she had an X-ray performed by James Michael Erskine, MD."
         )
     table = doc.add_table(rows=1, cols=5)
-    headers = ["DATE", "PAGE NO", "PROVIDER", "DESCRIPTION", "Red Flags/Comments"]
+    headers = ["DATE", "PAGE NO", "PROVIDER", "DESCRIPTION", flags_header]
     for index, header in enumerate(headers):
         table.rows[0].cells[index].text = header
     section = table.add_row().cells
@@ -134,6 +139,19 @@ class TestChronologyDocumentParser(unittest.TestCase):
             doc.add_paragraph("BRIEF SYNOPSIS OF POST-INJURY MEDICAL RECORD:")
             doc.add_paragraph("On 09/21/2020, Test Plaintiff saw Kaiser Permanente.")
             doc.save(source)
+            parsed = parse_chronology_document(str(source))
+
+        self.assertEqual(parsed.rows, [])
+        self.assertIn("No usable 5-column chronology table found.", parsed.blocking_errors)
+
+    def test_parse_chronology_document_blocks_when_flags_header_missing(self):
+        from icharlotte_core.med_record_chronology import parse_chronology_document
+
+        with tempfile.TemporaryDirectory() as td:
+            source = _build_chronology_docx(
+                Path(td) / "chronology.docx",
+                flags_header="Notes",
+            )
             parsed = parse_chronology_document(str(source))
 
         self.assertEqual(parsed.rows, [])

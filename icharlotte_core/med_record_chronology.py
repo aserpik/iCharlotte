@@ -69,7 +69,7 @@ _SYNOPSIS_HEADING_RE = re.compile(
 )
 _MAJOR_HEADING_RE = re.compile(r"^[A-Z0-9][A-Z0-9\s/&.,'()-]{4,}:?$")
 _DATE_RE = re.compile(r"\b(\d{1,2}/\d{1,2}/\d{2,4})\b")
-_CHRON_HEADERS = ("date", "page no", "provider", "description")
+_CHRON_HEADERS = ("date", "pageno", "provider", "description", "redflagscomments")
 
 
 def parse_chronology_document(path: str) -> ChronologyDocument:
@@ -122,7 +122,7 @@ def _parse_rows(path: str) -> list[SelectableChronologyRow]:
     for table in doc.tables:
         if not table.rows or len(table.rows[0].cells) != 5:
             continue
-        headers = [_collapse(cell.text).lower() for cell in table.rows[0].cells]
+        headers = [_normalize_header(cell.text) for cell in table.rows[0].cells]
         if not all(expected in headers[index] for index, expected in enumerate(_CHRON_HEADERS)):
             continue
 
@@ -159,6 +159,10 @@ def _parse_rows(path: str) -> list[SelectableChronologyRow]:
 
 def _collapse(text: str) -> str:
     return re.sub(r"\s+", " ", text or "").strip()
+
+
+def _normalize_header(text: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", _collapse(text).lower())
 
 
 def _stable_id(prefix: str, order: int, text: str) -> str:
