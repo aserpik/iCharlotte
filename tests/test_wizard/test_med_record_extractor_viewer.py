@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 from docx import Document
+from PySide6.QtCore import Qt
 
 pytest.importorskip("pytestqt")
 
@@ -30,6 +31,130 @@ def test_selection_page_loads_chronology_document(qtbot):
         assert page.selected_count_label.text() == "0 rows selected"
         assert page.synopsis_panel.count() == 2
         assert page.table_panel.count() == 2
+
+
+def test_selection_page_uses_brief_synopsis_and_chronology_row_tabs(qtbot):
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    with tempfile.TemporaryDirectory() as td:
+        source = _build_chronology_docx(Path(td) / "chronology.docx")
+        page = MedChronologySelectionPage(
+            case_path=td,
+            file_number="5800.013",
+            chronology_path=str(source),
+        )
+        qtbot.addWidget(page)
+
+        assert page.tab_widget.count() == 2
+        assert page.tab_widget.tabText(0) == "Brief Synopsis"
+        assert page.tab_widget.tabText(1) == "Chronology Rows"
+        assert page.synopsis_panel.count() == 2
+        assert page.table_panel.count() == 2
+
+
+def test_clicking_synopsis_text_toggles_entry_selection(qtbot):
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    with tempfile.TemporaryDirectory() as td:
+        source = _build_chronology_docx(Path(td) / "chronology.docx")
+        page = MedChronologySelectionPage(
+            case_path=td,
+            file_number="5800.013",
+            chronology_path=str(source),
+        )
+        qtbot.addWidget(page)
+
+        item = page.synopsis_panel.item(0)
+        click_pos = page.synopsis_panel.visualItemRect(item).center()
+
+        qtbot.mouseClick(
+            page.synopsis_panel.viewport(),
+            Qt.MouseButton.LeftButton,
+            pos=click_pos,
+        )
+
+        assert item.checkState() == Qt.CheckState.Checked
+        assert page.is_row_checked(page.document.rows[0].id)
+
+        qtbot.mouseClick(
+            page.synopsis_panel.viewport(),
+            Qt.MouseButton.LeftButton,
+            pos=click_pos,
+        )
+
+        assert item.checkState() == Qt.CheckState.Unchecked
+        assert not page.is_row_checked(page.document.rows[0].id)
+
+
+def test_clicking_chronology_row_text_toggles_row_selection(qtbot):
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    with tempfile.TemporaryDirectory() as td:
+        source = _build_chronology_docx(Path(td) / "chronology.docx")
+        page = MedChronologySelectionPage(
+            case_path=td,
+            file_number="5800.013",
+            chronology_path=str(source),
+        )
+        qtbot.addWidget(page)
+
+        click_pos = page.table_panel.visualRect(
+            page.table_panel.model().index(0, 4)
+        ).center()
+
+        qtbot.mouseClick(
+            page.table_panel.viewport(),
+            Qt.MouseButton.LeftButton,
+            pos=click_pos,
+        )
+
+        assert page.is_row_checked(page.document.rows[0].id)
+        assert page.selected_count_label.text() == "1 row selected"
+
+        qtbot.mouseClick(
+            page.table_panel.viewport(),
+            Qt.MouseButton.LeftButton,
+            pos=click_pos,
+        )
+
+        assert not page.is_row_checked(page.document.rows[0].id)
+        assert page.selected_count_label.text() == "0 rows selected"
+
+
+def test_chronology_row_tab_displays_all_source_columns_verbatim(qtbot):
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    with tempfile.TemporaryDirectory() as td:
+        source = _build_chronology_docx(Path(td) / "chronology.docx")
+        page = MedChronologySelectionPage(
+            case_path=td,
+            file_number="5800.013",
+            chronology_path=str(source),
+        )
+        qtbot.addWidget(page)
+
+        assert page.table_panel.columnCount() == 6
+        assert page.table_panel.horizontalHeaderItem(1).text() == "DATE"
+        assert page.table_panel.horizontalHeaderItem(2).text() == "PAGE NO"
+        assert page.table_panel.horizontalHeaderItem(3).text() == "PROVIDER"
+        assert page.table_panel.horizontalHeaderItem(4).text() == "DESCRIPTION"
+        assert page.table_panel.horizontalHeaderItem(5).text() == "Red Flags/Comments"
+        assert page.table_panel.item(0, 2).text() == (
+            "Hall - Doc Produced HALL 000001 to 002530 7-21-2023\n\n"
+            "Pg No: 599-604/2530"
+        )
+        assert page.table_panel.item(0, 3).text() == "Kaiser Permanente\nHenry Louis Marr, DO"
+        assert page.table_panel.item(0, 4).text() == (
+            "EMERGENCY DEPARTMENT NOTE\nChief Complaint: Ankle injury."
+        )
 
 
 def test_direct_row_selection_emits_selected_rows(qtbot):

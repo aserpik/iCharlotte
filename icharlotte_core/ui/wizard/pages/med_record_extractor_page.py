@@ -14,9 +14,9 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
-    QSplitter,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -72,6 +72,15 @@ class BriefSynopsisPanel(QListWidget):
         if item is not None:
             item.setToolTip(message)
 
+    def mousePressEvent(self, event) -> None:
+        item = self.itemAt(event.position().toPoint())
+        if item is not None:
+            checked = item.checkState() == Qt.CheckState.Checked
+            item.setCheckState(Qt.CheckState.Unchecked if checked else Qt.CheckState.Checked)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
     def _on_item_changed(self, item: QListWidgetItem) -> None:
         paragraph_id = item.data(Qt.ItemDataRole.UserRole)
         self.paragraph_toggled.emit(
@@ -88,9 +97,19 @@ class ChronologyTablePanel(QTableWidget):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._rows_by_id: dict[str, int] = {}
+        self._ids_by_row: dict[int, str] = {}
         self._extractable_by_id: dict[str, bool] = {}
-        self.setColumnCount(5)
-        self.setHorizontalHeaderLabels(["Select", "Date", "Pages", "Provider", "Description"])
+        self.setColumnCount(6)
+        self.setHorizontalHeaderLabels([
+            "Select",
+            "DATE",
+            "PAGE NO",
+            "PROVIDER",
+            "DESCRIPTION",
+            "Red Flags/Comments",
+        ])
+        self.setWordWrap(True)
+        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.setAlternatingRowColors(True)
         self.verticalHeader().setVisible(False)
@@ -99,6 +118,7 @@ class ChronologyTablePanel(QTableWidget):
         self.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         self.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        self.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
         self.cellChanged.connect(self._on_cell_changed)
 
     def count(self) -> int:
@@ -108,15 +128,18 @@ class ChronologyTablePanel(QTableWidget):
         self.blockSignals(True)
         self.setRowCount(len(rows))
         self._rows_by_id.clear()
+        self._ids_by_row.clear()
         self._extractable_by_id.clear()
         for index, row in enumerate(rows):
             self._rows_by_id[row.id] = index
+            self._ids_by_row[index] = row.id
             self._extractable_by_id[row.id] = row.extractable
             self.setItem(index, 0, self._check_item(row))
             self.setItem(index, 1, self._text_item(row.date))
-            self.setItem(index, 2, self._text_item(_page_display(row)))
+            self.setItem(index, 2, self._text_item(row.page_no))
             self.setItem(index, 3, self._text_item(row.provider))
             self.setItem(index, 4, self._text_item(row.description))
+            self.setItem(index, 5, self._text_item(row.flags))
             if row.warning:
                 for column in range(self.columnCount()):
                     item = self.item(index, column)
@@ -140,6 +163,16 @@ class ChronologyTablePanel(QTableWidget):
     def is_row_checked(self, row_id: str) -> bool:
         item = self.item(self._rows_by_id[row_id], 0)
         return item is not None and item.checkState() == Qt.CheckState.Checked
+
+    def mousePressEvent(self, event) -> None:
+        row_index = self.rowAt(event.position().toPoint().y())
+        row_id = self._ids_by_row.get(row_index)
+        if row_id is not None:
+            if self._extractable_by_id.get(row_id, False):
+                self.set_row_checked(row_id, not self.is_row_checked(row_id))
+            event.accept()
+            return
+        super().mousePressEvent(event)
 
     def _on_cell_changed(self, row: int, column: int) -> None:
         if column != 0:
@@ -281,11 +314,10 @@ class MedChronologySelectionPage(QWidget):
         self.match_status_label.setVisible(False)
         layout.addWidget(self.match_status_label)
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.addWidget(self._build_synopsis_pane())
-        splitter.addWidget(self._build_table_pane())
-        splitter.setSizes([360, 760])
-        layout.addWidget(splitter, 1)
+        self.tab_widget = QTabWidget()
+        self.tab_widget.addTab(self._build_synopsis_pane(), "Brief Synopsis")
+        self.tab_widget.addTab(self._build_table_pane(), "Chronology Rows")
+        layout.addWidget(self.tab_widget, 1)
 
         controls = QHBoxLayout()
         controls.setContentsMargins(0, 0, 0, 0)
@@ -427,14 +459,6 @@ class MedChronologySelectionPage(QWidget):
 
     def _open_original(self) -> None:
         os.startfile(self.chronology_path)
-
-
-def _page_display(row: SelectableChronologyRow) -> str:
-    if not row.extractable:
-        return "Not extractable"
-    if row.page_start == row.page_end:
-        return str(row.page_start)
-    return f"{row.page_start}-{row.page_end}"
 
 
 def _row_label(row: SelectableChronologyRow) -> str:
