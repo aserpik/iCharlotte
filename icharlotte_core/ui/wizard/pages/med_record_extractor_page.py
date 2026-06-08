@@ -3,13 +3,16 @@ from __future__ import annotations
 
 import os
 
-from PySide6.QtCore import QSettings, Qt, QTimer, Signal
+from PySide6.QtCore import QRect, QSettings, QSize, Qt, QTimer, Signal
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QDialog,
     QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QListView,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
@@ -30,22 +33,31 @@ from icharlotte_core.med_record_chronology import (
     match_synopsis_to_rows,
     parse_chronology_document,
 )
+from icharlotte_core.med_record_extractor import _build_file_index, _lookup_file
 from icharlotte_core.ui.wizard import theme
 
 
 TABLE_COLUMN_WIDTHS_KEY = "wizard/med_record_extractor/chronology_table_column_widths"
 DEFAULT_TABLE_COLUMN_WIDTHS = [56, 96, 240, 260, 520, 180]
+SELECTION_HIGHLIGHT_COLOR = "#fff3a3"
+_SELECTION_HIGHLIGHT_BRUSH = QBrush(QColor(SELECTION_HIGHLIGHT_COLOR))
 
 
 class BriefSynopsisPanel(QListWidget):
     """Checkable list of synopsis paragraphs from the selected chronology."""
 
     paragraph_toggled = Signal(str, bool)
+    paragraph_open_requested = Signal(str)
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._items_by_id: dict[str, QListWidgetItem] = {}
         self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.setWordWrap(True)
+        self.setTextElideMode(Qt.TextElideMode.ElideNone)
+        self.setResizeMode(QListView.ResizeMode.Adjust)
+        self.setUniformItemSizes(False)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.itemChanged.connect(self._on_item_changed)
 
     def load_paragraphs(self, paragraphs: list[SynopsisParagraph]) -> None:
@@ -66,10 +78,12 @@ class BriefSynopsisPanel(QListWidget):
             self.addItem(item)
             self._items_by_id[paragraph.id] = item
         self.blockSignals(False)
+        self._refresh_item_sizes()
 
     def set_paragraph_checked(self, paragraph_id: str, checked: bool) -> None:
         item = self._items_by_id[paragraph_id]
         item.setCheckState(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
+        self._apply_item_highlight(item)
 
     def mark_warning(self, paragraph_id: str, message: str) -> None:
         item = self._items_by_id.get(paragraph_id)
@@ -88,18 +102,58 @@ class BriefSynopsisPanel(QListWidget):
             return
         super().mousePressEvent(event)
 
+    def mouseDoubleClickEvent(self, event) -> None:
+        if event.button() != Qt.MouseButton.LeftButton:
+            super().mouseDoubleClickEvent(event)
+            return
+        item = self.itemAt(event.position().toPoint())
+        if item is not None:
+            paragraph_id = item.data(Qt.ItemDataRole.UserRole)
+            self.paragraph_open_requested.emit(paragraph_id)
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self._refresh_item_sizes()
+
     def _on_item_changed(self, item: QListWidgetItem) -> None:
+        self._apply_item_highlight(item)
         paragraph_id = item.data(Qt.ItemDataRole.UserRole)
         self.paragraph_toggled.emit(
             paragraph_id,
             item.checkState() == Qt.CheckState.Checked,
         )
 
+    def _refresh_item_sizes(self) -> None:
+        text_width = max(120, self.viewport().width() - 48)
+        for index in range(self.count()):
+            item = self.item(index)
+            item.setSizeHint(self._size_hint_for_text(item.text(), text_width))
+
+    def _size_hint_for_text(self, text: str, width: int) -> QSize:
+        flags = Qt.TextFlag.TextWordWrap | Qt.TextFlag.TextExpandTabs
+        rect = self.fontMetrics().boundingRect(
+            QRect(0, 0, width, 100000),
+            flags,
+            text,
+        )
+        return QSize(width, max(self.fontMetrics().height(), rect.height()) + 16)
+
+    @staticmethod
+    def _apply_item_highlight(item: QListWidgetItem) -> None:
+        if item.checkState() == Qt.CheckState.Checked:
+            item.setBackground(_SELECTION_HIGHLIGHT_BRUSH)
+        else:
+            item.setBackground(QBrush())
+
 
 class ChronologyTablePanel(QTableWidget):
     """Checkable chronology table rows."""
 
     row_toggled = Signal(str, bool)
+    row_open_requested = Signal(str)
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
@@ -182,11 +236,13 @@ class ChronologyTablePanel(QTableWidget):
                     item = self.item(index, column)
                     if item is not None:
                         item.setToolTip(row.warning)
+            self._apply_row_highlight(index, False)
         self.resizeRowsToContents()
         self.blockSignals(False)
 
     def set_row_checked(self, row_id: str, checked: bool, *, emit: bool = True) -> None:
-        item = self.item(self._rows_by_id[row_id], 0)
+        row_index = self._rows_by_id[row_id]
+        item = self.item(row_index, 0)
         if item is None:
             return
         if checked and not self._extractable_by_id.get(row_id, False):
@@ -194,6 +250,7 @@ class ChronologyTablePanel(QTableWidget):
         if not emit:
             self.blockSignals(True)
         item.setCheckState(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
+        self._apply_row_highlight(row_index, checked)
         if not emit:
             self.blockSignals(False)
 
@@ -214,6 +271,18 @@ class ChronologyTablePanel(QTableWidget):
             return
         super().mousePressEvent(event)
 
+    def mouseDoubleClickEvent(self, event) -> None:
+        if event.button() != Qt.MouseButton.LeftButton:
+            super().mouseDoubleClickEvent(event)
+            return
+        row_index = self.rowAt(event.position().toPoint().y())
+        row_id = self._ids_by_row.get(row_index)
+        if row_id is not None:
+            self.row_open_requested.emit(row_id)
+            event.accept()
+            return
+        super().mouseDoubleClickEvent(event)
+
     def _on_cell_changed(self, row: int, column: int) -> None:
         if column != 0:
             return
@@ -221,7 +290,9 @@ class ChronologyTablePanel(QTableWidget):
         if item is None:
             return
         row_id = item.data(Qt.ItemDataRole.UserRole)
-        self.row_toggled.emit(row_id, item.checkState() == Qt.CheckState.Checked)
+        checked = item.checkState() == Qt.CheckState.Checked
+        self._apply_row_highlight(row, checked)
+        self.row_toggled.emit(row_id, checked)
 
     @staticmethod
     def _check_item(row: SelectableChronologyRow) -> QTableWidgetItem:
@@ -239,6 +310,44 @@ class ChronologyTablePanel(QTableWidget):
         item = QTableWidgetItem(text)
         item.setFlags(Qt.ItemFlag.ItemIsEnabled)
         return item
+
+    def _apply_row_highlight(self, row: int, checked: bool) -> None:
+        brush = _SELECTION_HIGHLIGHT_BRUSH if checked else QBrush()
+        for column in range(self.columnCount()):
+            item = self.item(row, column)
+            if item is not None:
+                item.setBackground(brush)
+
+
+class MedRecordPdfDialog(QDialog):
+    """Non-modal PDF preview opened from a chronology selection."""
+
+    def __init__(self, pdf_path: str, page_number: int, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.pdf_path = pdf_path
+        self.page_number = max(1, int(page_number or 1))
+        self._navigation_attempts = 0
+        self.setWindowTitle(f"{os.path.basename(pdf_path)} - page {self.page_number}")
+        self.resize(1100, 800)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        from icharlotte_core.ui.pdf_viewer_widget import PdfViewerWidget
+
+        self.viewer = PdfViewerWidget()
+        layout.addWidget(self.viewer)
+        self.viewer.load_pdf(pdf_path)
+        QTimer.singleShot(250, self._go_to_target_page)
+
+    def _go_to_target_page(self) -> None:
+        self._navigation_attempts += 1
+        self.viewer.go_to_page(self.page_number)
+        if (
+            self.viewer.get_current_page() != self.page_number
+            and self._navigation_attempts < 10
+        ):
+            QTimer.singleShot(500, self._go_to_target_page)
 
 
 class MedChronologySelectionPage(QWidget):
@@ -262,6 +371,7 @@ class MedChronologySelectionPage(QWidget):
         self._paragraphs = {paragraph.id: paragraph for paragraph in self.document.synopsis_paragraphs}
         self._rows = {row.id: row for row in self.document.rows}
         self._paragraph_match_status: dict[str, str] = {}
+        self._pdf_dialogs: list[object] = []
 
         self._setup_ui()
         self._refresh_extract_state()
@@ -385,6 +495,7 @@ class MedChronologySelectionPage(QWidget):
         self.synopsis_panel = BriefSynopsisPanel()
         self.synopsis_panel.load_paragraphs(self.document.synopsis_paragraphs)
         self.synopsis_panel.paragraph_toggled.connect(self._on_paragraph_toggled)
+        self.synopsis_panel.paragraph_open_requested.connect(self._open_pdf_for_paragraph)
         layout.addWidget(self.synopsis_panel, 1)
         return pane
 
@@ -399,6 +510,7 @@ class MedChronologySelectionPage(QWidget):
         self.table_panel = ChronologyTablePanel()
         self.table_panel.load_rows(self.document.rows)
         self.table_panel.row_toggled.connect(self._on_row_toggled)
+        self.table_panel.row_open_requested.connect(self._open_pdf_for_row_id)
         layout.addWidget(self.table_panel, 1)
         return pane
 
@@ -496,6 +608,56 @@ class MedChronologySelectionPage(QWidget):
             "chronology_path": self.chronology_path,
             "selected_rows": rows,
         })
+
+    def _open_pdf_for_paragraph(self, paragraph_id: str) -> None:
+        paragraph = self._paragraphs.get(paragraph_id)
+        if paragraph is None:
+            return
+        result = match_synopsis_to_rows(paragraph, self.document.rows)
+        if result.status != "confident" or not result.row_ids:
+            reason = result.reason or "No confident chronology row match."
+            QMessageBox.warning(
+                self,
+                "Could not open PDF",
+                f"Could not identify one source PDF for this synopsis entry: {reason}",
+            )
+            return
+        self._open_pdf_for_row_id(result.row_ids[0])
+
+    def _open_pdf_for_row_id(self, row_id: str) -> None:
+        row = self._rows.get(row_id)
+        if row is not None:
+            self._open_pdf_for_row(row)
+
+    def _open_pdf_for_row(self, row: SelectableChronologyRow) -> None:
+        if not row.record_filename or row.page_start <= 0:
+            QMessageBox.warning(
+                self,
+                "Could not open PDF",
+                row.warning or f"Could not parse source record/pages from: {row.page_no}",
+            )
+            return
+        pdf_path = _lookup_file(_build_file_index(self.case_path), row.record_filename)
+        if not pdf_path:
+            QMessageBox.warning(
+                self,
+                "PDF not found",
+                f"Could not find source PDF: {row.record_filename}",
+            )
+            return
+        self._show_pdf_dialog(pdf_path, row.page_start)
+
+    def _show_pdf_dialog(self, pdf_path: str, page_number: int) -> None:
+        dialog = MedRecordPdfDialog(pdf_path, page_number, self)
+        self._pdf_dialogs.append(dialog)
+        destroyed = getattr(dialog, "destroyed", None)
+        if hasattr(destroyed, "connect"):
+            destroyed.connect(lambda *_args, dlg=dialog: self._forget_pdf_dialog(dlg))
+        dialog.show()
+
+    def _forget_pdf_dialog(self, dialog: object) -> None:
+        if dialog in self._pdf_dialogs:
+            self._pdf_dialogs.remove(dialog)
 
     def _open_original(self) -> None:
         os.startfile(self.chronology_path)

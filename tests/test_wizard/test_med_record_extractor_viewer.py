@@ -14,6 +14,11 @@ pytest.importorskip("pytestqt")
 from tests.test_med_record_extractor import _build_chronology_docx
 
 
+class _FakeSignal:
+    def connect(self, callback):
+        self.callback = callback
+
+
 @pytest.fixture(autouse=True)
 def isolated_qsettings(tmp_path):
     previous_default_format = QSettings.defaultFormat()
@@ -112,6 +117,82 @@ def test_chronology_row_heights_auto_fit_wrapped_text(qtbot, tmp_path):
     assert (
         page.table_panel.rowHeight(0)
         > page.table_panel.verticalHeader().defaultSectionSize()
+    )
+
+
+def test_brief_synopsis_entries_wrap_and_fit_full_text(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    long_synopsis = (
+        "On 09/22/2020, Test Plaintiff returned to Kaiser Permanente and "
+        "reported ongoing right ankle pain, difficulty bearing weight, swelling, "
+        "and trouble using crutches while completing basic activities of daily "
+        "living after the fall."
+    )
+    source = _build_chronology_docx(
+        tmp_path / "chronology.docx",
+        synopsis_extra_paragraphs=(long_synopsis,),
+    )
+    page = MedChronologySelectionPage(str(tmp_path), "5800.013", str(source))
+    qtbot.addWidget(page)
+
+    assert page.synopsis_panel.wordWrap() is True
+    assert page.synopsis_panel.textElideMode() == Qt.TextElideMode.ElideNone
+
+    page.synopsis_panel.setFixedWidth(240)
+    page.synopsis_panel.doItemsLayout()
+
+    wrapped_height = page.synopsis_panel.sizeHintForRow(1)
+    single_line_height = page.synopsis_panel.fontMetrics().height()
+    assert wrapped_height > single_line_height * 2
+
+
+def test_checked_synopsis_entry_gets_yellow_full_item_highlight(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        SELECTION_HIGHLIGHT_COLOR,
+        MedChronologySelectionPage,
+    )
+
+    source = _build_chronology_docx(tmp_path / "chronology.docx")
+    page = MedChronologySelectionPage(str(tmp_path), "5800.013", str(source))
+    qtbot.addWidget(page)
+
+    item = page.synopsis_panel.item(0)
+    page.set_paragraph_checked(page.document.synopsis_paragraphs[0].id, True)
+
+    assert item.background().color().name() == SELECTION_HIGHLIGHT_COLOR
+
+    page.set_paragraph_checked(page.document.synopsis_paragraphs[0].id, False)
+
+    assert item.background().style() == Qt.BrushStyle.NoBrush
+
+
+def test_checked_chronology_row_gets_yellow_full_row_highlight(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        SELECTION_HIGHLIGHT_COLOR,
+        MedChronologySelectionPage,
+    )
+
+    source = _build_chronology_docx(tmp_path / "chronology.docx")
+    page = MedChronologySelectionPage(str(tmp_path), "5800.013", str(source))
+    qtbot.addWidget(page)
+
+    row_id = page.document.rows[0].id
+    page.set_row_checked(row_id, True)
+
+    assert [
+        page.table_panel.item(0, column).background().color().name()
+        for column in range(page.table_panel.columnCount())
+    ] == [SELECTION_HIGHLIGHT_COLOR] * page.table_panel.columnCount()
+
+    page.set_row_checked(row_id, False)
+
+    assert all(
+        page.table_panel.item(0, column).background().style()
+        == Qt.BrushStyle.NoBrush
+        for column in range(page.table_panel.columnCount())
     )
 
 
@@ -299,6 +380,88 @@ def test_right_clicking_chronology_row_text_does_not_toggle_row_selection(qtbot)
 
         assert not page.is_row_checked(page.document.rows[0].id)
         assert page.selected_count_label.text() == "0 rows selected"
+
+
+def test_double_clicking_chronology_row_opens_cited_pdf_page(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+):
+    from icharlotte_core.ui.wizard.pages import med_record_extractor_page as mod
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    records = tmp_path / "RECORDS"
+    records.mkdir()
+    pdf = records / "Hall - Doc Produced HALL 000001 to 002530 7-21-2023.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n")
+    source = _build_chronology_docx(tmp_path / "chronology.docx")
+    opened = []
+
+    class FakeDialog:
+        def __init__(self, pdf_path, page_number, parent=None):
+            self.destroyed = _FakeSignal()
+            opened.append((pdf_path, page_number, parent))
+
+        def show(self):
+            opened.append("show")
+
+    monkeypatch.setattr(mod, "MedRecordPdfDialog", FakeDialog, raising=False)
+    page = MedChronologySelectionPage(str(tmp_path), "5800.013", str(source))
+    qtbot.addWidget(page)
+    page.tab_widget.setCurrentIndex(1)
+
+    click_pos = page.table_panel.visualRect(
+        page.table_panel.model().index(0, 4)
+    ).center()
+    qtbot.mouseDClick(
+        page.table_panel.viewport(),
+        Qt.MouseButton.LeftButton,
+        pos=click_pos,
+    )
+
+    assert opened == [(str(pdf), 599, page), "show"]
+
+
+def test_double_clicking_synopsis_opens_confident_match_pdf_page(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+):
+    from icharlotte_core.ui.wizard.pages import med_record_extractor_page as mod
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    records = tmp_path / "RECORDS"
+    records.mkdir()
+    pdf = records / "Hall - Doc Produced HALL 000001 to 002530 7-21-2023.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n")
+    source = _build_chronology_docx(tmp_path / "chronology.docx")
+    opened = []
+
+    class FakeDialog:
+        def __init__(self, pdf_path, page_number, parent=None):
+            self.destroyed = _FakeSignal()
+            opened.append((pdf_path, page_number, parent))
+
+        def show(self):
+            opened.append("show")
+
+    monkeypatch.setattr(mod, "MedRecordPdfDialog", FakeDialog, raising=False)
+    page = MedChronologySelectionPage(str(tmp_path), "5800.013", str(source))
+    qtbot.addWidget(page)
+
+    item = page.synopsis_panel.item(0)
+    click_pos = page.synopsis_panel.visualItemRect(item).center()
+    qtbot.mouseDClick(
+        page.synopsis_panel.viewport(),
+        Qt.MouseButton.LeftButton,
+        pos=click_pos,
+    )
+
+    assert opened == [(str(pdf), 599, page), "show"]
 
 
 def test_chronology_row_tab_displays_all_source_columns_verbatim(qtbot):
