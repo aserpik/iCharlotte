@@ -14,6 +14,7 @@ python-docx>=1.0.0
 mammoth>=1.6.0  # .docx → HTML for Wizard Mode output editor
 PyMuPDF>=1.23.0
 pytesseract>=0.3.10
+pdf2image>=1.17.0
 
 # External Integrations
 pywin32>=306  # Outlook integration
