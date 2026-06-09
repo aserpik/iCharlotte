@@ -21,6 +21,7 @@ class PdfViewerWidget(QWidget):
         self.current_pdf_path = None
         self._viewer_ready = False
         self._pending_pdf = None
+        self._pending_page_number = None
         self._nav_cooldown_until = 0  # Timestamp until which polling is suppressed
         self._setup_ui()
         self._start_page_polling()
@@ -547,6 +548,7 @@ class PdfViewerWidget(QWidget):
         self.current_page = 1
         self.total_pages = 0
         self._pending_pdf = None
+        self._pending_page_number = None
         self.page_label.setText("Page: - / -")
         self.page_spin.setMaximum(1)
         self.page_spin.setValue(1)
@@ -588,8 +590,16 @@ class PdfViewerWidget(QWidget):
     def _on_total_pages_result(self, total):
         """Handle getTotalPages poll result."""
         if total and total > 0:
+            total = int(total)
             self.total_pages = total
             self.page_spin.setMaximum(total)
+            pending_page_number = self._pending_page_number
+            if pending_page_number is not None:
+                if 1 <= pending_page_number <= total:
+                    self._pending_page_number = None
+                    self.go_to_page(pending_page_number)
+                    return
+                self._pending_page_number = None
             self.page_label.setText(f"Page: 1 / {total}")
             self.current_page = 1
             self.page_spin.blockSignals(True)
@@ -601,10 +611,18 @@ class PdfViewerWidget(QWidget):
 
     def go_to_page(self, page_num):
         """Navigate to a specific page."""
-        if not self._viewer_ready:
+        try:
+            page_num = int(page_num)
+        except (TypeError, ValueError):
             return
-        if page_num < 1 or (self.total_pages and page_num > self.total_pages):
+        if page_num < 1:
             return
+        if not self._viewer_ready or not self.total_pages:
+            self._pending_page_number = page_num
+            return
+        if page_num > self.total_pages:
+            return
+        self._pending_page_number = None
         # Suppress polling for 1.5s to let the scroll settle
         self._nav_cooldown_until = time.time() + 1.5
         js = f"window.pdfViewer.goToPage({page_num})"
