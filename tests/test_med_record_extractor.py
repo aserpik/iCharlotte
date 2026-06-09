@@ -69,6 +69,24 @@ class TestNormalizeDate(unittest.TestCase):
         self.assertEqual(_normalize_date("September 21, 68"), "09/21/1968")
 
 
+class TestBuildFileIndex(unittest.TestCase):
+    def test_indexes_demand_folder_pdfs(self):
+        from icharlotte_core.med_record_extractor import _build_file_index, _lookup_file
+
+        with tempfile.TemporaryDirectory() as td:
+            demand = Path(td) / "DEMAND"
+            demand.mkdir()
+            pdf = demand / "Richard Goulart demand exhibits.pdf"
+            pdf.write_bytes(b"%PDF-1.4\n")
+
+            index = _build_file_index(td)
+
+            self.assertEqual(
+                _lookup_file(index, "Richard Goulart demand exhibits.pdf"),
+                str(pdf),
+            )
+
+
 def _build_chronology_docx(
     path: Path,
     *,

@@ -175,11 +175,12 @@ def _parse_page_no(cell_text: str) -> Tuple[str, int, int]:
 
 
 def _build_file_index(case_path: str) -> dict:
-    """Walk RECORDS/ and DISCOVERY/RESPONSES/ to build filename-to-path lookup."""
+    """Walk likely source-record folders to build filename-to-path lookup."""
     file_index = {}
     search_folders = [
         _find_folder_ci(case_path, "RECORDS"),
         _find_folder_ci(case_path, "DISCOVERY", "RESPONSES"),
+        _find_folder_ci(case_path, "DEMAND"),
     ]
     for folder in search_folders:
         if folder is None:

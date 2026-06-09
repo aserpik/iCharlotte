@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QStyledItemDelegate,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -40,7 +41,62 @@ from icharlotte_core.ui.wizard import theme
 TABLE_COLUMN_WIDTHS_KEY = "wizard/med_record_extractor/chronology_table_column_widths"
 DEFAULT_TABLE_COLUMN_WIDTHS = [56, 96, 240, 260, 520, 180]
 SELECTION_HIGHLIGHT_COLOR = "#fff3a3"
+SELECTION_HIGHLIGHT_BORDER_COLOR = "#d1a500"
 _SELECTION_HIGHLIGHT_BRUSH = QBrush(QColor(SELECTION_HIGHLIGHT_COLOR))
+
+
+def _brief_synopsis_stylesheet() -> str:
+    check_path = theme._asset_path("checkmark.svg")
+    return f"""
+    QListWidget {{
+        border: 1px solid {theme.BORDER};
+        border-radius: {theme.RADIUS_SM}px;
+        background-color: #FFFFFF;
+        selection-background-color: {SELECTION_HIGHLIGHT_COLOR};
+        selection-color: {theme.TEXT};
+    }}
+    QListWidget::item {{
+        padding: 4px 6px;
+        border-radius: 3px;
+    }}
+    QListWidget::item:selected {{
+        background-color: {SELECTION_HIGHLIGHT_COLOR};
+        color: {theme.TEXT};
+    }}
+    QListWidget::item:checked {{
+        background-color: {SELECTION_HIGHLIGHT_COLOR};
+        color: {theme.TEXT};
+    }}
+    QListWidget::indicator {{
+        width: 16px;
+        height: 16px;
+        border: 1px solid {theme.BORDER};
+        border-radius: 3px;
+        background-color: #FFFFFF;
+    }}
+    QListWidget::indicator:hover {{
+        border-color: {SELECTION_HIGHLIGHT_BORDER_COLOR};
+    }}
+    QListWidget::indicator:checked {{
+        background-color: {SELECTION_HIGHLIGHT_COLOR};
+        border-color: {SELECTION_HIGHLIGHT_BORDER_COLOR};
+        image: url("{check_path}");
+    }}
+    QListWidget::indicator:checked:hover {{
+        background-color: {SELECTION_HIGHLIGHT_COLOR};
+    }}
+    """
+
+
+class _BriefSynopsisDelegate(QStyledItemDelegate):
+    """Paint checked synopsis entries across the full row before default content."""
+
+    def paint(self, painter, option, index) -> None:
+        if index.data(Qt.ItemDataRole.CheckStateRole) == Qt.CheckState.Checked:
+            painter.save()
+            painter.fillRect(option.rect, QColor(SELECTION_HIGHLIGHT_COLOR))
+            painter.restore()
+        super().paint(painter, option, index)
 
 
 class BriefSynopsisPanel(QListWidget):
@@ -52,12 +108,14 @@ class BriefSynopsisPanel(QListWidget):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._items_by_id: dict[str, QListWidgetItem] = {}
-        self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         self.setWordWrap(True)
         self.setTextElideMode(Qt.TextElideMode.ElideNone)
         self.setResizeMode(QListView.ResizeMode.Adjust)
         self.setUniformItemSizes(False)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setItemDelegate(_BriefSynopsisDelegate(self))
+        self.setStyleSheet(_brief_synopsis_stylesheet())
         self.itemChanged.connect(self._on_item_changed)
 
     def load_paragraphs(self, paragraphs: list[SynopsisParagraph]) -> None:
@@ -145,8 +203,10 @@ class BriefSynopsisPanel(QListWidget):
     def _apply_item_highlight(item: QListWidgetItem) -> None:
         if item.checkState() == Qt.CheckState.Checked:
             item.setBackground(_SELECTION_HIGHLIGHT_BRUSH)
+            item.setSelected(True)
         else:
             item.setBackground(QBrush())
+            item.setSelected(False)
 
 
 class ChronologyTablePanel(QTableWidget):

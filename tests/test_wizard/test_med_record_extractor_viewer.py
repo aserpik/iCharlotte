@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 from docx import Document
 from PySide6.QtCore import QSettings, Qt
+from PySide6.QtGui import QColor, QPixmap
 
 pytest.importorskip("pytestqt")
 
@@ -167,6 +168,41 @@ def test_checked_synopsis_entry_gets_yellow_full_item_highlight(qtbot, tmp_path)
     page.set_paragraph_checked(page.document.synopsis_paragraphs[0].id, False)
 
     assert item.background().style() == Qt.BrushStyle.NoBrush
+
+
+def test_checked_synopsis_entry_paints_full_row_and_checkbox_yellow(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        SELECTION_HIGHLIGHT_COLOR,
+        MedChronologySelectionPage,
+    )
+
+    source = _build_chronology_docx(tmp_path / "chronology.docx")
+    page = MedChronologySelectionPage(str(tmp_path), "5800.013", str(source))
+    qtbot.addWidget(page)
+    page.resize(900, 500)
+    page.show()
+    qtbot.waitExposed(page)
+
+    item = page.synopsis_panel.item(0)
+    page.set_paragraph_checked(page.document.synopsis_paragraphs[0].id, True)
+    page.synopsis_panel.viewport().update()
+    qtbot.wait(50)
+
+    rect = page.synopsis_panel.visualItemRect(item)
+    pixmap = QPixmap(page.synopsis_panel.viewport().size())
+    page.synopsis_panel.viewport().render(pixmap)
+    image = pixmap.toImage()
+
+    expected = QColor(SELECTION_HIGHLIGHT_COLOR)
+    row_pixel = QColor(image.pixel(rect.right() - 20, rect.center().y()))
+    checkbox_pixels = [
+        QColor(image.pixel(rect.left() + x, rect.center().y()))
+        for x in range(5, 31)
+    ]
+
+    assert row_pixel.name() == expected.name()
+    assert any(pixel.name() == expected.name() for pixel in checkbox_pixels)
+    assert all(pixel.name() != "#1976d2" for pixel in checkbox_pixels)
 
 
 def test_checked_chronology_row_gets_yellow_full_row_highlight(qtbot, tmp_path):
