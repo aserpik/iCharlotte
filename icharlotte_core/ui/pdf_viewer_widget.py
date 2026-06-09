@@ -8,6 +8,10 @@ from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEngineSettings
 
 
+PDF_LOAD_POLL_INTERVAL_MS = 100
+PDF_LOAD_MAX_POLLS = 100
+
+
 class PdfViewerWidget(QWidget):
     """PDF viewer with automatic page tracking using embedded pdf.js."""
 
@@ -577,7 +581,7 @@ class PdfViewerWidget(QWidget):
         js = f"window.pdfViewer.loadPdf('{url_escaped}')"
         self.web_view.page().runJavaScript(js)
         self._load_poll_count = 0
-        QTimer.singleShot(500, self._poll_total_pages)
+        QTimer.singleShot(PDF_LOAD_POLL_INTERVAL_MS, self._poll_total_pages)
 
     def _poll_total_pages(self):
         """Poll getTotalPages() until the PDF is loaded."""
@@ -605,9 +609,9 @@ class PdfViewerWidget(QWidget):
             self.page_spin.blockSignals(True)
             self.page_spin.setValue(1)
             self.page_spin.blockSignals(False)
-        elif self._load_poll_count < 20:
+        elif self._load_poll_count < PDF_LOAD_MAX_POLLS:
             # Still loading — retry (up to 10 seconds total)
-            QTimer.singleShot(500, self._poll_total_pages)
+            QTimer.singleShot(PDF_LOAD_POLL_INTERVAL_MS, self._poll_total_pages)
 
     def go_to_page(self, page_num):
         """Navigate to a specific page."""

@@ -398,7 +398,7 @@ class MedRecordPdfDialog(QDialog):
         self.viewer = PdfViewerWidget()
         layout.addWidget(self.viewer)
         self.viewer.load_pdf(pdf_path)
-        QTimer.singleShot(250, self._go_to_target_page)
+        self._go_to_target_page()
 
     def _go_to_target_page(self) -> None:
         self._navigation_attempts += 1
@@ -431,6 +431,7 @@ class MedChronologySelectionPage(QWidget):
         self._paragraphs = {paragraph.id: paragraph for paragraph in self.document.synopsis_paragraphs}
         self._rows = {row.id: row for row in self.document.rows}
         self._paragraph_match_status: dict[str, str] = {}
+        self._file_index: dict[str, str] | None = None
         self._pdf_dialogs: list[object] = []
 
         self._setup_ui()
@@ -697,7 +698,12 @@ class MedChronologySelectionPage(QWidget):
                 row.warning or f"Could not parse source record/pages from: {row.page_no}",
             )
             return
-        pdf_path = _lookup_file(_build_file_index(self.case_path), row.record_filename)
+        pdf_path = _lookup_file(self._get_file_index(), row.record_filename)
+        if not pdf_path:
+            pdf_path = _lookup_file(
+                self._get_file_index(refresh=True),
+                row.record_filename,
+            )
         if not pdf_path:
             QMessageBox.warning(
                 self,
@@ -706,6 +712,11 @@ class MedChronologySelectionPage(QWidget):
             )
             return
         self._show_pdf_dialog(pdf_path, row.page_start)
+
+    def _get_file_index(self, *, refresh: bool = False) -> dict[str, str]:
+        if refresh or self._file_index is None:
+            self._file_index = _build_file_index(self.case_path)
+        return self._file_index
 
     def _show_pdf_dialog(self, pdf_path: str, page_number: int) -> None:
         dialog = MedRecordPdfDialog(pdf_path, page_number, self)

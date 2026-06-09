@@ -460,6 +460,142 @@ def test_double_clicking_chronology_row_opens_cited_pdf_page(
     assert opened == [(str(pdf), 599, page), "show"]
 
 
+def test_opening_multiple_entries_reuses_file_index_cache(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+):
+    from icharlotte_core.ui.wizard.pages import med_record_extractor_page as mod
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    records = tmp_path / "RECORDS"
+    records.mkdir()
+    pdf = records / "Hall - Doc Produced HALL 000001 to 002530 7-21-2023.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n")
+    source = _build_chronology_docx(tmp_path / "chronology.docx")
+    opened = []
+    index_calls = []
+    file_index = {pdf.stem.lower(): str(pdf)}
+
+    class FakeDialog:
+        def __init__(self, pdf_path, page_number, parent=None):
+            self.destroyed = _FakeSignal()
+            opened.append((pdf_path, page_number, parent))
+
+        def show(self):
+            opened.append("show")
+
+    def fake_build_file_index(case_path):
+        index_calls.append(case_path)
+        return file_index
+
+    monkeypatch.setattr(mod, "MedRecordPdfDialog", FakeDialog, raising=False)
+    monkeypatch.setattr(mod, "_build_file_index", fake_build_file_index)
+    page = MedChronologySelectionPage(str(tmp_path), "5800.013", str(source))
+    qtbot.addWidget(page)
+
+    page._open_pdf_for_row(page.document.rows[0])
+    page._open_pdf_for_row(page.document.rows[1])
+
+    assert index_calls == [str(tmp_path)]
+    assert opened == [
+        (str(pdf), 599, page),
+        "show",
+        (str(pdf), 598, page),
+        "show",
+    ]
+
+
+def test_opening_entry_refreshes_file_index_after_cache_miss(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+):
+    from icharlotte_core.ui.wizard.pages import med_record_extractor_page as mod
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    records = tmp_path / "RECORDS"
+    records.mkdir()
+    pdf = records / "Hall - Doc Produced HALL 000001 to 002530 7-21-2023.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n")
+    source = _build_chronology_docx(tmp_path / "chronology.docx")
+    opened = []
+    warnings = []
+    index_calls = []
+    indexes = [{}, {pdf.stem.lower(): str(pdf)}]
+
+    class FakeDialog:
+        def __init__(self, pdf_path, page_number, parent=None):
+            self.destroyed = _FakeSignal()
+            opened.append((pdf_path, page_number, parent))
+
+        def show(self):
+            opened.append("show")
+
+    def fake_build_file_index(case_path):
+        index_calls.append(case_path)
+        return indexes.pop(0)
+
+    monkeypatch.setattr(mod, "MedRecordPdfDialog", FakeDialog, raising=False)
+    monkeypatch.setattr(mod, "_build_file_index", fake_build_file_index)
+    monkeypatch.setattr(
+        mod.QMessageBox,
+        "warning",
+        lambda *args: warnings.append(args),
+    )
+    page = MedChronologySelectionPage(str(tmp_path), "5800.013", str(source))
+    qtbot.addWidget(page)
+
+    page._open_pdf_for_row(page.document.rows[0])
+
+    assert index_calls == [str(tmp_path), str(tmp_path)]
+    assert opened == [(str(pdf), 599, page), "show"]
+    assert warnings == []
+
+
+def test_pdf_dialog_requests_target_page_without_startup_delay(
+    qtbot,
+    tmp_path,
+    monkeypatch,
+):
+    import icharlotte_core.ui.pdf_viewer_widget as viewer_mod
+    from PySide6.QtWidgets import QWidget
+
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedRecordPdfDialog,
+    )
+
+    pdf = tmp_path / "record.pdf"
+    pdf.write_bytes(b"%PDF-1.4\n")
+    calls = []
+
+    class FakeViewer(QWidget):
+        def __init__(self):
+            super().__init__()
+            self.current_page = 1
+
+        def load_pdf(self, path):
+            calls.append(("load", path))
+
+        def go_to_page(self, page_number):
+            calls.append(("go", page_number))
+            self.current_page = page_number
+
+        def get_current_page(self):
+            return self.current_page
+
+    monkeypatch.setattr(viewer_mod, "PdfViewerWidget", FakeViewer)
+
+    dialog = MedRecordPdfDialog(str(pdf), 599)
+    qtbot.addWidget(dialog)
+
+    assert calls == [("load", str(pdf)), ("go", 599)]
+
+
 def test_double_clicking_synopsis_opens_confident_match_pdf_page(
     qtbot,
     tmp_path,

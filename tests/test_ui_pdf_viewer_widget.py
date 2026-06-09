@@ -80,3 +80,26 @@ def test_page_request_before_pdf_page_count_is_known_runs_after_load() -> None:
     assert viewer.page_spin.maximum == 2530
     assert viewer.page_spin.value == 599
     assert viewer._pending_page_number is None
+
+
+def test_load_pdf_starts_page_count_polling_without_fixed_half_second_delay(
+    monkeypatch,
+) -> None:
+    import icharlotte_core.ui.pdf_viewer_widget as mod
+
+    viewer = _viewer_double()
+    delays = []
+
+    monkeypatch.setattr(
+        mod.QTimer,
+        "singleShot",
+        lambda delay, callback: delays.append((delay, callback)),
+    )
+
+    viewer._do_load_pdf(r"C:\records\source.pdf")
+
+    assert viewer.web_view.fake_page.javascript_calls == [
+        "window.pdfViewer.loadPdf('file:///C:/records/source.pdf')"
+    ]
+    assert delays == [(mod.PDF_LOAD_POLL_INTERVAL_MS, viewer._poll_total_pages)]
+    assert mod.PDF_LOAD_POLL_INTERVAL_MS <= 150
