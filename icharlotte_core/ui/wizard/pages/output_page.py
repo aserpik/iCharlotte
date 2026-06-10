@@ -90,6 +90,10 @@ class OutputPage(QWidget):
         self.file_label = QLabel("File: —")
         self.file_label.setStyleSheet(f"font-weight: 600; color: {theme.TEXT};")
         header.addWidget(self.file_label, 1)
+        self.open_folder_btn = theme.secondary_button("Open Folder")
+        self.open_folder_btn.setToolTip("Open the containing folder in Explorer")
+        self.open_folder_btn.clicked.connect(self._on_open_folder)
+        header.addWidget(self.open_folder_btn)
         self.open_in_word_btn = theme.secondary_button("Open in Word")
         self.open_in_word_btn.clicked.connect(self._on_open_in_word)
         header.addWidget(self.open_in_word_btn)
@@ -353,6 +357,22 @@ class OutputPage(QWidget):
 
     def _on_copy_all(self) -> None:
         QGuiApplication.clipboard().setText(self.editor.toPlainText())
+
+    def _on_open_folder(self) -> None:
+        if self._output_path is None:
+            return
+        folder = os.path.dirname(self._output_path)
+        if not os.path.isdir(folder):
+            QMessageBox.information(
+                self,
+                "Folder not found",
+                f"Output folder does not exist yet:\n{folder}",
+            )
+            return
+        try:
+            os.startfile(folder)  # Windows
+        except Exception as e:
+            QMessageBox.critical(self, "Open failed", f"Could not open folder:\n{e}")
 
     def _on_open_in_word(self) -> None:
         if self._output_path is None:

@@ -201,7 +201,7 @@ class ConversationSidebar(QFrame):
             try:
                 dt = datetime.fromisoformat(updated.replace('Z', '+00:00'))
                 conv_date = dt.date()
-            except:
+            except Exception:
                 conv_date = None
 
             # Categorize
@@ -240,11 +240,9 @@ class ConversationSidebar(QFrame):
     def on_item_clicked(self, item: QListWidgetItem):
         """Handle conversation item click."""
         conv_id = item.data(Qt.ItemDataRole.UserRole)
-        print(f"[DEBUG] on_item_clicked: conv_id={conv_id}, item_text={item.text()}")
         if conv_id:
             self.current_conversation_id = conv_id
             self.conversation_selected.emit(conv_id)
-            print(f"[DEBUG] Emitted conversation_selected signal for {conv_id}")
 
     def on_item_double_clicked(self, item: QListWidgetItem):
         """Handle double-click to rename."""
@@ -563,7 +561,7 @@ class CodeBlockWidget(QFrame):
                 highlighted = highlight(self.code, lexer, formatter)
                 css = formatter.get_style_defs('.highlight')
                 self.code_browser.setHtml(f"<style>{css}</style>{highlighted}")
-            except:
+            except Exception:
                 self.code_browser.setPlainText(self.code)
         else:
             self.code_browser.setPlainText(self.code)
@@ -645,7 +643,7 @@ class MessageWidget(QFrame):
                 time_label = QLabel(time_str)
                 time_label.setStyleSheet("color: #888; font-size: 11px;")
                 header.addWidget(time_label)
-            except:
+            except Exception:
                 pass
 
         # Pin indicator

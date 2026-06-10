@@ -95,7 +95,8 @@ class WordEmbedWidget(QWidget):
         # If Word is already embedded, close it first and create fresh instance
         # This is more reliable than trying to add a document to an embedded instance
         if self.word_hwnd:
-            self.close_word(save=False)
+            self.close_word(save=False, on_closed=lambda: self._launch_word(None))
+            return True
 
         return self._launch_word(None)
 
@@ -110,9 +111,15 @@ class WordEmbedWidget(QWidget):
         # If Word is already embedded, close it first and relaunch with the new document
         # This is more reliable than trying to open a new document in an embedded instance
         if self.word_hwnd:
-            self.close_word(save=False)
+            self.close_word(save=False, on_closed=lambda: self._launch_word(file_path))
+            return True
 
         return self._launch_word(file_path)
+
+    # Non-blocking connect-to-Word retry chain (was time.sleep on the UI thread)
+    CONNECT_INITIAL_DELAY_MS = 2000  # Protected View dialogs need the long first wait
+    CONNECT_RETRY_DELAY_MS = 500
+    CONNECT_MAX_RETRIES = 5
 
     def _launch_word(self, file_path=None):
         """Launch Word and embed it."""
@@ -127,7 +134,7 @@ class WordEmbedWidget(QWidget):
             # Reinitialize COM for fresh state
             try:
                 pythoncom.CoUninitialize()
-            except:
+            except Exception:
                 pass
             pythoncom.CoInitialize()
             self._com_initialized = True
@@ -139,63 +146,70 @@ class WordEmbedWidget(QWidget):
                 # Use os.startfile to open the document (like double-clicking)
                 os.startfile(file_path)
 
-                # Wait for Word to start and open the file
-                # Give extra time for Protected View dialogs
-                time.sleep(2.0)
-                QApplication.processEvents()
-
-                # Now connect to the running Word instance with retries
-                max_retries = 5
-                for attempt in range(max_retries):
-                    try:
-                        self.word_app = win32com.client.GetActiveObject("Word.Application")
-                        if self.word_app.Documents.Count > 0:
-                            self.word_doc = self.word_app.ActiveDocument
-                            break
-                        else:
-                            raise Exception("No document found")
-                    except Exception as e:
-                        print(f"Attempt {attempt + 1}: GetActiveObject failed: {e}")
-                        if attempt < max_retries - 1:
-                            time.sleep(0.5)
-                            QApplication.processEvents()
-                        else:
-                            # Last resort: try Dispatch
-                            try:
-                                self.word_app = win32com.client.Dispatch("Word.Application")
-                                if self.word_app.Documents.Count > 0:
-                                    self.word_doc = self.word_app.ActiveDocument
-                                else:
-                                    raise Exception("No document found after opening")
-                            except Exception as e2:
-                                raise Exception(f"Could not connect to Word: {e2}")
-
-                self.word_app.Visible = True
+                # Wait for Word to start and open the file without blocking the
+                # UI thread, then connect with retries
+                self._connect_attempt = 0
+                QTimer.singleShot(self.CONNECT_INITIAL_DELAY_MS, self._try_connect_word)
             else:
                 # For new documents, create via COM
                 self.word_app = win32com.client.DispatchEx("Word.Application")
                 self.word_app.Visible = True
                 self.word_doc = self.word_app.Documents.Add()
-
-            # Get the window handle directly from Word COM object
-            # This ensures we get the correct window even if other Word instances exist
-            try:
-                self.word_hwnd = self.word_app.ActiveWindow.Hwnd
-                _, self.word_pid = win32process.GetWindowThreadProcessId(self.word_hwnd)
-                print(f"Word launched: hwnd={self.word_hwnd}, pid={self.word_pid}")
-            except Exception as e:
-                print(f"Could not get Word hwnd from COM: {e}")
-                self.word_hwnd = 0
-                self.word_pid = 0
-
-            # Give Word time to fully initialize before embedding
-            self.embed_timer.start(800)
+                self._finish_launch()
             return True
 
         except Exception as e:
-            self.placeholder.setText(f"Failed to start Word: {e}")
-            QMessageBox.warning(self, "Word Error", f"Could not start Microsoft Word:\n{e}")
+            self._on_launch_failed(e)
             return False
+
+    def _try_connect_word(self):
+        """Attach to the Word instance opened via os.startfile, retrying on a timer."""
+        try:
+            self.word_app = win32com.client.GetActiveObject("Word.Application")
+            if self.word_app.Documents.Count > 0:
+                self.word_doc = self.word_app.ActiveDocument
+            else:
+                raise Exception("No document found")
+        except Exception as e:
+            print(f"Attempt {self._connect_attempt + 1}: GetActiveObject failed: {e}")
+            self._connect_attempt += 1
+            if self._connect_attempt < self.CONNECT_MAX_RETRIES:
+                QTimer.singleShot(self.CONNECT_RETRY_DELAY_MS, self._try_connect_word)
+                return
+            # Last resort: try Dispatch
+            try:
+                self.word_app = win32com.client.Dispatch("Word.Application")
+                if self.word_app.Documents.Count > 0:
+                    self.word_doc = self.word_app.ActiveDocument
+                else:
+                    raise Exception("No document found after opening")
+            except Exception as e2:
+                self._on_launch_failed(Exception(f"Could not connect to Word: {e2}"))
+                return
+
+        self.word_app.Visible = True
+        self._finish_launch()
+
+    def _finish_launch(self):
+        """Grab the Word window handle and schedule embedding."""
+        # Get the window handle directly from Word COM object
+        # This ensures we get the correct window even if other Word instances exist
+        try:
+            self.word_hwnd = self.word_app.ActiveWindow.Hwnd
+            _, self.word_pid = win32process.GetWindowThreadProcessId(self.word_hwnd)
+            print(f"Word launched: hwnd={self.word_hwnd}, pid={self.word_pid}")
+        except Exception as e:
+            print(f"Could not get Word hwnd from COM: {e}")
+            self.word_hwnd = 0
+            self.word_pid = 0
+
+        # Give Word time to fully initialize before embedding
+        self.embed_timer.start(800)
+
+    def _on_launch_failed(self, error):
+        """Show launch failure to the user."""
+        self.placeholder.setText(f"Failed to start Word: {error}")
+        QMessageBox.warning(self, "Word Error", f"Could not start Microsoft Word:\n{error}")
 
     def _do_embed(self):
         """Find and embed the Word window."""
@@ -277,7 +291,7 @@ class WordEmbedWidget(QWidget):
             class_name = win32gui.GetClassName(current)
             if class_name == "OpusApp":
                 return current
-        except:
+        except Exception:
             pass
 
         # If we couldn't find OpusApp, search for it by PID
@@ -405,12 +419,22 @@ class WordEmbedWidget(QWidget):
             try:
                 if self.word_doc.Path:
                     return self.word_doc.FullName
-            except:
+            except Exception:
                 pass
         return None
 
-    def close_word(self, save=True):
-        """Close Word and restore the window."""
+    # Grace periods when closing the embedded Word instance
+    CLOSE_GRACE_MS = 300   # time for Word to honor WM_CLOSE before force-destroy
+    CLOSE_SETTLE_MS = 500  # time for the process to fully exit before relaunch
+
+    def close_word(self, save=True, on_closed=None, wait=False):
+        """Close Word and restore the window.
+
+        Cleanup completes asynchronously via QTimer so the UI thread never
+        blocks; pass on_closed to run code once Word is fully gone. wait=True
+        forces the old synchronous behavior (only for app shutdown, where
+        pending QTimers would never fire).
+        """
         self.check_timer.stop()
         self.embed_timer.stop()
         self.resize_timer.stop()
@@ -431,22 +455,16 @@ class WordEmbedWidget(QWidget):
         self.word_doc = None
         self.word_app = None
 
-        # Force close the Word window
-        if self.word_hwnd:
-            try:
-                if win32gui.IsWindow(self.word_hwnd):
-                    # Send close message
-                    win32gui.PostMessage(self.word_hwnd, win32con.WM_CLOSE, 0, 0)
-                    time.sleep(0.3)
+        hwnd = self.word_hwnd
+        pid = self.word_pid
 
-                    # If still exists, force destroy
-                    if win32gui.IsWindow(self.word_hwnd):
-                        win32gui.DestroyWindow(self.word_hwnd)
+        # Ask the Word window to close, then force-destroy after a grace period
+        if hwnd:
+            try:
+                if win32gui.IsWindow(hwnd):
+                    win32gui.PostMessage(hwnd, win32con.WM_CLOSE, 0, 0)
             except Exception as e:
                 print(f"Error closing window: {e}")
-
-        # Kill only our specific Word process as a last resort
-        self._kill_word_process()
 
         self.word_hwnd = 0
         self.word_pid = 0
@@ -454,29 +472,47 @@ class WordEmbedWidget(QWidget):
         self.original_parent = 0
         self._com_initialized = False  # Reset so we reinitialize COM
 
-        # Wait for Word to fully close
-        time.sleep(0.5)
-        QApplication.processEvents()
-
-        self.placeholder.setText("Click 'New Document' or 'Open Document' to start Word")
+        if on_closed is None:
+            self.placeholder.setText("Click 'New Document' or 'Open Document' to start Word")
+        else:
+            self.placeholder.setText("Restarting Microsoft Word...")
         self.placeholder.show()
 
-    def _kill_word_process(self):
+        def _finalize():
+            try:
+                if hwnd and win32gui.IsWindow(hwnd):
+                    win32gui.DestroyWindow(hwnd)
+            except Exception as e:
+                print(f"Error closing window: {e}")
+            # Kill only our specific Word process as a last resort
+            self._kill_word_process(pid)
+            if on_closed:
+                QTimer.singleShot(self.CLOSE_SETTLE_MS, on_closed)
+
+        if wait:
+            # Shutdown path: block briefly so Word is gone before the app exits
+            time.sleep(self.CLOSE_GRACE_MS / 1000.0)
+            _finalize()
+        else:
+            QTimer.singleShot(self.CLOSE_GRACE_MS, _finalize)
+
+    def _kill_word_process(self, pid=None):
         """Kill only the specific Word process that iCharlotte created."""
-        if not self.word_pid:
+        pid = pid if pid is not None else self.word_pid
+        if not pid:
             return
 
         import subprocess
         try:
             # Use taskkill to kill only the specific Word process by PID
             result = subprocess.run(
-                ['taskkill', '/F', '/PID', str(self.word_pid)],
+                ['taskkill', '/F', '/PID', str(pid)],
                 capture_output=True,
                 timeout=5
             )
-            print(f"Killed Word process PID {self.word_pid}: {result.returncode}")
+            print(f"Killed Word process PID {pid}: {result.returncode}")
         except Exception as e:
-            print(f"Error killing Word process {self.word_pid}: {e}")
+            print(f"Error killing Word process {pid}: {e}")
 
 
 class WordTab(QWidget):
@@ -710,8 +746,8 @@ class WordTab(QWidget):
                 with open(config_path, 'r') as f:
                     self.recent_files = json.load(f)
                 self._update_recent_list()
-            except:
-                pass
+            except Exception as e:
+                print(f"Failed to load Word recent files {config_path}: {e}")
 
     def _save_recent_files(self):
         """Save recent files to settings."""
@@ -721,8 +757,8 @@ class WordTab(QWidget):
         try:
             with open(config_path, 'w') as f:
                 json.dump(self.recent_files, f)
-        except:
-            pass
+        except Exception as e:
+            print(f"Failed to save Word recent files {config_path}: {e}")
 
     def reset_state(self):
         """Reset state when switching cases."""
@@ -731,5 +767,6 @@ class WordTab(QWidget):
 
     def closeEvent(self, event):
         """Handle tab close - ensure Word is properly closed."""
-        self.word_widget.close_word(save=False)
+        # wait=True: QTimer-based cleanup would never fire once the app exits
+        self.word_widget.close_word(save=False, wait=True)
         super().closeEvent(event)

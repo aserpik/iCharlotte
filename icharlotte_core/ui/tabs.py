@@ -123,7 +123,7 @@ class OCRRunner(QThread):
                         try:
                             val = int(line.replace("PROGRESS: ", ""))
                             self.progress.emit(val)
-                        except: pass
+                        except Exception: pass
                     elif line.startswith("FINAL_PATH: "):
                         final_path = line.replace("FINAL_PATH: ", "").strip()
 
@@ -720,7 +720,6 @@ class ChatTab(QWidget):
     def add_to_library(self):
         lib = self._library()
         if lib is None:
-            from PySide6.QtWidgets import QMessageBox
             QMessageBox.information(self, "No Case Loaded",
                                     "Load a case before adding to its library.")
             return
@@ -809,7 +808,6 @@ class ChatTab(QWidget):
         if lib is None:
             return
         if confirm:
-            from PySide6.QtWidgets import QMessageBox
             reply = QMessageBox.question(
                 self, "Remove from library",
                 "Remove this document from the library? The saved text will be deleted.",
@@ -1039,7 +1037,6 @@ class ChatTab(QWidget):
         self.conv_sidebar.set_current_conversation(conv_id)
 
         if self.current_conversation:
-            print(f"[DEBUG] Loading conversation with {len(self.current_conversation.messages)} messages")
             # Restore settings
             self.provider_combo.setCurrentText(self.current_conversation.provider)
             # Model will be set after provider change triggers model fetch
@@ -1372,7 +1369,7 @@ class ChatTab(QWidget):
                         item.setIcon(pixmap)
                     else:
                         item.setIcon(self.icon_provider.icon(QFileInfo(final_path)))
-                except:
+                except Exception:
                     item.setIcon(self.icon_provider.icon(QFileInfo(final_path)))
             else:
                 item.setIcon(self.icon_provider.icon(QFileInfo(final_path)))
@@ -1522,7 +1519,7 @@ class ChatTab(QWidget):
                         item.setIcon(pixmap)
                     else:
                         item.setIcon(self.icon_provider.icon(QFileInfo(final_path)))
-                except:
+                except Exception:
                     item.setIcon(self.icon_provider.icon(QFileInfo(final_path)))
             else:
                 item.setIcon(self.icon_provider.icon(QFileInfo(final_path)))
@@ -1895,7 +1892,6 @@ class ChatTab(QWidget):
         file_content = self.read_files_content() + self.read_library_content()
         warn = self._library_budget_warning(file_content, history_tokens=0)
         if warn:
-            from PySide6.QtWidgets import QMessageBox
             reply = QMessageBox.warning(
                 self, "Context Budget", warn,
                 QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,

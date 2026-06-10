@@ -18,14 +18,9 @@ from datetime import datetime
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Mock PySide6 before importing the module
-sys.modules['PySide6'] = type(sys)('PySide6')
-sys.modules['PySide6.QtWidgets'] = type(sys)('PySide6.QtWidgets')
-sys.modules['PySide6.QtCore'] = type(sys)('PySide6.QtCore')
-sys.modules['PySide6.QtGui'] = type(sys)('PySide6.QtGui')
-
-# Now we can test the database components by importing them directly
-# but we need to patch them to avoid the Qt imports
+# NOTE: This module deliberately does NOT import the real UI classes (and
+# must not stub PySide6 in sys.modules — that poisons every test collected
+# after this one). It tests local re-implementations of the DB components.
 
 # Create minimal test implementations
 class ProcessingLogDB:

@@ -149,11 +149,12 @@ class TestMasterCaseTabSafety(unittest.TestCase):
             mock_db.return_value.get_all_cases.return_value = []
 
             tab = MasterCaseTab()
-            # Simulate click on empty cell
+            # Simulate double-click on empty cell (on_cell_clicked was
+            # renamed to on_case_double_clicked)
             try:
-                tab.on_cell_clicked(0, 0)
+                tab.on_case_double_clicked(0, 0)
             except AttributeError:
-                self.fail("on_cell_clicked crashed on null item")
+                self.fail("on_case_double_clicked crashed on null item")
             finally:
                 tab.deleteLater()
 
@@ -349,14 +350,22 @@ class TestChatTabSafety(unittest.TestCase):
 
     def test_send_message_without_conversation(self):
         """Test sending message when no conversation exists."""
+        from unittest.mock import patch
+        from PySide6.QtWidgets import QMessageBox
         from icharlotte_core.ui.tabs import ChatTab
 
         tab = ChatTab()
         tab.chat_input.setPlainText("Test message")
 
         try:
-            # This should handle no conversation gracefully
-            tab.send_message()
+            # This should handle no conversation gracefully. send_message
+            # shows a modal "No Case Loaded" warning in this state — patch it
+            # out (answering No) so the test stays headless.
+            with patch.object(
+                QMessageBox, "warning",
+                return_value=QMessageBox.StandardButton.No,
+            ):
+                tab.send_message()
         except (AttributeError, TypeError):
             self.fail("send_message crashed without conversation")
         finally:

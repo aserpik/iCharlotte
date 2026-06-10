@@ -198,7 +198,8 @@ class QuickOpenDialog(QDialog):
             try:
                 with open(self.recent_file, 'r') as f:
                     return json.load(f)
-            except:
+            except Exception as e:
+                log_event(f"Failed to load recent cases {self.recent_file}: {e}", "error")
                 return []
         return []
 
@@ -216,8 +217,8 @@ class QuickOpenDialog(QDialog):
         try:
             with open(self.recent_file, 'w') as f:
                 json.dump(self.recent_cases, f)
-        except:
-            pass
+        except Exception as e:
+            log_event(f"Failed to save recent cases {self.recent_file}: {e}", "error")
 
     def _resolve_to_file_number(self, text):
         """Resolve user input to a file number.
@@ -352,7 +353,7 @@ class DirectoryTreeWorker(QThread):
                         size = stat.st_size
                         mtime = stat.st_mtime
                         file_data.append((f, size, mtime))
-                    except:
+                    except Exception:
                         file_data.append((f, 0, 0))
 
                 _total_dirs += len(dirs)
@@ -471,6 +472,7 @@ class MainWindow(QMainWindow):
         from icharlotte_core.ui.wizard.mode_controller import ModeController
         self.mode_controller = ModeController(parent=self)
         self.setup_ui()
+        self._restore_window_state()
 
         # Apply current mode and react to future mode changes.
         self.mode_controller.mode_changed.connect(self._apply_mode_visibility)
@@ -993,6 +995,7 @@ class MainWindow(QMainWindow):
         # Settings button with dropdown menu
         self.settings_btn = QToolButton()
         self.settings_btn.setText("Settings ▾")
+        self.settings_btn.setToolTip("Application settings")
         self.settings_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.settings_btn.setStyleSheet(secondary_btn_style.replace("QPushButton", "QToolButton") + """
             QToolButton::menu-indicator { image: none; }
@@ -1012,6 +1015,7 @@ class MainWindow(QMainWindow):
         self.restart_btn.setStyleSheet(primary_btn_style.format(
             bg="#d32f2f", hover="#c62828", pressed="#b71c1c"
         ))
+        self.restart_btn.setToolTip("Restart iCharlotte (open work is saved first)")
         self.restart_btn.clicked.connect(self.restart_app)
         self.corner_layout.addWidget(self.restart_btn)
 
@@ -1752,8 +1756,8 @@ class MainWindow(QMainWindow):
         if not os.path.exists(config_dir):
             try:
                 os.makedirs(config_dir)
-            except:
-                pass
+            except Exception as e:
+                log_event(f"Failed to create config dir {config_dir}: {e}", "error")
             
         settings_path = os.path.join(config_dir, "view_settings.json")
         settings = {}
@@ -1775,11 +1779,16 @@ class MainWindow(QMainWindow):
             self._persist_session_state()
         except Exception as e:
             log_event(f"[wizard] restart persist failed: {e}", "error")
+        # QApplication.quit() does not dispatch closeEvent, so save here too
+        try:
+            self._save_window_state()
+        except Exception as e:
+            log_event(f"Error saving window state on restart: {e}", "error")
         # Close all agent runners if any are running
         for runner in self.agent_runners:
             try:
                 runner.terminate()
-            except:
+            except Exception:
                 pass
 
         # Get the absolute path to this script
@@ -2653,7 +2662,7 @@ class MainWindow(QMainWindow):
                         # Cleanup temp file
                         try:
                             os.remove(json_path)
-                        except:
+                        except Exception:
                             pass
                         
                     except Exception as e:
@@ -3001,6 +3010,26 @@ class MainWindow(QMainWindow):
         settings = QSettings("iCharlotte", "iCharlotte")
         return settings.value("preview_pane_width", type=int)
 
+    def _restore_window_state(self):
+        """Restore window geometry and splitter layout from the previous session."""
+        settings = QSettings("iCharlotte", "iCharlotte")
+        geometry = settings.value("main_window_geometry")
+        if geometry is not None:
+            self.restoreGeometry(geometry)
+        sizes = settings.value("main_splitter_sizes")
+        if isinstance(sizes, (list, tuple)) and sizes:
+            try:
+                self.main_splitter.setSizes([int(s) for s in sizes])
+            except (TypeError, ValueError):
+                pass
+
+    def _save_window_state(self):
+        """Persist window geometry and splitter layout for the next session."""
+        settings = QSettings("iCharlotte", "iCharlotte")
+        settings.setValue("main_window_geometry", self.saveGeometry())
+        if hasattr(self, "main_splitter"):
+            settings.setValue("main_splitter_sizes", self.main_splitter.sizes())
+
     def apply_advanced_filters(self, filters):
         """Apply advanced filters to the file tree."""
         iterator = QTreeWidgetItemIterator(self.tree)
@@ -3094,7 +3123,7 @@ class MainWindow(QMainWindow):
                         to_dt = datetime.strptime(date_to, "%Y-%m-%d")
                         if file_date > to_dt:
                             return False
-            except:
+            except Exception:
                 pass
 
         # Tag filter
@@ -3427,6 +3456,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         self._persist_session_state()
+        self._save_window_state()
         # Clean up global hotkeys
         if KEYBOARD_AVAILABLE:
             try:
@@ -3660,7 +3690,7 @@ class MainWindow(QMainWindow):
                         successful.add("CHR")
 
             return ", ".join(sorted(successful)) if successful else ""
-        except:
+        except Exception:
             return ""
 
     def _get_file_tags(self, file_path):
@@ -3675,7 +3705,7 @@ class MainWindow(QMainWindow):
 
             tags = self._cached_tags_db.get_tags(file_path)
             return ", ".join(tags) if tags else ""
-        except:
+        except Exception:
             return ""
 
     def _schedule_tree_refresh(self):

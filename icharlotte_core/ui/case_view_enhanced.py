@@ -50,7 +50,8 @@ class ProcessingLogDB:
             try:
                 with open(self.log_path, 'r', encoding='utf-8') as f:
                     return json.load(f)
-            except:
+            except Exception as e:
+                log_event(f"Failed to load processing log {self.log_path}: {e}", "error")
                 return []
         return []
 
@@ -106,7 +107,8 @@ class FileTagsDB:
             try:
                 with open(self.tags_path, 'r', encoding='utf-8') as f:
                     return json.load(f)
-            except:
+            except Exception as e:
+                log_event(f"Failed to load file tags {self.tags_path}: {e}", "error")
                 return {}
         return {}
 
@@ -190,7 +192,8 @@ class AgentSettingsDB:
                         else:
                             merged[key] = val
                     return merged
-            except:
+            except Exception as e:
+                log_event(f"Failed to load agent settings {self.settings_path}: {e}", "error")
                 return dict(self.DEFAULT_SETTINGS)
         return dict(self.DEFAULT_SETTINGS)
 
@@ -353,6 +356,8 @@ class EnhancedAgentButton(QFrame):
         """)
         self.settings_btn.setFixedSize(20, 20)
         self.settings_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.settings_btn.setToolTip("Agent settings")
+        self.settings_btn.setAccessibleName("Agent settings")
         self.settings_btn.clicked.connect(self.settings_clicked.emit)
         layout.addWidget(self.settings_btn)
 
@@ -407,7 +412,7 @@ class EnhancedAgentButton(QFrame):
                 self.status_label.setText("Last: Yesterday")
             else:
                 self.status_label.setText(f"Last: {days_ago} days ago")
-        except:
+        except Exception:
             self.status_label.setText(f"Last: {last_run_date}")
 
 
@@ -786,6 +791,8 @@ class FilePreviewWidget(QFrame):
         self.close_btn = QPushButton("×")
         self.close_btn.setFixedSize(24, 24)
         self.close_btn.setStyleSheet("font-weight: bold;")
+        self.close_btn.setToolTip("Close preview")
+        self.close_btn.setAccessibleName("Close preview")
         self.close_btn.clicked.connect(self.hide)
         header_layout.addWidget(self.close_btn)
 
@@ -807,6 +814,7 @@ class FilePreviewWidget(QFrame):
         self.prev_btn.clicked.connect(self._prev_page)
         self.prev_btn.setEnabled(False)
         self.prev_btn.setToolTip("Previous page (Left/Up/PageUp)")
+        self.prev_btn.setAccessibleName("Previous page")
         nav_layout.addWidget(self.prev_btn)
 
         self.page_label = QLabel("Page 1 / 1")
@@ -820,6 +828,7 @@ class FilePreviewWidget(QFrame):
         self.next_btn.clicked.connect(self._next_page)
         self.next_btn.setEnabled(False)
         self.next_btn.setToolTip("Next page (Right/Down/PageDown/Space)")
+        self.next_btn.setAccessibleName("Next page")
         nav_layout.addWidget(self.next_btn)
 
         nav_layout.addStretch()
@@ -876,7 +885,7 @@ class FilePreviewWidget(QFrame):
             size_str = f"{size / 1024:.1f} KB" if size < 1024 * 1024 else f"{size / (1024 * 1024):.1f} MB"
             mtime = datetime.datetime.fromtimestamp(stat.st_mtime).strftime("%m/%d/%Y %H:%M")
             self.info_label.setText(f"Size: {size_str} | Modified: {mtime}")
-        except:
+        except Exception:
             self.info_label.setText("")
 
         ext = os.path.splitext(file_path)[1].lower()
@@ -1021,7 +1030,7 @@ class FilePreviewWidget(QFrame):
         if self._pdf_doc:
             try:
                 self._pdf_doc.close()
-            except:
+            except Exception:
                 pass
             self._pdf_doc = None
         self._pdf_current_page = 0
@@ -1148,7 +1157,7 @@ class FilePreviewWidget(QFrame):
             page_count = self._get_pdf_page_count(file_path)
             if page_count:
                 info_text += f"Pages: {page_count}\n"
-        except:
+        except Exception:
             pass
 
         self.text_preview.setPlainText(info_text)
@@ -1315,7 +1324,7 @@ class FilePreviewWidget(QFrame):
             # Simple regex to find page count in PDF
             matches = re.findall(rb'/Type\s*/Page[^s]', content)
             return len(matches) if matches else None
-        except:
+        except Exception:
             return None
 
     def _open_file(self):
@@ -1728,7 +1737,7 @@ class OutputBrowserWidget(QDialog):
                 with open(path, "rb") as docx_file:
                     result = mammoth.extract_raw_text(docx_file)
                     return result.value
-            except:
+            except Exception:
                 return None
 
         # Handle PDF files using pypdf
@@ -1780,7 +1789,7 @@ class OutputBrowserWidget(QDialog):
                 return raw[3:].decode('utf-8', errors='replace')
             else:
                 return raw.decode('utf-8', errors='replace')
-        except:
+        except Exception:
             return None
 
     def _do_compare(self):
@@ -1827,8 +1836,8 @@ class OutputBrowserWidget(QDialog):
                     item = QListWidgetItem(f"{output['name']}: {context}")
                     item.setData(Qt.ItemDataRole.UserRole, output["path"])
                     self.search_results.addItem(item)
-            except:
-                pass
+            except Exception as e:
+                log_event(f"Failed to search output {output.get('path')}: {e}", "error")
 
     def _open_search_result(self, item):
         path = item.data(Qt.ItemDataRole.UserRole)
@@ -1879,8 +1888,8 @@ class OutputBrowserWidget(QDialog):
                     combined += f"## {output['name']}\n\n"
                     combined += content
                     combined += "\n\n---\n\n"
-                except:
-                    pass
+                except Exception as e:
+                    log_event(f"Failed to include output {output.get('path')} in export: {e}", "error")
 
         # Save
         try:

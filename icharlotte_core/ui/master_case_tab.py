@@ -309,7 +309,7 @@ class TodoItemWidget(QWidget):
                 # Expecting YYYY-MM-DD, convert to MM/DD/YY
                 dt = datetime.datetime.strptime(created_date, "%Y-%m-%d")
                 fmt_date = dt.strftime("[%m/%d/%y]")
-            except:
+            except Exception:
                 fmt_date = f"[{created_date}]"
             
             date_lbl = QLabel(fmt_date)
@@ -346,7 +346,7 @@ class TodoItemWidget(QWidget):
         order = ['yellow', 'green', 'red', 'blue']
         try:
             idx = order.index(self.current_color)
-        except:
+        except Exception:
             idx = 0
         new_color = order[(idx + 1) % len(order)]
         self.current_color = new_color
@@ -365,7 +365,7 @@ class TodoItemWidget(QWidget):
             
         try:
             idx = options.index(self.current_assigned)
-        except:
+        except Exception:
             idx = 0
         
         new_assigned = options[(idx + 1) % len(options)]
@@ -693,7 +693,8 @@ class MasterCaseTab(QWidget):
 
                         with open(json_path, 'w', encoding='utf-8') as f:
                             json.dump(vars_data, f, indent=4)
-                    except: pass
+                    except Exception as e:
+                        log_event(f"Failed to clear hearing data in {json_path}: {e}", "error")
                 
                 # Clear DB
                 self.db.update_hearing_date(file_number, "")
@@ -872,8 +873,8 @@ class MasterCaseTab(QWidget):
                 try:
                     with open(json_path, 'r', encoding='utf-8') as f:
                         vars_data = json.load(f)
-                except:
-                    pass
+                except Exception as e:
+                    log_event(f"Failed to load case variables {json_path}: {e}", "error")
 
             # Helper to extract value from potentially nested dict
             def get_val(key):
@@ -1008,7 +1009,7 @@ class MasterCaseTab(QWidget):
                             item_date.setBackground(QColor("#ffcdd2"))
                         elif days_to < 180: # < 6 months
                             item_date.setBackground(QColor("#fff9c4"))
-                except:
+                except Exception:
                     pass
 
             # --- Last Report (Column 5) ---
@@ -1035,7 +1036,7 @@ class MasterCaseTab(QWidget):
                          if len(parts) == 3:
                              disp_report = f"{parts[1]}/{parts[2]}/{parts[0]}" # mm/dd/yyyy
                          sort_report = last_report_date
-                 except:
+                 except Exception:
                      pass
             else:
                  sort_report = "0000-00-00"
@@ -1234,7 +1235,7 @@ class MasterCaseTab(QWidget):
                     parts = date_str.split("-")
                     if len(parts) == 3:
                         date_str = f"{parts[1]}/{parts[2]}/{parts[0][2:]}"
-                except: pass
+                except Exception: pass
                 
             label = f"{date_str} [{h['type']}] {h['notes']}"
             item = QListWidgetItem(label)
@@ -1277,7 +1278,7 @@ class MasterCaseTab(QWidget):
                     if len(parts) == 3:
                         # YYYY-MM-DD -> MM/DD/YY
                         display_date = f"{parts[1]}/{parts[2]}/{parts[0][2:]}"
-                except: pass
+                except Exception: pass
 
             new_text, ok = QInputDialog.getText(self, "Edit Date", "Date (MM/DD/YY):", text=display_date)
 
@@ -1292,7 +1293,7 @@ class MasterCaseTab(QWidget):
                             m, d, y = parts
                             if len(y) == 2: y = "20" + y
                             db_date = f"{y}-{m.zfill(2)}-{d.zfill(2)}"
-                except:
+                except Exception:
                     pass
 
                 self.db.update_history_date(hist_id, db_date)
@@ -1339,7 +1340,7 @@ class MasterCaseTab(QWidget):
                     return True
 
                 win32gui.EnumWindows(bring_outlook_to_front, None)
-            except:
+            except Exception:
                 pass  # Fallback if win32gui approach fails
 
         except Exception as e:
@@ -1414,8 +1415,8 @@ class MasterCaseTab(QWidget):
                         summary = fb['value']
                     elif isinstance(fb, str):
                         summary = fb
-                except:
-                    pass
+                except Exception as e:
+                    log_event(f"Failed to read factual_background from {json_path}: {e}", "error")
         
         self.summary_edit.blockSignals(True)
         self.summary_edit.setPlainText(summary or "")
@@ -1677,7 +1678,8 @@ class MasterCaseTab(QWidget):
                             current_val = v["value"]
                         elif isinstance(v, str):
                             current_val = v
-                except: pass
+                except Exception as e:
+                    log_event(f"Failed to read hearing data from {json_path}: {e}", "error")
 
             # If no other_hearings found in JSON, fall back to DB 'next_hearing_date'
             if not current_val:
@@ -1736,7 +1738,7 @@ class MasterCaseTab(QWidget):
                     parts = current_text.split('/')
                     if len(parts) == 3:
                         current_date = QDate(int(parts[2]), int(parts[0]), int(parts[1]))
-                except: pass
+                except Exception: pass
 
             dialog = CalendarDialog(self, current_date)
             if dialog.exec() == QDialog.DialogCode.Accepted:

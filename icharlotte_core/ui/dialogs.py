@@ -65,7 +65,8 @@ class FileNumberDialog(QDialog):
             try:
                 with open(self.recent_file, 'r') as f:
                     return json.load(f)
-            except:
+            except Exception as e:
+                log_event(f"Failed to load recent cases {self.recent_file}: {e}", "error")
                 return []
         return []
 
@@ -158,8 +159,8 @@ class VariablesDialog(QDialog):
         if not os.path.exists(self.settings_dir):
             try:
                 os.makedirs(self.settings_dir, exist_ok=True)
-            except:
-                pass
+            except Exception as e:
+                log_event(f"Failed to create settings dir {self.settings_dir}: {e}", "error")
             
         try:
             state = self.table.horizontalHeader().saveState().toHex().data().decode()
@@ -2663,7 +2664,7 @@ Provide the improved prompt:"""
             try:
                 dt = datetime.fromisoformat(v.created)
                 date_str = dt.strftime("%Y-%m-%d %H:%M")
-            except:
+            except Exception:
                 date_str = v.created[:16] if len(v.created) > 16 else v.created
             self.version_table.setItem(row, 1, QTableWidgetItem(date_str))
 
@@ -2785,7 +2786,7 @@ Provide the improved prompt:"""
             try:
                 dt = datetime.fromisoformat(v.created)
                 date_str = dt.strftime("%Y-%m-%d %H:%M")
-            except:
+            except Exception:
                 date_str = v.created[:16] if len(v.created) > 16 else v.created
             self.metrics_table.setItem(row, 1, QTableWidgetItem(date_str))
 
@@ -3336,8 +3337,13 @@ class LLMSettingsWidget(QWidget):
             if os.path.exists(CONFIG_FILE):
                 try:
                     os.remove(CONFIG_FILE)
-                except:
-                    pass
+                except Exception as e:
+                    log_event(f"Failed to remove LLM config {CONFIG_FILE}: {e}", "error")
+                    QMessageBox.warning(
+                        self, "Reset Failed",
+                        f"Could not remove the configuration file, so defaults were not restored:\n{e}"
+                    )
+                    return
 
             # Reset singleton
             LLMConfig._instance = None
