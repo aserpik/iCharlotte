@@ -9,6 +9,7 @@ A deterministic ``outline_from_config`` seeds an editable section outline from
 the motion type's section plan.
 """
 import json
+import re
 from typing import Any, Callable, Dict, List
 
 from icharlotte_core.opposition.models import MotionMetadata, OutlineNode
@@ -26,6 +27,21 @@ from .prompts import DEFAULT_ANALYZE_TEMPLATE, MOTION_OUTLINE_PROMPT
 
 # llm_callback(system_prompt, user_prompt) -> raw string response
 LLMCallback = Callable[[str, str], str]
+
+REQUIRED_MOTION_SPINE = [
+    "Introduction",
+    "Statement of Facts",
+    "Argument",
+    "Conclusion",
+]
+
+_MIN_ARGUMENT_SUBHEADINGS = 3
+_MAX_ARGUMENT_SUBHEADINGS = 4
+_ARGUMENT_FALLBACKS = [
+    "The Governing Law Supports the Requested Relief",
+    "The Facts Establish the Basis for Relief",
+    "The Court Should Grant the Requested Relief",
+]
 
 
 def _loads_json_safe(text: str) -> Dict[str, Any]:
@@ -48,6 +64,59 @@ def _loads_json_safe(text: str) -> Dict[str, Any]:
         except (json.JSONDecodeError, TypeError):
             return {}
     return {}
+
+
+def _heading_key(text: str) -> str:
+    text = re.sub(r"^\s*(?:[A-Z]\.|[IVXLC]+\.)\s*", "", text or "", flags=re.I)
+    text = re.sub(r"[^a-z0-9]+", " ", text.lower())
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _dedupe_texts(values: List[str]) -> List[str]:
+    out: List[str] = []
+    seen: set[str] = set()
+    for value in values:
+        text = re.sub(r"\s+", " ", (value or "").replace("\x00", " ")).strip()
+        if not text:
+            continue
+        key = _heading_key(text)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(text)
+    return out
+
+
+def _argument_subheadings(raw_nodes: List[OutlineNode], metadata: MotionMetadata) -> List[OutlineNode]:
+    candidates: List[str] = []
+    for node in raw_nodes or []:
+        if _heading_key(node.text) == "argument":
+            candidates.extend(child.text for child in node.children)
+    candidates.extend(getattr(metadata, "principal_arguments", None) or [])
+    candidates.extend(_ARGUMENT_FALLBACKS)
+
+    selected = _dedupe_texts(candidates)[:_MAX_ARGUMENT_SUBHEADINGS]
+    if not selected and getattr(metadata, "principal_arguments", None):
+        selected = _dedupe_texts(list(metadata.principal_arguments))[:_MAX_ARGUMENT_SUBHEADINGS]
+    if len(selected) < _MIN_ARGUMENT_SUBHEADINGS and selected:
+        for fallback in _ARGUMENT_FALLBACKS:
+            if len(selected) >= _MIN_ARGUMENT_SUBHEADINGS:
+                break
+            if _heading_key(fallback) not in {_heading_key(s) for s in selected}:
+                selected.append(fallback)
+    return [OutlineNode(text=text, selected=True) for text in selected[:_MAX_ARGUMENT_SUBHEADINGS]]
+
+
+def _canonical_motion_outline(raw_nodes: List[OutlineNode], metadata: MotionMetadata) -> List[OutlineNode]:
+    """Coerce any LLM outline into the required Generate Motion spine."""
+    argument_children = _argument_subheadings(raw_nodes, metadata)
+    nodes = [
+        OutlineNode(text="Introduction", selected=True),
+        OutlineNode(text="Statement of Facts", selected=True),
+        OutlineNode(text="Argument", selected=True, children=argument_children),
+        OutlineNode(text="Conclusion", selected=True),
+    ]
+    return normalize_outline(nodes)
 
 
 def _build_user_prompt(
@@ -96,7 +165,7 @@ def analyze_target(
 
 def outline_from_config(config: MotionTypeConfig) -> List[OutlineNode]:
     """Seed an editable section outline from the motion type's section plan."""
-    nodes = [OutlineNode(text=heading, selected=True) for heading in config.section_plan]
+    nodes = [OutlineNode(text=heading, selected=True) for heading in REQUIRED_MOTION_SPINE]
     return normalize_outline(nodes)
 
 
@@ -143,7 +212,9 @@ def generate_motion_outline(
     nodes = [_outline_node_from_raw(item) for item in raw if isinstance(item, dict)]
     _select_all(nodes)
     nodes = normalize_outline(nodes)
-    return nodes or outline_from_config(config)
+    if not nodes:
+        return outline_from_config(config)
+    return _canonical_motion_outline(nodes, metadata)
 
 
 def merge_intake_with_analysis(

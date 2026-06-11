@@ -37,3 +37,22 @@ def test_placeholder_project_env_does_not_replace_inherited_key(monkeypatch, tmp
 
     assert config.API_KEYS["Gemini"] == inherited_key
     assert os.environ["GEMINI_API_KEY"] == inherited_key
+
+
+def test_resources_dir_defaults_to_project_root(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("ICHARLOTTE_RESOURCES_DIR", raising=False)
+
+    config = _reload_config()
+
+    assert config.RESOURCES_DIR == os.path.join(str(tmp_path), "LLM Resources")
+
+
+def test_resources_dir_allows_env_override(monkeypatch, tmp_path):
+    override = os.path.join("E:", "icharlotte_resources")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("ICHARLOTTE_RESOURCES_DIR", override)
+
+    config = _reload_config()
+
+    assert config.RESOURCES_DIR == override

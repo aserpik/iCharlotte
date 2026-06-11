@@ -57,8 +57,9 @@ class WizardTaskRoutingTests(unittest.TestCase):
         # It is NOT an in-process task — it still runs the subprocess agent.
         self.assertFalse(is_in_process_task("depo_prep"))
 
-    def test_other_tasks_do_not_skip_picker(self):
-        self.assertFalse(opens_settings_without_picker("medical_records"))
+    def test_medical_records_review_opens_settings_without_picker(self):
+        self.assertTrue(opens_settings_without_picker("medical_records"))
+        self.assertFalse(requires_initial_file_picker("medical_records"))
 
 
 if __name__ == "__main__":

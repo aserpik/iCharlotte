@@ -51,6 +51,7 @@ class CaseResult:
     relevance_score: float = 0.0
     snippet_source: str = ""
     snippet_parenthetical_id: str = ""
+    snippet_page_label: str = ""
 
     @property
     def formatted_citation(self) -> str:
@@ -71,6 +72,7 @@ class CaseResult:
             "relevance_score": self.relevance_score,
             "snippet_source": self.snippet_source,
             "snippet_parenthetical_id": self.snippet_parenthetical_id,
+            "snippet_page_label": self.snippet_page_label,
         }
 
 

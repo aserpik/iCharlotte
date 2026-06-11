@@ -22,6 +22,12 @@ from icharlotte_core.config import SCRIPTS_DIR
 from icharlotte_core import case_index_store
 from icharlotte_core.ui.wizard import theme
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
+from icharlotte_core.ui.wizard.task_debug_helpers import (
+    emit_debug,
+    finish_debug_run,
+    record_status,
+    start_debug_run,
+)
 from icharlotte_core.ui.wizard.task_scaffold import WizardTaskContainer
 from icharlotte_core.ui.separator_workbench import SeparatorWorkbench
 from icharlotte_core.ui.wizard.file_picker import resolve_default_folder
@@ -198,6 +204,7 @@ class SeparateTaskTab(WizardTaskContainer):
         self._file_number = file_number
         self._pdf_path = pdf_path
         self._worker = None
+        self._debug_run_id = None
 
         self.settings_page = SeparateSettingsPage(pdf_path)
         self.status_page = StatusPage()
@@ -230,18 +237,39 @@ class SeparateTaskTab(WizardTaskContainer):
         self.settings_page.sensitivity_slider.setValue(sensitivity)
         self.status_page.reset()
         self.status_page.progress_bar.setRange(0, 0)
+        start_debug_run(
+            self,
+            source="wizard.separate.analysis",
+            details={
+                "case_path": self._case_path,
+                "file_number": self._file_number,
+                "pdf_path": self._pdf_path,
+                "sensitivity": sensitivity,
+            },
+        )
         self.status_page.on_status("Analyzing...")
+        record_status(self, "Analyzing...", source="wizard.ui")
         self.setCurrentIndex(PAGE_STATUS)
         worker = SeparateAnalysisWorker(self._pdf_path, sensitivity, parent=None)
-        worker.progress.connect(self.status_page.on_status)
+        worker.progress.connect(self._on_worker_progress)
         worker.finished_analysis.connect(self._on_analysis_finished)
         worker.finished.connect(worker.deleteLater)
         self._worker = worker
         worker.start()
 
+    def _on_worker_progress(self, message: str) -> None:
+        self.status_page.on_status(message)
+        record_status(self, message, source="wizard.separate.worker")
+
     def _on_analysis_finished(self, success: bool, payload: object):
         self._worker = None
         if not success:
+            finish_debug_run(
+                self,
+                status="error",
+                message=f"Task failed: {payload}",
+                details={"error": str(payload)},
+            )
             self.status_page.on_status(f"FAILED: {payload}")
             # Re-enable the workbench controls if this was a re-analyze attempt.
             self.workbench.set_busy(False)
@@ -252,17 +280,36 @@ class SeparateTaskTab(WizardTaskContainer):
             self.status_page.cancel_btn.setEnabled(True)
             return
         docs = payload if isinstance(payload, list) else []
+        emit_debug(
+            self,
+            phase="analysis_complete",
+            message="Analysis complete",
+            source="wizard.separate.worker",
+            details={"document_count": len(docs)},
+        )
         self.workbench.set_busy(False)
         self.workbench.load_docs(self._pdf_path, docs)
         self.setCurrentIndex(PAGE_WORKBENCH)
         self._persist_to_index(docs)
 
     def _on_cancel(self):
+        emit_debug(
+            self,
+            phase="cancel",
+            message="Back to settings requested",
+            source="wizard.ui",
+        )
         self.setCurrentIndex(PAGE_SETTINGS)
 
     def _on_processing_complete(self, summary: dict):
         from datetime import datetime
         self._persist_to_index(_docs_from_workbench(self.workbench))
+        finish_debug_run(
+            self,
+            status="success",
+            message="Task complete",
+            details=dict(summary or {}),
+        )
         self.task_completed.emit({
             "task_id": self._spec.task_id,
             "title": self._spec.title,

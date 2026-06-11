@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QProcess, QObject, Signal, QTimer
 from PySide6.QtGui import QTextCursor, QAction, QDragEnterEvent, QDropEvent
 from ..utils import log_event
+from . import theme
 
 # Import app crash handler for logging
 try:
@@ -182,7 +183,7 @@ class PassProgressWidget(QWidget):
             indicator.setStyleSheet("color: gray; font-size: 12px;")
         elif status == "in_progress":
             indicator.setText("◉")
-            indicator.setStyleSheet("color: #2196F3; font-size: 12px;")  # Blue
+            indicator.setStyleSheet(f"color: {theme.PRIMARY}; font-size: 12px;")  # Blue
         elif status == "completed":
             indicator.setText("●")
             indicator.setStyleSheet("color: #4CAF50; font-size: 12px;")  # Green

@@ -14,6 +14,7 @@ from PySide6.QtCore import Qt, QDate, QThread, Signal, QTimer
 from PySide6.QtGui import QColor, QAction, QFont, QShortcut, QKeySequence
 
 from icharlotte_core.master_db import MasterCaseDatabase
+from icharlotte_core.ui import theme
 from icharlotte_core.utils import log_event, get_case_path, BASE_PATH_WIN, parse_hearing_data
 from icharlotte_core.docket_refresh_worker import DocketRefreshWorker
 from icharlotte_core.ui.wizard.mode_toggle import ModeToggle
@@ -274,7 +275,7 @@ class TodoItemWidget(QWidget):
         # Email indicator icon (if this todo came from email monitor)
         if email_entry_id:
             email_icon = QLabel("✉")
-            email_icon.setStyleSheet("color: #1976D2; font-size: 14px; margin-right: 3px;")
+            email_icon.setStyleSheet(f"color: {theme.PRIMARY}; font-size: 14px; margin-right: 3px;")
             email_icon.setToolTip("Created from email - double-click to open in Outlook")
             layout.addWidget(email_icon)
 
@@ -606,11 +607,11 @@ class MasterCaseTab(QWidget):
         todo_input_layout = QHBoxLayout()
         self.todo_input = QLineEdit()
         self.todo_input.setPlaceholderText("New To-Do Item... (Enter to add)")
-        self.todo_input.setStyleSheet("""
-            border: 2px solid #2196F3;
+        self.todo_input.setStyleSheet(f"""
+            border: 2px solid {theme.PRIMARY};
             border-radius: 4px;
             padding: 5px;
-            background-color: #E3F2FD;
+            background-color: {theme.PRIMARY_SUBTLE};
             font-size: 13px;
         """)
         self.todo_input.returnPressed.connect(self.add_todo)

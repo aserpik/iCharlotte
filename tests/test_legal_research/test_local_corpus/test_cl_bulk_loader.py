@@ -56,3 +56,28 @@ def test_identifies_ca_by_citation_and_filters_published_recent():
     # passages present (keyword-indexable)
     case, passages = next(o for o in out if o[0].case_uid == "cl:100")
     assert passages and passages[0].case_uid == "cl:100"
+
+
+def test_parses_courtlistener_backslash_escaped_opinion_text():
+    citations = _csv([
+        {"id": "1", "volume": "15", "reporter": "Cal. 5th", "page": "1", "type": "8", "cluster_id": "100"},
+    ])
+    clusters = _csv([
+        {"id": "100", "date_filed": "2023-06-01", "case_name": "Recent Pub v. CA",
+         "case_name_short": "Recent", "citation_count": "7", "precedential_status": "Published", "docket_id": "9"},
+    ])
+    opinions = io.StringIO(
+        "cluster_id,plain_text,html,type\n"
+        '100,"The court said \\"hello, world\\" before ruling.",,020lead\n'
+    )
+
+    out = list(cl_bulk_loader.iter_recent_ca_cases(
+        citations_stream=citations, clusters_stream=clusters, opinions_stream=opinions,
+        cutoff_date="2017-01-01", published_only=True,
+    ))
+
+    assert len(out) == 1
+    case, passages = out[0]
+    assert case.case_uid == "cl:100"
+    assert '"hello, world"' in case.full_text
+    assert '"hello, world"' in passages[0].text

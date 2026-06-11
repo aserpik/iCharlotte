@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 # Import section order from gather
 from Scripts.report_generator.gather import SECTION_ORDER
 
+from . import theme
+
 
 class ReportGeneratorDialog(QDialog):
     """Dialog for configuring report generation before running the pipeline."""
@@ -126,10 +128,7 @@ class ReportGeneratorDialog(QDialog):
         cancel_btn.clicked.connect(self.reject)
         btn_layout.addWidget(cancel_btn)
 
-        generate_btn = QPushButton("Generate Report")
-        generate_btn.setStyleSheet(
-            "background-color: #2196F3; color: white; font-weight: bold; padding: 6px 20px;"
-        )
+        generate_btn = theme.primary_button("Generate Report")
         generate_btn.clicked.connect(self._validate_and_accept)
         btn_layout.addWidget(generate_btn)
         layout.addLayout(btn_layout)

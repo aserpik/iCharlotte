@@ -74,7 +74,9 @@ FIRM_BRIEFS_ROOTS = _default_firm_briefs_roots()
 
 # Templates & Resources
 TEMPLATES_DIR = os.path.join(os.getcwd(), "Templates")
-RESOURCES_DIR = r"C:\geminiterminal2\LLM Resources"
+RESOURCES_DIR = os.environ.get(
+    "ICHARLOTTE_RESOURCES_DIR", os.path.join(os.getcwd(), "LLM Resources")
+)
 TEMPLATE_EXTENSIONS = ['.docx', '.txt', '.html', '.rtf']
 RESOURCE_EXTENSIONS = ['.pdf', '.docx', '.doc', '.txt', '.msg', '.html', '.png', '.jpg', '.jpeg']
 

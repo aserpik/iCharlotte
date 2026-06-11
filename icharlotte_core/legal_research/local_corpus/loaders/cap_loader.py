@@ -12,6 +12,7 @@ import logging
 import zipfile
 from typing import Iterator
 
+from icharlotte_core.legal_research.local_corpus.cap_urls import cap_static_html_url
 from icharlotte_core.legal_research.local_corpus.models import CaseRecord, PassageRecord
 from icharlotte_core.legal_research.local_corpus.pincite import (
     page_label_for_offset, page_label_map,
@@ -79,7 +80,7 @@ def iter_cases_from_zip(zip_bytes: bytes) -> Iterator[tuple[CaseRecord, list[Pas
             citation=primary, parallel_citations=parallel, court=court,
             decision_date=date, year=(date[:4] if len(date) >= 4 else ""),
             docket_number=case.get("docket_number", ""),
-            url=f"https://static.case.law/{case_uid}",  # informational
+            url=cap_static_html_url(primary, file_name=case.get("file_name", "")),
             full_text=opinion_text, cites_to=cites_to,
             published_status=("published" if _is_citable_citation(primary) else "unreported"),
             citable=_is_citable_citation(primary),

@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..utils import sanitize_filename, format_date_to_mm_dd_yyyy
+from . import theme
 from .pdf_viewer_widget import PdfViewerWidget
 
 
@@ -66,9 +67,7 @@ class SeparatorWorkbench(QWidget):
         sens_layout.addWidget(self.sensitivity_slider)
         fine = QLabel("Fine"); fine.setStyleSheet("color:#666;font-size:11px;")
         sens_layout.addWidget(fine)
-        self.reanalyze_btn = QPushButton("Re-analyze")
-        self.reanalyze_btn.setStyleSheet(
-            "background-color:#2196F3;color:white;font-weight:bold;padding:6px 12px;")
+        self.reanalyze_btn = theme.primary_button("Re-analyze")
         self.reanalyze_btn.clicked.connect(self.on_reanalyze_clicked)
         sens_layout.addWidget(self.reanalyze_btn)
         sens_layout.addStretch()
@@ -123,8 +122,7 @@ class SeparatorWorkbench(QWidget):
         self.mark_status = QLabel("Range: Not set")
         self.mark_status.setStyleSheet("font-weight:bold;padding:5px;")
         mark_layout.addWidget(self.mark_status)
-        self.mark_start_btn = QPushButton("Mark Start")
-        self.mark_start_btn.setStyleSheet("background-color:#2196F3;color:white;padding:8px;")
+        self.mark_start_btn = theme.primary_button("Mark Start")
         self.mark_start_btn.clicked.connect(self.mark_start_page)
         mark_layout.addWidget(self.mark_start_btn)
         self.mark_end_btn = QPushButton("Mark End && Add")

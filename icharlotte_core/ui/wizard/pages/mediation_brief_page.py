@@ -35,6 +35,12 @@ from icharlotte_core.ui.context_files_dialog import ContextFilesDialog
 from icharlotte_core.ui.wizard import theme
 from icharlotte_core.ui.wizard.docx_io import load_docx_as_html
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
+from icharlotte_core.ui.wizard.task_debug_helpers import (
+    emit_debug,
+    finish_debug_run,
+    record_status,
+    start_debug_run,
+)
 from icharlotte_core.ui.wizard.task_scaffold import WizardTaskContainer
 
 logger = logging.getLogger(__name__)
@@ -549,6 +555,7 @@ class MediationBriefTaskTab(WizardTaskContainer):
         self._worker = None
         self._finishing_worker = None
         self._last_settings: dict = {}
+        self._debug_run_id = None
 
         self.settings_page = MediationBriefSettingsPage(case_path, file_number)
         self.status_page = StatusPage()
@@ -580,14 +587,25 @@ class MediationBriefTaskTab(WizardTaskContainer):
             return
         self._last_settings = dict(settings or {})
         self.status_page.reset()
+        start_debug_run(
+            self,
+            source="wizard.mediation_brief",
+            details={
+                "case_path": self._case_path,
+                "file_number": self._file_number,
+                "files": list(self.settings_page.current_files()),
+                "settings": dict(self._last_settings),
+            },
+        )
         self.status_page.on_status("Starting mediation brief…")
+        record_status(self, "Starting mediation brief…", source="wizard.ui")
         self.status_page.progress_bar.setRange(0, 0)  # indeterminate
         self.setCurrentIndex(TASK_PAGE_STATUS)
 
         worker = MediationBriefWizardWorker(
             self._case_path, self._file_number, self._last_settings, parent=None
         )
-        worker.progress.connect(self.status_page.on_status)
+        worker.progress.connect(self._on_worker_progress)
         worker.finished_result.connect(self._on_worker_finished)
         worker.finished.connect(lambda w=worker: self._on_worker_thread_finished(w))
         worker.finished.connect(worker.deleteLater)
@@ -597,6 +615,12 @@ class MediationBriefTaskTab(WizardTaskContainer):
     def _on_cancel(self) -> None:
         if self._worker is not None:
             self.status_page.on_status("Cancelling… (finishing the current section)")
+            emit_debug(
+                self,
+                phase="cancel",
+                message="Cancelling... (finishing the current section)",
+                source="wizard.ui",
+            )
             try:
                 self._worker.cancel()
             except Exception:  # noqa: BLE001
@@ -617,6 +641,12 @@ class MediationBriefTaskTab(WizardTaskContainer):
             self._worker = None
 
         if not success:
+            finish_debug_run(
+                self,
+                status="error",
+                message=f"Task failed: {payload}",
+                details={"error": str(payload)},
+            )
             self.status_page.on_status(f"FAILED: {payload}")
             # Re-enable the status button so the user can go back (routes through
             # cancel_requested → _on_cancel, which returns to Settings when no
@@ -627,6 +657,12 @@ class MediationBriefTaskTab(WizardTaskContainer):
             return
 
         path = payload if isinstance(payload, str) else ""
+        finish_debug_run(
+            self,
+            status="success",
+            message="Task complete",
+            details={"output_path": path},
+        )
         self.output_page.show_result(path)
         self.setCurrentIndex(TASK_PAGE_OUTPUT)
         self.task_completed.emit({
@@ -643,6 +679,10 @@ class MediationBriefTaskTab(WizardTaskContainer):
             self._worker = None
         if self._finishing_worker is worker:
             self._finishing_worker = None
+
+    def _on_worker_progress(self, message: str) -> None:
+        self.status_page.on_status(message)
+        record_status(self, message, source="wizard.mediation_brief.worker")
 
     def closeEvent(self, event) -> None:
         for worker in (self._worker, self._finishing_worker):

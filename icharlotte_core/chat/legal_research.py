@@ -15,6 +15,10 @@ import re
 from typing import Any, Callable, Iterable, Optional
 from urllib.parse import urlparse
 
+from icharlotte_core.legal_research.local_corpus.cap_urls import (
+    is_broken_cap_static_id_url,
+    repair_broken_cap_url,
+)
 from icharlotte_core.legal_research.models import CaseResult
 
 try:
@@ -37,6 +41,11 @@ class CourtListenerMode(str, Enum):
     ALWAYS_SEARCH = "always_search"
 
 
+class ChatResearchOutputMode(str, Enum):
+    QUICK_ANSWER = "quick_answer"
+    RESEARCH_MEMO = "research_memo"
+
+
 def _bool_value(value: Any, default: bool) -> bool:
     if isinstance(value, bool):
         return value
@@ -56,6 +65,7 @@ class ChatResearchSettings:
     firm_authority: bool = True
     local_corpus: bool = True
     courtlistener_mode: CourtListenerMode = CourtListenerMode.FALLBACK_CURRENT_LAW
+    output_mode: ChatResearchOutputMode = ChatResearchOutputMode.QUICK_ANSWER
 
     @classmethod
     def default(cls) -> "ChatResearchSettings":
@@ -68,6 +78,7 @@ class ChatResearchSettings:
         firm_authority: Any = True,
         local_corpus: Any = True,
         courtlistener_mode: Any = CourtListenerMode.FALLBACK_CURRENT_LAW,
+        output_mode: Any = ChatResearchOutputMode.QUICK_ANSWER,
     ) -> "ChatResearchSettings":
         if isinstance(courtlistener_mode, CourtListenerMode):
             mode = courtlistener_mode
@@ -76,11 +87,19 @@ class ChatResearchSettings:
                 mode = CourtListenerMode(str(courtlistener_mode))
             except ValueError:
                 mode = CourtListenerMode.FALLBACK_CURRENT_LAW
+        if isinstance(output_mode, ChatResearchOutputMode):
+            selected_output_mode = output_mode
+        else:
+            try:
+                selected_output_mode = ChatResearchOutputMode(str(output_mode))
+            except ValueError:
+                selected_output_mode = ChatResearchOutputMode.QUICK_ANSWER
         return normalize_settings(
             cls(
                 firm_authority=_bool_value(firm_authority, True),
                 local_corpus=_bool_value(local_corpus, True),
                 courtlistener_mode=mode,
+                output_mode=selected_output_mode,
             )
         )
 
@@ -95,6 +114,7 @@ def normalize_settings(settings: ChatResearchSettings) -> ChatResearchSettings:
             firm_authority=False,
             local_corpus=False,
             courtlistener_mode=CourtListenerMode.ALWAYS_SEARCH,
+            output_mode=settings.output_mode,
         )
     return settings
 
@@ -118,6 +138,7 @@ class ChatAuthorityCandidate:
     url: str = ""
     text: str = ""
     snippet: str = ""
+    snippet_page_label: str = ""
     sources: list[ChatResearchSource] = field(default_factory=list)
     citation_count: int | None = None
     latest_citing_year: str = ""
@@ -164,9 +185,21 @@ Never invent a quote. The quote must be copied from the candidate excerpt.
 RESEARCH_PROMPT_INSTRUCTION = """LEGAL RESEARCH MODE IS ENABLED.
 
 You must cite only authorities in [CHAT LEGAL RESEARCH AUTHORITY].
-Do not invent, recall, or add citations from memory.
+Do not add citations from memory. Do not invent, recall, or add outside citations.
 If the selected authorities do not support a requested proposition, say that the selected sources did not provide support.
-Include a concise section titled "Research Basis" explaining searches run, sources searched, why cited authorities were selected, and the quoted support.
+Write a direct answer to the user's question using the verified authorities below.
+"""
+
+RESEARCH_MEMO_PROMPT_INSTRUCTION = """Research Memo mode is enabled.
+
+Organize the main answer as polished attorney work product. Use this structure unless the user's prompt clearly requests a different structure:
+1. Summary
+2. Governing Rule
+3. Best Supporting Cases
+4. Limitations / Adverse Authority
+5. Suggested Argument Framing
+
+Use the Presentation role hints in the authority block to organize the discussion. Do not repeat the full Legal Research Basis appendix inside the main answer. The application will append the audit trail separately.
 """
 
 
@@ -209,14 +242,19 @@ class ChatResearchPacket:
                         f"  Untrusted selector support summary: {_sanitize_selector_text(authority.supports)}"
                     )
                 lines.append(f"  Source: {source_labels}")
+                if self.settings.output_mode == ChatResearchOutputMode.RESEARCH_MEMO:
+                    lines.append(
+                        f"  Presentation role: {_authority_presentation_role(authority)}"
+                    )
                 if authority.quote:
                     lines.append(f"  Quote: \"{_sanitize_selector_text(authority.quote)}\"")
                 if authority.caveat:
                     lines.append(
                         f"  Untrusted selector caveat: {_sanitize_selector_text(authority.caveat)}"
                     )
-                if authority.url:
-                    lines.append(f"  URL: {authority.url}")
+                view_url = _authority_view_url(authority)
+                if view_url:
+                    lines.append(f"  URL: {view_url}")
         if self.warnings:
             lines.append("")
             lines.append("Warnings:")
@@ -239,7 +277,7 @@ class ChatResearchPacket:
                     f"- <b>{_escape_html(authority.formatted_citation)}</b> "
                     f"[{_escape_html(source_labels)}]"
                 )
-                safe_url = _safe_http_url(authority.url)
+                safe_url = _authority_view_url(authority)
                 if safe_url:
                     line += f' <a href="{_escape_html(safe_url)}">View</a>'
                 lines.append(line)
@@ -254,13 +292,14 @@ class ChatResearchPacket:
         return lines
 
     def build_augmented_system_prompt(self, base_system_prompt: str) -> str:
-        return "\n\n".join(
-            [
-                base_system_prompt,
-                RESEARCH_PROMPT_INSTRUCTION,
-                self.format_authority_block(),
-            ]
-        )
+        parts = [
+            base_system_prompt,
+            RESEARCH_PROMPT_INSTRUCTION,
+        ]
+        if self.settings.output_mode == ChatResearchOutputMode.RESEARCH_MEMO:
+            parts.append(RESEARCH_MEMO_PROMPT_INSTRUCTION)
+        parts.append(self.format_authority_block())
+        return "\n\n".join(parts)
 
 
 def _loads_json(text: str) -> dict[str, Any]:
@@ -281,6 +320,41 @@ def _normalize_ws(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "")).strip().lower()
 
 
+def _is_california_supreme_court(authority: ChatSelectedAuthority) -> bool:
+    court = (authority.court or "").lower()
+    citation = authority.citation or ""
+    if "supreme" in court:
+        return True
+    return (
+        bool(re.search(r"\bCal\.\s*(?:2d|3d|4th|5th)\b", citation))
+        and "Cal.App" not in citation
+    )
+
+
+def _authority_presentation_role(authority: ChatSelectedAuthority) -> str:
+    caveat = (authority.caveat or "").lower()
+    combined = " ".join(
+        [
+            authority.reason or "",
+            authority.supports or "",
+            authority.proposition or "",
+            caveat,
+        ]
+    ).lower()
+    if any(
+        term in combined
+        for term in ("adverse", "contrary", "distinguish", "cuts against")
+    ):
+        return "adverse"
+    if caveat:
+        return "limiting"
+    if _is_california_supreme_court(authority):
+        return "foundational"
+    if any(term in combined for term in ("directly", "squarely", "direct support")):
+        return "direct"
+    return "background"
+
+
 def _escape_html(text: str) -> str:
     return html_lib.escape(str(text or ""), quote=True)
 
@@ -295,6 +369,17 @@ def _safe_http_url(url: str) -> str:
     if not parsed.netloc:
         return ""
     return value
+
+
+def _authority_view_url(authority: ChatSelectedAuthority) -> str:
+    safe_url = _safe_http_url(authority.url)
+    is_local_cap = (
+        str(authority.id or "").lower().startswith("cap:")
+        and any(source.kind == "local_corpus" for source in authority.sources)
+    )
+    if is_local_cap and (not safe_url or is_broken_cap_static_id_url(safe_url)):
+        return _safe_http_url(repair_broken_cap_url(safe_url, authority.citation))
+    return safe_url
 
 
 PROMPT_CONTROL_MARKER_RE = re.compile(
@@ -369,13 +454,16 @@ def _format_candidates(candidates: list[ChatAuthorityCandidate], proposition: st
         source_labels = ", ".join(s.label for s in candidate.sources)
         text = candidate.text or candidate.snippet
         excerpt = _relevant_excerpt(text, proposition)
-        if candidate.text and candidate.snippet and candidate.snippet not in candidate.text:
-            excerpt = f"{excerpt}\n\nSnippet:\n{candidate.snippet}"
-        blocks.append(
-            f"[{candidate.id}] {candidate.case_name}, {candidate.citation}\n"
-            f"Sources: {source_labels}\n"
-            f"Excerpt:\n{excerpt}"
-        )
+        lines = [
+            f"[{candidate.id}] {candidate.case_name}, {candidate.citation}",
+            f"Sources: {source_labels}",
+        ]
+        if candidate.snippet:
+            if candidate.snippet_page_label:
+                lines.append(f"Snippet page label: {candidate.snippet_page_label}")
+            lines.extend(["Best matching snippet:", candidate.snippet])
+        lines.extend(["Opinion excerpt:", excerpt])
+        blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
 
 
@@ -418,6 +506,93 @@ SEARCH_QUALITY_STOPWORDS = {
     "rule",
     "under",
 }
+_LOCAL_DOCTRINE_EXPANSIONS: tuple[tuple[set[str], str], ...] = (
+    (
+        {
+            "premises",
+            "landowner",
+            "landlord",
+            "owner",
+            "ownership",
+            "possessor",
+            "possession",
+            "control",
+            "controlled",
+            "property",
+        },
+        "premises liability ownership possession control landowner duty dangerous condition",
+    ),
+    (
+        {
+            "summary",
+            "judgment",
+            "adjudication",
+            "triable",
+            "burden",
+            "moving",
+        },
+        "summary judgment burden moving party triable issue Aguilar",
+    ),
+    (
+        {
+            "discovery",
+            "sanction",
+            "sanctions",
+            "misuse",
+            "evasive",
+            "terminating",
+        },
+        "discovery sanctions misuse discovery process terminating sanctions evasive response",
+    ),
+    (
+        {
+            "negligence",
+            "foreseeability",
+            "rowland",
+            "civil",
+        },
+        "Civil Code 1714 Rowland factors foreseeability duty negligence",
+    ),
+)
+_LOCAL_LANDMARK_CITATIONS: tuple[tuple[set[str], tuple[str, ...]], ...] = (
+    (
+        {
+            "summary",
+            "judgment",
+            "adjudication",
+            "triable",
+            "burden",
+            "moving",
+        },
+        ("25 Cal. 4th 826",),
+    ),
+    (
+        {
+            "premises",
+            "landowner",
+            "landlord",
+            "owner",
+            "ownership",
+            "possessor",
+            "possession",
+            "control",
+            "controlled",
+            "property",
+        },
+        ("14 Cal. 4th 1149",),
+    ),
+    (
+        {
+            "discovery",
+            "sanction",
+            "sanctions",
+            "misuse",
+            "evasive",
+            "terminating",
+        },
+        ("174 Cal. App. 4th 967",),
+    ),
+)
 
 
 def _year(value: str) -> str:
@@ -456,6 +631,36 @@ def _search_quality_terms(proposition: str) -> set[str]:
     }
 
 
+def expand_local_legal_queries(proposition: str) -> list[str]:
+    """Return deterministic local-corpus query variants for common CA doctrines."""
+    base = _normalize_ws(proposition)
+    if not base:
+        return []
+    lower = base.lower()
+    terms = set(re.findall(r"[a-z]+", lower))
+    queries = [base]
+    for triggers, expansion in _LOCAL_DOCTRINE_EXPANSIONS:
+        if terms & triggers and expansion.lower() not in lower:
+            queries.append(expansion)
+    return list(dict.fromkeys(queries))
+
+
+def _expanded_local_search_query(proposition: str) -> str:
+    queries = expand_local_legal_queries(proposition)
+    if len(queries) <= 1:
+        return queries[0] if queries else proposition
+    return " ".join(queries)
+
+
+def _local_landmark_citations(proposition: str) -> list[str]:
+    terms = set(re.findall(r"[a-z]+", (proposition or "").lower()))
+    citations: list[str] = []
+    for triggers, mapped_citations in _LOCAL_LANDMARK_CITATIONS:
+        if terms & triggers:
+            citations.extend(mapped_citations)
+    return list(dict.fromkeys(citations))
+
+
 def _case_search_text(case: CaseResult) -> str:
     return " ".join(
         str(value or "")
@@ -478,6 +683,49 @@ def _search_overlap_score(proposition: str, cases: list[CaseResult], *, top_n: i
     return matched / len(terms)
 
 
+def _candidate_relevance_score(candidate: ChatAuthorityCandidate) -> float:
+    terms = _search_quality_terms(candidate.proposition)
+    if not terms:
+        return 0.0
+    snippet_text = (candidate.snippet or "").lower()
+    text_excerpt = (candidate.text or "")[:8000].lower()
+    name_text = (candidate.case_name or "").lower()
+    snippet_matches = sum(1 for term in terms if term in snippet_text)
+    text_matches = sum(1 for term in terms if term in text_excerpt)
+    name_matches = sum(1 for term in terms if term in name_text)
+    score = (snippet_matches * 5.0) + (text_matches * 1.0) + (name_matches * 0.25)
+    if snippet_matches == 0 and text_matches == 0 and name_matches > 0:
+        score -= 2.0
+    try:
+        citation_count = int(candidate.citation_count or 0)
+    except (TypeError, ValueError):
+        citation_count = 0
+    if citation_count > 0:
+        import math
+        score += min(1.0, math.log10(citation_count + 1) / 4.0)
+    latest = str(candidate.latest_citing_year or "")
+    if latest.isdigit():
+        score += max(0.0, min(0.25, (int(latest) - 2000) / 100.0))
+    court = (candidate.court or "").lower()
+    if court in {"cal.", "cal"} or "supreme" in court:
+        score += 0.35
+    elif "app" in court:
+        score += 0.12
+    return score
+
+
+def _rank_candidates_for_selection(
+    candidates: list[ChatAuthorityCandidate],
+) -> list[ChatAuthorityCandidate]:
+    return [
+        candidate
+        for _idx, candidate in sorted(
+            enumerate(candidates),
+            key=lambda item: (-_candidate_relevance_score(item[1]), item[0]),
+        )
+    ]
+
+
 def _case_result_candidate(
     case: CaseResult,
     *,
@@ -490,6 +738,9 @@ def _case_result_candidate(
     cluster_id = str(getattr(case, "cluster_id", "") or "")
     year = _year(getattr(case, "date", "") or "")
     signals = authority_signals or {}
+    case_url = case.url
+    if source_kind == "local_corpus" and cluster_id.lower().startswith("cap:"):
+        case_url = repair_broken_cap_url(case_url, case.citation)
     return ChatAuthorityCandidate(
         id=cluster_id or f"{source_kind}:{case.name}:{case.citation}",
         proposition=proposition,
@@ -497,9 +748,10 @@ def _case_result_candidate(
         citation=case.citation,
         year=year,
         court=case.court,
-        url=case.url,
+        url=case_url,
         text=text or "",
         snippet=case.snippet or "",
+        snippet_page_label=getattr(case, "snippet_page_label", "") or "",
         sources=[ChatResearchSource(kind=source_kind, label=source_label, verification="verified")],
         citation_count=signals.get("citation_count", getattr(case, "citation_count", None)),
         latest_citing_year=str(
@@ -551,6 +803,8 @@ def _merge_candidates(candidates: Iterable[ChatAuthorityCandidate]) -> list[Chat
             existing.text = candidate.text
         if not existing.snippet and candidate.snippet:
             existing.snippet = candidate.snippet
+        if not existing.snippet_page_label and candidate.snippet_page_label:
+            existing.snippet_page_label = candidate.snippet_page_label
         if not existing.url and candidate.url:
             existing.url = candidate.url
         if existing.citation_count is None and candidate.citation_count is not None:
@@ -846,17 +1100,56 @@ class ChatLegalResearchService:
                     )
 
             if settings.local_corpus:
+                local_search_query = _expanded_local_search_query(proposition)
+                local_query_variants = expand_local_legal_queries(proposition)
+                local_landmarks = _local_landmark_citations(proposition)
                 debug(
                     "source_search",
                     f"Searching Local California corpus for: {proposition}",
-                    details={"source": "local_corpus", "proposition": proposition},
+                    details={
+                        "source": "local_corpus",
+                        "proposition": proposition,
+                        "query": local_search_query,
+                        "query_variants": local_query_variants,
+                        "landmark_citations": local_landmarks,
+                    },
                 )
                 local_candidates, _local_hits = self._collect_case_client(
                     self.local_corpus,
-                    proposition=proposition,
+                    proposition=local_search_query,
+                    candidate_proposition=proposition,
                     source_kind="local_corpus",
                     source_label="Local California corpus",
+                    # LocalCaseCorpus.search_opinions(semantic=True) already
+                    # fuses metadata, BM25/FTS, parenthetical recall, and
+                    # semantic ranking when embeddings are available. Calling
+                    # semantic=False afterward repeats the expensive local DB
+                    # search without improving the first-page candidate set.
+                    semantic_modes=(True,),
                 )
+                landmark_candidates: list[ChatAuthorityCandidate] = []
+                for citation in local_landmarks:
+                    citation_candidates, citation_hits = self._collect_case_client(
+                        self.local_corpus,
+                        proposition=f"{proposition} {citation}",
+                        candidate_proposition=proposition,
+                        source_kind="local_corpus",
+                        source_label="Local California corpus",
+                        semantic_modes=(False,),
+                    )
+                    for candidate in citation_candidates:
+                        if candidate.text:
+                            candidate.snippet = _relevant_excerpt(
+                                candidate.text,
+                                proposition,
+                                max_chars=650,
+                            )
+                    landmark_candidates.extend(citation_candidates)
+                    _local_hits += citation_hits
+                if landmark_candidates:
+                    local_candidates = _rank_candidates_for_selection(
+                        _merge_candidates([*local_candidates, *landmark_candidates])
+                    )[: self.max_results_per_source]
                 local_count = len(local_candidates)
                 non_live_candidates.extend(local_candidates)
                 all_candidates.extend(local_candidates)
@@ -867,6 +1160,9 @@ class ChatLegalResearchService:
                     details={
                         "source": "local_corpus",
                         "proposition": proposition,
+                        "query": local_search_query,
+                        "query_variants": local_query_variants,
+                        "landmark_citations": local_landmarks,
                         "candidate_count": local_count,
                         "raw_hit_count": _local_hits,
                     },
@@ -948,7 +1244,7 @@ class ChatLegalResearchService:
 
         unique_warnings = list(dict.fromkeys(warnings))
         unique_searches = list(dict.fromkeys(searches))
-        merged_candidates = _merge_candidates(all_candidates)
+        merged_candidates = _rank_candidates_for_selection(_merge_candidates(all_candidates))
         debug(
             "candidate_summary",
             f"Collected {len(merged_candidates)} unique candidate(s)",
@@ -1001,6 +1297,7 @@ class ChatLegalResearchService:
         client: Any,
         *,
         proposition: str,
+        candidate_proposition: str | None = None,
         source_kind: str,
         source_label: str,
         enrich_results: bool = True,
@@ -1056,6 +1353,7 @@ class ChatLegalResearchService:
 
         candidates: list[ChatAuthorityCandidate] = []
         seen: set[str] = set()
+        output_proposition = candidate_proposition or proposition
         for case in results:
             if len(candidates) >= self.max_results_per_source:
                 break
@@ -1082,7 +1380,7 @@ class ChatLegalResearchService:
             candidates.append(
                 _case_result_candidate(
                     case,
-                    proposition=proposition,
+                    proposition=output_proposition,
                     source_kind=source_kind,
                     source_label=source_label,
                     text=text,

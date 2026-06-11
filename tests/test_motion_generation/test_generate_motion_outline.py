@@ -25,6 +25,38 @@ def test_nested_argument_subheadings():
     assert all(c.selected for c in arg[0].children)
 
 
+def test_outline_enforces_required_spine_and_three_to_four_argument_headings():
+    def fake_llm(system, user):
+        return ('{"outline": [{"text": "Introduction"}, '
+                '{"text": "Legal Standard"}, '
+                '{"text": "Argument", "children": [{"text": "Sub A"}]}, '
+                '{"text": "Conclusion"}]}')
+
+    cfg = get_motion_config("generic")
+    nodes = generate_motion_outline(
+        cfg,
+        _md([
+            "The moving party satisfied the statutory prerequisites",
+            "The opposing party's objections lack merit",
+            "The requested relief is narrowly tailored",
+            "No prejudice will result from granting the motion",
+            "A fifth point should not become a fifth subheading",
+        ]),
+        llm_callback=fake_llm,
+    )
+
+    assert [n.text for n in nodes] == [
+        "Introduction",
+        "Statement of Facts",
+        "Argument",
+        "Conclusion",
+    ]
+    argument = next(n for n in nodes if n.text == "Argument")
+    assert 3 <= len(argument.children) <= 4
+    assert all(child.selected for child in argument.children)
+    assert "Legal Standard" not in [n.text for n in nodes]
+
+
 def test_fence_tolerant():
     def fake_llm(system, user):
         return '```json\n{"outline": [{"text": "Argument", "children": [{"text": "Sub A"}]}]}\n```'

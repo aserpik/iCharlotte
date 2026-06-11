@@ -19,6 +19,7 @@ from ..prompt_manager import get_prompt_manager, PromptManager, PromptVersion, P
 from ..llm import LLMWorker, ModelFetcher
 from .. import model_catalog
 from ..chat.token_counter import TokenCounter
+from . import theme
 
 # Available models per provider (must be defined before PromptsDialog class)
 AVAILABLE_MODELS = model_catalog.dialog_models_by_provider()
@@ -1210,7 +1211,7 @@ class PromptsDialog(QDialog):
             }
             QPushButton:checked {
                 background-color: #e3f2fd;
-                border-color: #2196F3;
+                border-color: #1976D2;
                 color: #1976D2;
             }
             QPushButton:hover {
@@ -1290,7 +1291,7 @@ class PromptsDialog(QDialog):
             self.editor_raw_mode = False
             self.editor_mode_toggle.setText("Switch to Raw")
             self.mode_label.setText("Mode: Rendered (WYSIWYG)")
-            self.mode_label.setStyleSheet("color: #1976D2; margin-left: 10px; font-weight: bold;")
+            self.mode_label.setStyleSheet(f"color: {theme.PRIMARY}; margin-left: 10px; font-weight: bold;")
             # Disable syntax highlighter in rendered mode
             self.highlighter.setDocument(None)
         else:
@@ -1359,8 +1360,7 @@ class PromptsDialog(QDialog):
         self.custom_instruction.setPlaceholderText("Enter custom improvement instruction...")
         instruction_layout.addWidget(self.custom_instruction)
 
-        self.run_custom_btn = QPushButton("Improve")
-        self.run_custom_btn.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold;")
+        self.run_custom_btn = theme.primary_button("Improve")
         self.run_custom_btn.clicked.connect(self._run_custom_improvement)
         instruction_layout.addWidget(self.run_custom_btn)
 
@@ -1462,7 +1462,7 @@ class PromptsDialog(QDialog):
         # Headers
         selection_layout.addWidget(QLabel(""), 0, 0)
         header_a = QLabel("A")
-        header_a.setStyleSheet("font-weight: bold; color: #1976D2;")
+        header_a.setStyleSheet(f"font-weight: bold; color: {theme.PRIMARY};")
         selection_layout.addWidget(header_a, 0, 1)
         header_b = QLabel("B")
         header_b.setStyleSheet("font-weight: bold; color: #F57C00;")
@@ -1569,8 +1569,7 @@ class PromptsDialog(QDialog):
         rating_layout = QHBoxLayout()
         rating_layout.addStretch()
 
-        self.rate_a_btn = QPushButton("A Wins")
-        self.rate_a_btn.setStyleSheet("background-color: #2196F3; color: white; padding: 8px 20px;")
+        self.rate_a_btn = theme.primary_button("A Wins")
         self.rate_a_btn.clicked.connect(lambda: self._record_ab_rating("A"))
         self.rate_a_btn.setEnabled(False)
         rating_layout.addWidget(self.rate_a_btn)

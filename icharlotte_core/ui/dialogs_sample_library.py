@@ -20,6 +20,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from . import theme
+
 # Default path for the roots config JSON (relative to cwd at import time).
 _DEFAULT_ROOTS_CONFIG = os.path.join(
     os.path.dirname(__file__),
@@ -205,10 +207,7 @@ class SampleLibraryTab(QWidget):
 
         reindex_row.addStretch()
 
-        self._reindex_btn = QPushButton("Re-index")
-        self._reindex_btn.setStyleSheet(
-            "background-color: #1565C0; color: white; font-weight: bold; padding: 6px 18px;"
-        )
+        self._reindex_btn = theme.primary_button("Re-index")
         self._reindex_btn.clicked.connect(self._on_reindex_clicked)
         reindex_row.addWidget(self._reindex_btn)
         layout.addLayout(reindex_row)

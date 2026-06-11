@@ -1,8 +1,14 @@
 You are drafting the Memorandum of Points and Authorities for a {motion_type} brought by the MOVING party in a California civil case.
 
-Draft a persuasive memorandum that argues IN FAVOR of granting the motion and the relief sought. Follow the section plan. Ground every case citation in the authority pool below; do not cite cases from memory. Cite the controlling statutes from the legal standard.
+Draft a persuasive memorandum that argues IN FAVOR of granting the motion and the relief sought. Follow the required section plan exactly. Ground every case citation in the authority pool below; do not cite cases from memory. Cite the controlling statutes from the legal standard.
 
-LEGAL STANDARD (ground the Legal Standard section in this):
+REQUIRED MOTION FORMAT:
+- Use these top-level headings only, in this order: I. INTRODUCTION; II. STATEMENT OF FACTS; III. ARGUMENT; IV. CONCLUSION.
+- Do not create a separate Legal Standard top-level heading. Work any legal standard into the relevant Argument subheadings.
+- Under III. ARGUMENT, use three to four capital-letter subheadings (A., B., C., and optionally D.) that state the main arguments supporting the motion.
+- Draft the memorandum within those headings and subheadings.
+
+LEGAL STANDARD (work this into the Argument section):
 {legal_standard}
 
 RELIEF SOUGHT:

@@ -81,6 +81,7 @@ from icharlotte_core.ui.case_view_enhanced import (
     AdvancedFilterWidget, FilePreviewWidget, OutputBrowserWidget,
     ProcessingLogWidget, ProcessingLogDB, FileTagsDB, EnhancedFileTreeWidget
 )
+from icharlotte_core.ui import theme
 from icharlotte_core.ui.dialogs import FileNumberDialog, VariablesDialog, PromptsDialog
 from icharlotte_core.ui.report_generator_dialog import ReportGeneratorDialog, ReportPipelineWorker
 from icharlotte_core.subpoena_tracker import SubpoenaTrackerWorker
@@ -130,39 +131,39 @@ class QuickOpenDialog(QDialog):
         layout.setContentsMargins(15, 15, 15, 15)
 
         # Style the dialog (light/white theme)
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #ffffff;
-                border: 2px solid #1565C0;
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {theme.BG};
+                border: 2px solid {theme.PRIMARY};
                 border-radius: 10px;
-            }
-            QComboBox {
-                background-color: #f5f5f5;
-                color: #333;
-                border: 1px solid #ccc;
+            }}
+            QComboBox {{
+                background-color: {theme.BG_SUBTLE};
+                color: {theme.TEXT_BODY};
+                border: 1px solid {theme.BORDER};
                 border-radius: 5px;
                 padding: 8px 12px;
                 font-size: 16px;
                 min-height: 30px;
-            }
-            QComboBox:focus {
-                border: 2px solid #1565C0;
-                background-color: #fff;
-            }
-            QComboBox::drop-down {
+            }}
+            QComboBox:focus {{
+                border: 2px solid {theme.PRIMARY};
+                background-color: {theme.BG};
+            }}
+            QComboBox::drop-down {{
                 border: none;
                 width: 20px;
-            }
-            QComboBox QAbstractItemView {
-                background-color: #fff;
-                color: #333;
-                selection-background-color: #1565C0;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: {theme.BG};
+                color: {theme.TEXT_BODY};
+                selection-background-color: {theme.PRIMARY};
                 selection-color: #fff;
-            }
-            QLabel {
-                color: #666;
+            }}
+            QLabel {{
+                color: {theme.TEXT_MUTED};
                 font-size: 11px;
-            }
+            }}
         """)
 
         # File number input with autocomplete (includes both file numbers and plaintiff names)
@@ -623,33 +624,33 @@ class MainWindow(QMainWindow):
         self.tabs.setUsesScrollButtons(False)
 
         # Style the tab bar for larger, more visible tabs
-        self.tabs.setStyleSheet("""
-            QTabWidget::pane {
-                border: 1px solid #ccc;
+        self.tabs.setStyleSheet(f"""
+            QTabWidget::pane {{
+                border: 1px solid {theme.BORDER};
                 border-top: none;
-            }
-            QTabBar::tab {
+            }}
+            QTabBar::tab {{
                 background-color: #e0e0e0;
-                color: #333;
+                color: {theme.TEXT_BODY};
                 font-size: 13px;
                 font-weight: 500;
                 padding: 10px 6px;
                 margin-right: 1px;
-                border: 1px solid #ccc;
+                border: 1px solid {theme.BORDER};
                 border-bottom: none;
                 border-top-left-radius: 6px;
                 border-top-right-radius: 6px;
-            }
-            QTabBar::tab:selected {
-                background-color: #fff;
-                color: #1565C0;
+            }}
+            QTabBar::tab:selected {{
+                background-color: {theme.BG};
+                color: {theme.PRIMARY};
                 font-weight: bold;
-                border-bottom: 2px solid #1565C0;
-            }
-            QTabBar::tab:hover:!selected {
+                border-bottom: 2px solid {theme.PRIMARY};
+            }}
+            QTabBar::tab:hover:!selected {{
                 background-color: #f0f0f0;
-                color: #1976D2;
-            }
+                color: {theme.PRIMARY};
+            }}
         """)
 
         # --- Tab 0: Master List ---
@@ -696,8 +697,7 @@ class MainWindow(QMainWindow):
         btn_proc_log.clicked.connect(self.open_processing_log)
         toolbar_layout.addWidget(btn_proc_log)
 
-        btn_generate_report = QPushButton("Generate Report")
-        btn_generate_report.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold;")
+        btn_generate_report = theme.primary_button("Generate Report")
         btn_generate_report.clicked.connect(self.open_report_generator)
         toolbar_layout.addWidget(btn_generate_report)
 
@@ -842,8 +842,8 @@ class MainWindow(QMainWindow):
         center_layout.addWidget(self.tree)
 
         btn_layout = QHBoxLayout()
-        self.process_btn = QPushButton("Process All Queued Tasks")
-        self.process_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 10px;")
+        self.process_btn = theme.primary_button("Process All Queued Tasks")
+        self.process_btn.setMinimumHeight(36)
         self.process_btn.clicked.connect(self.process_checked_items)
         btn_layout.addWidget(self.process_btn)
 
@@ -919,62 +919,22 @@ class MainWindow(QMainWindow):
         self.corner_layout.setContentsMargins(5, 5, 10, 5)
         self.corner_layout.setSpacing(8)
 
-        # Common button style for primary actions (colored buttons)
-        primary_btn_style = """
-            QPushButton {{
-                background-color: {bg};
-                color: white;
-                font-weight: bold;
-                font-size: 13px;
-                padding: 0px 16px;
-                border: none;
-                border-radius: 4px;
-                height: 34px;
-            }}
-            QPushButton:hover {{
-                background-color: {hover};
-            }}
-            QPushButton:pressed {{
-                background-color: {pressed};
-            }}
-        """
-
-        # Common button style for secondary actions (neutral buttons)
-        secondary_btn_style = """
-            QPushButton {
-                background-color: #f5f5f5;
-                color: #333;
-                font-weight: 500;
-                font-size: 13px;
-                padding: 0px 14px;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                height: 34px;
-            }
-            QPushButton:hover {
-                background-color: #e8e8e8;
-                border-color: #999;
-            }
-            QPushButton:pressed {
-                background-color: #ddd;
-            }
-        """
+        # Corner buttons share a fixed height so they align with the tab bar.
+        corner_btn_height = 34
 
         # Notes button (secondary) — opens/creates the case AS NOTES document.
         # Mirrors the Notes button in the Case View toolbar so it stays
         # reachable in Wizard mode, where the Case View tab is hidden. Placed
         # before the Open File button so it sits to its left in the corner.
-        self.btn_notes_corner = QPushButton("Notes")
-        self.btn_notes_corner.setStyleSheet(secondary_btn_style)
+        self.btn_notes_corner = theme.secondary_button("Notes")
+        self.btn_notes_corner.setFixedHeight(corner_btn_height)
         self.btn_notes_corner.setToolTip("Open or create the AS NOTES document for the current case")
         self.btn_notes_corner.clicked.connect(self.open_notes)
         self.corner_layout.addWidget(self.btn_notes_corner)
 
         # Open File button (blue - primary)
-        self.btn_open_root = QPushButton("Open File")
-        self.btn_open_root.setStyleSheet(primary_btn_style.format(
-            bg="#1976D2", hover="#1565C0", pressed="#0D47A1"
-        ))
+        self.btn_open_root = theme.primary_button("Open File")
+        self.btn_open_root.setFixedHeight(corner_btn_height)
         self.btn_open_root.setToolTip("Open case folder in Explorer (Win+F)")
         self.btn_open_root.clicked.connect(self.open_root_folder)
         self.corner_layout.addWidget(self.btn_open_root)
@@ -986,8 +946,8 @@ class MainWindow(QMainWindow):
         self.corner_layout.addWidget(self.view_btn)
 
         # Prompts button (secondary)
-        self.prompts_btn = QPushButton("Prompts")
-        self.prompts_btn.setStyleSheet(secondary_btn_style)
+        self.prompts_btn = theme.secondary_button("Prompts")
+        self.prompts_btn.setFixedHeight(corner_btn_height)
         self.prompts_btn.setToolTip("Open Prompt Engineering Workbench")
         self.prompts_btn.clicked.connect(self.manage_prompts)
         self.corner_layout.addWidget(self.prompts_btn)
@@ -997,9 +957,8 @@ class MainWindow(QMainWindow):
         self.settings_btn.setText("Settings ▾")
         self.settings_btn.setToolTip("Application settings")
         self.settings_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.settings_btn.setStyleSheet(secondary_btn_style.replace("QPushButton", "QToolButton") + """
-            QToolButton::menu-indicator { image: none; }
-        """)
+        theme.style_tool_button(self.settings_btn)
+        self.settings_btn.setFixedHeight(corner_btn_height)
         self.settings_menu = QMenu(self)
         self.docket_refresh_action = self.settings_menu.addAction("Auto Docket Refresh")
         self.docket_refresh_action.setCheckable(True)
@@ -1011,10 +970,8 @@ class MainWindow(QMainWindow):
         self.docket_refresh_action.toggled.connect(self.master_tab.toggle_docket_refresh)
 
         # Restart button (red - danger)
-        self.restart_btn = QPushButton("Restart")
-        self.restart_btn.setStyleSheet(primary_btn_style.format(
-            bg="#d32f2f", hover="#c62828", pressed="#b71c1c"
-        ))
+        self.restart_btn = theme.danger_button("Restart")
+        self.restart_btn.setFixedHeight(corner_btn_height)
         self.restart_btn.setToolTip("Restart iCharlotte (open work is saved first)")
         self.restart_btn.clicked.connect(self.restart_app)
         self.corner_layout.addWidget(self.restart_btn)
@@ -1114,8 +1071,18 @@ class MainWindow(QMainWindow):
         snapshots = []
         for _, tab in self._iter_task_tabs():
             if isinstance(tab, ChatTab):
-                # Chat tabs are case-scoped but not snapshot/restored — each
-                # session starts fresh; conversations live in chat persistence.
+                settings = {}
+                conv_id = getattr(tab, "current_conversation_id", None)
+                if conv_id:
+                    settings["current_conversation_id"] = conv_id
+                snapshots.append({
+                    "task_id": "chat",
+                    "instance_suffix": tab.property("wizard_instance_suffix") or "",
+                    "files": [],
+                    "settings": settings,
+                    "page": "settings",
+                    "output_path": None,
+                })
                 continue
             task_id = tab.spec.task_id
             # Determine page label.
@@ -1488,6 +1455,21 @@ class MainWindow(QMainWindow):
             if task_id not in TASK_REGISTRY:
                 continue
             spec = get_task(task_id)
+            if task_id == "chat":
+                suffix = entry.get("instance_suffix", "") or ""
+                tab = ChatTab(parent=self)
+                tab.setProperty("wizard_task_id", "chat")
+                tab.setProperty("wizard_instance_suffix", suffix)
+                if self.file_number:
+                    tab.load_case(self.file_number)
+                conv_id = (entry.get("settings") or {}).get("current_conversation_id")
+                if conv_id:
+                    try:
+                        tab.on_conversation_selected(conv_id)
+                    except Exception as e:
+                        log_event(f"[wizard] restore chat conversation failed: {e}")
+                self.tabs.addTab(tab, f"{spec.title} {suffix}".strip())
+                continue
             files_abs = [
                 f if os.path.isabs(f) else os.path.join(self.case_path, f)
                 for f in entry.get("files", [])
@@ -1692,28 +1674,8 @@ class MainWindow(QMainWindow):
         self.view_btn = QToolButton()
         self.view_btn.setText("View ▾")
         self.view_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.view_btn.setStyleSheet("""
-            QToolButton {
-                background-color: #f5f5f5;
-                color: #333;
-                font-weight: 500;
-                font-size: 13px;
-                padding: 0px 14px;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                height: 34px;
-            }
-            QToolButton:hover {
-                background-color: #e8e8e8;
-                border-color: #999;
-            }
-            QToolButton:pressed {
-                background-color: #ddd;
-            }
-            QToolButton::menu-indicator {
-                image: none;
-            }
-        """)
+        theme.style_tool_button(self.view_btn)
+        self.view_btn.setFixedHeight(34)
         
         self.view_menu = QMenu(self)
         self.view_btn.setMenu(self.view_menu)
@@ -1735,6 +1697,31 @@ class MainWindow(QMainWindow):
             # Use partial to capture the current loop variable 'i'
             action.toggled.connect(partial(self.toggle_tab_visibility, i))
             self.view_menu.addAction(action)
+
+        self._add_debug_console_action()
+
+    def _add_debug_console_action(self):
+        """Add the floating task debug console opener to the View menu."""
+        for existing in self.view_menu.actions():
+            if existing.text() == "Debug Console":
+                self.debug_console_action = existing
+                return
+        if self.view_menu.actions():
+            self.view_menu.addSeparator()
+        action = QAction("Debug Console", self.view_menu)
+        action.triggered.connect(self.show_task_debug_console)
+        self.view_menu.addAction(action)
+        self.debug_console_action = action
+
+    def show_task_debug_console(self):
+        """Show the reusable floating task debug console."""
+        if getattr(self, "_task_debug_window", None) is None:
+            from icharlotte_core.ui.task_debug_window import TaskDebugWindow
+
+            self._task_debug_window = TaskDebugWindow(parent=self)
+        self._task_debug_window.show()
+        self._task_debug_window.raise_()
+        self._task_debug_window.activateWindow()
 
     def toggle_tab_visibility(self, index, visible):
         self.tabs.setTabVisible(index, visible)
@@ -2338,6 +2325,14 @@ class MainWindow(QMainWindow):
             new_path = get_case_path(new_file_num)
 
             if new_path:
+                # Keep the Change File dialog/hotkey path aligned with
+                # load_case_by_number: wizard task tabs are case-scoped.
+                try:
+                    self._save_wizard_state_for_current_case()
+                except Exception as e:
+                    log_event(f"[wizard] snapshot failed: {e}")
+                self._remove_all_task_tabs()
+
                 self.save_status_history()
                 # Save the persistent chat tab + any wizard-spawned chat tabs
                 # against the OLD case before file_number changes.
@@ -2383,6 +2378,19 @@ class MainWindow(QMainWindow):
 
                 # A loaded case always defaults to Wizard mode on the Wizard tab.
                 self._default_to_wizard_mode()
+
+                try:
+                    self._restore_task_tabs_for_case()
+                except Exception as e:
+                    log_event(f"[wizard] restore failed: {e}")
+
+                if hasattr(self, "wizard_tab") and self.wizard_tab is not None:
+                    from icharlotte_core.ui.wizard.persistence import WizardStatePersistence
+                    try:
+                        p = WizardStatePersistence(self.case_path)
+                        self.wizard_tab.refresh_recent_tasks(p.get_recent_tasks())
+                    except Exception as e:
+                        log_event(f"[wizard] refresh recent_tasks failed: {e}")
 
                 log_event(f"Switched to case {new_file_num}")
             else:
@@ -3409,7 +3417,7 @@ class MainWindow(QMainWindow):
                     if not reconnected:
                         # Mark as interrupted if we couldn't find the runner
                         widget.status_text_label.setText(widget.status_text_label.text() + " (Interrupted)")
-                        widget.status_text_label.setStyleSheet("color: orange; font-weight: bold;")
+                        widget.status_text_label.setStyleSheet(f"color: {theme.WARNING}; font-weight: bold;")
                         widget.is_finished = True
 
                 self.status_list_layout.addWidget(widget)
@@ -3977,6 +3985,10 @@ if __name__ == "__main__":
 
         checkpoint("Creating QApplication")
         app = QApplication(sys.argv)
+
+        # App-wide design system (tokens + base widget styles). Accent buttons
+        # styled via theme builders override these defaults locally.
+        app.setStyleSheet(theme.app_stylesheet())
 
         # Set application icon (for taskbar)
         icon_path = os.path.join(os.path.dirname(__file__), 'icharlotte.ico')

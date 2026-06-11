@@ -4,6 +4,7 @@ from typing import List, Optional
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import QWidget
 
+from icharlotte_core import task_debug
 from icharlotte_core.ui.wizard.pages.settings_page import SettingsPage
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
 from icharlotte_core.ui.wizard.pages.output_page import OutputPage
@@ -36,6 +37,8 @@ class TaskTab(WizardTaskContainer):
         self._worker_thread = None  # reserved if we move to QThread later
         self._awaiting_session_path: Optional[str] = None
         self._settings_owns_worker = False
+        self._debug_run_id: str | None = None
+        self._debug_connected_workers: set[int] = set()
 
         self.settings_page = spec.settings_page_cls(spec, files=self._files, case_root=case_path or None)
         self.status_page = StatusPage()
@@ -132,6 +135,11 @@ class TaskTab(WizardTaskContainer):
         self.settings_page.attach_worker(worker)
 
         # TaskTab only handles terminal signals.
+        self._start_debug_run(
+            source="wizard.subprocess.speculative",
+            details={"mode": "phase1", "settings_owned": True},
+        )
+        self._wire_worker_debug(worker, source="wizard.subprocess.speculative")
         worker.finished.connect(self._on_worker_finished)
         worker.failed.connect(self._on_worker_failed)
         worker.cancelled.connect(self._on_worker_cancelled)
@@ -168,6 +176,11 @@ class TaskTab(WizardTaskContainer):
         replacement — cancel the in-flight worker but don't restart.
         """
         if self._worker is not None:
+            self._finish_debug_run(
+                status="cancelled",
+                message="Speculative run cancelled before restart",
+                details={"new_file_count": len(new_files or [])},
+            )
             # Suppress stale signals from the old worker so finished/failed/
             # cancelled don't disrupt the new prep state we're about to enter.
             try:
@@ -224,8 +237,26 @@ class TaskTab(WizardTaskContainer):
         # Wire the status/progress signals now that status page is visible.
         self._worker.status.connect(self.status_page.on_status)
         self._worker.progress.connect(self.status_page.on_progress)
+        if self._debug_run_id is None:
+            self._start_debug_run(
+                source="wizard.subprocess.phase2",
+                details={"mode": "phase2", "session_path": session_path},
+            )
+        else:
+            self._debug_emit(
+                phase="phase2",
+                message="Resuming Phase 2",
+                source="wizard.subprocess.phase2",
+                details={"session_path": session_path},
+            )
+        self._wire_worker_debug(self._worker, source="wizard.subprocess.phase2")
 
         self.status_page.on_status("Running Phase 2 — generating summary…")
+        self._debug_emit(
+            phase="status",
+            message="Running Phase 2 — generating summary…",
+            source="wizard.ui",
+        )
         self.status_page.progress_bar.setRange(0, 0)
         self._worker.resume_with_config(session_path)
 
@@ -272,10 +303,27 @@ class TaskTab(WizardTaskContainer):
         )
 
         self._awaiting_session_path = None
-        self.status_page.on_status(f"Starting {self._spec.title}…")
-
         worker_cls = self._pick_worker_cls(
             self._spec.script_name, len(self._files)
+        )
+        self._start_debug_run(
+            source=f"wizard.{worker_cls.__name__}",
+            details={
+                "script_name": self._spec.script_name,
+                "case_path": self._case_path,
+                "file_number": self._file_number,
+                "file_count": len(self._files),
+                "files": list(self._files),
+                "settings": dict(settings_dict or {}),
+                "worker_class": worker_cls.__name__,
+            },
+        )
+        start_message = f"Starting {self._spec.title}…"
+        self.status_page.on_status(start_message)
+        self._debug_emit(
+            phase="status",
+            message=start_message,
+            source="wizard.ui",
         )
 
         if worker_cls is ParallelSubprocessWorker:
@@ -310,9 +358,11 @@ class TaskTab(WizardTaskContainer):
             )
 
         if not self._settings_owns_worker:
-            self._worker.status.connect(self.status_page.on_status)
-            self._worker.progress.connect(self.status_page.on_progress)
+            self._worker.status.connect(self._on_worker_status)
+            self._worker.progress.connect(self._on_worker_progress)
             self._worker.awaiting_input.connect(self._on_worker_awaiting_input)
+        else:
+            self._wire_worker_debug(self._worker, source=f"wizard.{worker_cls.__name__}")
         self._worker.finished.connect(self._on_worker_finished)
         self._worker.failed.connect(self._on_worker_failed)
         self._worker.cancelled.connect(self._on_worker_cancelled)
@@ -327,6 +377,122 @@ class TaskTab(WizardTaskContainer):
         self.output_page.set_failure_banner("")
         self._worker.start()
 
+    def _start_debug_run(self, *, source: str, details: dict | None = None) -> None:
+        if self._debug_run_id is not None:
+            return
+        self._debug_run_id = task_debug.start_run(
+            task_id=getattr(self._spec, "task_id", ""),
+            task_title=getattr(self._spec, "title", ""),
+            source=source,
+            details={
+                "case_path": self._case_path,
+                "file_number": self._file_number,
+                "file_count": len(self._files),
+                "files": list(self._files),
+                **(details or {}),
+            },
+        )
+
+    def _debug_emit(
+        self,
+        *,
+        phase: str,
+        message: str,
+        level: str = "info",
+        source: str = "wizard",
+        details: dict | None = None,
+    ) -> None:
+        if not self._debug_run_id:
+            return
+        task_debug.emit_event(
+            self._debug_run_id,
+            getattr(self._spec, "task_id", ""),
+            getattr(self._spec, "title", ""),
+            phase=phase,
+            message=message,
+            level=level,
+            source=source,
+            details=details,
+        )
+
+    def _finish_debug_run(
+        self,
+        *,
+        status: str,
+        message: str,
+        details: dict | None = None,
+    ) -> None:
+        run_id = self._debug_run_id
+        if not run_id:
+            return
+        task_debug.finish_run(run_id, status=status, message=message, details=details)
+        self._debug_run_id = None
+        self._debug_connected_workers.clear()
+
+    def _wire_worker_debug(self, worker, *, source: str) -> None:
+        if worker is None:
+            return
+        key = id(worker)
+        if key in self._debug_connected_workers:
+            return
+        self._debug_connected_workers.add(key)
+        if hasattr(worker, "status"):
+            worker.status.connect(
+                lambda message, _source=source: self._record_worker_status(
+                    message,
+                    source=_source,
+                )
+            )
+        if hasattr(worker, "progress"):
+            worker.progress.connect(
+                lambda value, _source=source: self._record_worker_progress(
+                    value,
+                    source=_source,
+                )
+            )
+        if hasattr(worker, "awaiting_input"):
+            worker.awaiting_input.connect(
+                lambda session_path, _source=source: self._debug_emit(
+                    phase="awaiting_input",
+                    message="Awaiting Phase 2 input",
+                    source=_source,
+                    details={"session_path": session_path},
+                )
+            )
+
+    def _record_worker_status(self, message: str, *, source: str = "wizard.worker") -> None:
+        text = str(message)
+        upper = text.upper()
+        level = "warning" if upper.startswith("WARNING") else "info"
+        if upper.startswith("FAILED") or "ERROR" in upper:
+            level = "error"
+        self._debug_emit(
+            phase="status",
+            message=text,
+            level=level,
+            source=source,
+        )
+
+    def _record_worker_progress(self, value: int, *, source: str = "wizard.worker") -> None:
+        try:
+            pct = int(value)
+        except (TypeError, ValueError):
+            pct = 0
+        self._debug_emit(
+            phase="progress",
+            message=f"Progress {pct}%",
+            source=source,
+            details={"progress": pct},
+        )
+
+    def _on_worker_status(self, message: str) -> None:
+        self.status_page.on_status(message)
+        self._record_worker_status(message)
+
+    def _on_worker_progress(self, value: int) -> None:
+        self.status_page.on_progress(value)
+        self._record_worker_progress(value)
+
     def _on_worker_file_completed(self, output_path: str) -> None:
         """A single file's agent has finished in a parallel run.
 
@@ -337,6 +503,16 @@ class TaskTab(WizardTaskContainer):
         """
         self._files_done_for_run += 1
         remaining = max(0, self._total_files_for_run - self._files_done_for_run)
+        self._debug_emit(
+            phase="file_completed",
+            message=f"File completed: {output_path}",
+            source="wizard.worker",
+            details={
+                "output_path": output_path,
+                "files_done": self._files_done_for_run,
+                "remaining": remaining,
+            },
+        )
 
         if self.currentIndex() != PAGE_OUTPUT:
             # First file done — switch to Output page so the user can read it.
@@ -360,6 +536,15 @@ class TaskTab(WizardTaskContainer):
         all_output_paths = list(getattr(self._worker, "output_paths", []) or [])
         if output_path and output_path not in all_output_paths:
             all_output_paths.append(output_path)
+        self._finish_debug_run(
+            status="success",
+            message="Task complete",
+            details={
+                "output_path": output_path,
+                "output_paths": all_output_paths,
+                "output_count": len(all_output_paths),
+            },
+        )
 
         self._worker = None
         self._awaiting_session_path = None
@@ -400,6 +585,11 @@ class TaskTab(WizardTaskContainer):
         self.setCurrentIndex(PAGE_OUTPUT)
 
     def _on_worker_failed(self, err: str) -> None:
+        self._finish_debug_run(
+            status="error",
+            message=f"Task failed: {err}",
+            details={"error": err},
+        )
         self._worker = None
         self._awaiting_session_path = None
         self._settings_owns_worker = False
@@ -421,6 +611,10 @@ class TaskTab(WizardTaskContainer):
         self.status_page.cancel_btn.clicked.connect(lambda: self.setCurrentIndex(PAGE_SETTINGS))
 
     def _on_worker_cancelled(self) -> None:
+        self._finish_debug_run(
+            status="cancelled",
+            message="Task cancelled",
+        )
         self._worker = None
         self._awaiting_session_path = None
         self._settings_owns_worker = False
@@ -434,6 +628,12 @@ class TaskTab(WizardTaskContainer):
         if self._settings_owns_worker:
             return  # settings page is handling this itself
         self._awaiting_session_path = session_path
+        self._debug_emit(
+            phase="awaiting_input",
+            message="Awaiting Phase 2 input",
+            source="wizard.worker",
+            details={"session_path": session_path},
+        )
         self.status_page.show_awaiting_input(session_path)
         self.status_page.pause_eta()
 
@@ -447,9 +647,21 @@ class TaskTab(WizardTaskContainer):
             dlg = DepoSummaryConfigDialog(self._awaiting_session_path, parent=self)
         except Exception as e:
             self.status_page.on_status(f"Failed to open topic config dialog: {e}")
+            self._debug_emit(
+                phase="configure",
+                message=f"Failed to open topic config dialog: {e}",
+                level="error",
+                source="wizard.ui",
+            )
             return
 
         if dlg.exec() == QDialog.DialogCode.Accepted:
+            self._debug_emit(
+                phase="configure",
+                message="Phase 2 topic configuration accepted",
+                source="wizard.ui",
+                details={"session_path": self._awaiting_session_path},
+            )
             self.status_page.resume_eta()
             # Re-show progress bar for Phase 2.
             self.status_page.awaiting_input_widget.setVisible(False)

@@ -59,6 +59,12 @@ from icharlotte_core.ui.wizard.pages._motion_research_support import (
     select_research_client as _select_research_client,
 )
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
+from icharlotte_core.ui.wizard.task_debug_helpers import (
+    emit_debug,
+    finish_debug_run,
+    record_status,
+    start_debug_run,
+)
 from icharlotte_core.ui.wizard.task_scaffold import WizardTaskContainer
 from icharlotte_core.ui.context_files_dialog import ContextFilesDialog
 
@@ -73,7 +79,11 @@ from icharlotte_core.motion_generation.config import (
     get_motion_config,
     list_motion_types,
 )
-from icharlotte_core.motion_generation.drafter import draft_motion
+from icharlotte_core.motion_generation.drafter import (
+    draft_motion,
+    identify_key_legal_issues,
+    insert_researched_citations,
+)
 from icharlotte_core.firm_briefs.motion_taxonomy import normalize_motion_type
 from icharlotte_core.firm_briefs.provenance import attach_firm_provenance
 
@@ -551,6 +561,24 @@ def _attach_replacement_candidates(citations, *, verifier, llm_callback, on_prog
     return total
 
 
+def _merge_retrieved_authorities(*groups):
+    merged = []
+    seen = set()
+    for group in groups:
+        for authority in group or []:
+            key = (
+                getattr(authority, "cluster_id", "") or "",
+                getattr(authority, "case_name", "") or "",
+                getattr(authority, "citation", "") or "",
+                getattr(authority, "argument_text", "") or "",
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(authority)
+    return merged
+
+
 class GenerateMotionWorker(QThread):
     progress = Signal(str)
     finished_result = Signal(bool, object)
@@ -616,6 +644,11 @@ class GenerateMotionWorker(QThread):
             token = os.environ.get("COURTLISTENER_API_TOKEN", "").strip()
             retrieved = []
             verifier = None
+            client = None
+            source = "none"
+            corpus_status = {}
+            firm_provider = None
+            research_workers = 0
             research_source = "none"
             # Cache opinion text under this task's prompt dir (mirrors oppose).
             repo_root = os.path.dirname(
@@ -729,6 +762,81 @@ class GenerateMotionWorker(QThread):
                 "body_chars": len(draft.body_text or ""),
             }
             finish_phase("draft")
+
+            key_issues = identify_key_legal_issues(
+                draft,
+                metadata,
+                plan,
+                llm_callback=make_pass_llm("key_legal_issues"),
+            )
+            diagnostics["research"]["post_draft_issue_count"] = len(key_issues)
+            diagnostics["research"]["post_draft_authorities"] = 0
+            if key_issues and (corpus is not None or token):
+                if client is None:
+                    client, source, corpus_status = _select_research_client(
+                        corpus, token, on_progress=self.progress.emit
+                    )
+                    diagnostics["research"]["corpus_fresh"] = bool(corpus_status.get("fresh"))
+                    diagnostics["research"]["corpus_freshness_reason"] = corpus_status.get("reason", "")
+                    diagnostics["research"]["source"] = source
+                    research_source = source
+                    research_workers = 3 if source == "local_corpus" else 2
+                    diagnostics["research"]["workers"] = research_workers
+                if source != "none":
+                    if source == "courtlistener":
+                        self.progress.emit(
+                            "Researching completed-draft key legal issues through CourtListener "
+                            f"({len(key_issues)} issues)..."
+                        )
+                    else:
+                        self.progress.emit(
+                            "Researching completed-draft key legal issues locally "
+                            f"({len(key_issues)} issues)..."
+                        )
+                        if firm_provider is None:
+                            firm_provider = _make_firm_provider(corpus)
+                            diagnostics["research"]["firm_provider"] = firm_provider is not None
+                    post_draft_authorities = research_arguments(
+                        key_issues,
+                        cl_client=client,
+                        query_llm=make_pass_llm("research_queries"),
+                        rerank_llm=make_pass_llm("rerank_select"),
+                        max_workers=research_workers or (3 if source == "local_corpus" else 2),
+                        on_progress=self.progress.emit,
+                        cache_dir=opinion_cache,
+                        firm_provider=firm_provider,
+                        motion_type=firm_motion_type,
+                        side="moving",
+                        prompt_namespace="generate_motion",
+                    )
+                    diagnostics["research"]["post_draft_authorities"] = len(post_draft_authorities)
+                    if post_draft_authorities:
+                        self.progress.emit(
+                            f"Inserting citations for {len(post_draft_authorities)} post-draft authorities..."
+                        )
+                        revised = insert_researched_citations(
+                            draft,
+                            key_issues,
+                            post_draft_authorities,
+                            llm_callback=draft_llm,
+                        )
+                        if not revised.body_text.strip():
+                            reason = (revised.rejection_reason or "unknown reason").strip()
+                            self.finished_result.emit(False, f"Citation insertion failed: {reason}")
+                            return
+                        draft = revised
+                        retrieved = _merge_retrieved_authorities(retrieved, post_draft_authorities)
+                        diagnostics["draft"]["body_chars"] = len(draft.body_text or "")
+                        diagnostics["research"]["retrieved_authorities"] = len(retrieved)
+                else:
+                    self.progress.emit(
+                        "WARNING: no legal research source available for completed-draft key issues."
+                    )
+            elif key_issues:
+                self.progress.emit(
+                    "WARNING: completed-draft key issues were identified, but no legal research source is available."
+                )
+            finish_phase("post_draft_research")
 
             citations = extract_citations(draft.body_text)
             replacement_count = 0
@@ -853,6 +961,7 @@ class GenerateMotionTaskTab(WizardTaskContainer):
         self._finishing_worker = None
         self._analysis_worker = None
         self._finishing_analysis_worker = None
+        self._debug_run_id = None
 
         self.settings_page = GenerateMotionSettingsPage(case_path, file_number)
         self.status_page = StatusPage()
@@ -863,6 +972,7 @@ class GenerateMotionTaskTab(WizardTaskContainer):
         self.addWidget(self.output_page)
         self.settings_page.analyze_requested.connect(self._start_analysis)
         self.settings_page.run_requested.connect(self._on_run)
+        self.status_page.cancel_requested.connect(self._on_cancel)
 
     @property
     def spec(self):
@@ -876,11 +986,26 @@ class GenerateMotionTaskTab(WizardTaskContainer):
         if self._analysis_worker is not None or self._finishing_analysis_worker is not None:
             return
         self.status_page.reset()
+        start_debug_run(
+            self,
+            source="wizard.generate_motion.analysis",
+            details={
+                "case_path": self._case_path,
+                "file_number": self._file_number,
+                "settings": dict(intake_settings or {}),
+            },
+        )
         self.status_page.on_status("Analyzing context documents...")
+        record_status(self, "Analyzing context documents...", source="wizard.ui")
         self.status_page.progress_bar.setRange(0, 0)
         self.setCurrentIndex(TASK_PAGE_STATUS)
         worker = GenerateMotionAnalysisWorker(settings=dict(intake_settings or {}), parent=None)
-        worker.progress.connect(self.status_page.on_status)
+        worker.progress.connect(
+            lambda message: self._on_worker_progress(
+                message,
+                source="wizard.generate_motion.analysis",
+            )
+        )
         worker.finished_analysis.connect(self._on_analysis_finished)
         worker.finished.connect(lambda w=worker: self._on_analysis_thread_finished(w))
         worker.finished.connect(worker.deleteLater)
@@ -897,10 +1022,25 @@ class GenerateMotionTaskTab(WizardTaskContainer):
             self._analysis_worker = None
 
         if not success:
+            finish_debug_run(
+                self,
+                status="error",
+                message=f"Analysis failed: {payload}",
+                details={"error": str(payload)},
+            )
             self.status_page.on_status(f"FAILED: {payload}")
             return
 
         data = payload if isinstance(payload, dict) else {}
+        finish_debug_run(
+            self,
+            status="success",
+            message="Analysis complete",
+            details={
+                "outline_count": len(data.get("outline", []) or []),
+                "has_metadata": bool(data.get("metadata")),
+            },
+        )
         metadata = data.get("metadata")
         if not isinstance(metadata, MotionMetadata):
             metadata = MotionMetadata.from_dict(metadata if isinstance(metadata, dict) else {})
@@ -930,17 +1070,33 @@ class GenerateMotionTaskTab(WizardTaskContainer):
             self.setCurrentIndex(TASK_PAGE_STATUS)
             return
         self.status_page.reset()
+        self._last_settings = dict(settings or {})
+        start_debug_run(
+            self,
+            source="wizard.generate_motion.draft",
+            details={
+                "case_path": self._case_path,
+                "file_number": self._file_number,
+                "files": list(self.settings_page.current_target_files()),
+                "settings": dict(self._last_settings),
+            },
+        )
         self.status_page.on_status("Drafting motion...")
+        record_status(self, "Drafting motion...", source="wizard.ui")
         self.status_page.progress_bar.setRange(0, 0)
         self.setCurrentIndex(TASK_PAGE_STATUS)
-        self._last_settings = dict(settings or {})
         worker = GenerateMotionWorker(
             case_path=self._case_path,
             file_number=self._file_number,
             settings=self._last_settings,
             parent=None,
         )
-        worker.progress.connect(self.status_page.on_status)
+        worker.progress.connect(
+            lambda message: self._on_worker_progress(
+                message,
+                source="wizard.generate_motion.draft",
+            )
+        )
         worker.finished_result.connect(self._on_worker_finished)
         worker.finished.connect(lambda w=worker: self._on_worker_thread_finished(w))
         worker.finished.connect(worker.deleteLater)
@@ -958,10 +1114,26 @@ class GenerateMotionTaskTab(WizardTaskContainer):
         elif self._worker is not None:
             self._worker = None
         if not success:
+            finish_debug_run(
+                self,
+                status="error",
+                message=f"Draft failed: {payload}",
+                details={"error": str(payload)},
+            )
             self.status_page.on_status(f"FAILED: {payload}")
             return
 
         draft = payload if isinstance(payload, DraftDocument) else DraftDocument()
+        finish_debug_run(
+            self,
+            status="success",
+            message="Task complete",
+            details={
+                "output_path": draft.preview_path,
+                "citation_count": len(draft.citations or []),
+                "diagnostics": dict(draft.diagnostics or {}),
+            },
+        )
         self.output_page.show_result(draft)
         self.setCurrentIndex(TASK_PAGE_OUTPUT)
         self.task_completed.emit(
@@ -980,6 +1152,35 @@ class GenerateMotionTaskTab(WizardTaskContainer):
             self._worker = None
         if self._finishing_worker is worker:
             self._finishing_worker = None
+
+    def _on_cancel(self) -> None:
+        active_worker = self._worker or self._analysis_worker
+        if active_worker is None:
+            self.setCurrentIndex(TASK_PAGE_SETTINGS)
+            return
+        emit_debug(
+            self,
+            phase="cancel",
+            message="Cancellation requested",
+            source="wizard.ui",
+        )
+        cancel = getattr(active_worker, "cancel", None)
+        if callable(cancel):
+            try:
+                cancel()
+                self.status_page.on_status("Cancellation requested.")
+                record_status(self, "Cancellation requested.", source="wizard.ui")
+            except Exception as exc:  # noqa: BLE001
+                self.status_page.on_status(f"Cancel failed: {exc}")
+                record_status(self, f"Cancel failed: {exc}", source="wizard.ui")
+            return
+        message = "This task cannot be cancelled until the current step finishes."
+        self.status_page.on_status(message)
+        record_status(self, message, source="wizard.ui")
+
+    def _on_worker_progress(self, message: str, *, source: str) -> None:
+        self.status_page.on_status(message)
+        record_status(self, message, source=source)
 
     def closeEvent(self, event) -> None:
         for worker in (

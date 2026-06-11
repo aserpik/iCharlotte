@@ -31,6 +31,7 @@ from PySide6.QtGui import QAction, QColor, QFont, QMovie, QIcon, QPainter, QPen
 
 from ..utils import log_event
 from ..config import GEMINI_DATA_DIR, SCRIPTS_DIR
+from . import theme
 
 
 # =============================================================================
@@ -242,7 +243,7 @@ class SpinningIndicator(QLabel):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        pen = QPen(QColor("#2196F3"))
+        pen = QPen(QColor(theme.PRIMARY))
         pen.setWidth(2)
         painter.setPen(pen)
 
@@ -313,18 +314,18 @@ class EnhancedAgentButton(QFrame):
 
         # Agent name button
         self.name_btn = QPushButton(name)
-        self.name_btn.setStyleSheet("""
-            QPushButton {
+        self.name_btn.setStyleSheet(f"""
+            QPushButton {{
                 border: none;
                 background: transparent;
                 text-align: left;
                 font-size: 11px;
                 font-weight: bold;
                 padding: 2px;
-            }
-            QPushButton:hover {
-                color: #1976D2;
-            }
+            }}
+            QPushButton:hover {{
+                color: {theme.PRIMARY};
+            }}
         """)
         self.name_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.name_btn.clicked.connect(self.clicked.emit)
@@ -368,12 +369,12 @@ class EnhancedAgentButton(QFrame):
         if running:
             self.spinner.start()
             self.name_btn.setEnabled(False)
-            self.setStyleSheet("""
-                EnhancedAgentButton {
-                    background-color: #e3f2fd;
-                    border: 1px solid #2196F3;
+            self.setStyleSheet(f"""
+                EnhancedAgentButton {{
+                    background-color: {theme.PRIMARY_SUBTLE};
+                    border: 1px solid {theme.PRIMARY};
                     border-radius: 4px;
-                }
+                }}
             """)
         else:
             self.spinner.stop()

@@ -7,7 +7,7 @@ import json
 
 from icharlotte_core.motion_generation.config import get_motion_config
 from icharlotte_core.motion_generation.drafter import draft_motion
-from icharlotte_core.opposition.models import MotionMetadata
+from icharlotte_core.opposition.models import MotionMetadata, SectionPlanItem
 
 
 def _meta():
@@ -101,3 +101,40 @@ def test_draft_motion_prompt_carries_motion_type_and_guardrail():
     blob = (captured["system"] + "\n" + captured["user"]).lower()
     assert "motion in limine to exclude witnesses" in blob
     assert "summary judgment" in blob  # the "do not convert into an MSJ" guardrail
+
+
+def test_draft_motion_prompt_requires_required_roman_and_lettered_headings():
+    captured = {}
+
+    def fake_llm(system_prompt, user_prompt):
+        captured["user"] = user_prompt
+        return '{"title": "T", "body_text": "I. INTRODUCTION\\nBody."}'
+
+    plan = [
+        SectionPlanItem(path=["Introduction"], text="Introduction"),
+        SectionPlanItem(path=["Statement of Facts"], text="Statement of Facts"),
+        SectionPlanItem(path=["Argument"], text="Argument"),
+        SectionPlanItem(path=["Argument", "Responses are evasive"], text="Responses are evasive"),
+        SectionPlanItem(path=["Argument", "Objections lack merit"], text="Objections lack merit"),
+        SectionPlanItem(path=["Argument", "Further responses are warranted"], text="Further responses are warranted"),
+        SectionPlanItem(path=["Conclusion"], text="Conclusion"),
+    ]
+
+    draft_motion(
+        get_motion_config("compel"),
+        _meta(),
+        plan,
+        "TARGET",
+        "",
+        style_exemplars=[],
+        llm_callback=fake_llm,
+    )
+
+    prompt = captured["user"]
+    assert "I. INTRODUCTION" in prompt
+    assert "II. STATEMENT OF FACTS" in prompt
+    assert "III. ARGUMENT" in prompt
+    assert "A. Responses are evasive" in prompt
+    assert "B. Objections lack merit" in prompt
+    assert "C. Further responses are warranted" in prompt
+    assert "IV. CONCLUSION" in prompt

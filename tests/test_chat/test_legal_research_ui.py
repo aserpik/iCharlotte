@@ -7,7 +7,7 @@ import pytest
 from PySide6.QtCore import QSettings
 from PySide6.QtWidgets import QApplication
 
-from icharlotte_core.chat.legal_research import CourtListenerMode
+from icharlotte_core.chat.legal_research import ChatResearchOutputMode, CourtListenerMode
 
 
 @pytest.fixture(autouse=True)
@@ -30,6 +30,7 @@ def _clear_chat_research_settings():
         "chat_tab/legal_research_firm_authority",
         "chat_tab/legal_research_local_corpus",
         "chat_tab/legal_research_courtlistener_mode",
+        "chat_tab/legal_research_output_mode",
     ):
         settings.remove(key)
     settings.sync()
@@ -67,7 +68,8 @@ def test_chat_research_source_defaults(qtbot, monkeypatch):
     assert settings.firm_authority is True
     assert settings.local_corpus is True
     assert settings.courtlistener_mode == CourtListenerMode.FALLBACK_CURRENT_LAW
-    assert tab.research_sources_btn.text() == "Sources: Firm + Local + CL Fallback"
+    assert settings.output_mode == ChatResearchOutputMode.QUICK_ANSWER
+    assert tab.research_sources_btn.text() == "Sources: Firm + Local + CL Fallback | Quick"
 
 
 def test_chat_research_source_choices_persist(qtbot, monkeypatch):
@@ -87,6 +89,22 @@ def test_chat_research_source_choices_persist(qtbot, monkeypatch):
     assert settings.local_corpus is False
     assert settings.courtlistener_mode == CourtListenerMode.ALWAYS_SEARCH
     assert tab2.courtlistener_always_action.isChecked() is True
+
+
+def test_chat_research_output_mode_persists(qtbot, monkeypatch):
+    _app()
+    _clear_chat_research_settings()
+
+    tab = _make_chat_tab(qtbot, monkeypatch)
+    tab.research_memo_action.setChecked(True)
+    tab._on_research_source_changed()
+
+    tab2 = _make_chat_tab(qtbot, monkeypatch)
+    settings = tab2._current_chat_research_settings()
+
+    assert settings.output_mode == ChatResearchOutputMode.RESEARCH_MEMO
+    assert tab2.research_memo_action.isChecked() is True
+    assert "Memo" in tab2.research_sources_btn.text()
 
 
 def test_chat_research_source_menu_normalizes_fallback_when_no_local_sources(
@@ -138,6 +156,7 @@ def test_run_chat_legal_research_passes_selected_settings(qtbot, monkeypatch):
     tab.firm_authority_action.setChecked(False)
     tab.local_corpus_action.setChecked(False)
     tab.courtlistener_always_action.setChecked(True)
+    tab.research_memo_action.setChecked(True)
     tab._on_research_source_changed()
 
     packet = tab._run_chat_legal_research("research this", "context text")
@@ -148,6 +167,7 @@ def test_run_chat_legal_research_passes_selected_settings(qtbot, monkeypatch):
     assert captured["settings"].firm_authority is False
     assert captured["settings"].local_corpus is False
     assert captured["settings"].courtlistener_mode == CourtListenerMode.ALWAYS_SEARCH
+    assert captured["settings"].output_mode == ChatResearchOutputMode.RESEARCH_MEMO
     assert "fake progress" in tab.chat_history.toPlainText()
     assert packet is not None
 
@@ -200,6 +220,50 @@ def test_run_chat_legal_research_records_task_debug_events(qtbot, monkeypatch, t
         "Task complete",
     ]
     assert events[1].details["source"] == "courtlistener"
+
+
+def test_run_chat_legal_research_records_output_mode_in_debug_details(
+    qtbot,
+    monkeypatch,
+    tmp_path,
+):
+    _app()
+    _clear_chat_research_settings()
+    from icharlotte_core import task_debug
+    from icharlotte_core.ui import tabs
+
+    class FakeService:
+        @classmethod
+        def from_environment(cls, *, llm_callback):
+            return cls()
+
+        def research(
+            self,
+            *,
+            user_text,
+            context_text,
+            settings,
+            status_callback,
+            debug_callback=None,
+        ):
+            return SimpleNamespace(
+                selected_authorities=[],
+                get_known_case_names=lambda: [],
+                build_augmented_system_prompt=lambda base: base + "\nAUGMENTED",
+                format_research_basis_html=lambda: ["<b>Legal Research Basis</b>"],
+            )
+
+    monkeypatch.setattr(tabs, "ChatLegalResearchService", FakeService)
+    task_debug.reset_for_tests(trace_dir=tmp_path / "traces", max_events=20)
+    tab = _make_chat_tab(qtbot, monkeypatch)
+    tab.research_memo_action.setChecked(True)
+    tab._on_research_source_changed()
+
+    packet = tab._run_chat_legal_research("research this", "context text")
+
+    events = task_debug.get_events()
+    assert packet is not None
+    assert events[0].details["research_settings"]["output_mode"] == "research_memo"
 
 
 def test_run_chat_legal_research_llm_callback_uses_model_snapshot_during_status_events(
@@ -460,6 +524,8 @@ def test_send_message_dispatches_legal_research_in_background(qtbot, monkeypatch
     tab.model_combo.addItems(["gemini-snapshot"])
     tab.model_combo.setCurrentText("gemini-snapshot")
     tab.settings = {"temperature": 0.6, "top_p": 0.8, "max_tokens": 2048}
+    tab.research_memo_action.setChecked(True)
+    tab._on_research_source_changed()
     tab.legal_research_check.setChecked(True)
     tab.chat_input.setPlainText("research this")
     tab.read_files_content = lambda: ""
@@ -476,6 +542,7 @@ def test_send_message_dispatches_legal_research_in_background(qtbot, monkeypatch
     assert captured["model"] == "gemini-snapshot"
     assert captured["settings"]["max_tokens"] == 2048
     assert captured["research_settings"].courtlistener_mode == CourtListenerMode.FALLBACK_CURRENT_LAW
+    assert captured["research_settings"].output_mode == ChatResearchOutputMode.RESEARCH_MEMO
     assert tab.send_btn.isEnabled() is False
     assert tab.stop_btn.isEnabled() is True
 

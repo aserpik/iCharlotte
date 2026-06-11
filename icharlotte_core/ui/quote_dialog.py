@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, Signal, QThread
 
 from ..mediation_brief import MediationBriefGenerator, SECTION_ORDER, SECTION_HEADINGS
+from . import theme
 
 logger = logging.getLogger(__name__)
 
@@ -280,13 +281,8 @@ class QuoteInsertionDialog(QDialog):
         # ── 4. Search button + progress ──────────────────────────────────────
         search_row = QHBoxLayout()
 
-        self.search_btn = QPushButton("Search")
+        self.search_btn = theme.primary_button("Search")
         self.search_btn.setEnabled(False)
-        self.search_btn.setStyleSheet(
-            "QPushButton { background-color: #2196F3; color: white;"
-            " padding: 6px 18px; border-radius: 3px; }"
-            "QPushButton:disabled { background-color: #90CAF9; }"
-        )
         self.search_btn.clicked.connect(self._start_search)
         search_row.addWidget(self.search_btn)
 

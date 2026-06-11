@@ -19,6 +19,7 @@ _IN_PROCESS_TASK_BUILDERS = {
 # pre-Settings picker would be redundant and its selection would be dropped.
 _SETTINGS_MANAGED_SOURCE_TASKS = frozenset({
     "depo_prep",
+    "medical_records",
     "summarize_documents",
     "summarize_discovery",
     "summarize_depositions",

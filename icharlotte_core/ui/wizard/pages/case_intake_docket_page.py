@@ -23,6 +23,13 @@ from icharlotte_core.master_db import MasterCaseDatabase
 from icharlotte_core.ui.wizard import theme
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
 from icharlotte_core.ui.wizard.runners.case_agent_worker import CaseAgentWorker
+from icharlotte_core.ui.wizard.task_debug_helpers import (
+    emit_debug,
+    finish_debug_run,
+    record_progress,
+    record_status,
+    start_debug_run,
+)
 from icharlotte_core.ui.wizard.task_scaffold import WizardTaskContainer
 
 
@@ -546,6 +553,7 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
         self._last_settings: dict = {}
         self._last_summary: dict = {}
         self._last_metadata: dict = {}
+        self._debug_run_id = None
 
         self.settings_page = CaseIntakeSettingsPage(file_number=file_number)
         self.complaint_status_page = StatusPage()
@@ -608,7 +616,18 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
         self._last_settings = dict(self.settings_page.to_dict())
         self._last_summary = {}
         self.complaint_status_page.reset()
+        start_debug_run(
+            self,
+            source="wizard.case_intake.complaint",
+            details={
+                "case_path": self._case_path,
+                "file_number": self._file_number,
+                "script_name": "complaint.py",
+                "settings": dict(self._last_settings),
+            },
+        )
         self.complaint_status_page.on_status("Running complaint intake...")
+        record_status(self, "Running complaint intake...", source="wizard.ui")
         self.complaint_status_page.progress_bar.setRange(0, 0)
         self.setCurrentIndex(TASK_PAGE_COMPLAINT_STATUS)
 
@@ -633,7 +652,18 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
         save_reviewed_metadata(self._file_number, reviewed)
 
         self.docket_status_page.reset()
+        start_debug_run(
+            self,
+            source="wizard.case_intake.docket",
+            details={
+                "case_path": self._case_path,
+                "file_number": self._file_number,
+                "script_name": "docket.py",
+                "metadata": dict(reviewed),
+            },
+        )
         self.docket_status_page.on_status("Running docket...")
+        record_status(self, "Running docket...", source="wizard.ui")
         self.docket_status_page.progress_bar.setRange(0, 0)
         self.setCurrentIndex(TASK_PAGE_DOCKET_STATUS)
 
@@ -657,8 +687,24 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
         failed_slot = lambda err, w=worker, r=role: self._on_worker_failed(r, w, err)
         cancelled_slot = lambda w=worker, r=role: self._on_worker_cancelled(r, w)
         connections = [
-            (worker, worker.status, status_page.on_status),
-            (worker, worker.progress, status_page.on_progress),
+            (
+                worker,
+                worker.status,
+                lambda message, sp=status_page, r=role: self._on_worker_status(
+                    sp,
+                    r,
+                    message,
+                ),
+            ),
+            (
+                worker,
+                worker.progress,
+                lambda value, sp=status_page, r=role: self._on_worker_progress(
+                    sp,
+                    r,
+                    value,
+                ),
+            ),
             (worker, worker.finished, finished_slot),
             (worker, worker.failed, failed_slot),
             (worker, worker.cancelled, cancelled_slot),
@@ -666,6 +712,14 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
         for _worker, signal, slot in connections:
             signal.connect(slot)
         self._worker_connections = connections
+
+    def _on_worker_status(self, status_page: StatusPage, role: str, message: str) -> None:
+        status_page.on_status(message)
+        record_status(self, message, source=f"wizard.case_intake.{role}")
+
+    def _on_worker_progress(self, status_page: StatusPage, role: str, value: int) -> None:
+        status_page.on_progress(value)
+        record_progress(self, value, source=f"wizard.case_intake.{role}")
 
     def _on_worker_finished(self, role: str, worker, _output_path: str = "") -> None:
         if worker is not self._worker:
@@ -676,6 +730,15 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
             complaint_file = find_complaint_candidate(self._case_path)
             metadata = dict(metadata or {})
             metadata["complaint_file"] = complaint_file
+            finish_debug_run(
+                self,
+                status="success",
+                message="Complaint intake complete",
+                details={
+                    "complaint_file": complaint_file,
+                    "metadata_keys": sorted(metadata.keys()),
+                },
+            )
             self.load_review_state(metadata)
             return
         if role == "docket":
@@ -686,6 +749,12 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
             return
         if role == "complaint":
             self._retire_worker(worker)
+            finish_debug_run(
+                self,
+                status="error",
+                message=f"Complaint intake failed: {err}",
+                details={"error": err},
+            )
             self.complaint_status_page.on_status(f"FAILED: {err}")
             self.complaint_status_page.cancel_btn.setEnabled(True)
             self.complaint_status_page.cancel_btn.setText("Back to Intake")
@@ -698,6 +767,11 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
         if worker is not self._worker:
             return
         self._retire_worker(worker)
+        finish_debug_run(
+            self,
+            status="cancelled",
+            message=f"{role.title()} cancelled",
+        )
         if role == "docket":
             self.setCurrentIndex(TASK_PAGE_REVIEW)
         else:
@@ -706,9 +780,22 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
     def _on_cancel(self) -> None:
         if self._worker is not None:
             self._status_page_for_role(self._worker_role).on_status("Cancelling...")
+            emit_debug(
+                self,
+                phase="cancel",
+                message="Cancelling...",
+                source="wizard.ui",
+                details={"role": self._worker_role},
+            )
             try:
                 self._worker.cancel()
             except Exception:  # noqa: BLE001
+                finish_debug_run(
+                    self,
+                    status="cancelled",
+                    message="Cancellation failed; worker retired",
+                    details={"role": self._worker_role},
+                )
                 self._retire_worker(self._worker)
                 self.setCurrentIndex(TASK_PAGE_SETTINGS)
             return
@@ -734,6 +821,17 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
         except Exception as exc:  # noqa: BLE001
             summary = self._fallback_docket_summary(recent_lines, exc)
         self._last_summary = self._copy_summary(summary)
+        output_paths = self._summary_output_paths(summary)
+        finish_debug_run(
+            self,
+            status="success" if success and bool(summary.get("success", True)) else "error",
+            message=str(summary.get("status") or ("Docket complete" if success else "Docket failed")),
+            details={
+                "output_paths": output_paths,
+                "recent_lines": list(summary.get("recent_lines", []) or []),
+                "warning": str(summary.get("warning", "") or ""),
+            },
+        )
         self.output_page.show_summary(self._last_summary)
         self.setCurrentIndex(TASK_PAGE_OUTPUT)
         self._emit_task_completed(self._last_summary)
@@ -792,6 +890,12 @@ class CaseIntakeDocketTaskTab(WizardTaskContainer):
             worker.cancel()
         except Exception:  # noqa: BLE001
             pass
+        finish_debug_run(
+            self,
+            status="cancelled",
+            message="Task tab closed while worker was active",
+            details={"role": self._worker_role},
+        )
         self._retire_worker(worker)
 
     def _retire_worker(self, worker) -> None:

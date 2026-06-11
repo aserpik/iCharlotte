@@ -46,7 +46,6 @@ class MotionTypeConfig:
 _BASE_SECTIONS = [
     "Introduction",
     "Statement of Facts",
-    "Legal Standard",
     "Argument",
     "Conclusion",
 ]

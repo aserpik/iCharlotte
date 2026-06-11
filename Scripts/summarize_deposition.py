@@ -291,6 +291,9 @@ class DeponentExtractor:
 
 import json as _json  # local alias to avoid shadowing in helpers
 
+_TOPIC_DISCOVERY_CHUNK_CHAR_CAP = 90_000
+_TOPIC_DISCOVERY_MIN_SPLIT_FRACTION = 0.55
+
 
 def _parse_topic_response(response: str) -> list:
     """Parse the LLM topic-discovery response into a list of topic dicts.
@@ -369,6 +372,147 @@ def _parse_topic_response(response: str) -> list:
     return topics
 
 
+def _split_topic_discovery_text(text: str, max_chars: int = _TOPIC_DISCOVERY_CHUNK_CHAR_CAP) -> list:
+    """Split long transcript text into request-sized chunks for topic discovery."""
+    text = text or ""
+    if len(text) <= max_chars:
+        return [text]
+
+    chunks = []
+    start = 0
+    min_split_size = int(max_chars * _TOPIC_DISCOVERY_MIN_SPLIT_FRACTION)
+    while start < len(text):
+        hard_end = min(len(text), start + max_chars)
+        end = hard_end
+        if hard_end < len(text):
+            window_start = min(len(text), start + min_split_size)
+            split_points = [
+                text.rfind("\n\n", window_start, hard_end),
+                text.rfind("\nQ.", window_start, hard_end),
+                text.rfind("\nBY ", window_start, hard_end),
+            ]
+            split_at = max(split_points)
+            if split_at > start:
+                end = split_at
+
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+        start = end if end > start else hard_end
+
+    return chunks or [text]
+
+
+def _topic_dedupe_key(title: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", (title or "").lower()).strip()
+
+
+def _dedupe_topics(topics: list, limit: int = 25) -> list:
+    """Stable de-duplication for chunk-discovered topics."""
+    density_rank = {"high": 3, "medium": 2, "low": 1}
+    by_key = {}
+    order = []
+    for topic in topics:
+        title = str(topic.get("title", "")).strip()
+        key = _topic_dedupe_key(title)
+        if not key:
+            continue
+        density = str(topic.get("discussion_density", "medium")).lower()
+        if density not in density_rank:
+            density = "medium"
+        clean_topic = {
+            "id": 0,
+            "title": title,
+            "rank": len(order) + 1,
+            "discussion_density": density,
+        }
+        if key not in by_key:
+            by_key[key] = clean_topic
+            order.append(key)
+            continue
+        if density_rank[density] > density_rank[by_key[key]["discussion_density"]]:
+            by_key[key]["discussion_density"] = density
+
+    deduped = [by_key[key] for key in order]
+    if limit is not None:
+        deduped = deduped[:limit]
+    for i, topic in enumerate(deduped, 1):
+        topic["id"] = i
+        topic["rank"] = i
+    return deduped
+
+
+def _build_chunk_topic_prompt(topic_prompt: str, chunk_index: int, chunk_count: int) -> str:
+    return (
+        f"{topic_prompt}\n\n"
+        f"NOTE: This is transcript part {chunk_index} of {chunk_count}. "
+        "Identify only the testimony topics that appear in this part. "
+        "Return JSON only using the same schema."
+    )
+
+
+def _build_topic_consolidation_prompt(topic_prompt: str) -> str:
+    return (
+        f"{topic_prompt}\n\n"
+        "You are consolidating candidate topic lists discovered from chunks of "
+        "the same deposition transcript. Merge duplicates, preserve the most "
+        "legally significant and frequently recurring topics, and return one "
+        "ranked JSON array of 8 to 25 topics using the same schema. "
+        "The input below contains candidate topic lists, not transcript text."
+    )
+
+
+def _discover_topics(llm_caller, topic_prompt: str, text: str, logger) -> list:
+    chunks = _split_topic_discovery_text(text)
+    if len(chunks) == 1:
+        response = llm_caller.call(
+            topic_prompt,
+            chunks[0],
+            task_type="summary",
+            agent_id="agent_sum_depo",
+            pass_name="topic_discovery",
+        )
+        return _parse_topic_response(response)
+
+    logger.info(
+        "Large transcript detected; splitting topic discovery into "
+        f"{len(chunks)} chunks of up to {_TOPIC_DISCOVERY_CHUNK_CHAR_CAP} chars"
+    )
+    candidate_topics = []
+    for i, chunk in enumerate(chunks, 1):
+        logger.progress(40, f"Discovering topics from chunk {i}/{len(chunks)}...")
+        response = llm_caller.call(
+            _build_chunk_topic_prompt(topic_prompt, i, len(chunks)),
+            chunk,
+            task_type="summary",
+            agent_id="agent_sum_depo",
+            pass_name="topic_discovery",
+        )
+        chunk_topics = _parse_topic_response(response)
+        if not chunk_topics:
+            logger.warning(f"Topic discovery chunk {i}/{len(chunks)} returned no usable topics")
+            continue
+        candidate_topics.extend(chunk_topics)
+
+    if not candidate_topics:
+        return []
+
+    deduped_candidates = _dedupe_topics(candidate_topics, limit=None)
+    if len(deduped_candidates) <= 25:
+        return _dedupe_topics(deduped_candidates)
+
+    candidate_json = _json.dumps(deduped_candidates, ensure_ascii=False, indent=2)
+    response = llm_caller.call(
+        _build_topic_consolidation_prompt(topic_prompt),
+        candidate_json,
+        task_type="summary",
+        agent_id="agent_sum_depo",
+        pass_name="topic_discovery",
+    )
+    consolidated = _parse_topic_response(response)
+    return consolidated or _dedupe_topics(deduped_candidates)
+
+
 def process_topics(input_path: str, logger) -> bool:
     """Phase 1: extract text, discover topics, write session JSON, await input."""
     memory_monitor = MemoryMonitor(warn_threshold_mb=1500, abort_threshold_mb=2000, logger=logger.info)
@@ -406,18 +550,11 @@ def process_topics(input_path: str, logger) -> bool:
 
     logger.progress(40, "Calling LLM for topic discovery...")
     try:
-        response = llm_caller.call(
-            topic_prompt,
-            text,
-            task_type="summary",
-            agent_id="agent_sum_depo",
-            pass_name="topic_discovery",
-        )
+        topics = _discover_topics(llm_caller, topic_prompt, text, logger)
     except Exception as e:
         logger.pass_failed("Topic Discovery", str(e), recoverable=False)
         return False
 
-    topics = _parse_topic_response(response)
     if not topics:
         logger.error("Topic discovery returned no usable topics")
         return False
@@ -446,6 +583,7 @@ def process_topics(input_path: str, logger) -> bool:
 # =============================================================================
 
 _CONTEXT_DOC_PER_DOC_CHAR_CAP = 100_000
+_DEPOSITION_SUMMARY_CHUNK_CHAR_CAP = 90_000
 
 
 def _extract_doc_via_word_com(path: str, logger) -> str:
@@ -616,10 +754,10 @@ _resolve_bias_directive = _resolve_audience_directive
 
 
 def _build_topic_locked_prompt(base_prompt: str, *, topic_list: list, bullets_per_topic: int,
-                                deponent_label: str, custom_rules: str,
-                                audience_directive: str = "",
-                                tone_directive: str = "",
-                                context_documents: list = None,
+                               deponent_label: str, custom_rules: str,
+                               audience_directive: str = "",
+                               tone_directive: str = "",
+                               context_documents: list = None,
                                 bias_directive: str = None) -> str:
     """Render the topic-locked summary prompt with user-supplied substitutions.
 
@@ -674,6 +812,76 @@ def _build_topic_locked_prompt(base_prompt: str, *, topic_list: list, bullets_pe
             .replace("{tone_directive}", _strip_braces(tone_directive))
             .replace("{context_section}", context_section)
             .replace("{custom_rules}", _strip_braces(custom_rules) or "(none)"))
+
+
+def _build_chunk_summary_prompt(prompt: str, chunk_index: int, chunk_count: int) -> str:
+    return (
+        f"{prompt}\n\n"
+        f"NOTE: This is transcript part {chunk_index} of {chunk_count}. "
+        "Write the topic-locked summary for this part only. Preserve names, dates, "
+        "page/line-style references if present, admissions, contradictions, medical "
+        "details, and legally significant testimony so the final consolidated "
+        "deposition summary can cover the entire transcript."
+    )
+
+
+def _build_partial_summary_consolidation_prompt(prompt: str) -> str:
+    return (
+        f"{prompt}\n\n"
+        "You are consolidating partial deposition summaries generated from chunks "
+        "of the same transcript. Merge them into one coherent topic-locked "
+        "deposition summary. Remove duplicate bullets, preserve important names, "
+        "dates, admissions, contradictions, medical details, and legally significant "
+        "testimony. Do not add facts that are not present in the partial summaries.\n\n"
+        "The input below contains partial deposition summaries, not the original "
+        "transcript text."
+    )
+
+
+def _generate_topic_locked_summary(llm_caller, prompt: str, text: str, logger) -> str:
+    chunks = _split_topic_discovery_text(text, max_chars=_DEPOSITION_SUMMARY_CHUNK_CHAR_CAP)
+    if len(chunks) == 1:
+        return llm_caller.call(
+            prompt,
+            chunks[0],
+            task_type="summary",
+            agent_id="agent_sum_depo",
+            pass_name="summary",
+        )
+
+    logger.info(
+        "Large transcript detected; splitting narrative summary into "
+        f"{len(chunks)} chunks of up to {_DEPOSITION_SUMMARY_CHUNK_CHAR_CAP} chars"
+    )
+    partial_summaries = []
+    for i, chunk in enumerate(chunks, 1):
+        logger.progress(30, f"Generating summary chunk {i}/{len(chunks)}...")
+        partial = llm_caller.call(
+            _build_chunk_summary_prompt(prompt, i, len(chunks)),
+            chunk,
+            task_type="summary",
+            agent_id="agent_sum_depo",
+            pass_name="summary",
+        )
+        if not partial:
+            logger.error(f"Narrative summary chunk {i}/{len(chunks)} returned empty")
+            return None
+        partial_summaries.append(f"## Transcript Part {i}\n{partial.strip()}")
+
+    partial_text = "\n\n".join(partial_summaries)
+    logger.progress(60, "Consolidating partial deposition summaries...")
+    consolidated = llm_caller.call(
+        _build_partial_summary_consolidation_prompt(prompt),
+        partial_text,
+        task_type="summary",
+        agent_id="agent_sum_depo",
+        pass_name="summary",
+    )
+    if consolidated:
+        return consolidated
+
+    logger.warning("Partial summary consolidation returned empty; using partial summaries")
+    return partial_text
 
 
 def _register_outputs(input_path, summary, deponent_name, deponent_type, output_file, logger):
@@ -786,13 +994,7 @@ def process_summary(session_path: str, logger, output_path_override: str = None)
     logger.progress(30, "Generating summary...")
     try:
         with memory_monitor.track_operation("Narrative Summary"):
-            summary = llm_caller.call(
-                prompt,
-                text,
-                task_type="summary",
-                agent_id="agent_sum_depo",
-                pass_name="summary",
-            )
+            summary = _generate_topic_locked_summary(llm_caller, prompt, text, logger)
         if not summary:
             raise SummaryPassError("LLM returned empty summary")
     except Exception as e:

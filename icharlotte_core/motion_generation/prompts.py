@@ -38,11 +38,20 @@ You are drafting a {motion_type}. The relief and every argument MUST fit a \
 convert a motion in limine into a motion for summary judgment).
 
 Draft a persuasive memorandum that argues IN FAVOR of granting the motion and \
-the relief sought. Follow the section plan. Ground every case citation in the \
-authority pool below; do not cite cases from memory. Cite the controlling \
-statutes from the legal standard.
+the relief sought. Follow the required section plan exactly. Ground every case \
+citation in the authority pool below; do not cite cases from memory. Cite the \
+controlling statutes from the legal standard.
 
-LEGAL STANDARD (ground the Legal Standard section in this):
+REQUIRED MOTION FORMAT:
+- Use these top-level headings only, in this order: I. INTRODUCTION; \
+II. STATEMENT OF FACTS; III. ARGUMENT; IV. CONCLUSION.
+- Do not create a separate Legal Standard top-level heading. Work any legal \
+standard into the relevant Argument subheadings.
+- Under III. ARGUMENT, use three to four capital-letter subheadings (A., B., \
+C., and optionally D.) that state the main arguments supporting the motion.
+- Draft the memorandum within those headings and subheadings.
+
+LEGAL STANDARD (work this into the Argument section):
 {legal_standard}
 
 RELIEF SOUGHT:
@@ -105,11 +114,13 @@ Produce a JSON object exactly of the form:
   {{"outline": [{{"text": "<heading>", "children": [{{"text": "<subheading>"}}]}}]}}
 
 Rules:
-- Keep the SECTION SPINE below as the top-level headings, in order.
-- Under the "Argument" heading, add one subheading per DISTINCT legal argument \
-that supports THIS {motion_type}, phrased as a persuasive point heading (so a \
-motion in limine yields evidentiary-exclusion arguments, NOT summary-judgment \
-theories). You may nest sub-points. Map the GROUNDS below onto these \
+- Use these top-level headings only, in order: Introduction; Statement of \
+Facts; Argument; Conclusion.
+- Do not include Legal Standard as a top-level heading.
+- Under the "Argument" heading, add three to four capital-letter subheadings \
+for the DISTINCT legal arguments that support THIS {motion_type}, phrased as \
+persuasive point headings (so a motion in limine yields evidentiary-exclusion \
+arguments, NOT summary-judgment theories). Map the GROUNDS below onto these \
 subheadings.
 - Every heading must fit a {motion_type}; do not reframe it as a different \
 motion vehicle.

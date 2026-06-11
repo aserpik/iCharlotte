@@ -56,6 +56,25 @@ def test_load_opinion_cluster_map_caches_snapshot_rows(tmp_path):
     ]
 
 
+def test_load_opinion_cluster_map_parses_courtlistener_escaped_csv(tmp_path):
+    con = schema.connect(str(tmp_path / "c.db"))
+    schema.create_schema(con)
+    opinions = io.StringIO(
+        'id,plain_text,cluster_id\n'
+        '10,"The court said \\"hello, world\\" before ruling.",300\n'
+        '20,"Plain row.",200\n'
+    )
+
+    out = parenthetical_loader.load_opinion_cluster_map(
+        con,
+        opinions_stream=opinions,
+        snapshot_date="2026-03-31",
+        refresh=True,
+    )
+
+    assert out == {"10": "300", "20": "200"}
+
+
 def test_load_opinion_cluster_map_reuses_cache_without_stream(tmp_path):
     con = schema.connect(str(tmp_path / "c.db"))
     schema.create_schema(con)

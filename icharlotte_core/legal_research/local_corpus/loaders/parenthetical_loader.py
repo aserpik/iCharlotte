@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
 import re
 import sys
 from collections import defaultdict
@@ -24,6 +25,39 @@ except OverflowError:  # pragma: no cover - platform-dependent
 
 
 _PARENTHETICAL_ORDINAL_BASE = 1_000_000
+_OPINION_MAP_BATCH_SIZE = 100_000
+logger = logging.getLogger(__name__)
+
+
+def _cl_dict_reader(stream: TextIO) -> csv.DictReader:
+    # CourtListener bulk CSV uses backslash-escaped quotes in large text/html
+    # columns. The default csv dialect treats those quotes as structural and
+    # misaligns rows, which makes opinion_id -> cluster_id maps garbage.
+    return csv.DictReader(stream, escapechar="\\")
+
+
+def _meta_key(snapshot_date: str) -> str:
+    return f"opinion_map_complete:{snapshot_date}"
+
+
+def _get_meta(con, key: str) -> str:
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS corpus_meta ("
+        "key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+    )
+    row = con.execute("SELECT value FROM corpus_meta WHERE key=?", (key,)).fetchone()
+    return str(row["value"]) if row else ""
+
+
+def _set_meta(con, key: str, value: str) -> None:
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS corpus_meta ("
+        "key TEXT PRIMARY KEY, value TEXT NOT NULL)"
+    )
+    con.execute(
+        "INSERT OR REPLACE INTO corpus_meta (key, value) VALUES (?, ?)",
+        (key, value),
+    )
 
 
 class OpinionClusterLookup(Mapping[str, str]):
@@ -117,33 +151,58 @@ def load_opinion_cluster_map(
     snapshot_date: str,
     refresh: bool = False,
 ) -> Mapping[str, str]:
+    complete_key = _meta_key(snapshot_date)
     if not refresh:
         cached = con.execute(
             "SELECT 1 FROM courtlistener_opinion_map WHERE snapshot_date=? LIMIT 1",
             (snapshot_date,),
         ).fetchone()
-        if cached:
+        if cached and _get_meta(con, complete_key) != "0":
             return OpinionClusterLookup(con, snapshot_date)
     if opinions_stream is None:
         raise ValueError("opinions_stream is required when no cached opinion map exists")
 
-    if refresh:
-        con.execute(
-            "DELETE FROM courtlistener_opinion_map WHERE snapshot_date=?",
-            (snapshot_date,),
-        )
+    con.execute(
+        "DELETE FROM courtlistener_opinion_map WHERE snapshot_date=?",
+        (snapshot_date,),
+    )
+    _set_meta(con, complete_key, "0")
+    con.commit()
 
-    for row in csv.DictReader(opinions_stream):
+    pending: list[tuple[str, str, str]] = []
+    seen = 0
+    inserted = 0
+    for row in _cl_dict_reader(opinions_stream):
+        seen += 1
         opinion_id = (row.get("id") or "").strip()
         cluster_id = (row.get("cluster_id") or "").strip()
         if not opinion_id or not cluster_id:
             continue
-        con.execute(
+        pending.append((opinion_id, cluster_id, snapshot_date))
+        if len(pending) >= _OPINION_MAP_BATCH_SIZE:
+            con.executemany(
+                "INSERT OR REPLACE INTO courtlistener_opinion_map "
+                "(opinion_id, cluster_id, snapshot_date) VALUES (?,?,?)",
+                pending,
+            )
+            inserted += len(pending)
+            pending.clear()
+            con.commit()
+            logger.info(
+                "CL parentheticals: cached %d opinion map rows after %d opinion rows",
+                inserted,
+                seen,
+            )
+    if pending:
+        con.executemany(
             "INSERT OR REPLACE INTO courtlistener_opinion_map "
             "(opinion_id, cluster_id, snapshot_date) VALUES (?,?,?)",
-            (opinion_id, cluster_id, snapshot_date),
+            pending,
         )
+        inserted += len(pending)
+    _set_meta(con, complete_key, "1")
     con.commit()
+    logger.info("CL parentheticals: cached %d opinion map rows total", inserted)
     return OpinionClusterLookup(con, snapshot_date)
 
 
@@ -157,7 +216,7 @@ def build_cluster_case_map(con, *, citations_stream: TextIO | None) -> dict[str,
         return out
 
     by_citation = _local_citation_index(con)
-    for row in csv.DictReader(citations_stream):
+    for row in _cl_dict_reader(citations_stream):
         reporter = (row.get("reporter") or "").strip()
         if not _is_ca_reporter(reporter):
             continue
@@ -199,7 +258,7 @@ def iter_parenthetical_passages(
     min_score = float(min_score)
     buckets: dict[str, list[tuple[float, str, PassageRecord]]] = defaultdict(list)
 
-    for row in csv.DictReader(parentheticals_stream):
+    for row in _cl_dict_reader(parentheticals_stream):
         parenthetical_id = (row.get("id") or "").strip()
         text = normalize_text(row.get("text") or "")
         score = _float_score(row.get("score") or "")

@@ -42,6 +42,7 @@ def test_iter_cases_yields_normalized_case_and_passages():
     assert case.parallel_citations == ["131 Cal. Rptr. 2d 1"]
     assert case.court == "Cal."
     assert case.year == "2003"
+    assert case.url == "https://static.case.law/cal-4th/30/html/0043-01.html"
     assert "536 U.S. 584" in case.cites_to
     assert "duty" in case.full_text
     assert passages, "expected at least one passage"

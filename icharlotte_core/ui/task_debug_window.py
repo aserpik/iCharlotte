@@ -11,11 +11,18 @@ from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QGridLayout,
     QHBoxLayout,
     QHeaderView,
+    QLabel,
     QLineEdit,
     QMainWindow,
+    QPlainTextEdit,
     QPushButton,
+    QScrollArea,
+    QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -24,6 +31,64 @@ from PySide6.QtWidgets import (
 
 from icharlotte_core import task_debug
 from icharlotte_core.task_debug import TaskDebugEvent
+
+
+class TaskDebugRowDetailsDialog(QDialog):
+    """Expanded read-only view of every table column for one debug event."""
+
+    def __init__(
+        self,
+        headers: list[str],
+        values: list[str],
+        parent: QWidget | None = None,
+    ) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Task Debug Row Details")
+        self.resize(900, 700)
+
+        content = QWidget(self)
+        grid = QGridLayout(content)
+        grid.setContentsMargins(12, 12, 12, 12)
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(10)
+
+        for row, (header, value) in enumerate(zip(headers, values)):
+            label = QLabel(header)
+            label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+            label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            editor = QPlainTextEdit()
+            editor.setObjectName(f"detail_{row}")
+            editor.setReadOnly(True)
+            editor.setPlainText(value)
+            editor.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+            editor.setMinimumHeight(self._height_for_value(value))
+            editor.setSizePolicy(
+                QSizePolicy.Policy.Expanding,
+                QSizePolicy.Policy.MinimumExpanding,
+            )
+            grid.addWidget(label, row, 0)
+            grid.addWidget(editor, row, 1)
+        grid.setColumnStretch(1, 1)
+
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setWidget(content)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(self.reject)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(scroll)
+        layout.addWidget(buttons)
+
+    @staticmethod
+    def _height_for_value(value: str) -> int:
+        line_count = max(1, value.count("\n") + 1)
+        if len(value) > 500:
+            return 180
+        if len(value) > 160 or line_count > 2:
+            return 110
+        return 54
 
 
 class TaskDebugWindow(QMainWindow):
@@ -49,6 +114,17 @@ class TaskDebugWindow(QMainWindow):
         "Details",
     ]
 
+    INITIAL_COLUMN_WIDTHS = {
+        COL_TIME: 220,
+        COL_TASK: 190,
+        COL_SOURCE: 190,
+        COL_LEVEL: 80,
+        COL_PHASE: 130,
+        COL_MESSAGE: 360,
+        COL_ELAPSED: 95,
+        COL_DETAILS: 420,
+    }
+
     ALL_TASKS = "All tasks"
     ALL_SOURCES = "All sources"
     ALL_LEVELS = "All levels"
@@ -58,6 +134,7 @@ class TaskDebugWindow(QMainWindow):
         self.setWindowTitle("Task Debug Console")
         self.resize(1100, 620)
         self._events: list[TaskDebugEvent] = list(task_debug.get_events())
+        self._visible_events: list[TaskDebugEvent] = []
         self._updating_filters = False
 
         self.task_filter = QComboBox()
@@ -96,8 +173,11 @@ class TaskDebugWindow(QMainWindow):
         self.table.setSortingEnabled(False)
         self.table.verticalHeader().setVisible(False)
         header = self.table.horizontalHeader()
-        header.setSectionResizeMode(self.COL_MESSAGE, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(self.COL_DETAILS, QHeaderView.ResizeMode.Stretch)
+        header.setStretchLastSection(False)
+        header.setMinimumSectionSize(48)
+        for col in range(len(self.HEADERS)):
+            header.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
+            self.table.setColumnWidth(col, self.INITIAL_COLUMN_WIDTHS.get(col, 120))
 
         filters = QHBoxLayout()
         filters.addWidget(self.task_filter, 2)
@@ -125,6 +205,7 @@ class TaskDebugWindow(QMainWindow):
         self.clear_btn.clicked.connect(self._clear_events)
         self.copy_btn.clicked.connect(self._copy_visible_rows)
         self.open_folder_btn.clicked.connect(self._open_trace_folder)
+        self.table.cellDoubleClicked.connect(self._show_row_details)
 
     def _on_filter_changed(self) -> None:
         if self._updating_filters:
@@ -220,6 +301,7 @@ class TaskDebugWindow(QMainWindow):
 
     def _rebuild_table(self, *, scroll_to_bottom: bool) -> None:
         visible = [event for event in self._events if self._matches_filters(event)]
+        self._visible_events = visible
         self.table.setRowCount(0)
         for event in visible:
             self._append_row(event)
@@ -229,7 +311,30 @@ class TaskDebugWindow(QMainWindow):
     def _append_row(self, event: TaskDebugEvent) -> None:
         row = self.table.rowCount()
         self.table.insertRow(row)
-        values = [
+        values = self._event_values(event)
+        for col, value in enumerate(values):
+            item = QTableWidgetItem(value)
+            if col == self.COL_LEVEL:
+                item.setData(Qt.ItemDataRole.UserRole, event.level)
+            self.table.setItem(row, col, item)
+
+    def _show_row_details(self, row: int, _column: int) -> None:
+        dialog = self._build_row_details_dialog(row)
+        if dialog is None:
+            return
+        dialog.exec()
+
+    def _build_row_details_dialog(self, row: int) -> TaskDebugRowDetailsDialog | None:
+        if row < 0 or row >= len(self._visible_events):
+            return None
+        return TaskDebugRowDetailsDialog(
+            self.HEADERS,
+            self._event_values(self._visible_events[row]),
+            parent=self,
+        )
+
+    def _event_values(self, event: TaskDebugEvent) -> list[str]:
+        return [
             event.timestamp,
             self._task_label(event),
             event.source,
@@ -239,11 +344,6 @@ class TaskDebugWindow(QMainWindow):
             str(event.elapsed_ms),
             self._details_text(event),
         ]
-        for col, value in enumerate(values):
-            item = QTableWidgetItem(value)
-            if col == self.COL_LEVEL:
-                item.setData(Qt.ItemDataRole.UserRole, event.level)
-            self.table.setItem(row, col, item)
 
     def _matches_filters(self, event: TaskDebugEvent) -> bool:
         task_key = self.task_filter.currentData()

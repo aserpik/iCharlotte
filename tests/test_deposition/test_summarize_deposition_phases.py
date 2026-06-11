@@ -133,6 +133,95 @@ def test_phase1_caps_topic_count_at_25(isolated_sessions, capsys, monkeypatch):
     assert data["topics"][-1]["title"] == "Topic 25"
 
 
+def test_phase1_chunks_large_transcript_for_topic_discovery(isolated_sessions, capsys, monkeypatch):
+    large_transcript = FAKE_TRANSCRIPT + (
+        "\nQ. Please describe the incident.\n"
+        "A. I was asked about treatment, pain, work limits, and prior injuries.\n"
+    ) * 2200
+
+    def fake_extract(self, path):
+        return SimpleNamespace(
+            success=True,
+            text=large_transcript,
+            char_count=len(large_transcript),
+            page_count=130,
+            ocr_pages=[],
+            ocr_percentage=0.0,
+            error=None,
+        )
+
+    calls = []
+
+    def fake_call(self, prompt, text, task_type=None, agent_id=None, pass_name=None, **kwargs):
+        calls.append({
+            "prompt": prompt,
+            "text_len": len(text),
+            "task_type": task_type,
+            "agent_id": agent_id,
+            "pass_name": pass_name,
+        })
+        if len(text) > 95_000:
+            return None
+        if "candidate topic lists" in prompt.lower():
+            return json.dumps([
+                {"title": "Incident Description", "rank": 1, "discussion_density": "high"},
+                {"title": "Medical Treatment", "rank": 2, "discussion_density": "high"},
+            ])
+        return json.dumps([
+            {"title": "Incident Description", "rank": 1, "discussion_density": "high"},
+            {"title": "Medical Treatment", "rank": 2, "discussion_density": "medium"},
+        ])
+
+    monkeypatch.setattr(
+        summarize_deposition.DocumentProcessor,
+        "extract_with_dynamic_ocr",
+        fake_extract,
+    )
+    monkeypatch.setattr(summarize_deposition.LLMCaller, "call", fake_call)
+
+    input_path = str(isolated_sessions / "Long Depo.pdf")
+    Path(input_path).write_bytes(b"%PDF-1.4\n")
+    logger = summarize_deposition.AgentLogger("DepositionTest", log_to_file=False)
+    result = summarize_deposition.process_topics(input_path, logger)
+
+    assert result is True
+    discovery_calls = [
+        c for c in calls
+        if c["agent_id"] == "agent_sum_depo" and c["pass_name"] == "topic_discovery"
+    ]
+    assert len(discovery_calls) >= 2
+    assert all(c["text_len"] <= 95_000 for c in discovery_calls)
+
+    out = capsys.readouterr().out
+    session_path = Path([ln for ln in out.splitlines() if ln.startswith("AWAITING_INPUT:")][-1][len("AWAITING_INPUT:"):])
+    data = json.loads(session_path.read_text(encoding="utf-8"))
+    assert [t["title"] for t in data["topics"]][:2] == [
+        "Incident Description",
+        "Medical Treatment",
+    ]
+
+
+def test_deposition_chunk_caps_limit_known_large_transcripts_to_two_calls():
+    block = (
+        "\nQ. Please describe the incident, medical treatment, symptoms, "
+        "work limits, and damages.\n"
+        "A. The witness gave detailed testimony about those topics.\n"
+    )
+    transcript = FAKE_TRANSCRIPT + (block * 1140)
+    assert 166_000 < len(transcript) < 180_000
+
+    topic_chunks = summarize_deposition._split_topic_discovery_text(transcript)
+    summary_chunks = summarize_deposition._split_topic_discovery_text(
+        transcript,
+        max_chars=summarize_deposition._DEPOSITION_SUMMARY_CHUNK_CHAR_CAP,
+    )
+
+    assert len(topic_chunks) == 2
+    assert len(summary_chunks) == 2
+    assert max(len(chunk) for chunk in topic_chunks) <= 95_000
+    assert max(len(chunk) for chunk in summary_chunks) <= 95_000
+
+
 # ---------------------------------------------------------------------------
 # Phase 2
 # ---------------------------------------------------------------------------
@@ -721,3 +810,60 @@ def test_phase2_keeps_session_alive_after_success(tmp_path, monkeypatch):
     # Session + cached text MUST still exist after a successful phase 2.
     assert session_path.exists()
     assert cached_path.exists()
+
+
+def test_phase2_chunks_large_cached_transcript_for_summary(tmp_path, monkeypatch):
+    large_text = FAKE_TRANSCRIPT + (
+        "\nQ. Tell me about the incident.\n"
+        "A. We covered liability, medical treatment, symptoms, work limits, and damages.\n"
+    ) * 1500
+    session_path = _write_ready_session(
+        tmp_path,
+        cross_check=False,
+        selected=["Incident Description", "Medical Treatment"],
+        added=[],
+    )
+    session = session_manager.read_session(session_path)
+    Path(session["cached_text_path"]).write_text(large_text, encoding="utf-8")
+
+    calls = []
+
+    def fake_call(self, prompt, text, task_type=None, agent_id=None, pass_name=None, **kwargs):
+        calls.append({
+            "prompt": prompt,
+            "text_len": len(text),
+            "task_type": task_type,
+            "agent_id": agent_id,
+            "pass_name": pass_name,
+        })
+        if text and len(text) > 95_000:
+            return None
+        if "partial deposition summaries" in prompt.lower():
+            return "**Incident Description**\n- Final consolidated point."
+        return "**Incident Description**\n- Chunk point."
+
+    saved = {}
+
+    def fake_save(summary, output_path, deponent_name, deposition_date, logger):
+        saved["summary"] = summary
+        saved["output_path"] = output_path
+        return True
+
+    monkeypatch.setattr(summarize_deposition.LLMCaller, "call", fake_call)
+    monkeypatch.setattr(summarize_deposition, "save_to_docx", fake_save)
+    monkeypatch.setattr(summarize_deposition, "_register_outputs", lambda *a, **kw: None,
+                        raising=False)
+
+    ok = summarize_deposition.process_summary(
+        str(session_path),
+        summarize_deposition.AgentLogger("Phase2ChunkTest", log_to_file=False),
+    )
+
+    assert ok is True
+    summary_calls = [
+        c for c in calls
+        if c["agent_id"] == "agent_sum_depo" and c["pass_name"] == "summary"
+    ]
+    assert len(summary_calls) >= 2
+    assert all(c["text_len"] <= 95_000 for c in summary_calls)
+    assert saved["summary"] == "**Incident Description**\n- Final consolidated point."

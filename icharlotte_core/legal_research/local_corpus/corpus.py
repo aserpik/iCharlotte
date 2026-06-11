@@ -12,6 +12,7 @@ import os
 import re
 import sqlite3
 import threading
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -25,17 +26,121 @@ logger = logging.getLogger(__name__)
 _RRF_K = 60          # standard reciprocal-rank-fusion constant
 _CANDIDATES = 100    # passages pulled per retrieval arm before fusion
 _QUALITY_WEIGHT = 0.02
+_FTS_OVERFETCH_FACTOR = 8
+_SEMANTIC_OVERFETCH_FACTOR = 8
+_SEMANTIC_MIN_CANDIDATES = 128
+_SQLITE_IN_BATCH = 900
+_CASE_COLUMNS = (
+    "case_uid, source, name, name_abbreviation, citation, parallel_citations, "
+    "court, decision_date, year, docket_number, url, full_text, "
+    "citation_count, latest_citing_year, cites_to, published_status, citable"
+)
+_CA_CITATION_RE = re.compile(
+    r"\b\d+\s+Cal\.?\s*(?:App\.?\s*)?(?:Rptr\.?\s*)?"
+    r"\d*(?:st|nd|rd|th|d)?\s+\d+\b",
+    re.I,
+)
 
 _METADATA_STOP = {
     "the", "and", "for", "with", "from", "that", "this", "motion", "party",
     "parties", "burden", "standard", "issue", "issues", "judgment", "summary",
+    "of", "in", "to", "on", "by", "as", "at", "is", "are",
 }
+_STRICT_FTS_MIN_CASES = 8
+
+
+@dataclass(frozen=True)
+class _PassageHit:
+    case_uid: str
+    text: str
+    passage_type: str
+    parenthetical_id: str
+    page_label: str
+
+
+def _fts_terms(q: str, *, drop_stopwords: bool) -> list[str]:
+    terms = re.findall(r"[A-Za-z0-9]+", q or "")
+    if drop_stopwords:
+        return [
+            term
+            for term in terms
+            if len(term) > 2 and term.lower() not in _METADATA_STOP
+        ]
+    return terms
+
+
+def _quote_fts_terms(terms: list[str], operator: str) -> str:
+    if not terms:
+        return '""'
+    joiner = f" {operator} " if operator else " "
+    return joiner.join(f'"{term}"' for term in terms)
 
 
 def _fts_query(q: str) -> str:
-    # OR the bare terms so partial overlaps still match; quote to neutralize FTS syntax.
-    terms = re.findall(r"[A-Za-z0-9]+", q or "")
-    return " OR ".join(f'"{t}"' for t in terms) if terms else '""'
+    # Broad fallback: OR the bare terms so partial overlaps still match; quote
+    # to neutralize FTS syntax.
+    return _quote_fts_terms(_fts_terms(q, drop_stopwords=False), "OR")
+
+
+def _strict_fts_query(q: str) -> str:
+    # First-pass issue research should require all meaningful terms. This keeps
+    # generic legal words such as "control" from swamping stronger doctrinal hits.
+    return _quote_fts_terms(_fts_terms(q, drop_stopwords=True), "")
+
+
+def _snippet_terms(query: str) -> list[str]:
+    seen: set[str] = set()
+    terms: list[str] = []
+    for term in re.findall(r"[A-Za-z][A-Za-z0-9]+", query or ""):
+        lowered = term.lower()
+        if len(lowered) <= 2 or lowered in _METADATA_STOP or lowered in seen:
+            continue
+        seen.add(lowered)
+        terms.append(lowered)
+    return terms
+
+
+def _best_snippet_window(text: str, query: str, *, max_chars: int = 650) -> str:
+    clean = re.sub(r"\s+", " ", text or "").strip()
+    if len(clean) <= max_chars:
+        return clean
+    terms = _snippet_terms(query)
+    if not terms:
+        return clean[:max_chars].rstrip() + " ..."
+
+    lower_text = clean.lower()
+    hits: list[tuple[int, int]] = []
+    for term in terms:
+        start = 0
+        while True:
+            idx = lower_text.find(term, start)
+            if idx < 0:
+                break
+            hits.append((idx, len(term)))
+            start = idx + len(term)
+    if not hits:
+        return clean[:max_chars].rstrip() + " ..."
+
+    hit_positions = sorted(idx for idx, _length in hits)
+    best_start = 0
+    best_score = -1.0
+    for idx, length in hits:
+        start = max(0, idx - 220)
+        end = min(len(clean), start + max_chars)
+        score = sum(1 for pos in hit_positions if start <= pos < end)
+        if start <= idx and idx + length <= end:
+            score += 0.25
+        if score > best_score:
+            best_score = score
+            best_start = start
+
+    end = min(len(clean), best_start + max_chars)
+    snippet = clean[best_start:end].strip()
+    if best_start > 0:
+        snippet = "... " + snippet
+    if end < len(clean):
+        snippet = snippet.rstrip() + " ..."
+    return snippet
 
 
 class LocalCaseCorpus:
@@ -51,6 +156,7 @@ class LocalCaseCorpus:
         # (set in schema.connect) makes concurrent readers safe.
         self._local = threading.local()
         self._vectors: np.ndarray | None = None
+        self._passage_type_counts: dict[str, int] = {}
 
     # ---- lazy resources -------------------------------------------------
     def _conn(self) -> sqlite3.Connection:
@@ -76,52 +182,151 @@ class LocalCaseCorpus:
         return self._vectors
 
     # ---- retrieval arms -------------------------------------------------
-    def _bm25_case_ranking(self, query: str, limit: int) -> list[str]:
-        con = self._conn()
-        try:
-            rows = con.execute(
-                "SELECT p.case_uid AS uid, bm25(passages_fts) AS score "
-                "FROM passages_fts JOIN passages p ON p.vec_row = passages_fts.rowid - 1 "
-                "WHERE p.passage_type='opinion' AND passages_fts MATCH ? "
-                "ORDER BY score LIMIT ?",
-                (_fts_query(query), limit),
-            ).fetchall()
-        except sqlite3.OperationalError:
-            logger.debug("opinion-only BM25 failed; falling back to all passages", exc_info=True)
-            rows = con.execute(
-                "SELECT p.case_uid AS uid, bm25(passages_fts) AS score "
-                "FROM passages_fts JOIN passages p ON p.vec_row = passages_fts.rowid - 1 "
-                "WHERE passages_fts MATCH ? ORDER BY score LIMIT ?",
-                (_fts_query(query), limit),
-            ).fetchall()
-        seen, order = set(), []
-        for r in rows:                       # bm25() ascending = best first
-            if r["uid"] not in seen:
-                seen.add(r["uid"]); order.append(r["uid"])
-        return order
+    def _passage_type_count(self, passage_type: str) -> int:
+        if passage_type not in self._passage_type_counts:
+            try:
+                count = self._conn().execute(
+                    "SELECT COUNT(*) FROM passages WHERE passage_type=?",
+                    (passage_type,),
+                ).fetchone()[0]
+            except sqlite3.OperationalError:
+                count = 0
+            self._passage_type_counts[passage_type] = int(count or 0)
+        return self._passage_type_counts[passage_type]
 
-    def _parenthetical_case_ranking(self, query: str, limit: int) -> list[str]:
+    def _fts_case_ranking(
+        self,
+        query: str,
+        limit: int,
+        *,
+        passage_type: str,
+    ) -> tuple[list[str], dict[str, _PassageHit]]:
+        variants = []
+        strict_query = _strict_fts_query(query)
+        broad_query = _fts_query(query)
+        if strict_query != '""':
+            variants.append(strict_query)
+        if broad_query not in variants:
+            variants.append(broad_query)
+        if not variants:
+            return [], {}
+
+        order: list[str] = []
+        snippets: dict[str, _PassageHit] = {}
+        seen: set[str] = set()
+        for idx, match_query in enumerate(variants):
+            arm_order, arm_snippets = self._fts_case_ranking_for_match(
+                match_query,
+                limit,
+                passage_type=passage_type,
+            )
+            for uid in arm_order:
+                if uid in seen:
+                    continue
+                seen.add(uid)
+                order.append(uid)
+                if uid in arm_snippets:
+                    snippets[uid] = arm_snippets[uid]
+                if len(order) >= limit:
+                    break
+            if idx == 0 and len(order) >= min(_STRICT_FTS_MIN_CASES, limit):
+                break
+            if len(order) >= limit:
+                break
+        return order, snippets
+
+    def _fts_case_ranking_for_match(
+        self,
+        match_query: str,
+        limit: int,
+        *,
+        passage_type: str,
+    ) -> tuple[list[str], dict[str, _PassageHit]]:
         con = self._conn()
+        if self._passage_type_count(passage_type) <= 0:
+            return [], {}
+        overfetch = max(limit, limit * _FTS_OVERFETCH_FACTOR)
         try:
-            rows = con.execute(
-                "SELECT p.case_uid AS uid, bm25(passages_fts) AS score "
-                "FROM passages_fts JOIN passages p ON p.vec_row = passages_fts.rowid - 1 "
-                "WHERE p.passage_type='parenthetical' AND passages_fts MATCH ? "
+            fts_rows = con.execute(
+                "SELECT rowid, bm25(passages_fts) AS score "
+                "FROM passages_fts WHERE passages_fts MATCH ? "
                 "ORDER BY score LIMIT ?",
-                (_fts_query(query), limit),
+                (match_query, overfetch),
             ).fetchall()
         except sqlite3.OperationalError:
-            logger.debug("parenthetical ranking skipped; schema lacks passage_type", exc_info=True)
-            return []
-        seen, order = set(), []
-        for r in rows:
-            if r["uid"] not in seen:
-                seen.add(r["uid"]); order.append(r["uid"])
-        return order
+            logger.debug("%s FTS ranking failed", passage_type, exc_info=True)
+            return [], {}
+        if not fts_rows:
+            return [], {}
+
+        vec_rows = [int(row["rowid"]) - 1 for row in fts_rows]
+        placeholders = ",".join("?" for _ in vec_rows)
+        try:
+            passage_rows = con.execute(
+                "SELECT vec_row, case_uid, text, passage_type, parenthetical_id, page_label "
+                f"FROM passages INDEXED BY idx_passages_vec WHERE vec_row IN ({placeholders}) "
+                "AND passage_type=?",
+                [*vec_rows, passage_type],
+            ).fetchall()
+        except sqlite3.OperationalError:
+            logger.debug("%s passage lookup failed", passage_type, exc_info=True)
+            return [], {}
+        passages_by_vec = {
+            int(row["vec_row"]): row
+            for row in passage_rows
+            if row["vec_row"] is not None
+        }
+
+        seen: set[str] = set()
+        order: list[str] = []
+        snippets: dict[str, _PassageHit] = {}
+        for fts_row in fts_rows:             # bm25() ascending = best first
+            passage = passages_by_vec.get(int(fts_row["rowid"]) - 1)
+            if passage is None:
+                continue
+            uid = passage["case_uid"]
+            if uid in seen:
+                continue
+            seen.add(uid)
+            order.append(uid)
+            snippets[uid] = _PassageHit(
+                case_uid=uid,
+                text=passage["text"] or "",
+                passage_type=passage["passage_type"] or "",
+                parenthetical_id=passage["parenthetical_id"] or "",
+                page_label=passage["page_label"] or "",
+            )
+            if len(order) >= limit:
+                break
+        return order, snippets
+
+    def _bm25_case_ranking(self, query: str, limit: int) -> tuple[list[str], dict[str, _PassageHit]]:
+        return self._fts_case_ranking(query, limit, passage_type="opinion")
+
+    def _parenthetical_case_ranking(self, query: str, limit: int) -> tuple[list[str], dict[str, _PassageHit]]:
+        return self._fts_case_ranking(query, limit, passage_type="parenthetical")
 
     @staticmethod
     def _norm_citation(citation: str) -> str:
         return re.sub(r"[^a-z0-9]+", "", (citation or "").lower())
+
+    @staticmethod
+    def _citation_variants(citation: str) -> list[str]:
+        text = re.sub(r"\s+", " ", (citation or "").strip())
+        if not text:
+            return []
+        variants = {text}
+        spaced = re.sub(r"\bCal\.?\s*App\.?\s*", "Cal. App. ", text, flags=re.I)
+        spaced = re.sub(r"\bCal\.?\s*Rptr\.?\s*", "Cal. Rptr. ", spaced, flags=re.I)
+        spaced = re.sub(r"\bCal\.?\s*(\d)", r"Cal. \1", spaced, flags=re.I)
+        spaced = re.sub(r"\s+", " ", spaced).strip()
+        variants.add(spaced)
+        return sorted(variants)
+
+    @staticmethod
+    def _extract_citation(text: str) -> str:
+        match = _CA_CITATION_RE.search(text or "")
+        return match.group(0).strip() if match else ""
 
     @staticmethod
     def _is_citable_row(row) -> bool:
@@ -179,6 +384,8 @@ class LocalCaseCorpus:
                 continue
             hay_name = f"{row['name'] or ''} {row['name_abbreviation'] or ''}".lower()
             hay_cite = f"{row['citation'] or ''} {row['parallel_citations'] or ''}".lower()
+            name_matches = sum(1 for term in terms if term in hay_name)
+            cite_matches = sum(1 for term in terms if term in hay_cite)
             score = 0.0
             for term in terms:
                 if term in hay_name:
@@ -190,42 +397,81 @@ class LocalCaseCorpus:
                 row_cites.extend(json.loads(row["parallel_citations"] or "[]"))
             except (TypeError, ValueError):
                 pass
-            if any(self._norm_citation(cite) and self._norm_citation(cite) in norm_query for cite in row_cites):
+            exact_citation_match = any(
+                self._norm_citation(cite) and self._norm_citation(cite) in norm_query
+                for cite in row_cites
+            )
+            if exact_citation_match:
                 score += 30.0
-            if score > 0:
+
+            term_count = max(len(terms), 1)
+            name_match_ratio = name_matches / term_count
+            strong_name_lookup = (
+                name_matches == term_count
+                or (name_matches >= 2 and name_match_ratio >= 0.75)
+            )
+            strong_citation_lookup = exact_citation_match or cite_matches > 0
+            if score > 0 and (strong_name_lookup or strong_citation_lookup):
                 score += self._quality_score(row)
                 scored.append((score, row["case_uid"]))
         scored.sort(key=lambda item: (-item[0], item[1]))
         return [uid for _score, uid in scored[:limit]]
 
+    def _opinion_cases_for_vec_rows(self, vec_rows: list[int]) -> dict[int, str]:
+        if not vec_rows:
+            return {}
+        out: dict[int, str] = {}
+        con = self._conn()
+        for start in range(0, len(vec_rows), _SQLITE_IN_BATCH):
+            batch = vec_rows[start : start + _SQLITE_IN_BATCH]
+            placeholders = ",".join("?" for _ in batch)
+            rows = con.execute(
+                "SELECT vec_row, case_uid FROM passages INDEXED BY idx_passages_vec "
+                f"WHERE vec_row IN ({placeholders}) AND passage_type='opinion'",
+                batch,
+            ).fetchall()
+            for row in rows:
+                if row["vec_row"] is not None:
+                    out[int(row["vec_row"])] = row["case_uid"]
+        return out
+
     def _semantic_case_ranking(self, query: str, limit: int) -> list[str]:
         vecs = self._vecs()
         if vecs.shape[0] == 0:
             return []
-        from icharlotte_core.legal_research.local_corpus.embedder import cosine_topk
         qv = self.embedder.encode([query])[0].astype(np.float32)
-        con = self._conn()
-        rows = con.execute(
-            "SELECT vec_row, case_uid FROM passages "
-            "WHERE passage_type='opinion' AND vec_row IS NOT NULL ORDER BY vec_row"
-        ).fetchall()
-        opinion_rows: list[int] = []
-        case_by_vec_row: dict[int, str] = {}
-        for row in rows:
-            vec_row = int(row["vec_row"])
-            if 0 <= vec_row < vecs.shape[0]:
-                opinion_rows.append(vec_row)
-                case_by_vec_row[vec_row] = row["case_uid"]
-        if not opinion_rows:
+        qn = np.linalg.norm(qv)
+        if qn > 0:
+            qv = qv / qn
+        sims = vecs @ qv
+        n_vectors = int(sims.shape[0])
+        if n_vectors <= 0:
             return []
-        matrix = vecs[np.asarray(opinion_rows, dtype=np.int64)].astype(np.float32)
-        idx, _scores = cosine_topk(qv, matrix, k=limit)
-        order, seen = [], set()
-        for matrix_row in idx.tolist():
-            vec_row = opinion_rows[int(matrix_row)]
-            case_uid = case_by_vec_row[vec_row]
-            if case_uid not in seen:
-                seen.add(case_uid); order.append(case_uid)
+
+        top_k = min(
+            n_vectors,
+            max(limit * _SEMANTIC_OVERFETCH_FACTOR, _SEMANTIC_MIN_CANDIDATES, limit),
+        )
+        order: list[str] = []
+        seen: set[str] = set()
+        while True:
+            idx = np.argpartition(-sims, top_k - 1)[:top_k]
+            idx = idx[np.argsort(-sims[idx])]
+            vec_rows = [int(value) for value in idx.tolist()]
+            case_by_vec_row = self._opinion_cases_for_vec_rows(vec_rows)
+            order.clear()
+            seen.clear()
+            for vec_row in vec_rows:
+                case_uid = case_by_vec_row.get(vec_row)
+                if not case_uid or case_uid in seen:
+                    continue
+                seen.add(case_uid)
+                order.append(case_uid)
+                if len(order) >= limit:
+                    return order
+            if len(order) >= limit or top_k >= n_vectors:
+                return order
+            top_k = min(n_vectors, max(top_k * 2, top_k + limit))
         return order
 
     @staticmethod
@@ -283,9 +529,21 @@ class LocalCaseCorpus:
     # ---- public interface (mirrors CourtListenerClient) -----------------
     def search_opinions(self, query: str, *, semantic: bool = False,
                         max_results: int = 15, published_only: bool = True) -> list[CaseResult]:
+        citation = self._extract_citation(query)
+        if citation:
+            hit = self.lookup_by_citation(citation)
+            if hit and (not published_only or self._is_citable_row(hit)):
+                return [
+                    self._case_result(
+                        str(hit["case_uid"]),
+                        query,
+                        relevance_score=1.0,
+                    )
+                ][:max_results]
+
         metadata = self._metadata_case_ranking(query, _CANDIDATES, published_only=published_only)
-        bm25 = self._bm25_case_ranking(query, _CANDIDATES)
-        parenthetical = self._parenthetical_case_ranking(query, _CANDIDATES)
+        bm25, bm25_snippets = self._bm25_case_ranking(query, _CANDIDATES)
+        parenthetical, parenthetical_snippets = self._parenthetical_case_ranking(query, _CANDIDATES)
         semantic_ranking: list[str] = []
         if semantic:
             try:
@@ -326,43 +584,55 @@ class LocalCaseCorpus:
 
         relevance_scores = self._rrf_scores(metadata, bm25, semantic_ranking, parenthetical)
         return [
-            self._case_result(uid, query, relevance_score=relevance_scores.get(uid, 0.0))
+            self._case_result(
+                uid,
+                query,
+                relevance_score=relevance_scores.get(uid, 0.0),
+                passage_hint=parenthetical_snippets.get(uid) or bm25_snippets.get(uid),
+            )
             for uid in ordered
         ]
 
-    def _best_passage_for_query(self, case_uid: str, query: str):
-        con = self._conn()
-        try:
-            row = con.execute(
-                "SELECT p.text, p.passage_type, p.parenthetical_id "
-                "FROM passages_fts JOIN passages p ON p.vec_row = passages_fts.rowid - 1 "
-                "WHERE p.case_uid=? AND passages_fts MATCH ? "
-                "ORDER BY bm25(passages_fts) LIMIT 1",
-                (case_uid, _fts_query(query)),
-            ).fetchone()
-            if row:
-                return row
-        except sqlite3.Error:
-            logger.debug("best passage lookup failed for %s", case_uid, exc_info=True)
-        return con.execute(
-            "SELECT text, passage_type, parenthetical_id FROM passages "
+    def _fallback_passage_for_case(self, case_uid: str):
+        return self._conn().execute(
+            "SELECT text, passage_type, parenthetical_id, page_label FROM passages "
             "WHERE case_uid=? AND passage_type='opinion' ORDER BY ordinal LIMIT 1",
             (case_uid,),
         ).fetchone()
 
-    def _case_result(self, case_uid: str, query: str, *, relevance_score: float = 0.0) -> CaseResult:
+    def _case_result(
+        self,
+        case_uid: str,
+        query: str,
+        *,
+        relevance_score: float = 0.0,
+        passage_hint: _PassageHit | None = None,
+    ) -> CaseResult:
         con = self._conn()
         c = con.execute("SELECT * FROM cases WHERE case_uid=?", (case_uid,)).fetchone()
         snippet = ""
         snippet_source = ""
         snippet_parenthetical_id = ""
+        snippet_page_label = ""
         display_name = ""
         if c:
-            p = self._best_passage_for_query(case_uid, query)
-            snippet = (p["text"][:400] if p else (c["full_text"] or "")[:400])
-            if p:
-                snippet_source = p["passage_type"] or ""
-                snippet_parenthetical_id = p["parenthetical_id"] or ""
+            if passage_hint is not None:
+                snippet = _best_snippet_window(passage_hint.text, query)
+                snippet_source = passage_hint.passage_type
+                snippet_parenthetical_id = passage_hint.parenthetical_id
+                snippet_page_label = passage_hint.page_label
+            else:
+                full_text = c["full_text"] or ""
+                if full_text:
+                    snippet = _best_snippet_window(full_text, query)
+                    snippet_source = "opinion"
+                else:
+                    p = self._fallback_passage_for_case(case_uid)
+                    snippet = _best_snippet_window(p["text"], query) if p else ""
+                    if p:
+                        snippet_source = p["passage_type"] or ""
+                        snippet_parenthetical_id = p["parenthetical_id"] or ""
+                        snippet_page_label = p["page_label"] or ""
             # Prefer the Bluebook short name (CAP name_abbreviation, e.g.
             # "Engalla v. Permanente Medical Group, Inc.") over the full party
             # caption stored in `name`. The caption is hundreds of chars long,
@@ -376,6 +646,7 @@ class LocalCaseCorpus:
             relevance_score=relevance_score,
             snippet_source=snippet_source,
             snippet_parenthetical_id=snippet_parenthetical_id,
+            snippet_page_label=snippet_page_label,
         )
 
     def get_opinion_text(self, case_uid: str | int) -> str | None:
@@ -396,7 +667,29 @@ class LocalCaseCorpus:
         norm = self._norm_citation(citation)
         if not norm:
             return None
-        for row in self._conn().execute("SELECT * FROM cases"):
+
+        variants = self._citation_variants(citation)
+        if variants:
+            placeholders = ",".join("?" for _ in variants)
+            row = self._conn().execute(
+                f"SELECT {_CASE_COLUMNS} FROM cases "
+                f"WHERE citation COLLATE NOCASE IN ({placeholders}) "
+                "LIMIT 1",
+                variants,
+            ).fetchone()
+            if row:
+                return dict(row)
+
+        row = self._conn().execute(
+            f"SELECT {_CASE_COLUMNS} FROM cases "
+            "WHERE lower(replace(replace(replace(citation, ' ', ''), '.', ''), char(160), '')) = ? "
+            "LIMIT 1",
+            (norm,),
+        ).fetchone()
+        if row:
+            return dict(row)
+
+        for row in self._conn().execute(f"SELECT {_CASE_COLUMNS} FROM cases WHERE parallel_citations IS NOT NULL AND parallel_citations<>''"):
             cites = [row["citation"] or ""]
             try:
                 cites.extend(json.loads(row["parallel_citations"] or "[]"))

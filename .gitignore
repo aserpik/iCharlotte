@@ -1,6 +1,7 @@
 # Logs
 *.log
 *.log.*
+logs/
 logs/*.fd*
 logs/crashes/
 logs/depo_sessions/
@@ -12,12 +13,16 @@ logs/depo_sessions/
 # Superpowers brainstorm session runtime state
 .superpowers/brainstorm/*/state/
 
+# Local Codex scratch output
+.codex_tmp/
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
 .pytest_cache_codex/
+.pytest_tmp_depo_prep/
 .venv/
 env/
 venv/
@@ -34,6 +39,7 @@ NoteTaker/dist/
 .gemini/case_data/
 .gemini/caselaw/
 .gemini/firm_briefs/
+.gemini/**/.cache/
 *.pdf
 *.docx
 !Templates/litigation_report.docx
@@ -89,3 +95,7 @@ tmp_oppose_test_out*/
 
 # Per-task research opinion caches
 Scripts/prompts/*/.cache/
+
+# Generated pleading corpus manifests
+*_Pleadings_PDFs/_manifest.csv
+*_Pleadings_PDFs/_classification.csv

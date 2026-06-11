@@ -35,6 +35,7 @@ from ..chat import (
     BUILTIN_PROMPTS,
     TRANSCRIBE_PROMPT,
     ChatResearchError,
+    ChatResearchOutputMode,
     ChatResearchSettings,
     CourtListenerMode,
 )
@@ -2062,6 +2063,7 @@ class ChatTab(QWidget):
                     "firm_authority": research_settings.firm_authority,
                     "local_corpus": research_settings.local_corpus,
                     "courtlistener_mode": research_settings.courtlistener_mode.value,
+                    "output_mode": research_settings.output_mode.value,
                 },
                 "user_text_length": len(user_text or ""),
                 "context_text_length": len(file_content or ""),
@@ -2215,6 +2217,7 @@ class ChatTab(QWidget):
                     "firm_authority": research_settings.firm_authority,
                     "local_corpus": research_settings.local_corpus,
                     "courtlistener_mode": research_settings.courtlistener_mode.value,
+                    "output_mode": research_settings.output_mode.value,
                 },
                 "user_text_length": len(user_text or ""),
                 "context_text_length": len(file_content or ""),
@@ -2485,6 +2488,10 @@ class ChatTab(QWidget):
                 "chat_tab/legal_research_courtlistener_mode",
                 CourtListenerMode.FALLBACK_CURRENT_LAW.value,
             ),
+            output_mode=settings.value(
+                "chat_tab/legal_research_output_mode",
+                ChatResearchOutputMode.QUICK_ANSWER.value,
+            ),
         )
 
     def _save_chat_research_settings(self, research_settings):
@@ -2500,6 +2507,10 @@ class ChatTab(QWidget):
         settings.setValue(
             "chat_tab/legal_research_courtlistener_mode",
             research_settings.courtlistener_mode.value,
+        )
+        settings.setValue(
+            "chat_tab/legal_research_output_mode",
+            research_settings.output_mode.value,
         )
 
     def _build_research_sources_menu(self):
@@ -2542,12 +2553,29 @@ class ChatTab(QWidget):
         else:
             self.courtlistener_fallback_action.setChecked(True)
 
+        menu.addSeparator()
+        output_group = QActionGroup(menu)
+        output_group.setExclusive(True)
+        self.quick_answer_action = QAction("Output: Quick Answer", menu)
+        self.research_memo_action = QAction("Output: Research Memo", menu)
+        for action in (self.quick_answer_action, self.research_memo_action):
+            action.setCheckable(True)
+            output_group.addAction(action)
+            menu.addAction(action)
+
+        if current.output_mode == ChatResearchOutputMode.RESEARCH_MEMO:
+            self.research_memo_action.setChecked(True)
+        else:
+            self.quick_answer_action.setChecked(True)
+
         for action in (
             self.firm_authority_action,
             self.local_corpus_action,
             self.courtlistener_off_action,
             self.courtlistener_fallback_action,
             self.courtlistener_always_action,
+            self.quick_answer_action,
+            self.research_memo_action,
         ):
             action.triggered.connect(self._on_research_source_changed)
 
@@ -2561,10 +2589,16 @@ class ChatTab(QWidget):
             mode = CourtListenerMode.ALWAYS_SEARCH
         else:
             mode = CourtListenerMode.FALLBACK_CURRENT_LAW
+        output_mode = (
+            ChatResearchOutputMode.RESEARCH_MEMO
+            if self.research_memo_action.isChecked()
+            else ChatResearchOutputMode.QUICK_ANSWER
+        )
         return ChatResearchSettings.from_values(
             firm_authority=self.firm_authority_action.isChecked(),
             local_corpus=self.local_corpus_action.isChecked(),
             courtlistener_mode=mode.value,
+            output_mode=output_mode.value,
         )
 
     def _on_research_source_changed(self):
@@ -2575,6 +2609,10 @@ class ChatTab(QWidget):
             self.courtlistener_off_action.setChecked(True)
         else:
             self.courtlistener_fallback_action.setChecked(True)
+        if current.output_mode == ChatResearchOutputMode.RESEARCH_MEMO:
+            self.research_memo_action.setChecked(True)
+        else:
+            self.quick_answer_action.setChecked(True)
         self._save_chat_research_settings(current)
         self._refresh_research_sources_label()
 
@@ -2591,7 +2629,10 @@ class ChatTab(QWidget):
             parts.append("CL Always")
         else:
             parts.append("CL Off")
-        self.research_sources_btn.setText("Sources: " + " + ".join(parts))
+        output = "Memo" if current.output_mode == ChatResearchOutputMode.RESEARCH_MEMO else "Quick"
+        self.research_sources_btn.setText(
+            "Sources: " + " + ".join(parts) + f" | {output}"
+        )
 
     # --- Splitter Persistence ---
 

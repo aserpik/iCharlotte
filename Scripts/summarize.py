@@ -70,6 +70,9 @@ CROSS_CHECK_PROMPT_FILE = os.path.join(SCRIPTS_DIR, "SUMMARIZE_CROSS_CHECK_PROMP
 # Legacy log file for backward compatibility
 LEGACY_LOG_FILE = r"C:\GeminiTerminal\Summarize_activity.log"
 
+_SUMMARY_CHUNK_CHAR_CAP = 75_000
+_SUMMARY_MIN_SPLIT_FRACTION = 0.55
+
 
 # =============================================================================
 # File Number Extraction
@@ -295,6 +298,105 @@ def get_output_directory(input_path: str) -> str:
     return output_dir
 
 
+def _split_summary_text(text: str, max_chars: int = _SUMMARY_CHUNK_CHAR_CAP) -> list:
+    text = text or ""
+    if len(text) <= max_chars:
+        return [text]
+
+    chunks = []
+    start = 0
+    min_split_size = int(max_chars * _SUMMARY_MIN_SPLIT_FRACTION)
+    while start < len(text):
+        hard_end = min(len(text), start + max_chars)
+        end = hard_end
+        if hard_end < len(text):
+            window_start = min(len(text), start + min_split_size)
+            split_points = [
+                text.rfind("\n\n", window_start, hard_end),
+                text.rfind("\nQ.", window_start, hard_end),
+                text.rfind("\nBY ", window_start, hard_end),
+                text.rfind(". ", window_start, hard_end),
+            ]
+            split_at = max(split_points)
+            if split_at > start:
+                end = split_at + (1 if text[split_at:split_at + 2] == ". " else 0)
+
+        chunk = text[start:end].strip()
+        if chunk:
+            chunks.append(chunk)
+        start = end if end > start else hard_end
+
+    return chunks or [text]
+
+
+def _build_chunk_summary_prompt(summary_prompt: str, chunk_index: int, chunk_count: int) -> str:
+    return (
+        f"{summary_prompt}\n\n"
+        f"NOTE: This is document part {chunk_index} of {chunk_count}. "
+        "Summarize this part faithfully. Preserve names, dates, amounts, admissions, "
+        "and legally significant details so the final consolidated summary can cover "
+        "the entire document."
+    )
+
+
+def _build_summary_consolidation_prompt(summary_prompt: str) -> str:
+    return (
+        f"{summary_prompt}\n\n"
+        "You are consolidating partial summaries from chunks of the same source "
+        "document. Merge them into one coherent final summary. Do not add facts "
+        "that are not present in the partial summaries. Remove duplicate points, "
+        "preserve important names, dates, chronology, admissions, and legally "
+        "significant details.\n\n"
+        "The input below contains partial summaries, not the original document text."
+    )
+
+
+def _generate_summary(llm_caller, summary_prompt: str, text: str, logger: AgentLogger) -> str:
+    chunks = _split_summary_text(text)
+    if len(chunks) == 1:
+        return llm_caller.call(
+            summary_prompt,
+            chunks[0],
+            task_type="summary",
+            agent_id="agent_summarize",
+            pass_name="summary",
+        )
+
+    logger.info(
+        "Large document detected; splitting summary generation into "
+        f"{len(chunks)} chunks of up to {_SUMMARY_CHUNK_CHAR_CAP} chars"
+    )
+    partial_summaries = []
+    for i, chunk in enumerate(chunks, 1):
+        logger.progress(35, f"Summarizing chunk {i}/{len(chunks)}...")
+        partial = llm_caller.call(
+            _build_chunk_summary_prompt(summary_prompt, i, len(chunks)),
+            chunk,
+            task_type="summary",
+            agent_id="agent_summarize",
+            pass_name="summary",
+        )
+        if not partial:
+            logger.error(f"Summary chunk {i}/{len(chunks)} returned empty")
+            return None
+        partial_summaries.append(f"## Part {i}\n{partial.strip()}")
+
+    partial_text = "\n\n".join(partial_summaries)
+    logger.progress(55, "Consolidating partial summaries...")
+    consolidated = llm_caller.call(
+        _build_summary_consolidation_prompt(summary_prompt),
+        partial_text,
+        task_type="summary",
+        agent_id="agent_summarize",
+        pass_name="summary",
+    )
+    if consolidated:
+        return consolidated
+
+    logger.warning("Summary consolidation returned empty; using partial summaries")
+    return partial_text
+
+
 # =============================================================================
 # Main Processing Functions
 # =============================================================================
@@ -395,13 +497,7 @@ def process_document(
     try:
         with memory_monitor.track_operation("Summary Generation"):
             logger.progress(35, "Sending document to LLM for summarization...")
-            summary = llm_caller.call(
-                summary_prompt,
-                text,
-                task_type="summary",
-                agent_id="agent_summarize",
-                pass_name="summary",
-            )
+            summary = _generate_summary(llm_caller, summary_prompt, text, logger)
 
             if not summary:
                 raise SummaryPassError("LLM returned empty response")

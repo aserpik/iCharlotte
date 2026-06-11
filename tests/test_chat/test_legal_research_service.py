@@ -3,6 +3,7 @@ import pytest
 from icharlotte_core.chat.legal_research import (
     ChatAuthorityCandidate,
     ChatResearchError,
+    ChatResearchOutputMode,
     ChatResearchPacket,
     ChatLegalResearchService,
     ChatResearchSettings,
@@ -10,6 +11,7 @@ from icharlotte_core.chat.legal_research import (
     ChatSelectedAuthority,
     CourtListenerMode,
     THIN_RESULT_THRESHOLD,
+    expand_local_legal_queries,
     is_current_law_query,
     normalize_settings,
 )
@@ -22,6 +24,19 @@ def test_default_settings_are_firm_local_and_courtlistener_fallback():
     assert settings.firm_authority is True
     assert settings.local_corpus is True
     assert settings.courtlistener_mode == CourtListenerMode.FALLBACK_CURRENT_LAW
+    assert settings.output_mode == ChatResearchOutputMode.QUICK_ANSWER
+
+
+def test_research_output_mode_from_values_accepts_research_memo():
+    settings = ChatResearchSettings.from_values(output_mode="research_memo")
+
+    assert settings.output_mode == ChatResearchOutputMode.RESEARCH_MEMO
+
+
+def test_unknown_research_output_mode_uses_default():
+    settings = ChatResearchSettings.from_values(output_mode="unknown")
+
+    assert settings.output_mode == ChatResearchOutputMode.QUICK_ANSWER
 
 
 def test_courtlistener_fallback_without_local_sources_becomes_always():
@@ -29,6 +44,7 @@ def test_courtlistener_fallback_without_local_sources_becomes_always():
         firm_authority=False,
         local_corpus=False,
         courtlistener_mode=CourtListenerMode.FALLBACK_CURRENT_LAW,
+        output_mode=ChatResearchOutputMode.RESEARCH_MEMO,
     )
 
     normalized = normalize_settings(settings)
@@ -36,6 +52,7 @@ def test_courtlistener_fallback_without_local_sources_becomes_always():
     assert normalized.firm_authority is False
     assert normalized.local_corpus is False
     assert normalized.courtlistener_mode == CourtListenerMode.ALWAYS_SEARCH
+    assert normalized.output_mode == ChatResearchOutputMode.RESEARCH_MEMO
 
 
 def test_courtlistener_off_stays_off_without_local_sources():
@@ -166,6 +183,20 @@ def test_current_law_query_detection_negative():
     assert is_current_law_query("What is the rule for negligence duty?") is False
 
 
+def test_expand_local_legal_queries_adds_premises_doctrine_terms():
+    queries = expand_local_legal_queries("owner controlled dangerous stairs duty")
+
+    assert queries[0] == "owner controlled dangerous stairs duty"
+    assert any(
+        "premises liability" in query
+        and "ownership" in query
+        and "possession" in query
+        and "control" in query
+        for query in queries[1:]
+    )
+    assert len(queries) == len(set(queries))
+
+
 class FakeCorpusClient:
     def __init__(self, results=None, text_by_id=None, metadata=None):
         self.results = results or []
@@ -230,6 +261,7 @@ def _case(
     cite="30 Cal. 4th 43",
     uid="cap:1",
     text="The duty rule controls.",
+    url="https://example.test/case",
 ):
     return CaseResult(
         name=name,
@@ -237,7 +269,7 @@ def _case(
         date="2020-01-01",
         court="Cal.",
         snippet=text,
-        url="https://example.test/case",
+        url=url,
         cluster_id=uid,
     )
 
@@ -273,11 +305,37 @@ def test_collect_local_only_searches_local_and_not_courtlistener():
     assert candidates[0].case_name == "Duty v. Care"
     assert candidates[0].citation_count == 7
     assert candidates[0].latest_citing_year == "2025"
-    assert len(local.calls) == 2
+    assert local.calls == [("duty rule", True, 8, True)]
     assert local.signal_calls == ["cap:1"]
     assert cl.calls == []
     assert warnings == []
     assert any("Local California corpus" in item for item in searches)
+
+
+def test_collect_local_repairs_broken_cap_static_id_candidate_url():
+    local = FakeCorpusClient(
+        results=[
+            _case(
+                cite="30 Cal. 4th 43",
+                uid="cap:1204770",
+                url="https://static.case.law/cap:1204770",
+            )
+        ],
+        text_by_id={"cap:1204770": "The duty rule controls."},
+    )
+    service = _service_for_sources(local=local)
+
+    candidates, _warnings, _searches = service.collect_candidates(
+        propositions=["duty rule"],
+        settings=ChatResearchSettings(
+            firm_authority=False,
+            local_corpus=True,
+            courtlistener_mode=CourtListenerMode.OFF,
+        ),
+        original_query="duty rule",
+    )
+
+    assert candidates[0].url == "https://static.case.law/cal-4th/30/html/0043-01.html"
 
 
 def test_local_case_client_enriches_no_more_than_result_budget():
@@ -316,9 +374,170 @@ def test_local_case_client_enriches_no_more_than_result_budget():
     assert len(candidates) == 3
     assert local.text_calls == ["cl:0", "cl:1", "cl:2"]
     assert local.signal_calls == ["cl:0", "cl:1", "cl:2"]
-    assert len(local.calls) == 2
+    assert local.calls == [("duty rule", True, 3, True)]
     assert warnings == []
     assert searches == ["Local California corpus: duty rule"]
+
+
+def test_collect_local_corpus_uses_doctrine_expanded_query_but_keeps_original_proposition():
+    class QuerySensitiveLocal(FakeCorpusClient):
+        def search_opinions(self, query, *, semantic=False, max_results=15, published_only=True):
+            self.calls.append((query, semantic, max_results, published_only))
+            if "premises liability" in query and "possession" in query:
+                return [
+                    _case(
+                        name="Landowner v. Visitor",
+                        cite="10 Cal.App.5th 100",
+                        uid="cap:premises",
+                        text=(
+                            "Premises liability depends on ownership, possession, "
+                            "or control of the property."
+                        ),
+                    )
+                ]
+            return []
+
+    local = QuerySensitiveLocal(
+        text_by_id={
+            "cap:premises": (
+                "Premises liability depends on ownership, possession, or control "
+                "of the property."
+            )
+        }
+    )
+    service = ChatLegalResearchService(
+        llm_callback=lambda _system, _user: "{}",
+        local_corpus=local,
+        max_results_per_source=4,
+    )
+
+    candidates, warnings, searches = service.collect_candidates(
+        propositions=["owner controlled dangerous stairs duty"],
+        settings=ChatResearchSettings(
+            firm_authority=False,
+            local_corpus=True,
+            courtlistener_mode=CourtListenerMode.OFF,
+        ),
+        original_query="owner controlled dangerous stairs duty",
+    )
+
+    assert len(local.calls) == 2
+    assert local.calls[0][0] != "owner controlled dangerous stairs duty"
+    assert "owner controlled dangerous stairs duty" in local.calls[0][0]
+    assert "premises liability" in local.calls[0][0]
+    assert any("14 Cal. 4th 1149" in call[0] for call in local.calls)
+    assert candidates[0].case_name == "Landowner v. Visitor"
+    assert candidates[0].proposition == "owner controlled dangerous stairs duty"
+    assert warnings == []
+    assert searches == ["Local California corpus: owner controlled dangerous stairs duty"]
+
+
+def test_collect_local_corpus_adds_landmark_case_by_exact_citation():
+    class LandmarkLocal(FakeCorpusClient):
+        def search_opinions(self, query, *, semantic=False, max_results=15, published_only=True):
+            self.calls.append((query, semantic, max_results, published_only))
+            if "25 Cal. 4th 826" in query:
+                return [
+                    _case(
+                        name="Aguilar v. Atlantic Richfield Co.",
+                        cite="25 Cal. 4th 826",
+                        uid="cap:aguilar",
+                        text="A defendant moving for summary judgment bears the initial burden.",
+                    )
+                ]
+            return [
+                _case(
+                    name="Case Citing Aguilar",
+                    cite="186 Cal.App.4th 1038",
+                    uid="cap:citing",
+                    text="The court cited Aguilar for the summary judgment burden.",
+                )
+            ]
+
+    local = LandmarkLocal(
+        text_by_id={
+            "cap:aguilar": (
+                "A defendant moving for summary judgment bears the initial burden "
+                "to show no triable issue of material fact."
+            ),
+            "cap:citing": "The court cited Aguilar for the summary judgment burden.",
+        }
+    )
+    service = ChatLegalResearchService(
+        llm_callback=lambda _system, _user: "{}",
+        local_corpus=local,
+        max_results_per_source=4,
+    )
+
+    candidates, warnings, searches = service.collect_candidates(
+        propositions=["summary judgment burden moving party triable issue"],
+        settings=ChatResearchSettings(
+            firm_authority=False,
+            local_corpus=True,
+            courtlistener_mode=CourtListenerMode.OFF,
+        ),
+        original_query="summary judgment burden moving party triable issue",
+    )
+
+    assert any("25 Cal. 4th 826" in call[0] for call in local.calls)
+    assert candidates[0].case_name == "Aguilar v. Atlantic Richfield Co."
+    assert candidates[0].proposition == "summary judgment burden moving party triable issue"
+    assert "triable issue" in candidates[0].snippet
+    assert warnings == []
+    assert searches == ["Local California corpus: summary judgment burden moving party triable issue"]
+
+
+def test_collect_local_corpus_preserves_direct_snippet_when_landmark_duplicates_search_hit():
+    class DuplicateLandmarkLocal(FakeCorpusClient):
+        def search_opinions(self, query, *, semantic=False, max_results=15, published_only=True):
+            self.calls.append((query, semantic, max_results, published_only))
+            if "174 Cal. App. 4th 967" in query:
+                return [
+                    _case(
+                        name="Doppes v. Bentley Motors, Inc.",
+                        cite="174 Cal. App. 4th 967",
+                        uid="cap:doppes",
+                        text="The exact lookup starts with unrelated sanctions procedure.",
+                    )
+                ]
+            case = _case(
+                name="Doppes v. Bentley Motors, Inc.",
+                cite="174 Cal. App. 4th 967",
+                uid="cap:doppes",
+                text="Misuse of the discovery process supports discovery sanctions.",
+            )
+            case.snippet_page_label = "991"
+            return [case]
+
+    local = DuplicateLandmarkLocal(
+        text_by_id={
+            "cap:doppes": (
+                "Misuse of the discovery process supports discovery sanctions. "
+                "The exact lookup starts with unrelated sanctions procedure."
+            )
+        }
+    )
+    service = ChatLegalResearchService(
+        llm_callback=lambda _system, _user: "{}",
+        local_corpus=local,
+        max_results_per_source=4,
+    )
+
+    candidates, warnings, searches = service.collect_candidates(
+        propositions=["discovery sanctions misuse of discovery"],
+        settings=ChatResearchSettings(
+            firm_authority=False,
+            local_corpus=True,
+            courtlistener_mode=CourtListenerMode.OFF,
+        ),
+        original_query="discovery sanctions misuse of discovery",
+    )
+
+    assert candidates[0].case_name == "Doppes v. Bentley Motors, Inc."
+    assert "Misuse of the discovery process" in candidates[0].snippet
+    assert candidates[0].snippet_page_label == "991"
+    assert warnings == []
+    assert searches == ["Local California corpus: discovery sanctions misuse of discovery"]
 
 
 def test_courtlistener_live_search_uses_keyword_first_without_bulk_enrichment():
@@ -753,7 +972,7 @@ def test_courtlistener_fallback_counts_deduped_local_candidates_for_thinness():
 
     assert any(candidate.case_name == "Local v. Case" for candidate in candidates)
     assert any(candidate.case_name == "Live v. Case" for candidate in candidates)
-    assert len(local.calls) == 2
+    assert local.calls == [("thin issue", True, 8, True)]
     assert cl.calls
     assert any("Local corpus returned thin results" in warning for warning in warnings)
     assert any("CourtListener API" in item for item in searches)
@@ -956,6 +1175,53 @@ def test_courtlistener_selected_without_client_warns_and_skips_live():
     assert warnings == ["CourtListener API selected but COURTLISTENER_API_TOKEN is not set."]
 
 
+def test_collect_candidates_reranks_local_snippet_matches_before_caption_noise():
+    noisy = _case(
+        name="Control Board v. Agency",
+        cite="99 Cal. 5th 1",
+        uid="cap:noisy",
+        text="This snippet discusses agency budgets and administrative procedure.",
+    )
+    relevant = _case(
+        name="Landowner v. Visitor",
+        cite="10 Cal.App.5th 100",
+        uid="cap:relevant",
+        text=(
+            "Premises liability depends on ownership, possession, or control "
+            "and the landowner duty to maintain property safely."
+        ),
+    )
+    local = FakeCorpusClient(
+        results=[noisy, relevant],
+        text_by_id={
+            "cap:noisy": "This opinion discusses agency budgets and administrative procedure.",
+            "cap:relevant": (
+                "Premises liability depends on ownership, possession, or control "
+                "and the landowner duty to maintain property safely."
+            ),
+        },
+    )
+    service = ChatLegalResearchService(
+        llm_callback=lambda _system, _user: "{}",
+        local_corpus=local,
+        max_results_per_source=2,
+    )
+
+    candidates, warnings, searches = service.collect_candidates(
+        propositions=["premises liability ownership control duty"],
+        settings=ChatResearchSettings(
+            firm_authority=False,
+            local_corpus=True,
+            courtlistener_mode=CourtListenerMode.OFF,
+        ),
+        original_query="premises liability ownership control duty",
+    )
+
+    assert [candidate.id for candidate in candidates] == ["cap:relevant", "cap:noisy"]
+    assert warnings == []
+    assert searches == ["Local California corpus: premises liability ownership control duty"]
+
+
 def test_select_authorities_keeps_only_verbatim_quotes():
     candidates = [
         ChatAuthorityCandidate(
@@ -994,6 +1260,39 @@ def test_select_authorities_keeps_only_verbatim_quotes():
     assert selected[0].case_name == "Duty v. Care"
     assert selected[0].quote == "The duty rule controls the negligence analysis."
     assert selected[0].reason == "Direct duty rule."
+
+
+def test_select_authorities_prompt_prioritizes_retrieval_snippet():
+    captured = {}
+
+    def llm(_system, user_prompt):
+        captured["user_prompt"] = user_prompt
+        return "{}"
+
+    candidate = ChatAuthorityCandidate(
+        id="cap:discovery",
+        proposition="discovery sanctions misuse of discovery",
+        case_name="Discovery v. Sanctions",
+        citation="10 Cal.App.5th 100",
+        year="2020",
+        text=(
+            "This opinion starts with procedural history and attorney fee issues. "
+            "The court later explained that misuse of the discovery process can "
+            "support discovery sanctions."
+        ),
+        snippet=(
+            "Misuse of the discovery process can support discovery sanctions."
+        ),
+        sources=[ChatResearchSource(kind="local_corpus", label="Local California corpus")],
+    )
+    service = ChatLegalResearchService(llm_callback=llm)
+
+    service.select_authorities("discovery sanctions misuse of discovery", [candidate])
+
+    prompt = captured["user_prompt"]
+    assert "Best matching snippet:" in prompt
+    assert "Opinion excerpt:" in prompt
+    assert prompt.index("Best matching snippet:") < prompt.index("Opinion excerpt:")
 
 
 def test_select_authorities_rejects_unverified_firm_snippet_only_quote():
@@ -1319,7 +1618,40 @@ def test_research_basis_html_escapes_dynamic_text_and_omits_unsafe_links():
     assert 'href="javascript:alert(1)"' not in html
 
 
-def test_build_augmented_chat_prompt_requires_research_basis():
+def test_research_basis_html_rewrites_broken_cap_static_id_links():
+    packet = ChatResearchPacket(
+        query="duty rule",
+        settings=ChatResearchSettings.default(),
+        selected_authorities=[
+            ChatSelectedAuthority(
+                id="cap:1204770",
+                proposition="duty rule",
+                case_name="People v. Snow",
+                citation="30 Cal. 4th 43",
+                url="https://static.case.law/cap:1204770",
+                sources=[
+                    ChatResearchSource(
+                        kind="local_corpus",
+                        label="Local California corpus",
+                    )
+                ],
+            )
+        ],
+    )
+
+    html = "\n".join(packet.format_research_basis_html())
+    authority_block = packet.format_authority_block()
+
+    assert 'href="https://static.case.law/cap:1204770"' not in html
+    assert (
+        'href="https://static.case.law/cal-4th/30/html/0043-01.html"'
+        in html
+    )
+    assert "https://static.case.law/cap:1204770" not in authority_block
+    assert "https://static.case.law/cal-4th/30/html/0043-01.html" in authority_block
+
+
+def test_quick_answer_prompt_uses_guardrails_without_memo_format():
     packet = ChatResearchPacket(
         query="duty rule",
         settings=ChatResearchSettings.default(),
@@ -1340,11 +1672,48 @@ def test_build_augmented_chat_prompt_requires_research_basis():
     )
 
     prompt = packet.build_augmented_system_prompt("Base prompt.")
+    basis_html = "\n".join(packet.format_research_basis_html())
 
     assert "Base prompt." in prompt
-    assert "Research Basis" in prompt
     assert "cite only authorities" in prompt.lower()
     assert "Duty v. Care" in prompt
+    assert "Research Memo" not in prompt
+    assert "Best Supporting Cases" not in prompt
+    assert 'Include a concise section titled "Research Basis"' not in prompt
+    assert "Legal Research Basis" in basis_html
+
+
+def test_research_memo_prompt_adds_memo_format_and_role_hints():
+    packet = ChatResearchPacket(
+        query="duty rule",
+        settings=ChatResearchSettings(output_mode=ChatResearchOutputMode.RESEARCH_MEMO),
+        propositions=["duty rule"],
+        selected_authorities=[
+            ChatSelectedAuthority(
+                id="cap:1",
+                proposition="duty rule",
+                case_name="Seminal v. Rule",
+                citation="45 Cal. 2d 265",
+                year="1955",
+                court="California Supreme Court",
+                reason="It states the foundational rule.",
+                supports="An occupant of land may recover annoyance and discomfort damages.",
+                quote="an occupant of land may recover damages for annoyance and discomfort",
+                sources=[ChatResearchSource(kind="local_corpus", label="Local California corpus")],
+            )
+        ],
+    )
+
+    prompt = packet.build_augmented_system_prompt("Base prompt.")
+
+    assert "Research Memo mode is enabled" in prompt
+    assert "Summary" in prompt
+    assert "Governing Rule" in prompt
+    assert "Best Supporting Cases" in prompt
+    assert "Limitations / Adverse Authority" in prompt
+    assert "Suggested Argument Framing" in prompt
+    assert "Presentation role: foundational" in prompt
+    assert "Do not add citations from memory" in prompt
 
 
 def test_build_augmented_prompt_sanitizes_untrusted_selector_fields():

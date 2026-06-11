@@ -70,6 +70,23 @@ def test_search_semantic_path_runs(tmp_path):
     assert any(r.cluster_id == "cap:1" for r in results)
 
 
+def test_semantic_search_looks_up_only_top_vector_rows(tmp_path):
+    db, vec, emb = _build(tmp_path)
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    trace = []
+    corpus._conn().set_trace_callback(trace.append)
+
+    results = corpus.search_opinions("negligence duty", semantic=True, max_results=5)
+
+    assert results
+    assert not any(
+        "WHERE passage_type='opinion' AND vec_row IS NOT NULL ORDER BY vec_row" in sql
+        for sql in trace
+    )
+    assert any("vec_row IN" in sql and "passage_type='opinion'" in sql for sql in trace)
+    assert any("INDEXED BY idx_passages_vec" in sql for sql in trace)
+
+
 def test_semantic_search_ignores_embedded_parenthetical_vectors_for_primary_ranking(tmp_path):
     db = str(tmp_path / "c.db")
     vec = str(tmp_path / "v.f16")
@@ -148,6 +165,19 @@ def test_get_opinion_text_and_lookup(tmp_path):
     assert "negligence" in hit["full_text"]
 
 
+def test_lookup_by_primary_citation_uses_targeted_query(tmp_path):
+    db, vec, emb = _build(tmp_path)
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    trace = []
+    corpus._conn().set_trace_callback(trace.append)
+
+    hit = corpus.lookup_by_citation("30 Cal.4th 43")
+
+    assert hit is not None
+    assert hit["case_uid"] == "cap:1"
+    assert not any("SELECT * FROM cases" in sql for sql in trace)
+
+
 def test_lookup_by_citation_matches_parallel_citation_and_spacing(tmp_path):
     db = str(tmp_path / "c.db"); vec = str(tmp_path / "v.f16")
     con = schema.connect(db); schema.create_schema(con)
@@ -169,6 +199,20 @@ def test_lookup_by_citation_matches_parallel_citation_and_spacing(tmp_path):
 
     assert hit is not None
     assert hit["case_uid"] == "cap:parallel"
+
+
+def test_exact_citation_search_uses_lookup_without_fts(tmp_path):
+    db, vec, emb = _build(tmp_path)
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    trace = []
+    corpus._conn().set_trace_callback(trace.append)
+
+    results = corpus.search_opinions("30 Cal.4th 43", semantic=False, max_results=5)
+
+    assert results
+    assert results[0].cluster_id == "cap:1"
+    assert not any("passages_fts MATCH" in sql for sql in trace)
+    assert not any("FROM passages WHERE case_uid=" in sql for sql in trace)
 
 
 def test_search_result_uses_short_name_abbreviation(tmp_path):
@@ -293,6 +337,163 @@ def test_search_uses_case_name_and_citation_metadata(tmp_path):
     )
 
     assert results[0].cluster_id == "cap:aguilar"
+
+
+def test_issue_search_prioritizes_opinion_matches_over_metadata_only_caption_hits(tmp_path):
+    db = str(tmp_path / "c.db"); vec = str(tmp_path / "v.f16")
+    con = schema.connect(db); schema.create_schema(con)
+    emb = FakeEmbedder(dim=64)
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb)
+    idx.add(
+        CaseRecord(
+            case_uid="cap:caption-noise",
+            source="cap",
+            name="Control Duty Ownership Board v. State",
+            citation="99 Cal. 5th 1",
+            court="Cal.",
+            decision_date="2022-01-01",
+            year="2022",
+            full_text="This opinion discusses administrative procedure and public agency budgets.",
+            citation_count=500,
+            latest_citing_year="2024",
+        ),
+        [
+            PassageRecord(
+                passage_uid="cap:caption-noise#0",
+                case_uid="cap:caption-noise",
+                ordinal=0,
+                text="This opinion discusses administrative procedure and public agency budgets.",
+            )
+        ],
+    )
+    idx.add(
+        CaseRecord(
+            case_uid="cap:premises",
+            source="cap",
+            name="Landowner v. Visitor",
+            citation="10 Cal. App. 5th 100",
+            court="Cal. Ct. App.",
+            decision_date="2018-01-01",
+            year="2018",
+            full_text=(
+                "Premises liability depends on ownership, possession, or control "
+                "and the landowner duty to maintain property safely."
+            ),
+            citation_count=1,
+            latest_citing_year="2019",
+        ),
+        [
+            PassageRecord(
+                passage_uid="cap:premises#0",
+                case_uid="cap:premises",
+                ordinal=0,
+                text=(
+                    "Premises liability depends on ownership, possession, or control "
+                    "and the landowner duty to maintain property safely."
+                ),
+            )
+        ],
+    )
+    idx.finalize(); con.close()
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+
+    results = corpus.search_opinions(
+        "premises liability ownership control duty",
+        semantic=False,
+        max_results=3,
+    )
+
+    assert results
+    assert results[0].cluster_id == "cap:premises"
+
+
+def test_fts_search_attempts_strict_match_before_broad_or_fallback(tmp_path):
+    db, vec, emb = _build(tmp_path)
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    trace = []
+    corpus._conn().set_trace_callback(trace.append)
+
+    corpus.search_opinions("privacy discovery", semantic=False, max_results=1)
+
+    match_queries = [sql for sql in trace if "passages_fts MATCH" in sql]
+    assert match_queries
+    assert "'\"privacy\" \"discovery\"'" in match_queries[0]
+    assert " OR " not in match_queries[0]
+
+
+def test_search_reuses_initial_fts_hit_for_snippet(tmp_path):
+    db, vec, emb = _build(tmp_path)
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    trace = []
+    corpus._conn().set_trace_callback(trace.append)
+
+    results = corpus.search_opinions("privacy discovery", semantic=False, max_results=1)
+
+    assert results
+    assert results[0].cluster_id == "cap:2"
+    assert "Constitutional privacy" in results[0].snippet
+    assert not any(
+        "WHERE p.case_uid=" in sql and "passages_fts MATCH" in sql
+        for sql in trace
+    )
+    assert any("INDEXED BY idx_passages_vec" in sql for sql in trace)
+
+
+def test_search_snippet_centers_best_matching_window_and_carries_page_label(tmp_path):
+    db = str(tmp_path / "c.db"); vec = str(tmp_path / "v.f16")
+    con = schema.connect(db); schema.create_schema(con)
+    emb = FakeEmbedder(dim=64)
+    intro = "Background procedure. " * 60
+    match = "misuse of the discovery process can support discovery sanctions"
+    full_text = f"{intro}{match}. The rest of the opinion applies the rule."
+    idx = CorpusIndexer(con, vectors_path=vec, embedder=emb)
+    idx.add(
+        CaseRecord(
+            case_uid="cap:long",
+            source="cap",
+            name="Discovery v. Sanctions",
+            citation="10 Cal.App.5th 100",
+            court="Cal. Ct. App.",
+            decision_date="2020-01-01",
+            year="2020",
+            full_text=full_text,
+        ),
+        [
+            PassageRecord(
+                passage_uid="cap:long#0",
+                case_uid="cap:long",
+                ordinal=0,
+                page_label="123",
+                text=full_text,
+            )
+        ],
+    )
+    idx.finalize(); con.close()
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+
+    results = corpus.search_opinions(
+        "discovery sanctions misuse of discovery",
+        semantic=False,
+        max_results=1,
+    )
+
+    assert results
+    assert match in results[0].snippet
+    assert len(results[0].snippet) < len(full_text)
+    assert results[0].snippet_source == "opinion"
+    assert results[0].snippet_page_label == "123"
+
+
+def test_search_skips_parenthetical_fts_when_no_parenthetical_passages(tmp_path):
+    db, vec, emb = _build(tmp_path)
+    corpus = LocalCaseCorpus(db_path=db, vectors_path=vec, embedder=emb)
+    trace = []
+    corpus._conn().set_trace_callback(trace.append)
+
+    results = corpus.search_opinions("privacy discovery", semantic=False, max_results=1)
+
+    assert results
+    assert not any("p.passage_type='parenthetical'" in sql for sql in trace)
 
 
 def test_search_quality_ranking_prefers_stronger_authority(tmp_path):
@@ -670,6 +871,9 @@ def test_parenthetical_does_not_add_duplicate_vote_for_existing_keyword_hit(tmp_
     )
 
     assert [r.cluster_id for r in results[:2]] == ["cap:strong", "cap:duplicate"]
+    assert results[1].snippet_source == "parenthetical"
+    assert results[1].snippet_parenthetical_id == "902"
+    assert "causation allocation" in results[1].snippet
 
 
 def test_semantic_search_does_not_suppress_parenthetical_recall(tmp_path):

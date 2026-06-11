@@ -166,7 +166,8 @@ def build_from_cl_streams(*, courts_stream, clusters_stream, opinions_stream,
 def append_cl_to_corpus(*, citations_stream, clusters_stream, opinions_stream,
                         db_path: str, vectors_path: str, embedder: Embedder,
                         cutoff_date: str = "2017-01-01", published_only: bool = True,
-                        embed: bool = False) -> dict[str, Any]:
+                        embed: bool = False,
+                        snapshot_date: str = "") -> dict[str, Any]:
     """Append recent CA cases from CourtListener bulk into an EXISTING published
     corpus, IN PLACE.
 
@@ -204,11 +205,156 @@ def append_cl_to_corpus(*, citations_stream, clusters_stream, opinions_stream,
                 logger.info("CL append: %d new CA cases added", n)
     idx.finalize()
     build_signals(con)
-    _write_corpus_metadata(con, vectors_path=vectors_path)
+    _write_corpus_metadata(con, vectors_path=vectors_path, cl_snapshot_date=snapshot_date)
     con.commit()
     con.close()
     logger.info("CL append: DONE — %d new cases (corpus now %d cases)", n, pre_cases + n)
     return {"added": n}
+
+
+def _vector_row_count(*, vectors_path: str, dim: int) -> int:
+    if not os.path.exists(vectors_path):
+        raise FileNotFoundError(f"missing vector sidecar: {vectors_path}")
+    bytes_per_vec = dim * 2  # float16
+    size = os.path.getsize(vectors_path)
+    if bytes_per_vec <= 0 or size % bytes_per_vec:
+        raise ValueError(
+            f"vector sidecar size is not aligned to dim={dim}: "
+            f"{vectors_path} has {size} bytes"
+        )
+    return size // bytes_per_vec
+
+
+def backfill_cl_embeddings(
+    *,
+    db_path: str,
+    vectors_path: str,
+    embedder: Embedder,
+    batch_size: int = 256,
+    include_parentheticals: bool = False,
+) -> dict[str, Any]:
+    """Embed existing zero-vector CourtListener rows without re-ingesting CL.
+
+    The CL append can intentionally write zero placeholder vectors so recent
+    cases are keyword-searchable immediately. This backfill rewrites those
+    placeholder rows in place, skipping already-nonzero vectors so reruns resume
+    naturally after interruption.
+    """
+    import numpy as np
+
+    if batch_size <= 0:
+        raise ValueError("batch_size must be positive")
+    if not (os.path.exists(db_path) and os.path.exists(vectors_path)):
+        raise FileNotFoundError(
+            "backfill_cl_embeddings requires an existing published corpus "
+            f"({db_path} + {vectors_path})."
+        )
+
+    con = schema.connect(db_path)
+    arr = None
+    try:
+        schema.create_schema(con)
+        vector_rows = _vector_row_count(vectors_path=vectors_path, dim=embedder.dim)
+        max_vec_row = con.execute(
+            "SELECT MAX(vec_row) FROM passages WHERE vec_row IS NOT NULL"
+        ).fetchone()[0]
+        if max_vec_row is not None and int(max_vec_row) >= vector_rows:
+            raise ValueError(
+                f"passages reference vec_row={max_vec_row}, but {vectors_path} "
+                f"contains only {vector_rows} rows"
+            )
+
+        arr = np.memmap(vectors_path, dtype=np.float16, mode="r+").reshape(
+            vector_rows, embedder.dim
+        )
+        passage_types = ["opinion"]
+        if include_parentheticals:
+            passage_types.append("parenthetical")
+        placeholders = ",".join("?" for _ in passage_types)
+        select_sql = (
+            "SELECT p.passage_uid, p.vec_row, p.text "
+            "FROM passages p JOIN cases c ON c.case_uid=p.case_uid "
+            "WHERE c.source='cl' "
+            "AND p.vec_row IS NOT NULL "
+            f"AND COALESCE(p.passage_type,'opinion') IN ({placeholders}) "
+            "ORDER BY p.vec_row"
+        )
+
+        eligible = 0
+        already_embedded = 0
+        backfilled = 0
+        pending: list[dict[str, Any]] = []
+
+        def flush_pending() -> None:
+            nonlocal backfilled, pending
+            if not pending:
+                return
+            texts = [str(row["text"] or "") for row in pending]
+            vecs = embedder.encode(texts).astype(np.float16)
+            if vecs.shape != (len(pending), embedder.dim):
+                raise ValueError(
+                    f"embedder returned {vecs.shape}, expected "
+                    f"{(len(pending), embedder.dim)}"
+                )
+            for row, vec in zip(pending, vecs):
+                arr[int(row["vec_row"])] = vec
+            backfilled += len(pending)
+            pending = []
+
+        for row in con.execute(select_sql, passage_types):
+            eligible += 1
+            vec_row = int(row["vec_row"])
+            if np.any(arr[vec_row]):
+                already_embedded += 1
+                continue
+            pending.append(dict(row))
+            if len(pending) >= batch_size:
+                flush_pending()
+                arr.flush()
+                logger.info("CL embedding backfill: %d/%d eligible rows embedded",
+                            backfilled, eligible)
+        flush_pending()
+        arr.flush()
+
+        remaining_zero = 0
+        for row in con.execute(select_sql, passage_types):
+            if not np.any(arr[int(row["vec_row"])]):
+                remaining_zero += 1
+
+        schema.set_meta(
+            con,
+            cl_embeddings_backfilled_at=time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            cl_embeddings_backfilled_count=str(backfilled),
+            cl_embeddings_eligible_count=str(eligible),
+            cl_embeddings_already_count=str(already_embedded),
+            cl_embeddings_zero_remaining=str(remaining_zero),
+            cl_embeddings_include_parentheticals=str(bool(include_parentheticals)),
+        )
+        _write_corpus_metadata(con, vectors_path=vectors_path)
+        con.commit()
+        logger.info(
+            "CL embedding backfill: DONE - eligible=%d, backfilled=%d, "
+            "already_embedded=%d, remaining_zero=%d",
+            eligible,
+            backfilled,
+            already_embedded,
+            remaining_zero,
+        )
+        return {
+            "eligible": eligible,
+            "backfilled": backfilled,
+            "already_embedded": already_embedded,
+            "remaining_zero": remaining_zero,
+            "include_parentheticals": include_parentheticals,
+        }
+    finally:
+        if arr is not None:
+            arr.flush()
+            mmap = getattr(arr, "_mmap", None)
+            del arr
+            if mmap is not None:
+                mmap.close()
+        con.close()
 
 
 def append_parentheticals_to_corpus(
@@ -432,7 +578,7 @@ def run_cl_append(*, db_path: str, vectors_path: str, embedder: Embedder,
         clusters_stream=_stream_cl_bulk("opinion-clusters", date),
         opinions_stream=_stream_cl_bulk("opinions", date),   # ~50 GB, streamed
         db_path=db_path, vectors_path=vectors_path, embedder=embedder,
-        cutoff_date=cutoff_date, embed=embed,
+        cutoff_date=cutoff_date, embed=embed, snapshot_date=date,
     )
 
 
@@ -476,7 +622,11 @@ def main() -> None:  # pragma: no cover - CLI wrapper
     ap = argparse.ArgumentParser(
         description="Build the local CA case-law corpus. Re-run after an "
         "interruption to RESUME automatically (volume-checkpointed).")
-    ap.add_argument("--source", choices=["cap", "cl", "parentheticals", "all"], default="all")
+    ap.add_argument(
+        "--source",
+        choices=["cap", "cl", "parentheticals", "cl-embeddings", "all"],
+        default="all",
+    )
     ap.add_argument("--data-dir", default=None)
     ap.add_argument("--fts-only", action="store_true",
                     help="Skip semantic embedding (BM25 keyword search only; builds in minutes).")
@@ -492,6 +642,8 @@ def main() -> None:  # pragma: no cover - CLI wrapper
     ap.add_argument("--parentheticals-min-score", type=float, default=0.5)
     ap.add_argument("--parentheticals-max-per-case", type=int, default=25)
     ap.add_argument("--embed-parentheticals", action="store_true")
+    ap.add_argument("--cl-embedding-batch-size", type=int, default=256)
+    ap.add_argument("--cl-embedding-parentheticals", action="store_true")
     ap.add_argument("--refresh-opinion-map", action="store_true")
     args = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -526,6 +678,27 @@ def main() -> None:  # pragma: no cover - CLI wrapper
             date=args.cl_date, cutoff_date=args.cl_cutoff, embed=args.cl_embed,
         )
         logger.info("CL append: %s new CA cases", summary["added"])
+    if args.source == "cl-embeddings":
+        logger.info(
+            "CL embedding backfill: batch_size=%s, include_parentheticals=%s",
+            args.cl_embedding_batch_size,
+            args.cl_embedding_parentheticals,
+        )
+        summary = backfill_cl_embeddings(
+            db_path=db_path,
+            vectors_path=vectors_path,
+            embedder=embedder,
+            batch_size=args.cl_embedding_batch_size,
+            include_parentheticals=args.cl_embedding_parentheticals,
+        )
+        logger.info(
+            "CL embedding backfill: eligible=%s, backfilled=%s, "
+            "already_embedded=%s, remaining_zero=%s",
+            summary["eligible"],
+            summary["backfilled"],
+            summary["already_embedded"],
+            summary["remaining_zero"],
+        )
     if args.source == "parentheticals":
         logger.info(
             "CL parentheticals: streaming bulk snapshot %s, min_score=%s, "

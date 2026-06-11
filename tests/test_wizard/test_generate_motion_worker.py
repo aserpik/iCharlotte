@@ -285,6 +285,144 @@ def test_worker_uses_courtlistener_when_local_corpus_is_stale(monkeypatch, tmp_p
     assert results["payload"].diagnostics["research"]["source"] == "courtlistener"
 
 
+def test_worker_researches_completed_draft_key_issues_and_inserts_citations(monkeypatch, tmp_path):
+    import icharlotte_core.motion_generation.samples as samples
+    import icharlotte_core.ui.wizard.pages.generate_motion_page as gm
+    from icharlotte_core.opposition.citation_parser import Citation
+    from icharlotte_core.opposition.models import (
+        CitationVerification,
+        DraftDocument,
+        MotionMetadata,
+        OutlineNode,
+        RetrievedAuthority,
+    )
+
+    monkeypatch.setattr(gm, "extract_context_bundle", lambda files: ("ctx", []))
+    monkeypatch.setattr(gm, "_make_local_corpus", lambda: object())
+    monkeypatch.setattr(samples, "load_exemplars", lambda tid: [])
+    monkeypatch.setattr(gm.DiscoveryAssembler, "find_caption_page", staticmethod(lambda p: ""))
+    monkeypatch.setattr(gm, "assemble_motion_preview", lambda **k: k.get("output_path"))
+    monkeypatch.setattr(
+        gm,
+        "draft_motion",
+        lambda *a, **k: DraftDocument(
+            title="M",
+            body_text=(
+                "I. INTRODUCTION\nThe motion should be granted.\n"
+                "II. STATEMENT OF FACTS\nThe responses were evasive.\n"
+                "III. ARGUMENT\nA. Evasive responses require further answers.\n"
+                "B. Boilerplate objections lack merit.\n"
+                "C. The requested relief is warranted.\n"
+                "IV. CONCLUSION\nGrant the motion."
+            ),
+        ),
+    )
+
+    monkeypatch.setattr(
+        gm,
+        "identify_key_legal_issues",
+        lambda *a, **k: [
+            "Evasive discovery responses require further answers",
+            "Boilerplate objections lack merit",
+            "The court may order further responses",
+        ],
+        raising=False,
+    )
+
+    research_calls = []
+
+    def fake_research(targets, **kwargs):
+        research_calls.append(list(targets))
+        if len(research_calls) == 1:
+            return []
+        return [
+            RetrievedAuthority(
+                argument_text=targets[0],
+                case_name="Smith v. Jones",
+                citation="50 Cal.4th 100",
+                year="2010",
+                supports="Evasive responses require further answers.",
+                passage="A party must provide complete discovery responses.",
+            )
+        ]
+
+    monkeypatch.setattr(gm, "research_arguments", fake_research)
+
+    insertion = {}
+
+    def fake_insert(draft, issues, authorities, *, llm_callback):
+        insertion["issues"] = list(issues)
+        insertion["authorities"] = list(authorities)
+        return DraftDocument(
+            title=draft.title,
+            body_text=(
+                draft.body_text
+                + "\nSmith v. Jones (2010) 50 Cal.4th 100 supports further responses."
+            ),
+        )
+
+    monkeypatch.setattr(gm, "insert_researched_citations", fake_insert, raising=False)
+    monkeypatch.setattr(
+        gm,
+        "extract_citations",
+        lambda body: [
+            Citation(
+                kind="case",
+                raw_text="Smith v. Jones (2010) 50 Cal.4th 100",
+                normalized="Smith v. Jones (2010) 50 Cal.4th 100",
+                reporter_citation="50 Cal.4th 100",
+                proposition="Smith supports further responses.",
+            )
+        ] if "Smith v. Jones" in body else [],
+    )
+    monkeypatch.setattr(gm, "pool_membership_check", lambda citations, retrieved: (citations, []))
+
+    class FakeVerifier:
+        def verify_all(self, citations, on_progress=None):
+            return [
+                CitationVerification(
+                    citation_text=citations[0].raw_text,
+                    normalized_citation=citations[0].normalized,
+                    kind="case",
+                    verdict="SUPPORTED",
+                    proposition=citations[0].proposition,
+                )
+            ]
+
+    monkeypatch.setattr(gm, "build_local_opposition_verifier", lambda **kwargs: FakeVerifier())
+
+    settings = {
+        "motion_type_id": "compel",
+        "motion_type_name": "Motion to Compel",
+        "target_files": [],
+        "metadata": MotionMetadata(
+            motion_type="Motion to Compel",
+            relief_requested="Compel further responses",
+            principal_arguments=["Boilerplate objections are improper"],
+        ).to_dict(),
+        "outline": [
+            OutlineNode(text="Argument", selected=True, children=[
+                OutlineNode(text="Responses were evasive and incomplete", selected=True),
+            ]).to_dict(),
+        ],
+    }
+    worker = gm.GenerateMotionWorker(case_path=str(tmp_path), file_number="123", settings=settings)
+
+    results = {}
+    worker.finished_result.connect(lambda ok, payload: results.update(ok=ok, payload=payload))
+    worker.run()
+
+    assert results.get("ok") is True
+    assert len(research_calls) == 2
+    assert research_calls[1] == insertion["issues"]
+    assert insertion["authorities"][0].case_name == "Smith v. Jones"
+    draft = results["payload"]
+    assert "Smith v. Jones (2010) 50 Cal.4th 100" in draft.body_text
+    assert draft.citations and draft.citations[0].verdict == "SUPPORTED"
+    assert draft.diagnostics["research"]["post_draft_issue_count"] == 3
+    assert draft.diagnostics["research"]["post_draft_authorities"] == 1
+
+
 def test_analysis_worker_passes_motion_name(monkeypatch):
     import icharlotte_core.ui.wizard.pages.generate_motion_page as gm
     from icharlotte_core.opposition.models import MotionMetadata

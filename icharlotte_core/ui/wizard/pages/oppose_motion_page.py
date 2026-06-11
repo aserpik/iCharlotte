@@ -59,6 +59,12 @@ from icharlotte_core.ui.wizard.pages._motion_research_support import (
 
 
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
+from icharlotte_core.ui.wizard.task_debug_helpers import (
+    emit_debug,
+    finish_debug_run,
+    record_status,
+    start_debug_run,
+)
 from icharlotte_core.ui.wizard.task_scaffold import WizardTaskContainer
 from icharlotte_core.ui.context_files_dialog import ContextFilesDialog
 from icharlotte_core.word_validator import validate_opposition_docx
@@ -782,6 +788,7 @@ class OpposeMotionTaskTab(WizardTaskContainer):
         self._finishing_worker = None
         self._analysis_worker = None
         self._finishing_analysis_worker = None
+        self._debug_run_id = None
 
         self.settings_page = OpposeMotionSettingsPage(
             case_path,
@@ -796,6 +803,7 @@ class OpposeMotionTaskTab(WizardTaskContainer):
         self.addWidget(self.status_page)
         self.addWidget(self.output_page)
         self.settings_page.run_requested.connect(self._on_run)
+        self.status_page.cancel_requested.connect(self._on_cancel)
         if auto_analyze:
             self._start_analysis()
 
@@ -811,7 +819,22 @@ class OpposeMotionTaskTab(WizardTaskContainer):
         if self._analysis_worker is not None or self._finishing_analysis_worker is not None:
             return
         self.status_page.reset()
+        start_debug_run(
+            self,
+            source="wizard.oppose_motion.analysis",
+            details={
+                "case_path": self._case_path,
+                "file_number": self._file_number,
+                "motion_file": self.settings_page.motion_file,
+                "context_files": list(self.settings_page.context_files),
+            },
+        )
         self.status_page.on_status("Analyzing selected motion and context...")
+        record_status(
+            self,
+            "Analyzing selected motion and context...",
+            source="wizard.ui",
+        )
         self.status_page.progress_bar.setRange(0, 0)
         self.setCurrentIndex(TASK_PAGE_STATUS)
         worker = OpposeMotionAnalysisWorker(
@@ -822,7 +845,12 @@ class OpposeMotionTaskTab(WizardTaskContainer):
             },
             parent=None,
         )
-        worker.progress.connect(self.status_page.on_status)
+        worker.progress.connect(
+            lambda message: self._on_worker_progress(
+                message,
+                source="wizard.oppose_motion.analysis",
+            )
+        )
         worker.finished_analysis.connect(self._on_analysis_finished)
         if hasattr(worker, "finished"):
             worker.finished.connect(lambda w=worker: self._on_analysis_thread_finished(w))
@@ -841,10 +869,25 @@ class OpposeMotionTaskTab(WizardTaskContainer):
             self._analysis_worker = None
 
         if not success:
+            finish_debug_run(
+                self,
+                status="error",
+                message=f"Analysis failed: {payload}",
+                details={"error": str(payload)},
+            )
             self.status_page.on_status(f"FAILED: {payload}")
             return
 
         data = payload if isinstance(payload, dict) else {}
+        finish_debug_run(
+            self,
+            status="success",
+            message="Analysis complete",
+            details={
+                "outline_count": len(data.get("outline", []) or []),
+                "has_metadata": bool(data.get("metadata")),
+            },
+        )
         metadata = data.get("metadata")
         if not isinstance(metadata, MotionMetadata):
             metadata = MotionMetadata.from_dict(metadata if isinstance(metadata, dict) else {})
@@ -877,17 +920,37 @@ class OpposeMotionTaskTab(WizardTaskContainer):
             self.setCurrentIndex(TASK_PAGE_STATUS)
             return
         self.status_page.reset()
+        self._last_settings = dict(settings or {})
+        start_debug_run(
+            self,
+            source="wizard.oppose_motion.draft",
+            details={
+                "case_path": self._case_path,
+                "file_number": self._file_number,
+                "files": list(self._files),
+                "settings": dict(self._last_settings),
+            },
+        )
         self.status_page.on_status("Drafting opposition memorandum...")
+        record_status(
+            self,
+            "Drafting opposition memorandum...",
+            source="wizard.ui",
+        )
         self.status_page.progress_bar.setRange(0, 0)
         self.setCurrentIndex(TASK_PAGE_STATUS)
-        self._last_settings = dict(settings or {})
         worker = OpposeMotionWorker(
             case_path=self._case_path,
             file_number=self._file_number,
             settings=self._last_settings,
             parent=None,
         )
-        worker.progress.connect(self.status_page.on_status)
+        worker.progress.connect(
+            lambda message: self._on_worker_progress(
+                message,
+                source="wizard.oppose_motion.draft",
+            )
+        )
         worker.finished_result.connect(self._on_worker_finished)
         if hasattr(worker, "finished"):
             worker.finished.connect(lambda w=worker: self._on_worker_thread_finished(w))
@@ -907,10 +970,26 @@ class OpposeMotionTaskTab(WizardTaskContainer):
         elif self._worker is not None:
             self._worker = None
         if not success:
+            finish_debug_run(
+                self,
+                status="error",
+                message=f"Draft failed: {payload}",
+                details={"error": str(payload)},
+            )
             self.status_page.on_status(f"FAILED: {payload}")
             return
 
         draft = payload if isinstance(payload, DraftDocument) else DraftDocument()
+        finish_debug_run(
+            self,
+            status="success",
+            message="Task complete",
+            details={
+                "output_path": draft.preview_path,
+                "citation_count": len(draft.citations or []),
+                "diagnostics": dict(draft.diagnostics or {}),
+            },
+        )
         self.output_page.show_result(draft)
         self.setCurrentIndex(TASK_PAGE_OUTPUT)
         self.task_completed.emit(
@@ -929,6 +1008,35 @@ class OpposeMotionTaskTab(WizardTaskContainer):
             self._worker = None
         if self._finishing_worker is worker:
             self._finishing_worker = None
+
+    def _on_cancel(self) -> None:
+        active_worker = self._worker or self._analysis_worker
+        if active_worker is None:
+            self.setCurrentIndex(TASK_PAGE_SETTINGS)
+            return
+        emit_debug(
+            self,
+            phase="cancel",
+            message="Cancellation requested",
+            source="wizard.ui",
+        )
+        cancel = getattr(active_worker, "cancel", None)
+        if callable(cancel):
+            try:
+                cancel()
+                self.status_page.on_status("Cancellation requested.")
+                record_status(self, "Cancellation requested.", source="wizard.ui")
+            except Exception as exc:  # noqa: BLE001
+                self.status_page.on_status(f"Cancel failed: {exc}")
+                record_status(self, f"Cancel failed: {exc}", source="wizard.ui")
+            return
+        message = "This task cannot be cancelled until the current step finishes."
+        self.status_page.on_status(message)
+        record_status(self, message, source="wizard.ui")
+
+    def _on_worker_progress(self, message: str, *, source: str) -> None:
+        self.status_page.on_status(message)
+        record_status(self, message, source=source)
 
     def closeEvent(self, event) -> None:
         for worker in (

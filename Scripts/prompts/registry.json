@@ -848,6 +848,22 @@
           "usage_count": 0
         }
       ]
+    },
+    "generate_motion:generate_outline": {
+      "agent": "generate_motion",
+      "pass_name": "generate_outline",
+      "current_version": "v1",
+      "versions": [
+        {
+          "version": "v1",
+          "created": "2026-06-09T20:57:02.376332",
+          "description": "Generate Motion: nested argument-subheading outline",
+          "author": "system",
+          "is_current": true,
+          "performance_score": 0.0,
+          "usage_count": 0
+        }
+      ]
     }
   }
 }

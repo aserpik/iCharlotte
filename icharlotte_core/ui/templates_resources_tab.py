@@ -29,6 +29,7 @@ from ..config import TEMPLATES_DIR, RESOURCES_DIR, TEMPLATE_EXTENSIONS, RESOURCE
 from ..templates_db import TemplatesDatabase
 from ..utils import log_event
 from ..bridge import LocalFileSchemeHandler
+from . import theme
 
 
 class EditorBridge(QObject):
@@ -1259,23 +1260,22 @@ class TemplatesResourcesTab(QWidget):
 
         # Save button
         self.save_btn = QPushButton("Save")
-        self.save_btn.setStyleSheet("""
-            QPushButton {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #5bc0de, stop:1 #2196F3);
+        self.save_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {theme.PRIMARY};
                 color: white;
-                border: 1px solid #1976D2;
+                border: none;
                 border-radius: 3px;
                 padding: 3px 12px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #6bd0ee, stop:1 #42a6f3);
-            }
-            QPushButton:disabled {
-                background: #ccc;
-                border-color: #aaa;
+            }}
+            QPushButton:hover {{ background-color: {theme.PRIMARY_HOVER}; }}
+            QPushButton:pressed {{ background-color: {theme.PRIMARY_PRESSED}; }}
+            QPushButton:disabled {{
+                background-color: #ccc;
+                border: none;
                 color: #888;
-            }
+            }}
         """)
         self.save_btn.clicked.connect(self.save_template_content)
         self.save_btn.setEnabled(False)

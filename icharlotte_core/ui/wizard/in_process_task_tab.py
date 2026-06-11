@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from icharlotte_core import task_debug
 from icharlotte_core.ui.wizard import theme
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
 from icharlotte_core.ui.wizard.pages.output_page import OutputPage
@@ -82,6 +83,7 @@ class InProcessTaskTab(WizardTaskContainer):
         self._file_number = file_number
         self._worker_factory = worker_factory
         self._worker: QThread | None = None
+        self._debug_run_id: str | None = None
 
         self.settings_page = settings_widget
         self.status_page = StatusPage()
@@ -121,7 +123,14 @@ class InProcessTaskTab(WizardTaskContainer):
     def _on_run(self, settings_dict: dict) -> None:
         self.status_page.reset()
         self.setCurrentIndex(PAGE_STATUS)
-        self.status_page.on_status(f"Starting {self._spec.title}…")
+        self._start_debug_run(settings_dict)
+        start_message = f"Starting {self._spec.title}…"
+        self.status_page.on_status(start_message)
+        self._debug_emit(
+            phase="status",
+            message=start_message,
+            source="wizard.ui",
+        )
         # In-process workers don't report % — keep the bar indeterminate.
         self.status_page.progress_bar.setRange(0, 0)
         self._last_settings = dict(settings_dict)
@@ -138,7 +147,18 @@ class InProcessTaskTab(WizardTaskContainer):
         cancel = getattr(self._worker, "cancel", None)
         if callable(cancel):
             try:
+                self._debug_emit(
+                    phase="cancel",
+                    message="Cancellation requested",
+                    source="wizard.ui",
+                )
                 cancel()
+                is_running = getattr(self._worker, "isRunning", None)
+                if callable(is_running) and not is_running():
+                    self._finish_debug_run(
+                        status="cancelled",
+                        message="Task cancelled",
+                    )
             except Exception:
                 pass
         else:
@@ -160,8 +180,8 @@ class InProcessTaskTab(WizardTaskContainer):
         worker = self._worker_factory(
             self._case_path, self._file_number, settings_dict, self
         )
-        worker.progress.connect(self.status_page.on_status)
-        worker.warning.connect(lambda msg: self.status_page.on_status(f"WARNING: {msg}"))
+        worker.progress.connect(self._on_worker_progress)
+        worker.warning.connect(self._on_worker_warning)
         worker.finished_result.connect(self._on_worker_finished)
         self._worker = worker
         worker.start()
@@ -178,12 +198,85 @@ class InProcessTaskTab(WizardTaskContainer):
                 settings.update(page_settings)
         return settings
 
+    def _start_debug_run(self, settings_dict: dict) -> None:
+        if self._debug_run_id is not None:
+            return
+        self._debug_run_id = task_debug.start_run(
+            task_id=getattr(self._spec, "task_id", ""),
+            task_title=getattr(self._spec, "title", ""),
+            source="wizard.in_process",
+            details={
+                "case_path": self._case_path,
+                "file_number": self._file_number,
+                "settings": dict(settings_dict or {}),
+            },
+        )
+
+    def _debug_emit(
+        self,
+        *,
+        phase: str,
+        message: str,
+        level: str = "info",
+        source: str = "wizard.in_process",
+        details: dict | None = None,
+    ) -> None:
+        if not self._debug_run_id:
+            return
+        task_debug.emit_event(
+            self._debug_run_id,
+            getattr(self._spec, "task_id", ""),
+            getattr(self._spec, "title", ""),
+            phase=phase,
+            message=message,
+            level=level,
+            source=source,
+            details=details,
+        )
+
+    def _finish_debug_run(
+        self,
+        *,
+        status: str,
+        message: str,
+        details: dict | None = None,
+    ) -> None:
+        run_id = self._debug_run_id
+        if not run_id:
+            return
+        task_debug.finish_run(run_id, status=status, message=message, details=details)
+        self._debug_run_id = None
+
+    def _on_worker_progress(self, message: str) -> None:
+        text = str(message)
+        self.status_page.on_status(text)
+        self._debug_emit(
+            phase="status",
+            message=text,
+            source="wizard.in_process.worker",
+        )
+
+    def _on_worker_warning(self, message: str) -> None:
+        text = f"WARNING: {message}"
+        self.status_page.on_status(text)
+        self._debug_emit(
+            phase="status",
+            message=text,
+            level="warning",
+            source="wizard.in_process.worker",
+        )
+
     def _on_worker_finished(self, success: bool, output_or_error: str) -> None:
         from datetime import datetime
         worker = self._worker
         self._worker = None
 
         if not success:
+            self._finish_debug_run(
+                status="error",
+                message=f"Task failed: {output_or_error}",
+                details={"error": output_or_error},
+            )
             self.status_page.on_status(f"FAILED: {output_or_error}")
             self.status_page.cancel_btn.setText("Back to Settings")
             self.status_page.cancel_btn.setEnabled(True)
@@ -195,6 +288,17 @@ class InProcessTaskTab(WizardTaskContainer):
                 lambda: self.setCurrentIndex(PAGE_SETTINGS)
             )
             return
+
+        self._finish_debug_run(
+            status="success",
+            message="Task complete",
+            details={
+                "output": output_or_error,
+                "output_path": output_or_error
+                if os.path.isfile(output_or_error or "")
+                else "",
+            },
+        )
 
         settings = self._completion_settings()
         if hasattr(self.output_page, "set_save_as_defaults"):
@@ -465,6 +569,7 @@ def build_med_extractor_tab(
         auto_run=False,
         parent=parent,
     )
+
 
 def build_respond_to_discovery_tab(
     spec,

@@ -2,12 +2,12 @@
 
 The wizard "Chat" task card spawns a new ChatTab each click (titled "Chat",
 "Chat (2)", ...). Each one is treated as a task tab (has wizard_task_id
-property) so it's closable and gets cleared on case-switch, but chat tabs
-are NOT included in the wizard snapshot/restore set — they don't have
-spec/settings_page/output_page attrs.
+property) so it's closable, gets cleared on case-switch, and is included in
+the wizard snapshot/restore set.
 
 These tests exercise the helper methods that have to handle ChatTab safely:
-- `_snapshot_open_task_tabs` must skip ChatTab.
+- `_snapshot_open_task_tabs` must include wizard-spawned ChatTab.
+- `_restore_task_tabs_for_case` must rebuild wizard-spawned ChatTab.
 - `_remove_all_task_tabs` must call `save_current_state` before delete.
 """
 import os
@@ -65,12 +65,12 @@ class _FakeTaskTab(QWidget):
         return 0  # PAGE_SETTINGS
 
 
-class TestSnapshotSkipsChatTab(unittest.TestCase):
+class TestSnapshotIncludesChatTab(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
 
-    def test_snapshot_returns_only_non_chat_task_tabs(self):
+    def test_snapshot_includes_wizard_chat_task_tabs(self):
         from icharlotte_core.ui.tabs import ChatTab
 
         stub = _Stub()
@@ -79,15 +79,74 @@ class TestSnapshotSkipsChatTab(unittest.TestCase):
         regular = _FakeTaskTab(task_id="summarize")
         chat = ChatTab()
         chat.setProperty("wizard_task_id", "chat")
-        chat.setProperty("wizard_instance_suffix", "")
+        chat.setProperty("wizard_instance_suffix", "(2)")
+        chat.current_conversation_id = "conv-1"
 
         stub.tabs.addTab(regular, "Summarize")
-        stub.tabs.addTab(chat, "Chat")
+        stub.tabs.addTab(chat, "Chat (2)")
 
         snapshots = stub._snapshot_open_task_tabs()
 
-        self.assertEqual(len(snapshots), 1)
+        self.assertEqual(len(snapshots), 2)
         self.assertEqual(snapshots[0]["task_id"], "summarize")
+        self.assertEqual(snapshots[1]["task_id"], "chat")
+        self.assertEqual(snapshots[1]["instance_suffix"], "(2)")
+        self.assertEqual(snapshots[1]["files"], [])
+        self.assertEqual(snapshots[1]["settings"], {"current_conversation_id": "conv-1"})
+        self.assertEqual(snapshots[1]["page"], "settings")
+        self.assertIsNone(snapshots[1]["output_path"])
+
+
+class _RestoreStub(QWidget):
+    """QWidget stand-in for restore helpers that construct child widgets."""
+
+    def __init__(self, case_path):
+        super().__init__()
+        self.tabs = QTabWidget(self)
+        self.case_path = case_path
+        self.file_number = "0000.000"
+
+    def _on_task_completed(self, entry):
+        pass
+
+    def _hide_fixed_close_buttons(self):
+        pass
+
+
+class TestRestoreChatTab(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_restore_rebuilds_wizard_chat_task_tab(self):
+        import tempfile
+        from icharlotte_core.ui.tabs import ChatTab
+        from icharlotte_core.ui.wizard.persistence import WizardStatePersistence
+
+        with tempfile.TemporaryDirectory() as case_path:
+            p = WizardStatePersistence(case_path)
+            p.set_open_tabs([{
+                "task_id": "chat",
+                "instance_suffix": "(2)",
+                "files": [],
+                "settings": {"current_conversation_id": "conv-1"},
+                "page": "settings",
+                "output_path": None,
+            }])
+            p.save()
+
+            stub = _RestoreStub(case_path)
+            _bind("_restore_task_tabs_for_case", stub)
+            stub._restore_task_tabs_for_case()
+
+            self.assertEqual(stub.tabs.count(), 1)
+            tab = stub.tabs.widget(0)
+            self.assertIsInstance(tab, ChatTab)
+            self.assertEqual(tab.property("wizard_task_id"), "chat")
+            self.assertEqual(tab.property("wizard_instance_suffix"), "(2)")
+            self.assertEqual(stub.tabs.tabText(0), "Chat (2)")
+            self.assertEqual(tab.file_number, "0000.000")
+            self.assertEqual(tab.current_conversation_id, "conv-1")
 
 
 class TestRemoveAllTaskTabsSavesChatState(unittest.TestCase):

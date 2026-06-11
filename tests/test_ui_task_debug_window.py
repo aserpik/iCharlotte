@@ -3,6 +3,8 @@ import pytest
 pytest.importorskip("pytestqt")
 
 from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QLabel, QPlainTextEdit
+from PySide6.QtWidgets import QHeaderView
 
 
 def _messages(window):
@@ -246,3 +248,61 @@ def test_debug_console_receives_new_events_and_clear_clears_recorder(qtbot, tmp_
     window.clear_btn.click()
     assert window.table.rowCount() == 0
     assert td.get_events() == []
+
+
+def test_debug_console_columns_are_user_resizable(qtbot, tmp_path):
+    import icharlotte_core.task_debug as td
+    from icharlotte_core.ui.task_debug_window import TaskDebugWindow
+
+    td.reset_for_tests(trace_dir=tmp_path)
+    window = TaskDebugWindow()
+    qtbot.addWidget(window)
+
+    header = window.table.horizontalHeader()
+    for col in range(window.table.columnCount()):
+        assert header.sectionResizeMode(col) == QHeaderView.ResizeMode.Interactive
+
+
+def test_debug_console_double_click_opens_full_row_details(
+    qtbot, tmp_path, monkeypatch
+):
+    import icharlotte_core.task_debug as td
+    import icharlotte_core.ui.task_debug_window as mod
+    from icharlotte_core.ui.task_debug_window import TaskDebugWindow
+
+    td.reset_for_tests(trace_dir=tmp_path)
+    run_id = td.start_run(task_id="chat", task_title="Chat Research")
+    td.emit_event(
+        run_id=run_id,
+        task_id="chat",
+        task_title="Chat Research",
+        phase="source_search",
+        level="info",
+        source="CourtListener API",
+        message="Searching CourtListener API for a very long proposition that should not be truncated.",
+        details={
+            "query": "duty of care and negligent undertaking with a long fact pattern",
+            "result_count": 12,
+        },
+    )
+    window = TaskDebugWindow()
+    qtbot.addWidget(window)
+    opened = []
+
+    def fake_exec(dialog):
+        opened.append(dialog)
+        return 0
+
+    monkeypatch.setattr(mod.TaskDebugRowDetailsDialog, "exec", fake_exec)
+
+    window.table.cellDoubleClicked.emit(1, window.COL_MESSAGE)
+
+    assert len(opened) == 1
+    dialog = opened[0]
+    labels = {label.text() for label in dialog.findChildren(QLabel)}
+    assert set(window.HEADERS).issubset(labels)
+    values = "\n".join(
+        editor.toPlainText() for editor in dialog.findChildren(QPlainTextEdit)
+    )
+    assert "Searching CourtListener API for a very long proposition" in values
+    assert '"result_count": 12' in values

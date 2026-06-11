@@ -31,12 +31,20 @@ _TEXT_COLS = ("plain_text", "html_with_citations", "html", "html_columbia",
 
 # CL precedential_status values we treat as "published".
 _PUBLISHED = {"Published"}
+_PROGRESS_EVERY = 500_000
 
 # Big CSV fields (opinion html/text) can exceed the default csv field-size limit.
 try:
     csv.field_size_limit(sys.maxsize)
 except OverflowError:  # pragma: no cover - platform-dependent
     csv.field_size_limit(2**31 - 1)
+
+
+def _cl_dict_reader(stream: TextIO) -> csv.DictReader:
+    # CourtListener bulk CSV uses backslash-escaped quotes in text/html columns.
+    # The default csv dialect treats those quotes as structural and can shift
+    # later columns such as cluster_id.
+    return csv.DictReader(stream, escapechar="\\")
 
 
 def _is_ca_reporter(reporter: str) -> bool:
@@ -56,7 +64,9 @@ def _prefer_official(cites: list[tuple[str, str]]) -> str:
 def _ca_clusters_from_citations(citations_stream: TextIO) -> dict[str, str]:
     """cluster_id -> preferred CA reporter citation, for CA cases only."""
     by_cluster: dict[str, list[tuple[str, str]]] = {}
-    for row in csv.DictReader(citations_stream):
+    seen = 0
+    for row in _cl_dict_reader(citations_stream):
+        seen += 1
         reporter = (row.get("reporter") or "").strip()
         if not _is_ca_reporter(reporter):
             continue
@@ -65,13 +75,20 @@ def _ca_clusters_from_citations(citations_stream: TextIO) -> dict[str, str]:
         page = (row.get("page") or "").strip()
         if cid and vol and page:
             by_cluster.setdefault(cid, []).append((reporter, f"{vol} {reporter} {page}"))
+    logger.info(
+        "CL append: scanned %d citation rows; found %d CA citation clusters",
+        seen,
+        len(by_cluster),
+    )
     return {cid: _prefer_official(cites) for cid, cites in by_cluster.items()}
 
 
 def _recent_published(clusters_stream: TextIO, ca_cites: dict[str, str],
                       cutoff: str, published_only: bool) -> dict[str, dict]:
     keep: dict[str, dict] = {}
-    for row in csv.DictReader(clusters_stream):
+    seen = 0
+    for row in _cl_dict_reader(clusters_stream):
+        seen += 1
         cid = (row.get("id") or "").strip()
         if cid not in ca_cites:
             continue
@@ -81,6 +98,12 @@ def _recent_published(clusters_stream: TextIO, ca_cites: dict[str, str],
         if published_only and (row.get("precedential_status") or "").strip() not in _PUBLISHED:
             continue
         keep[cid] = row
+    logger.info(
+        "CL append: scanned %d cluster rows; kept %d CA clusters after %s",
+        seen,
+        len(keep),
+        cutoff,
+    )
     return keep
 
 
@@ -106,17 +129,42 @@ def iter_recent_ca_cases(
     # The opinions file has one row per opinion; a cluster may have several
     # (lead + concurrence/dissent). Accumulate text per cluster across rows.
     text_by_cluster: dict[str, str] = {}
-    for row in csv.DictReader(opinions_stream):
+    seen = 0
+    matched = 0
+    for row in _cl_dict_reader(opinions_stream):
+        seen += 1
         cid = (row.get("cluster_id") or "").strip()
         if cid not in clusters:
+            if seen % _PROGRESS_EVERY == 0:
+                logger.info(
+                    "CL append: scanned %d opinion rows; matched text for %d/%d CA clusters",
+                    seen,
+                    len(text_by_cluster),
+                    len(clusters),
+                )
             continue
         for col in _TEXT_COLS:
             raw = row.get(col) or ""
             if raw:
                 t = normalize_text(_strip_html(raw))
                 if t:
+                    if cid not in text_by_cluster:
+                        matched += 1
                     text_by_cluster[cid] = (text_by_cluster.get(cid, "") + "\n\n" + t).strip()
                     break
+        if seen % _PROGRESS_EVERY == 0:
+            logger.info(
+                "CL append: scanned %d opinion rows; matched text for %d/%d CA clusters",
+                seen,
+                matched,
+                len(clusters),
+            )
+    logger.info(
+        "CL append: scanned %d opinion rows total; matched text for %d/%d CA clusters",
+        seen,
+        matched,
+        len(clusters),
+    )
 
     for cid, meta in clusters.items():
         text = text_by_cluster.get(cid, "")
