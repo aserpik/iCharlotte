@@ -63,6 +63,17 @@ def _motion_text_payload(motion_text: str) -> str:
     return _json_source_payload("motion_text", motion_text)
 
 
+def _format_prompt_template(template: str, **values: Any) -> str:
+    """Format editable prompts without choking on literal JSON examples."""
+    try:
+        return template.format(**values)
+    except (KeyError, IndexError, ValueError):
+        formatted = template
+        for key, value in values.items():
+            formatted = formatted.replace("{" + key + "}", str(value or ""))
+        return formatted.replace("{{", "{").replace("}}", "}")
+
+
 def _first_json_object(text: str) -> str:
     start = text.find("{")
     if start == -1:
@@ -108,7 +119,8 @@ def analyze_motion(
     )
 
     template = get_prompt("oppose_motion", "analyze_motion") or default_prompts.ANALYZE_MOTION_PROMPT
-    user_prompt = template.format(
+    user_prompt = _format_prompt_template(
+        template,
         motion_text=motion_text or "",
         context_text=context_text or "",
     )
@@ -131,7 +143,8 @@ def generate_outline(
     )
 
     template = get_prompt("oppose_motion", "generate_outline") or default_prompts.GENERATE_OUTLINE_PROMPT
-    user_prompt = template.format(
+    user_prompt = _format_prompt_template(
+        template,
         metadata_json=_motion_metadata_payload(metadata),
         principal_arguments_json=_json_source_payload(
             "principal_arguments", metadata.principal_arguments

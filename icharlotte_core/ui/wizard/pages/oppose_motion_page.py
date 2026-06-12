@@ -121,6 +121,7 @@ def _make_local_corpus():
 class OpposeMotionSettingsPage(QStackedWidget):
     """Confirmation and editable outline screens for the opposition workflow."""
 
+    analysis_requested = Signal()
     run_requested = Signal(dict)
 
     def __init__(
@@ -150,6 +151,27 @@ class OpposeMotionSettingsPage(QStackedWidget):
         self.motion_label = QLabel()
         layout.addWidget(self.motion_label)
         self._refresh_motion_label()
+
+        motion_row = QHBoxLayout()
+        self.select_motion_btn = QPushButton("Select Motion")
+        self.select_motion_btn.clicked.connect(self._on_select_motion_file)
+        motion_row.addWidget(self.select_motion_btn)
+        self.analyze_motion_btn = QPushButton("Analyze Motion")
+        self.analyze_motion_btn.clicked.connect(self._emit_analysis_requested)
+        motion_row.addWidget(self.analyze_motion_btn)
+        motion_row.addStretch()
+        layout.addLayout(motion_row)
+
+        self.context_label = QLabel()
+        layout.addWidget(self.context_label)
+        self._refresh_context_label()
+
+        context_row = QHBoxLayout()
+        self.add_context_btn = QPushButton("Add Context")
+        self.add_context_btn.clicked.connect(self._on_add_context_files)
+        context_row.addWidget(self.add_context_btn)
+        context_row.addStretch()
+        layout.addLayout(context_row)
 
         self.motion_type_edit = QLineEdit()
         self.motion_type_edit.setPlaceholderText("Motion type")
@@ -234,6 +256,7 @@ class OpposeMotionSettingsPage(QStackedWidget):
         self.motion_file = data.get("motion_file", self.motion_file)
         self.context_files = list(data.get("context_files", self.context_files))
         self._refresh_motion_label()
+        self._refresh_context_label()
         self.set_metadata(MotionMetadata.from_dict(data.get("metadata")))
         self.set_outline(
             [
@@ -256,6 +279,70 @@ class OpposeMotionSettingsPage(QStackedWidget):
     def _refresh_motion_label(self) -> None:
         motion_name = os.path.basename(self.motion_file) or "(no motion selected)"
         self.motion_label.setText(f"Motion: {motion_name}")
+
+    def _refresh_context_label(self) -> None:
+        count = len(self.context_files)
+        label = f"{count} file" if count == 1 else f"{count} files"
+        self.context_label.setText(f"Context: {label}")
+
+    def _on_select_motion_file(self) -> None:
+        start_dir = os.path.dirname(self.motion_file) or self.case_root
+        motion_file, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select motion to oppose",
+            start_dir,
+            "Motion files (*.pdf *.docx)",
+        )
+        if not motion_file:
+            return
+        if not is_supported_motion_file(motion_file):
+            QMessageBox.warning(
+                self,
+                "Unsupported motion file",
+                "Select a PDF or DOCX motion.",
+            )
+            return
+        if motion_file != self.motion_file:
+            self.motion_file = motion_file
+            self.set_metadata(MotionMetadata())
+            self.set_outline([])
+            self.setCurrentIndex(SETTINGS_PAGE_CONFIRM)
+        self._refresh_motion_label()
+
+    def _on_add_context_files(self) -> None:
+        start_dir = os.path.dirname(self.motion_file) or self.case_root
+        context_files = ContextFilesDialog.get_files(
+            self,
+            title="Select context document(s)",
+            start_dir=start_dir,
+            file_filter="Context files (*.pdf *.docx *.txt *.msg);;All files (*.*)",
+        )
+        if context_files is None:
+            return
+        existing = set(self.context_files)
+        for path in context_files:
+            if path in existing or not is_supported_context_file(path):
+                continue
+            self.context_files.append(path)
+            existing.add(path)
+        self._refresh_context_label()
+
+    def _emit_analysis_requested(self) -> None:
+        if not self.motion_file:
+            QMessageBox.warning(
+                self,
+                "Select a motion",
+                "Select the motion to oppose before analyzing.",
+            )
+            return
+        if not is_supported_motion_file(self.motion_file):
+            QMessageBox.warning(
+                self,
+                "Unsupported motion file",
+                "Select a PDF or DOCX motion.",
+            )
+            return
+        self.analysis_requested.emit()
 
     def _emit_run_requested(self) -> None:
         self.run_requested.emit(self.to_dict())
@@ -782,7 +869,9 @@ class OpposeMotionTaskTab(WizardTaskContainer):
         super().__init__(spec, parent=parent)
         self._case_path = case_path
         self._file_number = file_number
-        self._files = [motion_file] + list(context_files)
+        self._files = [
+            path for path in [motion_file] + list(context_files) if path
+        ]
         self._worker = None
         self._last_settings: dict = {}
         self._finishing_worker = None
@@ -802,6 +891,7 @@ class OpposeMotionTaskTab(WizardTaskContainer):
         self.addWidget(self.settings_page)
         self.addWidget(self.status_page)
         self.addWidget(self.output_page)
+        self.settings_page.analysis_requested.connect(self._start_analysis)
         self.settings_page.run_requested.connect(self._on_run)
         self.status_page.cancel_requested.connect(self._on_cancel)
         if auto_analyze:
@@ -818,6 +908,26 @@ class OpposeMotionTaskTab(WizardTaskContainer):
     def _start_analysis(self) -> None:
         if self._analysis_worker is not None or self._finishing_analysis_worker is not None:
             return
+        if not self.settings_page.motion_file:
+            QMessageBox.warning(
+                self,
+                "Select a motion",
+                "Select the motion to oppose before analyzing.",
+            )
+            return
+        if not is_supported_motion_file(self.settings_page.motion_file):
+            QMessageBox.warning(
+                self,
+                "Unsupported motion file",
+                "Select a PDF or DOCX motion.",
+            )
+            return
+        self._files = [
+            path
+            for path in [self.settings_page.motion_file]
+            + list(self.settings_page.context_files)
+            if path
+        ]
         self.status_page.reset()
         start_debug_run(
             self,
@@ -921,6 +1031,12 @@ class OpposeMotionTaskTab(WizardTaskContainer):
             return
         self.status_page.reset()
         self._last_settings = dict(settings or {})
+        self._files = [
+            path
+            for path in [self._last_settings.get("motion_file", "")]
+            + list(self._last_settings.get("context_files", []) or [])
+            if path
+        ]
         start_debug_run(
             self,
             source="wizard.oppose_motion.draft",
@@ -1062,37 +1178,12 @@ def build_oppose_motion_tab(
     file_number: str,
     parent: QWidget | None,
 ):
-    motion_file, _ = QFileDialog.getOpenFileName(
-        parent,
-        "Select motion to oppose",
-        case_path,
-        "Motion files (*.pdf *.docx)",
-    )
-    if not motion_file:
-        return None
-    if not is_supported_motion_file(motion_file):
-        QMessageBox.warning(
-            parent,
-            "Unsupported motion file",
-            "Select a PDF or DOCX motion.",
-        )
-        return None
-
-    context_files = ContextFilesDialog.get_files(
-        parent,
-        title="Select context document(s)",
-        start_dir=os.path.dirname(motion_file) or case_path,
-        file_filter="Context files (*.pdf *.docx *.txt *.msg);;All files (*.*)",
-    )
-    context_files = [
-        path for path in (context_files or []) if is_supported_context_file(path)
-    ]
     return OpposeMotionTaskTab(
         spec=spec,
         case_path=case_path,
         file_number=file_number,
-        motion_file=motion_file,
-        context_files=list(context_files),
-        auto_analyze=True,
+        motion_file="",
+        context_files=[],
+        auto_analyze=False,
         parent=parent,
     )

@@ -38,6 +38,8 @@ class WizardTaskRoutingTests(unittest.TestCase):
 
     def test_oppose_motion_is_in_process_task(self):
         self.assertTrue(is_in_process_task("oppose_motion"))
+        self.assertTrue(opens_settings_without_picker("oppose_motion"))
+        self.assertFalse(requires_initial_file_picker("oppose_motion"))
         self.assertFalse(is_in_process_task("summarize_documents"))
 
     def test_case_intake_docket_uses_in_process_route_without_file_picker(self):

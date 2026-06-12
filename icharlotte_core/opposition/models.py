@@ -36,6 +36,14 @@ def _candidate_list(value: Any) -> list[Any]:
     return []
 
 
+def _first_string(data: dict[str, Any], *keys: str) -> str:
+    for key in keys:
+        value = data.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
 @dataclass
 class MotionMetadata:
     motion_type: str = ""
@@ -55,7 +63,15 @@ class MotionMetadata:
     def from_dict(cls, data: dict[str, Any] | None) -> "MotionMetadata":
         data = data or {}
         return cls(
-            motion_type=data.get("motion_type", ""),
+            motion_type=_first_string(
+                data,
+                "motion_type",
+                "motion_type_name",
+                "motion_name",
+                "motion_title",
+                "type_of_motion",
+                "motion",
+            ),
             moving_party=data.get("moving_party", ""),
             opposing_party=data.get("opposing_party", ""),
             relief_requested=data.get("relief_requested", ""),

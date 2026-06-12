@@ -808,57 +808,90 @@ def test_save_as_reports_copy_errors(qtbot, tmp_path):
     assert critical.called
 
 
-def test_builder_rejects_cancelled_motion_picker(qtbot):
+def test_builder_opens_settings_without_launch_picker(qtbot):
     spec = type("Spec", (), {"task_id": "oppose_motion", "title": "Oppose a Motion"})()
     with patch(
         "icharlotte_core.ui.wizard.pages.oppose_motion_page.QFileDialog.getOpenFileName",
-        return_value=("", ""),
-    ):
+    ) as motion_picker, patch(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.ContextFilesDialog.get_files",
+    ) as context_picker:
         tab = build_oppose_motion_tab(spec, "/tmp/case", "0000.000", None)
-    assert tab is None
+
+    qtbot.addWidget(tab)
+    motion_picker.assert_not_called()
+    context_picker.assert_not_called()
+    assert tab.currentIndex() == TASK_PAGE_SETTINGS
+    assert tab.settings_page.motion_file == ""
+    assert tab.settings_page.context_files == []
+    assert "(no motion selected)" in tab.settings_page.motion_label.text()
 
 
-def test_builder_rejects_unsupported_motion_file(qtbot):
-    spec = type("Spec", (), {"task_id": "oppose_motion", "title": "Oppose a Motion"})()
+def test_settings_page_rejects_unsupported_motion_file(qtbot):
+    page = OpposeMotionSettingsPage(
+        case_root="/tmp/case",
+        file_number="0000.000",
+        motion_file="",
+        context_files=[],
+    )
+    qtbot.addWidget(page)
+
     with patch(
         "icharlotte_core.ui.wizard.pages.oppose_motion_page.QFileDialog.getOpenFileName",
         return_value=("/tmp/motion.txt", ""),
-    ):
-        with patch(
-            "icharlotte_core.ui.wizard.pages.oppose_motion_page.QMessageBox.warning"
-        ) as warning:
-            tab = build_oppose_motion_tab(spec, "/tmp/case", "0000.000", None)
-    assert tab is None
+    ), patch(
+        "icharlotte_core.ui.wizard.pages.oppose_motion_page.QMessageBox.warning"
+    ) as warning:
+        page._on_select_motion_file()
+
     assert warning.called
+    assert page.motion_file == ""
+    assert "(no motion selected)" in page.motion_label.text()
 
 
-def test_builder_filters_unsupported_context_files(qtbot, tmp_path, monkeypatch):
-    spec = type("Spec", (), {"task_id": "oppose_motion", "title": "Oppose a Motion"})()
+def test_settings_page_selects_supported_motion_file(qtbot, tmp_path):
     motion = tmp_path / "motion.pdf"
     motion.write_bytes(b"")
-    good_context = tmp_path / "facts.txt"
-    bad_context = tmp_path / "notes.xlsx"
-    good_context.write_text("facts")
-    bad_context.write_text("spreadsheet")
-    monkeypatch.setattr(OpposeMotionTaskTab, "_start_analysis", lambda self: None)
+    page = OpposeMotionSettingsPage(
+        case_root=str(tmp_path),
+        file_number="0000.000",
+        motion_file="",
+        context_files=[],
+    )
+    qtbot.addWidget(page)
 
     with patch(
         "icharlotte_core.ui.wizard.pages.oppose_motion_page.QFileDialog.getOpenFileName",
         return_value=(str(motion), ""),
-    ), patch(
+    ):
+        page._on_select_motion_file()
+
+    assert page.motion_file == str(motion)
+    assert "motion.pdf" in page.motion_label.text()
+
+
+def test_settings_page_filters_unsupported_context_files(qtbot, tmp_path):
+    good_context = tmp_path / "facts.txt"
+    bad_context = tmp_path / "notes.xlsx"
+    good_context.write_text("facts")
+    bad_context.write_text("spreadsheet")
+    page = OpposeMotionSettingsPage(
+        case_root=str(tmp_path),
+        file_number="0000.000",
+        motion_file="",
+        context_files=[],
+    )
+    qtbot.addWidget(page)
+
+    with patch(
         "icharlotte_core.ui.wizard.pages.oppose_motion_page.ContextFilesDialog.get_files",
         return_value=[str(good_context), str(bad_context)],
     ):
-        tab = build_oppose_motion_tab(spec, str(tmp_path), "0000.000", None)
+        page._on_add_context_files()
 
-    qtbot.addWidget(tab)
-    assert tab.settings_page.context_files == [str(good_context)]
+    assert page.context_files == [str(good_context)]
 
 
-def test_builder_accumulates_multifolder_context_files(qtbot, tmp_path, monkeypatch):
-    spec = type("Spec", (), {"task_id": "oppose_motion", "title": "Oppose a Motion"})()
-    motion = tmp_path / "motion.pdf"
-    motion.write_bytes(b"")
+def test_settings_page_accumulates_multifolder_context_files(qtbot, tmp_path):
     folder_a = tmp_path / "DISCOVERY"
     folder_b = tmp_path / "RECORDS"
     folder_a.mkdir()
@@ -867,38 +900,39 @@ def test_builder_accumulates_multifolder_context_files(qtbot, tmp_path, monkeypa
     ctx_b = folder_b / "records.pdf"
     ctx_a.write_text("a")
     ctx_b.write_text("b")
-    monkeypatch.setattr(OpposeMotionTaskTab, "_start_analysis", lambda self: None)
+    page = OpposeMotionSettingsPage(
+        case_root=str(tmp_path),
+        file_number="0000.000",
+        motion_file="",
+        context_files=[],
+    )
+    qtbot.addWidget(page)
 
     with patch(
-        "icharlotte_core.ui.wizard.pages.oppose_motion_page.QFileDialog.getOpenFileName",
-        return_value=(str(motion), ""),
-    ), patch(
         "icharlotte_core.ui.wizard.pages.oppose_motion_page.ContextFilesDialog.get_files",
         return_value=[str(ctx_a), str(ctx_b)],
     ):
-        tab = build_oppose_motion_tab(spec, str(tmp_path), "0000.000", None)
+        page._on_add_context_files()
 
-    qtbot.addWidget(tab)
-    assert tab.settings_page.context_files == [str(ctx_a), str(ctx_b)]
+    assert page.context_files == [str(ctx_a), str(ctx_b)]
 
 
-def test_builder_handles_cancelled_context_picker(qtbot, tmp_path, monkeypatch):
-    spec = type("Spec", (), {"task_id": "oppose_motion", "title": "Oppose a Motion"})()
-    motion = tmp_path / "motion.pdf"
-    motion.write_bytes(b"")
-    monkeypatch.setattr(OpposeMotionTaskTab, "_start_analysis", lambda self: None)
+def test_settings_page_handles_cancelled_context_picker(qtbot, tmp_path):
+    page = OpposeMotionSettingsPage(
+        case_root=str(tmp_path),
+        file_number="0000.000",
+        motion_file="",
+        context_files=[],
+    )
+    qtbot.addWidget(page)
 
     with patch(
-        "icharlotte_core.ui.wizard.pages.oppose_motion_page.QFileDialog.getOpenFileName",
-        return_value=(str(motion), ""),
-    ), patch(
         "icharlotte_core.ui.wizard.pages.oppose_motion_page.ContextFilesDialog.get_files",
         return_value=None,
     ):
-        tab = build_oppose_motion_tab(spec, str(tmp_path), "0000.000", None)
+        page._on_add_context_files()
 
-    qtbot.addWidget(tab)
-    assert tab.settings_page.context_files == []
+    assert page.context_files == []
 
 
 def test_worker_calls_verifier_with_parsed_citations(tmp_path, monkeypatch):

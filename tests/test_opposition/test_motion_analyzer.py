@@ -34,6 +34,49 @@ def test_analyze_motion_parses_json_metadata():
     assert "motion_type" in calls[0][1]
 
 
+def test_analyze_motion_formats_editable_prompt_with_raw_json_schema():
+    captured = {}
+
+    def fake_llm(system_prompt, user_prompt):
+        captured["user"] = user_prompt
+        return json.dumps(
+            {
+                "motion_type": "Motion for Novel Equitable Allocation",
+                "relief_requested": "Allocate settlement credits under a novel theory",
+                "principal_arguments": ["The requested allocation is equitable"],
+            }
+        )
+
+    prompt_with_schema = """Analyze any California civil motion, including novel motions.
+
+Return JSON in this shape:
+{
+  "motion_type": "freeform motion label, not a fixed taxonomy value",
+  "relief_requested": "string",
+  "principal_arguments": ["string"]
+}
+
+MOTION:
+{motion_text}
+
+CONTEXT:
+{context_text}
+"""
+
+    with patch("icharlotte_core.opposition.motion_analyzer.get_prompt") as gp:
+        gp.return_value = prompt_with_schema
+        metadata = analyze_motion(
+            "novel motion text",
+            context_text="case facts",
+            llm_callback=fake_llm,
+        )
+
+    assert metadata.motion_type == "Motion for Novel Equitable Allocation"
+    assert '"motion_type"' in captured["user"]
+    assert "novel motion text" in captured["user"]
+    assert "case facts" in captured["user"]
+
+
 def test_generate_outline_normalizes_selected_three_level_tree():
     def fake_llm(system_prompt, user_prompt):
         # New template framing (from PromptManager).

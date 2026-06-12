@@ -31,6 +31,19 @@ def test_motion_metadata_round_trip_and_required_missing():
     ]
 
 
+def test_motion_metadata_accepts_freeform_motion_type_aliases():
+    metadata = MotionMetadata.from_dict(
+        {
+            "motion_name": "Motion for Novel Equitable Allocation",
+            "relief_requested": "Allocate settlement credits under a novel theory",
+            "principal_arguments": ["The requested allocation is equitable"],
+        }
+    )
+
+    assert metadata.motion_type == "Motion for Novel Equitable Allocation"
+    assert metadata.required_missing() == []
+
+
 def test_outline_node_round_trip_preserves_nested_selected_states():
     outline = OutlineNode(
         id="root",

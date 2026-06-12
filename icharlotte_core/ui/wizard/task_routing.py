@@ -20,6 +20,7 @@ _IN_PROCESS_TASK_BUILDERS = {
 _SETTINGS_MANAGED_SOURCE_TASKS = frozenset({
     "depo_prep",
     "medical_records",
+    "oppose_motion",
     "summarize_documents",
     "summarize_discovery",
     "summarize_depositions",
