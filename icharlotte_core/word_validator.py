@@ -1278,7 +1278,12 @@ def validate_subpoena_tracker_docx(doc_path: str) -> ValidationResult:
         result.findings.append(Finding("PASS", "headers", "Tracker headers present"))
 
     data_rows = max(0, len(table.rows) - 1)
-    has_empty_message = "No issued subpoena PDFs were found" in text
+    empty_report_messages = (
+        "No issued subpoena PDFs were found",
+        "No DISCOVERY/Subpoenas folder was found",
+        "No parseable subpoena IDs were found",
+    )
+    has_empty_message = any(message in text for message in empty_report_messages)
     if data_rows == 0 and not has_empty_message:
         result.findings.append(
             Finding(

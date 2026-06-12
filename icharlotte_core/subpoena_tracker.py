@@ -393,6 +393,8 @@ class SubpoenaTrackerWorker(QThread):
         self.output_root = output_root
         self._unparsed_received_candidates = []
         self._ignored_received_items = []
+        self._empty_subpoena_message = "No issued subpoena PDFs were found in DISCOVERY/Subpoenas."
+        self._alternate_record_matches = {}
 
     def run(self):
         try:
@@ -434,6 +436,10 @@ class SubpoenaTrackerWorker(QThread):
         self._match_chron_by_facility(subpoenas, chronologies, pages_map,
                                       non_subpoena_records)
 
+        # --- Phase 3c: Surface possible records outside standard subpoena folder ---
+        self.progress.emit("Checking alternate records folders...")
+        self._match_alternate_records_by_facility(subpoenas, received)
+
         # --- Phase 4: Generate report ---
         self.progress.emit("Generating report...")
         self._generate_report(subpoenas, received, chronologies, pages_map,
@@ -450,8 +456,8 @@ class SubpoenaTrackerWorker(QThread):
         """
         folder = _find_folder_ci(self.case_path, "DISCOVERY", "Subpoenas")
         if folder is None:
-            self.finished_result.emit(False, "No DISCOVERY/Subpoenas folder found.")
-            return {}, False
+            self._empty_subpoena_message = "No DISCOVERY/Subpoenas folder was found."
+            return {}, True
 
         subpoenas = {}
         skipped = []
@@ -493,13 +499,16 @@ class SubpoenaTrackerWorker(QThread):
         self._emit_skipped_summary("subpoena PDF", skipped)
 
         if not subpoenas and pdf_count == 0:
+            self._empty_subpoena_message = (
+                "No issued subpoena PDFs were found in DISCOVERY/Subpoenas."
+            )
             return {}, True
         if not subpoenas:
-            self.finished_result.emit(
-                False,
-                "No parseable subpoena IDs found in DISCOVERY/Subpoenas folder.",
+            self._empty_subpoena_message = (
+                "No parseable subpoena IDs were found in DISCOVERY/Subpoenas. "
+                "Review the ignored subpoena PDF warning(s) for manual tracking."
             )
-            return {}, False
+            return {}, True
 
         return subpoenas, True
 
@@ -844,6 +853,11 @@ class SubpoenaTrackerWorker(QThread):
 
             entries = []
             for row in table.rows:
+                if len(row.cells) < 2:
+                    self.warning.emit(
+                        f"Skipping malformed row in RECORDS SUMMARIZED table: {fname}"
+                    )
+                    continue
                 cell_text = row.cells[0].text.strip().upper()
                 if cell_text in ("RECORDS SUMMARIZED:", "FILENAME", ""):
                     continue
@@ -988,6 +1002,114 @@ class SubpoenaTrackerWorker(QThread):
             del non_subpoena_records[fn]
 
     # ---------------------------------------------------------------
+    # Phase 3c — Alternate records folders
+    # ---------------------------------------------------------------
+    def _alternate_record_roots(self):
+        """Return likely record-production folders outside RECORDS/Subpoenaed."""
+        roots = []
+
+        records_folder = _find_folder_ci(self.case_path, "RECORDS")
+        if records_folder:
+            try:
+                for entry in os.scandir(records_folder):
+                    if not entry.is_dir():
+                        continue
+                    lower = entry.name.lower()
+                    if "subpoena" in lower:
+                        continue
+                    if "summar" in lower and "do not" in lower:
+                        continue
+                    if (
+                        "medical docs" in lower
+                        or "med records" in lower
+                        or "billing records" in lower
+                    ):
+                        roots.append((entry.path, os.path.relpath(entry.path, self.case_path)))
+            except OSError:
+                pass
+
+        for parts in (
+            ("DISCOVERY", "RESPONSES", "Productions"),
+            ("DISCOVERY", "INITIAL DISCLOSURES"),
+        ):
+            folder = _find_folder_ci(self.case_path, *parts)
+            if folder:
+                roots.append((folder, os.path.relpath(folder, self.case_path)))
+
+        seen = set()
+        unique_roots = []
+        for folder, label in roots:
+            norm = os.path.normcase(os.path.abspath(folder))
+            if norm in seen:
+                continue
+            seen.add(norm)
+            unique_roots.append((folder, label))
+        return unique_roots
+
+    def _scan_alternate_record_candidates(self):
+        """Find possible received records outside RECORDS/Subpoenaed."""
+        candidates = []
+        for folder, source_label in self._alternate_record_roots():
+            for root, _dirs, files in os.walk(folder):
+                for fname in files:
+                    ext = os.path.splitext(fname)[1].lower()
+                    if ext not in RECEIVED_RECORD_EXTENSIONS:
+                        continue
+                    if fname.startswith('~$'):
+                        continue
+                    facility = self._clean_unparsed_received_facility(fname)
+                    if (
+                        len(facility) < 4
+                        or not re.search(r'[A-Za-z]', facility)
+                        or facility.lower().strip() in UNINFORMATIVE_FACILITY
+                    ):
+                        continue
+                    candidates.append({
+                        "filename": fname,
+                        "facility": facility,
+                        "path": os.path.join(root, fname),
+                        "source": source_label,
+                    })
+        return candidates
+
+    def _match_alternate_records_by_facility(self, subpoenas, received):
+        """Attach high-confidence possible matches from non-standard folders.
+
+        These matches are intentionally separate from `received`; the report labels
+        them as possible matches rather than treating them as subpoena returns.
+        """
+        self._alternate_record_matches = {}
+        unmatched_sids = [sid for sid in subpoenas if sid not in received]
+        if not unmatched_sids:
+            return
+
+        candidates = self._scan_alternate_record_candidates()
+        if not candidates:
+            return
+
+        used_paths = set()
+        for sid in unmatched_sids:
+            facility = subpoenas[sid]["facility"]
+            best_candidate, best_ratio = None, 0.0
+            for candidate in candidates:
+                if candidate["path"] in used_paths:
+                    continue
+                ratio = _facility_similarity(candidate["facility"], facility)
+                if ratio > best_ratio:
+                    best_candidate = candidate
+                    best_ratio = ratio
+            if best_candidate and best_ratio >= 0.85:
+                match = dict(best_candidate)
+                match["ratio"] = best_ratio
+                match["subpoena_id"] = sid
+                match["subpoena_facility"] = facility
+                self._alternate_record_matches[sid] = match
+                used_paths.add(best_candidate["path"])
+                self.progress.emit(
+                    f"Possible alternate record '{match['facility']}' → subpoena {sid} "
+                    f"(facility similarity {best_ratio:.0%})")
+
+    # ---------------------------------------------------------------
     # Phase 4
     # ---------------------------------------------------------------
     def _generate_report(self, subpoenas, received, chronologies, pages_map,
@@ -1022,9 +1144,7 @@ class SubpoenaTrackerWorker(QThread):
         doc.add_paragraph(f"Last Updated: {today.strftime('%B %d, %Y')}")
         doc.add_paragraph("")
         if not subpoenas:
-            doc.add_paragraph(
-                "No issued subpoena PDFs were found in DISCOVERY/Subpoenas."
-            )
+            doc.add_paragraph(self._empty_subpoena_message)
             doc.add_paragraph("")
 
         # Create table with fixed column widths — 5 columns now
@@ -1079,11 +1199,15 @@ class SubpoenaTrackerWorker(QThread):
 
             # Column 3: Records Received
             rec = received.get(sid)
+            alt_match = self._alternate_record_matches.get(sid)
             rec_p = row_cells[2].paragraphs[0]
             if rec is None or rec["status"] == "No":
-                run = rec_p.add_run("No")
-                run.font.name = 'Times New Roman'
-                run.font.size = Pt(12)
+                if alt_match:
+                    add_hyperlink(rec_p, alt_match["path"], "Possible Match")
+                else:
+                    run = rec_p.add_run("No")
+                    run.font.name = 'Times New Roman'
+                    run.font.size = Pt(12)
             else:
                 label = rec["status"]  # "Yes", "CNR", or "Other"
                 add_hyperlink(rec_p, rec["path"], label)
@@ -1178,6 +1302,8 @@ class SubpoenaTrackerWorker(QThread):
                     run.font.name = 'Times New Roman'
                     run.font.size = Pt(12)
 
+        self._append_alternate_record_section(doc)
+
         # Save
         output_base = self.output_root or self.case_path
         output_dir = os.path.join(output_base, "NOTES", "AI OUTPUT")
@@ -1194,6 +1320,45 @@ class SubpoenaTrackerWorker(QThread):
             )
 
         self.finished_result.emit(True, output_path)
+
+    def _append_alternate_record_section(self, doc):
+        if not self._alternate_record_matches:
+            return
+
+        doc.add_paragraph("")
+        heading = doc.add_paragraph()
+        run = heading.add_run("Potential records found outside RECORDS/Subpoenaed")
+        run.bold = True
+        run.font.name = 'Times New Roman'
+        run.font.size = Pt(12)
+
+        table = doc.add_table(rows=1, cols=5)
+        table.style = 'Table Grid'
+        headers = ["Subpoena", "Subpoena Facility", "Possible Record", "Source", "Confidence"]
+        for idx, text in enumerate(headers):
+            cell = table.rows[0].cells[idx]
+            run = cell.paragraphs[0].add_run(text)
+            run.bold = True
+            run.font.name = 'Times New Roman'
+            run.font.size = Pt(12)
+
+        for sid, match in sorted(self._alternate_record_matches.items()):
+            row = table.add_row().cells
+            values = [
+                sid,
+                match["subpoena_facility"],
+                match["filename"],
+                match["source"],
+                f"{match['ratio']:.0%}",
+            ]
+            for idx, text in enumerate(values):
+                p = row[idx].paragraphs[0]
+                if idx == 2:
+                    add_hyperlink(p, match["path"], text)
+                else:
+                    run = p.add_run(text)
+                    run.font.name = 'Times New Roman'
+                    run.font.size = Pt(12)
 
     @staticmethod
     def _extract_facility_from_received(filename):
