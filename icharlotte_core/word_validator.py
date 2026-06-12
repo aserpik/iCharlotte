@@ -1221,6 +1221,80 @@ def validate_summary_docx(doc_path: str) -> ValidationResult:
     return result
 
 
+def validate_subpoena_tracker_docx(doc_path: str) -> ValidationResult:
+    """Lightweight validation for generated subpoena tracker reports."""
+    from docx import Document
+
+    result = ValidationResult(
+        context=f"Subpoena tracker: {os.path.basename(doc_path)}"
+    )
+
+    if not os.path.exists(doc_path):
+        result.findings.append(Finding("ERROR", "file", f"File not found: {doc_path}"))
+        return result
+
+    try:
+        doc = Document(doc_path)
+    except Exception as exc:
+        result.findings.append(
+            Finding("ERROR", "open_docx", f"Could not open generated docx: {exc}")
+        )
+        return result
+
+    text = _docx_all_story_text(doc)
+    if "Subpoena Tracking Report" not in text:
+        result.findings.append(
+            Finding("ERROR", "title", "Missing subpoena tracking report title")
+        )
+    else:
+        result.findings.append(Finding("PASS", "title", "Report title present"))
+
+    if not doc.tables:
+        result.findings.append(Finding("ERROR", "table", "Report has no tracker table"))
+        return result
+
+    table = doc.tables[0]
+    expected_headers = [
+        "Subpoena Number",
+        "Facility",
+        "Records Received",
+        "Records Summarized",
+        "Pages",
+    ]
+    actual_headers = [
+        cell.text.strip() for cell in table.rows[0].cells
+    ] if table.rows else []
+    if actual_headers != expected_headers:
+        result.findings.append(
+            Finding(
+                "ERROR",
+                "headers",
+                "Tracker table headers do not match expected subpoena schema",
+                expected=expected_headers,
+                actual=actual_headers,
+            )
+        )
+    else:
+        result.findings.append(Finding("PASS", "headers", "Tracker headers present"))
+
+    data_rows = max(0, len(table.rows) - 1)
+    has_empty_message = "No issued subpoena PDFs were found" in text
+    if data_rows == 0 and not has_empty_message:
+        result.findings.append(
+            Finding(
+                "ERROR",
+                "rows",
+                "Tracker table has no data rows and no empty-report explanation",
+            )
+        )
+    else:
+        result.findings.append(
+            Finding("PASS", "rows", f"{data_rows} tracker data row(s)")
+        )
+
+    return result
+
+
 def validate_index_docx(doc_path: str, expected_doc_count: Optional[int] = None) -> ValidationResult:
     """Lightweight offline validation for the separator INDEX .docx.
 

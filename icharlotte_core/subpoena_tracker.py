@@ -20,6 +20,8 @@ from docx.oxml.shared import qn
 from docx.oxml import OxmlElement
 import docx.opc.constants as opc_constants
 
+from icharlotte_core.word_validator import validate_subpoena_tracker_docx
+
 log = logging.getLogger(__name__)
 
 # --- Regex patterns ---
@@ -28,6 +30,18 @@ DATE_PATTERN = re.compile(r'(\d{4})[.\-](\d{2})[.\-](\d{2})')
 SEPARATOR_STRIP = re.compile(r'^[\s,_\-]+')
 CNR_PATTERN = re.compile(r'\bCNR\b', re.IGNORECASE)
 REPLY_OBJECTION_PATTERN = re.compile(r'(reply|objection)', re.IGNORECASE)
+UNPARSED_DATE_PREFIX = re.compile(
+    r'^(?:\d{4}[.\-]\d{2}[.\-]\d{2}|\d{2}[.\-]\d{2}[.\-]\d{2})[\s_\-]+'
+)
+UNPARSED_BRACKET_PREFIX = re.compile(r'^\[[^\]]+\]\s*')
+UNPARSED_EXTERNAL_ID_PREFIX = re.compile(r'^\([A-Za-z0-9]+\)\s*')
+UNPARSED_STATUS_PREFIX = re.compile(r'^(?:CNR|CNX)\b[\s\-_:]*', re.IGNORECASE)
+NON_RECORD_UNPARSED_PATTERN = re.compile(
+    r'(?:status\s+letter|order\s+confirmation|request\s+form|rcd\s+req|'
+    r'authorization|subpoena\s+log|file\s+copy|image\b)',
+    re.IGNORECASE,
+)
+RECEIVED_RECORD_EXTENSIONS = {'.pdf', '.doc', '.docx', '.xlsx', '.msg'}
 
 # Suffixes to strip from received record filenames when extracting facility names
 _RECORD_SUFFIX = re.compile(
@@ -372,10 +386,13 @@ class SubpoenaTrackerWorker(QThread):
     finished_result = Signal(bool, str)  # (success, output_path_or_error_message)
     warning = Signal(str)
 
-    def __init__(self, case_path, file_number="", parent=None):
+    def __init__(self, case_path, file_number="", parent=None, output_root=None):
         super().__init__(parent)
         self.case_path = case_path
         self.file_number = file_number
+        self.output_root = output_root
+        self._unparsed_received_candidates = []
+        self._ignored_received_items = []
 
     def run(self):
         try:
@@ -389,6 +406,11 @@ class SubpoenaTrackerWorker(QThread):
         self.progress.emit("Scanning issued subpoenas...")
         subpoenas, phase1_ok = self._scan_issued_subpoenas()
         if not phase1_ok:
+            return
+
+        if not subpoenas:
+            self.progress.emit("No issued subpoena PDFs found; generating empty report...")
+            self._generate_report(subpoenas, {}, {}, {}, {}, {})
             return
 
         # --- Phase 2: Scan received records + build file index ---
@@ -433,11 +455,13 @@ class SubpoenaTrackerWorker(QThread):
 
         subpoenas = {}
         skipped = []
+        pdf_count = 0
 
         for root, _dirs, files in os.walk(folder):
             for fname in files:
                 if not fname.lower().endswith('.pdf'):
                     continue
+                pdf_count += 1
                 sid, remainder = parse_subpoena_id(fname)
                 if sid is None:
                     skipped.append(fname)
@@ -466,11 +490,15 @@ class SubpoenaTrackerWorker(QThread):
                         subpoenas[sid]["facility"] = facility
                         subpoenas[sid]["subpoena_path"] = full_path
 
-        for s in skipped:
-            self.warning.emit(f"Could not parse subpoena ID from: {s}")
+        self._emit_skipped_summary("subpoena PDF", skipped)
 
+        if not subpoenas and pdf_count == 0:
+            return {}, True
         if not subpoenas:
-            self.finished_result.emit(False, "No subpoenas found in DISCOVERY/Subpoenas folder.")
+            self.finished_result.emit(
+                False,
+                "No parseable subpoena IDs found in DISCOVERY/Subpoenas folder.",
+            )
             return {}, False
 
         return subpoenas, True
@@ -537,12 +565,13 @@ class SubpoenaTrackerWorker(QThread):
         Returns:
             dict mapping normalized_id -> {"status": str, "path": str}
         """
+        self._unparsed_received_candidates = []
+        self._ignored_received_items = []
         folder = _find_folder_ci(self.case_path, "RECORDS", "Subpoenaed")
         if folder is None:
             return {}
 
         received = {}
-        skipped = []
 
         # Scan direct children and one level of subfolders (vendor folders like
         # JJ Photocopy, CNR, Gemini, COMPEX contain record files with subpoena IDs).
@@ -550,14 +579,14 @@ class SubpoenaTrackerWorker(QThread):
             for entry in os.scandir(folder):
                 if entry.is_file():
                     self._classify_received_item(
-                        entry.name, entry.path, received, skipped, is_file=True
+                        entry.name, entry.path, received, is_file=True
                     )
                 elif entry.is_dir():
                     # Scan inside vendor subfolders
                     try:
                         for sub_entry in os.scandir(entry.path):
                             self._classify_received_item(
-                                sub_entry.name, sub_entry.path, received, skipped,
+                                sub_entry.name, sub_entry.path, received,
                                 is_file=sub_entry.is_file()
                             )
                     except OSError:
@@ -565,25 +594,23 @@ class SubpoenaTrackerWorker(QThread):
         except OSError as e:
             self.warning.emit(f"Error scanning Subpoenaed folder: {e}")
 
-        for s in skipped:
-            self.warning.emit(f"Could not parse ID from received item: {s}")
-
         return received
 
-    def _classify_received_item(self, name, full_path, received, skipped, is_file):
+    def _classify_received_item(self, name, full_path, received, is_file):
         """Classify a single received record file or folder."""
         sid, remainder = parse_subpoena_id(name)
         if sid is None:
-            skipped.append(name)
+            candidate = self._build_unparsed_received_candidate(
+                name, full_path, is_file
+            )
+            if candidate:
+                self._unparsed_received_candidates.append(candidate)
+            else:
+                self._ignored_received_items.append(name)
             return
 
         # Classify based on remainder text
-        if CNR_PATTERN.search(remainder) or CNR_PATTERN.search(name):
-            status = "CNR"
-        elif REPLY_OBJECTION_PATTERN.search(remainder) or REPLY_OBJECTION_PATTERN.search(name):
-            status = "Other"
-        else:
-            status = "Yes"
+        status = self._classify_received_status(name, remainder)
 
         if sid in received:
             existing = received[sid]
@@ -596,6 +623,56 @@ class SubpoenaTrackerWorker(QThread):
             # Otherwise keep existing
         else:
             received[sid] = {"status": status, "path": full_path}
+
+    @staticmethod
+    def _classify_received_status(name, remainder=""):
+        if CNR_PATTERN.search(remainder) or CNR_PATTERN.search(name):
+            return "CNR"
+        if (REPLY_OBJECTION_PATTERN.search(remainder)
+                or REPLY_OBJECTION_PATTERN.search(name)):
+            return "Other"
+        return "Yes"
+
+    @staticmethod
+    def _clean_unparsed_received_facility(name):
+        basename = os.path.splitext(name)[0].strip()
+        basename = UNPARSED_EXTERNAL_ID_PREFIX.sub('', basename).strip()
+        basename = UNPARSED_BRACKET_PREFIX.sub('', basename).strip()
+        basename = UNPARSED_DATE_PREFIX.sub('', basename).strip()
+        basename = UNPARSED_STATUS_PREFIX.sub('', basename).strip()
+        basename = _RECORD_SUFFIX.sub('', basename).strip(' -_,')
+        basename = UNPARSED_STATUS_PREFIX.sub('', basename).strip(' -_,')
+        return basename
+
+    def _build_unparsed_received_candidate(self, name, full_path, is_file):
+        ext = os.path.splitext(name)[1].lower()
+        if is_file and ext not in RECEIVED_RECORD_EXTENSIONS:
+            return None
+        if NON_RECORD_UNPARSED_PATTERN.search(name):
+            return None
+
+        facility = self._clean_unparsed_received_facility(name)
+        if (len(facility) < 4
+                or not re.search(r'[A-Za-z]', facility)
+                or facility.lower().strip() in UNINFORMATIVE_FACILITY):
+            return None
+
+        return {
+            "name": name,
+            "facility": facility,
+            "status": self._classify_received_status(name),
+            "path": full_path,
+        }
+
+    def _emit_skipped_summary(self, item_label, skipped, *, limit=5):
+        if not skipped:
+            return
+        examples = ", ".join(skipped[:limit])
+        suffix = "" if len(skipped) <= limit else f", and {len(skipped) - limit} more"
+        self.warning.emit(
+            f"Ignored {len(skipped)} {item_label}(s) without parseable IDs: "
+            f"{examples}{suffix}"
+        )
 
     def _build_file_index(self):
         """Walk RECORDS/ and DISCOVERY/RESPONSES/ once to build a filename-to-path lookup.
@@ -807,15 +884,34 @@ class SubpoenaTrackerWorker(QThread):
         subpoena SID and the copy-service SID entry is removed.
         """
         unmatched_sids = [sid for sid in received if sid not in subpoenas]
-        if not unmatched_sids:
+        candidates = []
+        for u_sid in unmatched_sids:
+            rec = received[u_sid]
+            candidates.append({
+                "source_sid": u_sid,
+                "facility": self._extract_facility_from_received(
+                    os.path.basename(rec["path"])),
+                "status": rec["status"],
+                "path": rec["path"],
+                "threshold": 0.70,
+            })
+        for rec in self._unparsed_received_candidates:
+            candidates.append({
+                "source_sid": None,
+                "facility": rec["facility"],
+                "status": rec["status"],
+                "path": rec["path"],
+                "threshold": 0.80,
+            })
+
+        if not candidates:
             return
 
         already_received = {sid for sid in received if sid in subpoenas}
+        unmatched_unparsed = 0
 
-        for u_sid in unmatched_sids:
-            rec = received[u_sid]
-            rec_facility = self._extract_facility_from_received(
-                os.path.basename(rec["path"]))
+        for rec in candidates:
+            rec_facility = rec["facility"]
             if not rec_facility or rec_facility.lower().strip() in UNINFORMATIVE_FACILITY:
                 continue
 
@@ -828,13 +924,23 @@ class SubpoenaTrackerWorker(QThread):
                     best_ratio = ratio
                     best_sid = s_sid
 
-            if best_ratio >= 0.70 and best_sid:
+            if best_ratio >= rec["threshold"] and best_sid:
                 received[best_sid] = rec
                 already_received.add(best_sid)
-                del received[u_sid]
+                if rec["source_sid"] is not None:
+                    del received[rec["source_sid"]]
                 self.progress.emit(
                     f"Matched received '{rec_facility}' → subpoena {best_sid} "
                     f"(facility similarity {best_ratio:.0%})")
+            elif rec["source_sid"] is None:
+                unmatched_unparsed += 1
+
+        if unmatched_unparsed:
+            self.warning.emit(
+                "Ignored "
+                f"{unmatched_unparsed} received item(s) without parseable subpoena ID "
+                "or a strong facility match."
+            )
 
     def _match_chron_by_facility(self, subpoenas, chronologies, pages_map,
                                  non_subpoena_records):
@@ -915,6 +1021,11 @@ class SubpoenaTrackerWorker(QThread):
         today = datetime.date.today()
         doc.add_paragraph(f"Last Updated: {today.strftime('%B %d, %Y')}")
         doc.add_paragraph("")
+        if not subpoenas:
+            doc.add_paragraph(
+                "No issued subpoena PDFs were found in DISCOVERY/Subpoenas."
+            )
+            doc.add_paragraph("")
 
         # Create table with fixed column widths — 5 columns now
         table = doc.add_table(rows=1, cols=5)
@@ -1068,11 +1179,19 @@ class SubpoenaTrackerWorker(QThread):
                     run.font.size = Pt(12)
 
         # Save
-        output_dir = os.path.join(self.case_path, "NOTES", "AI OUTPUT")
+        output_base = self.output_root or self.case_path
+        output_dir = os.path.join(output_base, "NOTES", "AI OUTPUT")
         os.makedirs(output_dir, exist_ok=True)
         filename = f"Tracked_Subpoenas {today.strftime('%Y-%m-%d')}.docx"
         output_path = os.path.join(output_dir, filename)
         doc.save(output_path)
+        validation = validate_subpoena_tracker_docx(output_path)
+        if validation.has_errors:
+            validation.print_summary()
+            raise ValueError(
+                f"Subpoena tracker validation failed: "
+                f"{validation.error_count} error(s) in {output_path}"
+            )
 
         self.finished_result.emit(True, output_path)
 
