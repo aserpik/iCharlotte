@@ -155,7 +155,39 @@ def _register_job_routes(app, manager, templates):
 
 
 def _register_depo_prep_routes(app, manager, templates):
-    pass
+    @app.post("/case/{file_number}/task/depo_prep/submit")
+    async def depo_prep_submit(request: Request, file_number: str):
+        case = cases.get_case(file_number)
+        if case is None:
+            return HTMLResponse("Case not found", status_code=404)
+        form = await request.form()
+        rel_files = [f for f in form.getlist("files") if f]
+        if not rel_files:
+            return HTMLResponse("No source files.", status_code=400)
+        try:
+            abs_files = [str(cases.safe_resolve(case["case_path"], rf))
+                         for rf in rel_files]
+        except ValueError:
+            return HTMLResponse("Invalid path", status_code=400)
+        cfg = {
+            "deponent_name": (form.get("deponent_name") or "").strip(),
+            "deponent_role": (form.get("deponent_role") or "").strip(),
+            "deponent_sources": abs_files,
+            "context_sources": [],
+            "style": form.get("style") or "discovery",
+            "free_text_notes": (form.get("free_text_notes") or "").strip(),
+            "per_topic_flags": {
+                "strategic_note": form.get("flag_strategic") == "on",
+                "source_facts": form.get("flag_source_facts") == "on",
+                "impeachment_hook": form.get("flag_impeachment") == "on",
+                "objection_alts": form.get("flag_objection") == "on",
+            },
+            "case_root": case["case_path"],
+        }
+        cfg_path = T.write_depo_prep_config(cfg)
+        job = new_job("depo_prep", case["case_path"], file_number, [cfg_path])
+        manager.submit(job)
+        return RedirectResponse(f"/job/{job.id}", status_code=303)
 
 
 def _register_awaiting_routes(app, manager, templates):

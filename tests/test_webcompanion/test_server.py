@@ -131,3 +131,36 @@ def test_output_download(client, tmp_path):
 def test_output_missing_file_404(client):
     job = _make_job(client, state=J.DONE, output_path="E:/nope/gone.docx")
     assert client.get(f"/job/{job.id}/output").status_code == 404
+
+
+def test_depo_prep_start_shows_settings(client):
+    r = client.post("/case/9999/task/depo_prep/start",
+                    data={"files": ["doc.pdf"]})
+    assert r.status_code == 200
+    assert "deponent_name" in r.text and "Lock-down" in r.text
+
+
+def test_depo_prep_submit_builds_config(client, monkeypatch):
+    import json
+    from pathlib import Path
+    submitted = {}
+    monkeypatch.setattr(client.manager, "submit",
+                        lambda job: submitted.setdefault("job", job) or job)
+    r = client.post("/case/9999/task/depo_prep/submit", data={
+        "files": "doc.pdf",
+        "deponent_name": "Dr. Jones",
+        "deponent_role": "Treating physician",
+        "style": "expert",
+        "free_text_notes": "Focus on causation.",
+        "flag_strategic": "on",
+    }, follow_redirects=False)
+    assert r.status_code == 303
+    job = submitted["job"]
+    assert job.task_id == "depo_prep" and len(job.files) == 1
+    cfg = json.loads(Path(job.files[0]).read_text(encoding="utf-8"))
+    assert cfg["deponent_name"] == "Dr. Jones"
+    assert cfg["style"] == "expert"
+    assert cfg["per_topic_flags"]["strategic_note"] is True
+    assert cfg["per_topic_flags"]["source_facts"] is False
+    assert cfg["deponent_sources"][0].endswith("doc.pdf")
+    assert cfg["context_sources"] == []
