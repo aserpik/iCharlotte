@@ -262,4 +262,11 @@ powershell -ExecutionPolicy Bypass -File "C:\geminiterminal2\screenshot_util.ps1
 - Template cleaned of Angular CSS pollution (ng-star-inserted style)
 - Paragraph classifier handles L1/L2 subheading hierarchy for Discovery, Liability, Exposure sections
 
+### Wizard Web Companion (2026-06-12)
+- Standalone FastAPI server (`python -m webcompanion.server`, port 8765) for
+  running the seven script-based wizard tasks from a phone over Tailscale
+- Reuses the wizard stdout protocol and session managers; desktop app untouched
+- `--lan` flag binds 0.0.0.0 for local development; default binds Tailscale IP
+- Spec: `docs/superpowers/specs/2026-06-12-wizard-web-companion-design.md`
+
 See `DEVELOPMENT_LOG.md` for detailed changelog of features added during development.
