@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="crumb"><a href="/case/{{ case.file_number }}/chat">&#8592; Conversations</a></div>
+<h1>{{ conv.name }}</h1>
+{% for m in conv.messages %}
+<div class="card">
+ <b>{{ 'You' if m.role == 'user' else 'AI' }}:</b>
+ <div style="white-space:pre-wrap">{{ m.content }}</div>
+ {% for a in m.attachments %}<small>&#128206; {{ a.name }}</small>{% endfor %}
+</div>
+{% endfor %}
+{% if turn_id %}
+<div class="card" id="pending">
+ <b>AI:</b> <span id="turnstatus">thinking&hellip;</span>
+ <pre id="turnlog"></pre>
+</div>
+<script>
+const timer = setInterval(async () => {
+  let r;
+  try { r = await fetch('/api/chat/{{ conv.id }}/turn/{{ turn_id }}'); } catch(e){ return; }
+  if(!r.ok) return;
+  const s = await r.json();
+  document.getElementById('turnstatus').textContent = s.status;
+  document.getElementById('turnlog').textContent = (s.log || []).join('\n');
+  if(s.done){ clearInterval(timer); location.href = '/case/{{ case.file_number }}/chat/{{ conv.id }}'; }
+}, 2500);
+</script>
+{% endif %}
+<form method="post" action="/case/{{ case.file_number }}/chat/{{ conv.id }}/send" class="card">
+ <textarea name="message" rows="4" placeholder="Ask about this case..." {% if turn_id %}disabled{% endif %}></textarea>
+ <button class="btn" type="submit" {% if turn_id %}disabled{% endif %}>Send</button>
+</form>
+{% endblock %}

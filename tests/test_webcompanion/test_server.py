@@ -299,3 +299,81 @@ def test_tailscale_exe_defaults_to_bare_command(monkeypatch):
     monkeypatch.setattr(server.shutil, "which", lambda name: None)
     monkeypatch.setattr(server.os.path, "isfile", lambda p: False)
     assert server._tailscale_exe() == "tailscale"
+
+
+# --- Task 3: Chat routes -----------------------------------------------------
+
+from webcompanion import chat as chat_mod
+
+
+def test_case_page_shows_chat_card(client):
+    r = client.get("/case/9999")
+    assert r.status_code == 200
+    assert "/case/9999/chat" in r.text and "Chat" in r.text
+
+
+def test_chat_conversations_list(client, monkeypatch):
+    class _Conv:
+        id = "c1"; name = "Thread 1"
+    monkeypatch.setattr(chat_mod, "list_conversations", lambda fn: [_Conv()])
+    r = client.get("/case/9999/chat")
+    assert r.status_code == 200 and "Thread 1" in r.text
+
+
+def test_chat_new_creates_and_redirects(client, monkeypatch):
+    monkeypatch.setattr(chat_mod, "create_conversation", lambda fn, **kw: "newid")
+    r = client.post("/case/9999/chat/new", follow_redirects=False)
+    assert r.status_code == 303
+    assert r.headers["location"] == "/case/9999/chat/newid"
+
+
+def test_chat_conversation_view(client, monkeypatch):
+    class _Msg:
+        def __init__(self, role, content):
+            self.role, self.content, self.attachments, self.model_used = role, content, [], None
+    class _Conv:
+        id = "c1"; name = "T"; provider = "Gemini"; model = "gemini-3.5-flash"
+        messages = [_Msg("user", "hi"), _Msg("assistant", "hello there")]
+    monkeypatch.setattr(chat_mod, "get_conversation", lambda fn, cid: _Conv())
+    r = client.get("/case/9999/chat/c1")
+    assert r.status_code == 200
+    assert "hi" in r.text and "hello there" in r.text
+
+
+def test_chat_conversation_404(client, monkeypatch):
+    monkeypatch.setattr(chat_mod, "get_conversation", lambda fn, cid: None)
+    assert client.get("/case/9999/chat/nope").status_code == 404
+
+
+def test_chat_send_starts_turn_and_redirects(client, monkeypatch):
+    class _Conv:
+        id = "c1"; name = "T"; provider = "Gemini"; model = "gemini-3.5-flash"
+        messages = []
+    monkeypatch.setattr(chat_mod, "get_conversation", lambda fn, cid: _Conv())
+    started = {}
+    def fake_start(self, fn, cid, **kw):
+        started.update(kw); started["cid"] = cid; return "turn1"
+    monkeypatch.setattr(chat_mod.ChatTurnManager, "start_turn", fake_start)
+    r = client.post("/case/9999/chat/c1/send",
+                    data={"message": "what is the law?"}, follow_redirects=False)
+    assert r.status_code == 303
+    assert "/case/9999/chat/c1?turn=turn1" in r.headers["location"]
+    assert started["user_text"] == "what is the law?"
+    assert started["research_on"] is False
+
+
+def test_chat_send_empty_message_400(client, monkeypatch):
+    class _Conv:
+        id = "c1"; messages = []; provider = "Gemini"; model = "gemini-3.5-flash"; name = "T"
+    monkeypatch.setattr(chat_mod, "get_conversation", lambda fn, cid: _Conv())
+    r = client.post("/case/9999/chat/c1/send", data={"message": "  "})
+    assert r.status_code == 400
+
+
+def test_chat_turn_status_api(client, monkeypatch):
+    monkeypatch.setattr(chat_mod.ChatTurnManager, "get_turn",
+                        lambda self, tid: {"status": "generating", "log": ["x"],
+                                           "done": False, "error": ""})
+    r = client.get("/api/chat/c1/turn/turn1")
+    body = r.json()
+    assert body["status"] == "generating" and body["done"] is False

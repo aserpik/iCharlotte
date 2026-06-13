@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>&#128172; Chat &mdash; {{ case.file_number }}</h1>
+<form method="post" action="/case/{{ case.file_number }}/chat/new">
+ <button class="btn" type="submit">+ New conversation</button>
+</form>
+{% for conv in conversations %}
+<div class="card"><a href="/case/{{ case.file_number }}/chat/{{ conv.id }}">
+ <b>{{ conv.name }}</b>
+</a></div>
+{% else %}
+<p>No conversations yet.</p>
+{% endfor %}
+{% endblock %}

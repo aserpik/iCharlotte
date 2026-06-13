@@ -18,8 +18,11 @@ from fastapi.templating import Jinja2Templates
 from . import cases
 from . import jobs as J
 from . import task_defs as T
+from . import chat
 from .job_manager import JobManager
 from .jobs import JobStore, new_job
+
+_CHAT_MANAGER = chat.ChatTurnManager()
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
 DEFAULT_JOBS_PATH = T.REPO_ROOT / "logs" / "webcompanion" / "jobs.json"
@@ -107,7 +110,76 @@ def create_app(manager: JobManager) -> FastAPI:
     _register_job_routes(app, manager, templates)
     _register_depo_prep_routes(app, manager, templates)
     _register_awaiting_routes(app, manager, templates)
+    _register_chat_routes(app, templates)
     return app
+
+
+def _register_chat_routes(app, templates):
+    def _render(name, request, **ctx):
+        return templates.TemplateResponse(request, name, ctx)
+
+    @app.get("/case/{file_number}/chat", response_class=HTMLResponse)
+    def chat_list(request: Request, file_number: str):
+        case = cases.get_case(file_number)
+        if case is None:
+            return HTMLResponse("Case not found", status_code=404)
+        return _render("chat_conversations.html", request, case=case,
+                       conversations=chat.list_conversations(file_number))
+
+    @app.post("/case/{file_number}/chat/new")
+    def chat_new(file_number: str):
+        case = cases.get_case(file_number)
+        if case is None:
+            return HTMLResponse("Case not found", status_code=404)
+        conv_id = chat.create_conversation(file_number)
+        return RedirectResponse(f"/case/{file_number}/chat/{conv_id}",
+                                status_code=303)
+
+    @app.get("/case/{file_number}/chat/{conv_id}", response_class=HTMLResponse)
+    def chat_view(request: Request, file_number: str, conv_id: str,
+                  turn: str = None):
+        case = cases.get_case(file_number)
+        if case is None:
+            return HTMLResponse("Case not found", status_code=404)
+        conv = chat.get_conversation(file_number, conv_id)
+        if conv is None:
+            return HTMLResponse("Conversation not found", status_code=404)
+        return _render("chat_conversation.html", request, case=case, conv=conv,
+                       turn_id=turn)
+
+    @app.post("/case/{file_number}/chat/{conv_id}/send")
+    async def chat_send(request: Request, file_number: str, conv_id: str):
+        case = cases.get_case(file_number)
+        if case is None:
+            return HTMLResponse("Case not found", status_code=404)
+        conv = chat.get_conversation(file_number, conv_id)
+        if conv is None:
+            return HTMLResponse("Conversation not found", status_code=404)
+        form = await request.form()
+        message = (form.get("message") or "").strip()
+        if not message:
+            return HTMLResponse("Type a message.", status_code=400)
+        provider = form.get("provider") or conv.provider
+        model = form.get("model") or conv.model
+        rel_files = [f for f in form.getlist("attach") if f]
+        research_on = form.get("research") == "on"
+        try:
+            turn_id = _CHAT_MANAGER.start_turn(
+                file_number, conv_id, user_text=message, provider=provider,
+                model=model, attach_rel_files=rel_files, research_on=research_on)
+        except ValueError as exc:
+            return HTMLResponse(str(exc), status_code=409)
+        return RedirectResponse(
+            f"/case/{file_number}/chat/{conv_id}?turn={turn_id}",
+            status_code=303)
+
+    @app.get("/api/chat/{conv_id}/turn/{turn_id}")
+    def chat_turn_status(conv_id: str, turn_id: str):
+        t = _CHAT_MANAGER.get_turn(turn_id)
+        if t is None:
+            return JSONResponse({"error": "not found"}, status_code=404)
+        return JSONResponse({"status": t["status"], "log": t["log"],
+                             "done": t["done"], "error": t["error"]})
 
 
 def _register_job_routes(app, manager, templates):
