@@ -67,6 +67,7 @@ class TaskSpec:
     default_folders: List[str] = field(default_factory=list)
     phase1_args: List[str] = field(default_factory=list)
     phase2_flag: str = "--phase=summary"
+    hidden: bool = False
     # Optional launcher-card corner button (e.g. Separate → open the Index).
     # When card_action_id is set, TaskCard renders a small QToolButton that
     # emits action_requested(card_action_id). None = no button (default).
@@ -224,6 +225,26 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         ],
         default_folders=["DISCOVERY/PROPOUNDED", "DISCOVERY"],
     ),
+    "motion_drafting": TaskSpec(
+        task_id="motion_drafting",
+        title="Motion Drafting",
+        description="Draft a motion, opposition, or reply using Motion Database categories.",
+        icon_glyph="⚖️",
+        script_name="",
+        category="Motions",
+        keywords=[
+            "motion",
+            "draft",
+            "opposition",
+            "oppose",
+            "reply",
+            "compel",
+            "demurrer",
+            "strike",
+            "summary judgment",
+        ],
+        default_folders=["MOTIONS", "PLEADINGS", "DISCOVERY"],
+    ),
     "oppose_motion": TaskSpec(
         task_id="oppose_motion",
         title="Oppose a Motion",
@@ -233,6 +254,7 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
         category="Motions",
         keywords=["motion", "opposition", "oppose", "MSJ", "brief", "memorandum", "demurrer"],
         default_folders=["MOTIONS", "PLEADINGS", "DISCOVERY"],
+        hidden=True,
     ),
     "generate_motion": TaskSpec(
         task_id="generate_motion",
@@ -246,6 +268,7 @@ TASK_REGISTRY: dict[str, TaskSpec] = {
             "memorandum", "points and authorities", "notice of motion",
         ],
         default_folders=["MOTIONS", "PLEADINGS", "DISCOVERY"],
+        hidden=True,
     ),
     "mediation_brief": TaskSpec(
         task_id="mediation_brief",
@@ -318,4 +341,4 @@ def get_task(task_id: str) -> TaskSpec:
 
 def list_tasks() -> list[TaskSpec]:
     """Return all registered tasks in registry-insertion order."""
-    return list(TASK_REGISTRY.values())
+    return [spec for spec in TASK_REGISTRY.values() if not spec.hidden]

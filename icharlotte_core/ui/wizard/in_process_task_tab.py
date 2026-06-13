@@ -519,10 +519,6 @@ def build_med_extractor_tab(
     initial_settings: dict | None = None,
 ) -> InProcessTaskTab | None:
     from icharlotte_core.med_record_extractor import MedRecordExtractorWorker
-    from icharlotte_core.ui.wizard.file_picker import (
-        find_medical_summary_folder,
-        resolve_default_folder,
-    )
     from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
         MedChronologySelectionPage,
     )
@@ -532,21 +528,8 @@ def build_med_extractor_tab(
     if chronology_path and case_path and not os.path.isabs(chronology_path):
         chronology_path = os.path.join(case_path, chronology_path)
 
-    if not chronology_path:
-        start_dir = find_medical_summary_folder(case_path) or resolve_default_folder(
-            case_path,
-            ["RECORDS"],
-        )
-        chronology_path, _ = QFileDialog.getOpenFileName(
-            parent,
-            "Select medical chronology summary",
-            start_dir,
-            "Word Documents (*.docx)",
-        )
-        if not chronology_path:
-            return None
-
-    settings["chronology_path"] = chronology_path
+    if chronology_path:
+        settings["chronology_path"] = chronology_path
     settings_widget = MedChronologySelectionPage(case_path, file_number, chronology_path)
     if settings:
         settings_widget.from_dict(settings)
@@ -645,6 +628,24 @@ def build_oppose_motion_tab(
 ):
     from icharlotte_core.ui.wizard.pages.oppose_motion_page import (
         build_oppose_motion_tab as _build,
+    )
+
+    return _build(
+        spec=spec,
+        case_path=case_path,
+        file_number=file_number,
+        parent=parent,
+    )
+
+
+def build_motion_drafting_tab(
+    spec,
+    case_path: str,
+    file_number: str,
+    parent: QWidget | None,
+):
+    from icharlotte_core.ui.wizard.pages.motion_drafting_page import (
+        build_motion_drafting_tab as _build,
     )
 
     return _build(

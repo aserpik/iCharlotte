@@ -1290,6 +1290,7 @@ class MainWindow(QMainWindow):
         builder_name = get_in_process_task_builder_name(task_id)
         if builder_name and builder_name not in (
             "build_oppose_motion_tab",
+            "build_motion_drafting_tab",
             "build_mediation_brief_tab",
             "build_generate_motion_tab",
             "build_case_intake_docket_tab",
@@ -1345,6 +1346,23 @@ class MainWindow(QMainWindow):
                 file_number=self.file_number,
                 motion_file=motion_file,
                 context_files=context_files,
+                parent=self,
+            )
+            task_tab.settings_page.from_dict(settings)
+            output_page = TASK_PAGE_OUTPUT
+            settings_page = TASK_PAGE_SETTINGS
+        elif builder_name == "build_motion_drafting_tab":
+            from icharlotte_core.ui.wizard.pages.motion_drafting_page import (
+                MotionDraftingTaskTab,
+                TASK_PAGE_OUTPUT,
+                TASK_PAGE_SETTINGS,
+            )
+
+            settings = dict(entry.get("settings") or {})
+            task_tab = MotionDraftingTaskTab(
+                spec=spec,
+                case_path=self.case_path,
+                file_number=self.file_number,
                 parent=self,
             )
             task_tab.settings_page.from_dict(settings)
@@ -1483,6 +1501,7 @@ class MainWindow(QMainWindow):
             builder_name = get_in_process_task_builder_name(task_id)
             if builder_name and builder_name not in (
                 "build_oppose_motion_tab",
+                "build_motion_drafting_tab",
                 "build_mediation_brief_tab",
                 "build_generate_motion_tab",
                 "build_case_intake_docket_tab",
@@ -1539,6 +1558,21 @@ class MainWindow(QMainWindow):
                     file_number=self.file_number,
                     motion_file=motion_file,
                     context_files=context_files,
+                    parent=self,
+                )
+                output_page = TASK_PAGE_OUTPUT
+                settings_page = TASK_PAGE_SETTINGS
+            elif builder_name == "build_motion_drafting_tab":
+                from icharlotte_core.ui.wizard.pages.motion_drafting_page import (
+                    MotionDraftingTaskTab,
+                    TASK_PAGE_OUTPUT,
+                    TASK_PAGE_SETTINGS,
+                )
+
+                tab = MotionDraftingTaskTab(
+                    spec=spec,
+                    case_path=self.case_path,
+                    file_number=self.file_number,
                     parent=self,
                 )
                 output_page = TASK_PAGE_OUTPUT

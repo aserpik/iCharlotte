@@ -10,6 +10,7 @@ from PySide6.QtWebEngineCore import QWebEngineSettings
 
 PDF_LOAD_POLL_INTERVAL_MS = 100
 PDF_LOAD_MAX_POLLS = 100
+DEFAULT_PDF_SCALE = 1.5
 
 
 class PdfViewerWidget(QWidget):
@@ -202,7 +203,7 @@ class PdfViewerWidget(QWidget):
         let sessionHighlights = [];
         let nextSessionHighlightId = 1;
 
-        async function loadPdf(url) {
+        async function loadPdf(url, defaultScale = 1.5) {
             if (isLoading) return { success: false, error: 'Already loading' };
             isLoading = true;
 
@@ -219,6 +220,7 @@ class PdfViewerWidget(QWidget):
                 renderingPages.clear();
                 pageHeights = [];
                 clearSessionHighlights();
+                scale = defaultScale;
 
                 pdfDoc = await pdfjsLib.getDocument(url).promise;
                 totalPages = pdfDoc.numPages;
@@ -707,8 +709,9 @@ class PdfViewerWidget(QWidget):
         url_escaped = url.replace("'", "\\'")
         # loadPdf is async — runJavaScript can't await Promises.
         # Just fire the call, then poll getTotalPages() until it's > 0.
-        js = f"window.pdfViewer.loadPdf('{url_escaped}')"
+        js = f"window.pdfViewer.loadPdf('{url_escaped}', {DEFAULT_PDF_SCALE})"
         self.web_view.page().runJavaScript(js)
+        self.zoom_label.setText(f"{int(DEFAULT_PDF_SCALE * 100)}%")
         self._load_poll_count = 0
         QTimer.singleShot(PDF_LOAD_POLL_INTERVAL_MS, self._poll_total_pages)
 
