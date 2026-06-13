@@ -43,7 +43,7 @@ def create_app(manager: JobManager) -> FastAPI:
     templates = Jinja2Templates(directory=str(_TEMPLATES_DIR))
 
     def _render(name, request, **ctx):
-        return templates.TemplateResponse(name, {"request": request, **ctx})
+        return templates.TemplateResponse(request, name, ctx)
 
     # ---- home / case / picker ----
 
@@ -114,7 +114,7 @@ def _register_job_routes(app, manager, templates):
     import os
 
     def _render(name, request, **ctx):
-        return templates.TemplateResponse(name, {"request": request, **ctx})
+        return templates.TemplateResponse(request, name, ctx)
 
     @app.get("/job/{job_id}", response_class=HTMLResponse)
     def job_page(request: Request, job_id: str):
@@ -193,7 +193,7 @@ def _register_depo_prep_routes(app, manager, templates):
 
 def _register_awaiting_routes(app, manager, templates):
     def _render(name, request, **ctx):
-        return templates.TemplateResponse(name, {"request": request, **ctx})
+        return templates.TemplateResponse(request, name, ctx)
 
     def _get_awaiting(job_id):
         job = manager.store.get(job_id)
