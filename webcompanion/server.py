@@ -108,7 +108,6 @@ def create_app(manager: JobManager) -> FastAPI:
     return app
 
 
-# Filled in by Tasks 9-11. Keep these stubs so Task 8 imports cleanly.
 def _register_job_routes(app, manager, templates):
     import os
 

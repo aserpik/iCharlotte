@@ -15,7 +15,6 @@ FAILED = "failed"
 CANCELLED = "cancelled"
 INTERRUPTED = "interrupted"
 
-ACTIVE_STATES = {QUEUED, RUNNING, AWAITING_INPUT}
 _LOG_CAP = 200
 
 
