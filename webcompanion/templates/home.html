@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>iCharlotte Companion</h1>
+{% if jobs %}
+<h2>Jobs</h2>
+{% for job in jobs %}
+<div class="card"><a href="/job/{{ job.id }}">
+ <b>{{ tasks[job.task_id].title if job.task_id in tasks else job.task_id }}</b>
+ &mdash; {{ job.file_number }}<br>
+ <span class="state">{{ job.state }}</span> {{ job.progress }}%
+</a></div>
+{% endfor %}
+{% endif %}
+<h2>Cases</h2>
+<form method="get" action="/">
+ <input type="text" name="q" value="{{ q }}" placeholder="Search file number or plaintiff" autocomplete="off">
+</form>
+{% for case in cases %}
+<div class="card"><a href="/case/{{ case.file_number }}">
+ <b>{{ case.file_number }}</b> &mdash; {{ case.plaintiff_last_name }}
+</a></div>
+{% endfor %}
+{% endblock %}

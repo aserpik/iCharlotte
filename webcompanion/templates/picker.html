@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ task.glyph }} {{ task.title }}</h1>
+<div class="crumb">
+ <a href="/case/{{ case.file_number }}/task/{{ task.task_id }}?path=">{{ case.file_number }}</a>
+ {% for label, crumb_rel in crumbs %} / <a href="/case/{{ case.file_number }}/task/{{ task.task_id }}?path={{ crumb_rel | urlencode }}">{{ label }}</a>{% endfor %}
+</div>
+{% for d in dirs %}
+<div class="card"><a href="/case/{{ case.file_number }}/task/{{ task.task_id }}?path={{ ((path ~ '/' ~ d) if path else d) | urlencode }}">&#128193; {{ d }}</a></div>
+{% endfor %}
+<form method="post" action="/case/{{ case.file_number }}/task/{{ task.task_id }}/start">
+{% for f in files %}
+<div class="card"><label class="row">
+ <input type="checkbox" name="files" value="{{ (path ~ '/' ~ f) if path else f }}"> {{ f }}
+</label></div>
+{% endfor %}
+{% if files %}
+<button class="btn" type="submit">{% if task.pre_settings %}Continue&hellip;{% else %}Run {{ task.title }}{% endif %}</button>
+{% else %}
+<p>No matching files in this folder.</p>
+{% endif %}
+</form>
+{% endblock %}
