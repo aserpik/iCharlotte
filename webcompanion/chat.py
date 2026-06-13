@@ -98,16 +98,24 @@ class ChatTurnManager:
             self._busy_convs.add(conv_id)
             turn_id = uuid.uuid4().hex[:12]
             self._turns[turn_id] = {
-                "id": turn_id, "conv_id": conv_id, "status": "generating",
+                "id": turn_id, "conv_id": conv_id, "status": "extracting",
                 "log": [], "error": "", "done": False,
             }
         # Persist the user message immediately so it shows while we work.
-        append_message(file_number, conv_id, role="user", content=user_text)
-        threading.Thread(
-            target=self._run, daemon=True,
-            args=(turn_id, file_number, conv_id, user_text, provider, model,
-                  attach_rel_files, research_on),
-        ).start()
+        # If startup fails before the worker thread runs, free the conversation
+        # here (the thread's finally-block would otherwise never run).
+        try:
+            append_message(file_number, conv_id, role="user", content=user_text)
+            threading.Thread(
+                target=self._run, daemon=True,
+                args=(turn_id, file_number, conv_id, user_text, provider, model,
+                      attach_rel_files, research_on),
+            ).start()
+        except Exception:
+            with self._lock:
+                self._busy_convs.discard(conv_id)
+                self._turns.pop(turn_id, None)
+            raise
         return turn_id
 
     # ---- internals ----

@@ -1,7 +1,10 @@
 """Tests for webcompanion.chat — persistence wrappers + turn manager."""
+import time
+
 import pytest
 
 from webcompanion import chat
+from webcompanion import chat as chatmod
 from icharlotte_core.chat import persistence as _persistence
 
 
@@ -49,11 +52,6 @@ def test_append_assistant_message_records_model(data_dir):
                         model_used="gemini-3.5-flash")
     conv = chat.get_conversation("9999", conv_id)
     assert conv.messages[0].model_used == "gemini-3.5-flash"
-
-
-import time
-
-from webcompanion import chat as chatmod
 
 
 def _wait_turn(mgr, turn_id, status, timeout=5.0):
@@ -127,9 +125,26 @@ def test_one_turn_per_conversation(data_dir, monkeypatch):
                         staticmethod(lambda **kw: (time.sleep(0.3) or "slow")))
     conv_id = chat.create_conversation("9999")
     mgr = chatmod.ChatTurnManager()
-    mgr.start_turn("9999", conv_id, user_text="a", provider="Gemini",
-                   model="gemini-3.5-flash", attach_rel_files=[], research_on=False)
+    first = mgr.start_turn("9999", conv_id, user_text="a", provider="Gemini",
+                           model="gemini-3.5-flash", attach_rel_files=[], research_on=False)
     with pytest.raises(ValueError):
         mgr.start_turn("9999", conv_id, user_text="b", provider="Gemini",
                        model="gemini-3.5-flash", attach_rel_files=[],
                        research_on=False)
+    _wait_turn(mgr, first, "done")  # let the first turn finish before teardown
+
+
+def test_conversation_frees_after_successful_turn(data_dir, monkeypatch):
+    monkeypatch.setattr(chatmod.LLMHandler, "generate",
+                        staticmethod(lambda **kw: "ok"))
+    conv_id = chat.create_conversation("9999")
+    mgr = chatmod.ChatTurnManager()
+    t1 = mgr.start_turn("9999", conv_id, user_text="first", provider="Gemini",
+                        model="gemini-3.5-flash", attach_rel_files=[], research_on=False)
+    _wait_turn(mgr, t1, "done")
+    # conversation is no longer busy -> a second turn starts without ValueError
+    t2 = mgr.start_turn("9999", conv_id, user_text="second", provider="Gemini",
+                        model="gemini-3.5-flash", attach_rel_files=[], research_on=False)
+    _wait_turn(mgr, t2, "done")
+    conv = chat.get_conversation("9999", conv_id)
+    assert [m.role for m in conv.messages] == ["user", "assistant", "user", "assistant"]
