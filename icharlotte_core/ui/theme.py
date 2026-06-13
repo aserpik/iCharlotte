@@ -282,6 +282,51 @@ def app_stylesheet() -> str:
         padding: 0 4px;
     }}
 
+    /* Tabs — flat underline indicator instead of beveled boxes. The main
+       window tab bar overrides this with a larger variant (same treatment). */
+    QTabWidget::pane {{
+        border: 1px solid {BORDER_LIGHT};
+        border-top: 1px solid {BORDER};
+    }}
+    QTabBar::tab {{
+        background: transparent;
+        color: {TEXT_MUTED};
+        padding: 7px 14px;
+        border: none;
+        border-bottom: 2px solid transparent;
+    }}
+    QTabBar::tab:selected {{
+        color: {PRIMARY};
+        font-weight: 600;
+        border-bottom: 2px solid {PRIMARY};
+    }}
+    QTabBar::tab:hover:!selected {{ color: {TEXT}; background-color: {BG_SUBTLE}; }}
+    QTabBar::tab:disabled {{ color: {TEXT_FAINT}; }}
+
+    /* Item views — roomier rows for scanability, tinted alternating rows,
+       and flat headers. */
+    QTreeView, QTreeWidget, QTableView, QTableWidget {{
+        alternate-background-color: {BG_SUBTLE};
+        selection-background-color: {PRIMARY_SUBTLE};
+        selection-color: {TEXT};
+    }}
+    QTreeView::item, QTreeWidget::item {{ padding: 4px 2px; }}
+    QTableView::item, QTableWidget::item {{ padding: 4px 6px; }}
+    QTreeView::item:selected, QTreeWidget::item:selected,
+    QTableView::item:selected, QTableWidget::item:selected {{
+        background-color: {PRIMARY_SUBTLE};
+        color: {TEXT};
+    }}
+    QHeaderView::section {{
+        background-color: {BG_SUBTLE};
+        color: {TEXT_MUTED};
+        font-weight: 600;
+        border: none;
+        border-bottom: 1px solid {BORDER};
+        border-right: 1px solid {BORDER_LIGHT};
+        padding: 6px 8px;
+    }}
+
     QScrollArea {{ border: none; }}
     QSplitter::handle {{ background-color: {BORDER_LIGHT}; }}
     QSplitter::handle:hover {{ background-color: #C4CCD4; }}

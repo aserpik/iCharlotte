@@ -17,7 +17,7 @@ Extraction Rules:
    - "Not reasonably calculated"
    - Any other boilerplate objection language
 
-2. CAPTURE ALL SUBSTANTIVE CONTENT: Extract every factual response, including:
+2. CAPTURE ALL SUBSTANTIVE CONTENT VERBATIM: Extract every substantive response exactly as it appears in the source response document. Do not summarize, condense, paraphrase, shorten, or convert the response into bullet-point facts. Preserve the responding party's substantive answer text word-for-word, including all names, dates, dollar amounts, qualifications, admissions, denials, and explanatory sentences. Extract:
    - Direct answers to interrogatories
    - Admissions (full or partial)
    - Denials with factual basis
@@ -35,7 +35,7 @@ Extraction Rules:
    You MUST read to the END of every response to capture these hidden answers.
 
 4. ORGANIZATION: Organize your extraction by request number exactly as they appear in the document. Use the format:
-   [Request Type] No. [Number]: [Extracted substantive content]
+   [Request Type] No. [Number]: [complete substantive response copied verbatim from the source response document]
 
    Examples:
    - FROG No. 2.1: Plaintiff's full legal name is John Michael Smith.
@@ -47,7 +47,7 @@ Extraction Rules:
 5. COMPLETENESS: If a response provides ANY substantive information, extract it. Even partial answers must be captured. If a request was truly not answered (only objections with no substantive response), note:
    [Request Type] No. [Number]: No substantive response provided.
 
-6. NO INTERPRETATION: Extract facts as stated. Do not summarize, paraphrase excessively, or interpret. Preserve the responding party's actual statements as closely as possible.
+6. NO INTERPRETATION OR SHORTENING: Extract the substantive response text as stated. Do not summarize, paraphrase, shorten, rephrase, interpret, or replace the response with a fact list. The extracted response must be suitable for checking against the source text as a verbatim passage.
 
 Output Format:
 - Start with RESPONDING_PARTY and DISCOVERY_TYPE lines

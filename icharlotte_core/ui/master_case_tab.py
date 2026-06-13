@@ -92,7 +92,7 @@ class HearingCellWidget(QWidget):
                 QPushButton {
                     border: none; 
                     font-size: 8px; 
-                    color: gray;
+                    color: #909090;
                     background: transparent;
                 }
                 QPushButton:hover {
@@ -301,7 +301,7 @@ class TodoItemWidget(QWidget):
             f = self.label.font()
             f.setStrikeOut(True)
             self.label.setFont(f)
-            self.label.setStyleSheet("color: gray; padding-left: 5px;")
+            self.label.setStyleSheet("color: #909090; padding-left: 5px;")
         layout.addWidget(self.label)
         
         # Created Date [mm/dd/yy]
@@ -314,7 +314,7 @@ class TodoItemWidget(QWidget):
                 fmt_date = f"[{created_date}]"
             
             date_lbl = QLabel(fmt_date)
-            date_lbl.setStyleSheet("color: gray; font-size: 10px; margin-left: 5px;")
+            date_lbl.setStyleSheet("color: #909090; font-size: 10px; margin-left: 5px;")
             layout.addWidget(date_lbl)
 
         # Assignment Box
@@ -328,7 +328,7 @@ class TodoItemWidget(QWidget):
 
         # Assigned Date
         self.assign_date_lbl = QLabel(assigned_date or "")
-        self.assign_date_lbl.setStyleSheet("color: gray; font-size: 10px; margin-left: 5px;")
+        self.assign_date_lbl.setStyleSheet("color: #909090; font-size: 10px; margin-left: 5px;")
         layout.addWidget(self.assign_date_lbl)
         
         layout.addStretch()

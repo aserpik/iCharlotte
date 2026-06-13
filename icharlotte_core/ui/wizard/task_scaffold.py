@@ -126,7 +126,14 @@ class WizardTaskContainer(QWidget):
     QStackedWidget directly.
     """
 
-    def __init__(self, spec, steps: Optional[List[str]] = None, parent=None):
+    def __init__(
+        self,
+        spec,
+        steps: Optional[List[str]] = None,
+        parent=None,
+        *,
+        show_header: bool = True,
+    ):
         super().__init__(parent)
         self._spec = spec
         self.setStyleSheet(theme.wizard_stylesheet())
@@ -137,6 +144,7 @@ class WizardTaskContainer(QWidget):
 
         self.header = TaskHeader(spec, steps=steps)
         outer.addWidget(self.header)
+        self.header.setVisible(show_header)
 
         self._stack = QStackedWidget()
         outer.addWidget(self._stack, 1)

@@ -2979,7 +2979,7 @@ class LLMSettingsWidget(QWidget):
 
         # Current setting indicator
         current_label = QLabel("")
-        current_label.setStyleSheet("color: #888; font-style: italic;")
+        current_label.setStyleSheet("color: #909090; font-style: italic;")
         current_label.setFixedWidth(150)
         row.addWidget(current_label)
 

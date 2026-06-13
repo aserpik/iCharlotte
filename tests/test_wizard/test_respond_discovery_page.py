@@ -620,6 +620,31 @@ class RespondDiscoverySettingsPageTests(unittest.TestCase):
             mock_generate.assert_not_called()
             self.assertEqual(page.context_files, [])
 
+    def test_add_context_files_dedupes_and_generates(self):
+        with tempfile.TemporaryDirectory(dir="C:\\geminiterminal2") as tmp:
+            propounded = Path(tmp) / "DISCOVERY" / "PROPOUNDED"
+            propounded.mkdir(parents=True)
+            discovery_file = propounded / "srogg.pdf"
+            discovery_file.write_text("SPECIAL INTERROGATORIES")
+            context = Path(tmp) / "STATUS" / "responses.pdf"
+            context.parent.mkdir()
+            context.write_bytes(b"%PDF-1.4\n")
+            ignored = Path(tmp) / "STATUS" / "image.png"
+            ignored.write_bytes(b"png")
+
+            page = RespondDiscoverySettingsPage(
+                case_root=tmp,
+                file_number="1234.001",
+                discovery_file=str(discovery_file),
+                detected_type="SI",
+            )
+
+            with patch.object(page, "_generate_proposals") as mock_generate:
+                page.add_context_files([str(context), str(ignored), str(context)])
+
+            self.assertEqual(page.context_files, [str(context)])
+            mock_generate.assert_called_once()
+
     def test_si_quick_response_refer_to_document_inserts_text(self):
         page = self._review_page_for_type("SI")
 

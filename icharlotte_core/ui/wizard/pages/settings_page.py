@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
 )
 
 from .. import theme
+from ..file_drop import enable_file_drop
 from ..file_picker import resolve_default_folder
 from ..registry import TaskSpec
 
@@ -93,6 +94,7 @@ class SettingsPage(QWidget):
         self.files_list.setMaximumHeight(150)
         self.files_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.files_list.itemSelectionChanged.connect(self._on_selection_changed)
+        enable_file_drop(self.files_list, self.add_files)
         outer.addWidget(self.files_list)
 
         # Empty-state hint shown under the list when no files are selected.
@@ -190,6 +192,7 @@ class SettingsPage(QWidget):
         self.files_list.setWordWrap(True)
         self.files_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.files_list.itemSelectionChanged.connect(self._on_selection_changed)
+        enable_file_drop(self.files_list, self.add_files)
         layout.addWidget(self.files_list, 1)
 
         self.empty_hint = QLabel()
@@ -197,6 +200,7 @@ class SettingsPage(QWidget):
         self.empty_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_hint.setWordWrap(True)
         self.empty_hint.setMinimumHeight(86)
+        enable_file_drop(self.empty_hint, self.add_files)
         layout.addWidget(self.empty_hint)
 
         return panel
@@ -473,6 +477,9 @@ class SettingsPage(QWidget):
         paths, _ = QFileDialog.getOpenFileNames(
             self, "Add files", start_dir, "All files (*.*)"
         )
+        self.add_files(paths)
+
+    def add_files(self, paths: list[str]) -> None:
         existing = set(self._files)
         for p in paths:
             if p not in existing:

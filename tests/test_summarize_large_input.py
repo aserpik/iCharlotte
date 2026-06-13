@@ -73,3 +73,46 @@ def test_summarize_chunks_large_document_before_llm(monkeypatch, tmp_path):
     assert len(summary_calls) >= 2
     assert all(c["text_len"] <= 80_000 for c in summary_calls)
     assert saved["content"] == "Final consolidated summary."
+
+
+def test_summarize_documents_trusts_existing_pdf_text_layer(monkeypatch, tmp_path):
+    captured_configs = []
+
+    def fake_init(self, ocr_config=None, logger=None):
+        captured_configs.append(ocr_config)
+
+    def fake_extract(self, path, progress_callback=None):
+        return SimpleNamespace(
+            success=True,
+            text="Document text extracted from an existing OCR layer.",
+            char_count=52,
+            page_count=2,
+            ocr_pages=[],
+            ocr_percentage=0.0,
+            error=None,
+        )
+
+    def fake_call(self, prompt, text, task_type=None, agent_id=None, pass_name=None, **kwargs):
+        return "Summary."
+
+    def fake_save(output_path, content, title, logger):
+        return output_path
+
+    monkeypatch.setattr(summarize.DocumentProcessor, "__init__", fake_init)
+    monkeypatch.setattr(summarize.DocumentProcessor, "extract_with_dynamic_ocr", fake_extract)
+    monkeypatch.setattr(summarize.LLMCaller, "call", fake_call)
+    monkeypatch.setattr(summarize, "safe_append_to_docx", fake_save)
+
+    input_path = tmp_path / "Text Layered.pdf"
+    input_path.write_bytes(b"%PDF-1.4\n")
+    logger = summarize.AgentLogger("SummarizeTest", log_to_file=False)
+
+    ok = summarize.process_document(
+        str(input_path),
+        logger,
+        output_path_override=str(tmp_path / "AI_OUTPUT.docx"),
+    )
+
+    assert ok is True
+    assert captured_configs
+    assert getattr(captured_configs[0], "skip_sparse_ocr_in_text_layer_pdf", False) is True

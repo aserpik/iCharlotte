@@ -48,7 +48,7 @@ class ReportGeneratorDialog(QDialog):
         # Prior report (for STATUS)
         prior_row = QHBoxLayout()
         self.prior_path_label = QLabel("None selected")
-        self.prior_path_label.setStyleSheet("color: #888;")
+        self.prior_path_label.setStyleSheet("color: #909090;")
         prior_row.addWidget(self.prior_path_label, 1)
         self.prior_browse_btn = QPushButton("Browse...")
         self.prior_browse_btn.clicked.connect(self._browse_prior_report)

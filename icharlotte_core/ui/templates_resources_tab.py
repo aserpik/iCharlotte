@@ -503,7 +503,7 @@ class TemplatesResourcesTab(QWidget):
             }
             #mainToolbar QPushButton:hover {
                 background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #fff, stop:1 #ddd);
-                border-color: #999;
+                border-color: #909090;
             }
         """)
         layout = QHBoxLayout(toolbar)
@@ -606,7 +606,7 @@ class TemplatesResourcesTab(QWidget):
         # Page 0: Placeholder
         placeholder = QLabel("Select a template or resource to preview")
         placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        placeholder.setStyleSheet("color: #888; font-size: 14px;")
+        placeholder.setStyleSheet("color: #909090; font-size: 14px;")
         self.content_stack.addWidget(placeholder)
 
         # Page 1: PDF Preview
@@ -1274,7 +1274,7 @@ class TemplatesResourcesTab(QWidget):
             QPushButton:disabled {{
                 background-color: #ccc;
                 border: none;
-                color: #888;
+                color: #909090;
             }}
         """)
         self.save_btn.clicked.connect(self.save_template_content)

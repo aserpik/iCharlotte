@@ -7,7 +7,6 @@ from PySide6.QtCore import QRect, QSettings, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QAbstractItemView,
-    QDialog,
     QFrame,
     QHBoxLayout,
     QHeaderView,
@@ -17,10 +16,12 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QSplitter,
     QTableWidget,
     QTableWidgetItem,
     QStyledItemDelegate,
     QTabWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -379,37 +380,6 @@ class ChronologyTablePanel(QTableWidget):
                 item.setBackground(brush)
 
 
-class MedRecordPdfDialog(QDialog):
-    """Non-modal PDF preview opened from a chronology selection."""
-
-    def __init__(self, pdf_path: str, page_number: int, parent: QWidget | None = None):
-        super().__init__(parent)
-        self.pdf_path = pdf_path
-        self.page_number = max(1, int(page_number or 1))
-        self._navigation_attempts = 0
-        self.setWindowTitle(f"{os.path.basename(pdf_path)} - page {self.page_number}")
-        self.resize(1100, 800)
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        from icharlotte_core.ui.pdf_viewer_widget import PdfViewerWidget
-
-        self.viewer = PdfViewerWidget()
-        layout.addWidget(self.viewer)
-        self.viewer.load_pdf(pdf_path)
-        self._go_to_target_page()
-
-    def _go_to_target_page(self) -> None:
-        self._navigation_attempts += 1
-        self.viewer.go_to_page(self.page_number)
-        if (
-            self.viewer.get_current_page() != self.page_number
-            and self._navigation_attempts < 10
-        ):
-            QTimer.singleShot(500, self._go_to_target_page)
-
-
 class MedChronologySelectionPage(QWidget):
     """Review a generated chronology and choose rows for record extraction."""
 
@@ -432,7 +402,11 @@ class MedChronologySelectionPage(QWidget):
         self._rows = {row.id: row for row in self.document.rows}
         self._paragraph_match_status: dict[str, str] = {}
         self._file_index: dict[str, str] | None = None
-        self._pdf_dialogs: list[object] = []
+        self.pdf_preview_viewer: QWidget | None = None
+        self._pdf_preview_collapsed = False
+        self._pdf_preview_width = 420
+        self._pdf_preview_target_page = 1
+        self._pdf_preview_navigation_attempts = 0
 
         self._setup_ui()
         self._refresh_extract_state()
@@ -503,17 +477,12 @@ class MedChronologySelectionPage(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(
-            theme.SPACE_XL,
-            theme.SPACE_XL,
-            theme.SPACE_XL,
-            theme.SPACE_XL,
+            theme.SPACE_SM,
+            theme.SPACE_SM,
+            theme.SPACE_SM,
+            theme.SPACE_SM,
         )
-        layout.setSpacing(theme.SPACE_MD)
-
-        layout.addWidget(theme.page_title("Select Medical Chronology Records"))
-        layout.addWidget(theme.helper_text(
-            "Choose synopsis paragraphs or individual chronology rows to extract source records."
-        ))
+        layout.setSpacing(theme.SPACE_SM)
 
         self.message_label = theme.error_text(_status_message(self.document))
         self.warning_label = self.message_label
@@ -525,16 +494,29 @@ class MedChronologySelectionPage(QWidget):
         self.match_status_label.setVisible(False)
         layout.addWidget(self.match_status_label)
 
+        self.preview_splitter = QSplitter(Qt.Orientation.Horizontal)
+        layout.addWidget(self.preview_splitter, 1)
+
+        left_pane = QWidget()
+        left_layout = QVBoxLayout(left_pane)
+        left_layout.setContentsMargins(0, 0, theme.SPACE_SM, 0)
+        left_layout.setSpacing(theme.SPACE_SM)
+
         self.tab_widget = QTabWidget()
         self.tab_widget.addTab(self._build_synopsis_pane(), "Brief Synopsis")
         self.tab_widget.addTab(self._build_table_pane(), "Chronology Rows")
-        layout.addWidget(self.tab_widget, 1)
+        left_layout.addWidget(self.tab_widget, 1)
 
         controls = QHBoxLayout()
         controls.setContentsMargins(0, 0, 0, 0)
         self.selected_count_label = QLabel("")
         controls.addWidget(self.selected_count_label)
         controls.addStretch(1)
+
+        self.pdf_preview_toggle_btn = theme.secondary_button("Hide Preview")
+        self.pdf_preview_toggle_btn.setToolTip("Show or hide the PDF preview panel")
+        self.pdf_preview_toggle_btn.clicked.connect(self.toggle_pdf_preview_collapse)
+        controls.addWidget(self.pdf_preview_toggle_btn)
 
         self.open_original_btn = theme.secondary_button("Open Original")
         self.open_original_btn.clicked.connect(self._open_original)
@@ -543,15 +525,66 @@ class MedChronologySelectionPage(QWidget):
         self.extract_btn = theme.primary_button("Extract")
         self.extract_btn.clicked.connect(self._emit_run)
         controls.addWidget(self.extract_btn)
-        layout.addLayout(controls)
+        left_layout.addLayout(controls)
+
+        self.preview_splitter.addWidget(left_pane)
+        self.pdf_preview_panel = self._build_pdf_preview_panel()
+        self.preview_splitter.addWidget(self.pdf_preview_panel)
+        self.preview_splitter.setSizes([900, self._pdf_preview_width])
+        self.preview_splitter.setCollapsible(1, True)
+
+    def _build_pdf_preview_panel(self) -> QWidget:
+        panel = QFrame()
+        panel.setObjectName("medRecordPdfPreviewPanel")
+        panel.setFrameShape(QFrame.Shape.NoFrame)
+        panel.setStyleSheet(
+            f"QFrame#medRecordPdfPreviewPanel {{ border-left: 1px solid {theme.BORDER_LIGHT}; }}"
+        )
+
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(theme.SPACE_SM, 0, 0, 0)
+        layout.setSpacing(theme.SPACE_SM)
+
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.addWidget(theme.section_header("PDF Preview"))
+        header.addStretch(1)
+
+        self.collapse_pdf_preview_btn = QToolButton()
+        self.collapse_pdf_preview_btn.setText("▶")
+        self.collapse_pdf_preview_btn.setToolTip("Collapse PDF preview")
+        self.collapse_pdf_preview_btn.setFixedSize(24, 24)
+        self.collapse_pdf_preview_btn.setStyleSheet(
+            "QToolButton { border: none; font-size: 12px; }"
+        )
+        self.collapse_pdf_preview_btn.clicked.connect(self.toggle_pdf_preview_collapse)
+        header.addWidget(self.collapse_pdf_preview_btn)
+        layout.addLayout(header)
+
+        self.pdf_preview_status_label = theme.caption(
+            "Double-click a chronology entry to preview its source PDF."
+        )
+        self.pdf_preview_status_label.setWordWrap(True)
+        layout.addWidget(self.pdf_preview_status_label)
+
+        self.pdf_preview_placeholder = QLabel("No PDF selected")
+        self.pdf_preview_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.pdf_preview_placeholder.setWordWrap(True)
+        self.pdf_preview_placeholder.setStyleSheet(
+            f"color: {theme.TEXT_FAINT}; border: 1px solid {theme.BORDER_LIGHT};"
+            f" border-radius: {theme.RADIUS_SM}px; background-color: #FFFFFF;"
+        )
+        layout.addWidget(self.pdf_preview_placeholder, 1)
+
+        self.pdf_preview_body_layout = layout
+        return panel
 
     def _build_synopsis_pane(self) -> QWidget:
         pane = QFrame()
         pane.setFrameShape(QFrame.Shape.NoFrame)
         layout = QVBoxLayout(pane)
-        layout.setContentsMargins(0, 0, theme.SPACE_SM, 0)
-        layout.setSpacing(theme.SPACE_SM)
-        layout.addWidget(theme.section_header("Brief Synopsis"))
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
         self.synopsis_panel = BriefSynopsisPanel()
         self.synopsis_panel.load_paragraphs(self.document.synopsis_paragraphs)
@@ -564,9 +597,8 @@ class MedChronologySelectionPage(QWidget):
         pane = QFrame()
         pane.setFrameShape(QFrame.Shape.NoFrame)
         layout = QVBoxLayout(pane)
-        layout.setContentsMargins(theme.SPACE_SM, 0, 0, 0)
-        layout.setSpacing(theme.SPACE_SM)
-        layout.addWidget(theme.section_header("Chronology Rows"))
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
         self.table_panel = ChronologyTablePanel()
         self.table_panel.load_rows(self.document.rows)
@@ -711,24 +743,69 @@ class MedChronologySelectionPage(QWidget):
                 f"Could not find source PDF: {row.record_filename}",
             )
             return
-        self._show_pdf_dialog(pdf_path, row.page_start)
+        self._show_pdf_preview(pdf_path, row.page_start)
 
     def _get_file_index(self, *, refresh: bool = False) -> dict[str, str]:
         if refresh or self._file_index is None:
             self._file_index = _build_file_index(self.case_path)
         return self._file_index
 
-    def _show_pdf_dialog(self, pdf_path: str, page_number: int) -> None:
-        dialog = MedRecordPdfDialog(pdf_path, page_number, self)
-        self._pdf_dialogs.append(dialog)
-        destroyed = getattr(dialog, "destroyed", None)
-        if hasattr(destroyed, "connect"):
-            destroyed.connect(lambda *_args, dlg=dialog: self._forget_pdf_dialog(dlg))
-        dialog.show()
+    def _show_pdf_preview(self, pdf_path: str, page_number: int) -> None:
+        page_number = max(1, int(page_number or 1))
+        if self._pdf_preview_collapsed:
+            self.toggle_pdf_preview_collapse()
 
-    def _forget_pdf_dialog(self, dialog: object) -> None:
-        if dialog in self._pdf_dialogs:
-            self._pdf_dialogs.remove(dialog)
+        viewer = self._ensure_pdf_preview_viewer()
+        self._pdf_preview_target_page = page_number
+        self._pdf_preview_navigation_attempts = 0
+        self.pdf_preview_status_label.setText(
+            f"{os.path.basename(pdf_path)} - page {page_number}"
+        )
+        self.pdf_preview_placeholder.setVisible(False)
+        viewer.load_pdf(pdf_path)
+        self._go_to_pdf_preview_target_page()
+
+    def _ensure_pdf_preview_viewer(self) -> QWidget:
+        if self.pdf_preview_viewer is None:
+            from icharlotte_core.ui.pdf_viewer_widget import PdfViewerWidget
+
+            self.pdf_preview_viewer = PdfViewerWidget()
+            self.pdf_preview_body_layout.addWidget(self.pdf_preview_viewer, 1)
+        return self.pdf_preview_viewer
+
+    def _go_to_pdf_preview_target_page(self) -> None:
+        if self.pdf_preview_viewer is None:
+            return
+        self._pdf_preview_navigation_attempts += 1
+        self.pdf_preview_viewer.go_to_page(self._pdf_preview_target_page)
+        if (
+            self.pdf_preview_viewer.get_current_page() != self._pdf_preview_target_page
+            and self._pdf_preview_navigation_attempts < 10
+        ):
+            QTimer.singleShot(500, self._go_to_pdf_preview_target_page)
+
+    def toggle_pdf_preview_collapse(self) -> None:
+        sizes = self.preview_splitter.sizes()
+        if self._pdf_preview_collapsed:
+            self.pdf_preview_panel.setVisible(True)
+            total_width = max(sum(sizes), self.width(), 1)
+            preview_width = min(self._pdf_preview_width, max(280, total_width // 2))
+            self.preview_splitter.setSizes([
+                max(320, total_width - preview_width),
+                preview_width,
+            ])
+            self.pdf_preview_toggle_btn.setText("Hide Preview")
+            self.collapse_pdf_preview_btn.setText("▶")
+            self.collapse_pdf_preview_btn.setToolTip("Collapse PDF preview")
+            self._pdf_preview_collapsed = False
+            return
+
+        if len(sizes) > 1 and sizes[1] > 0:
+            self._pdf_preview_width = sizes[1]
+        self.pdf_preview_panel.setVisible(False)
+        self.preview_splitter.setSizes([max(sum(sizes), 1), 0])
+        self.pdf_preview_toggle_btn.setText("Show Preview")
+        self._pdf_preview_collapsed = True
 
     def _open_original(self) -> None:
         os.startfile(self.chronology_path)

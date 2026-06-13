@@ -186,6 +186,9 @@ class MedChronSettingsPage(SettingsPage):
         paths, _ = QFileDialog.getOpenFileNames(
             self, "Select medical chronology", start_dir, "All files (*.*)"
         )
+        self.add_files(paths)
+
+    def add_files(self, paths: list[str]) -> None:
         if not paths:
             return
         new_file = paths[0]

@@ -86,6 +86,22 @@ class TestBuildFileIndex(unittest.TestCase):
                 str(pdf),
             )
 
+    def test_lookup_preserves_periods_in_extensionless_chronology_labels(self):
+        from icharlotte_core.med_record_extractor import _build_file_index, _lookup_file
+
+        with tempfile.TemporaryDirectory() as td:
+            records = Path(td) / "RECORDS" / "Subpoeaned" / "Compex"
+            records.mkdir(parents=True)
+            pdf = records / "16 - Troy I. Mounts, M.D. - medical, billing.pdf"
+            pdf.write_bytes(b"%PDF-1.4\n")
+
+            index = _build_file_index(td)
+
+            self.assertEqual(
+                _lookup_file(index, "16 - Troy I. Mounts, M.D. - medical, billing"),
+                str(pdf),
+            )
+
 
 def _build_chronology_docx(
     path: Path,

@@ -1186,13 +1186,13 @@ class ChatTab(QWidget):
         self.clear_chat_display()
 
         if not self.current_conversation:
-            self.chat_history.append("<i style='color: #888;'>No conversation selected.</i>")
+            self.chat_history.append("<i style='color: #909090;'>No conversation selected.</i>")
             return
 
         if not self.current_conversation.messages:
             # Show a helpful message for empty conversations
             conv_name = self.current_conversation.name
-            self.chat_history.append(f"<i style='color: #888;'>Conversation '{conv_name}' loaded. Start chatting!</i>")
+            self.chat_history.append(f"<i style='color: #909090;'>Conversation '{conv_name}' loaded. Start chatting!</i>")
             self.chat_history.append("-" * 50)
             log_event(f"Loaded empty conversation: {self.current_conversation_id}")
             return

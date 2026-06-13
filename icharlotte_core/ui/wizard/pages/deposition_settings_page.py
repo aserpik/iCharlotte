@@ -242,6 +242,9 @@ class DepositionSettingsPage(SettingsPage):
         paths, _ = QFileDialog.getOpenFileNames(
             self, "Select deposition transcript", start_dir, "All files (*.*)"
         )
+        self.add_files(paths)
+
+    def add_files(self, paths: list[str]) -> None:
         if not paths:
             return
         new_file = paths[0]

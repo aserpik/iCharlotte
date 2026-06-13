@@ -12,9 +12,10 @@ Instructions:
 
 2. **Consolidate Section A (Extracted Responses):**
    - Merge all "SECTION A: EXTRACTED RESPONSES" content together
-   - Remove exact duplicates but preserve all unique extracted facts
+   - Remove exact duplicates but preserve all unique extracted responses
    - Organize by request type and number (all FROGs together, all SROGs together, etc.)
    - Maintain the format: [Request Type] No. [Number]: [Extracted content]
+   - CRITICAL: Section A must contain the complete substantive response text verbatim from the source response document. Do not summarize, shorten, paraphrase, condense, or convert these responses into fact lists. If a response contains several substantive sentences, every substantive sentence must remain in Section A.
 
 3. **Consolidate Section B (Narrative Summary):**
    - Merge all "SECTION B: NARRATIVE SUMMARY" content together

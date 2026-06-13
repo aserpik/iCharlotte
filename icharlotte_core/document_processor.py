@@ -68,6 +68,8 @@ class OCRConfig:
     min_threshold: int = 20           # Minimum threshold (for sparse forms)
     max_threshold: int = 200          # Maximum threshold (for dense documents)
     gc_interval: int = 10             # Run GC every N pages
+    # Trust an existing OCR/text layer for sparse pages in otherwise text-layered PDFs.
+    skip_sparse_ocr_in_text_layer_pdf: bool = False
 
 
 @dataclass
@@ -215,13 +217,23 @@ class DocumentProcessor:
             # Calculate adaptive threshold
             threshold = self._calculate_dynamic_threshold(sample_densities, file_path)
             self._log(f"Dynamic OCR threshold calculated: {threshold} chars/page")
+            skip_sparse_ocr = (
+                self.ocr_config.skip_sparse_ocr_in_text_layer_pdf
+                and self._has_substantial_text_layer(sample_densities)
+            )
+            if skip_sparse_ocr:
+                self._log("Existing PDF text layer detected; sparse pages will use extracted text without OCR.")
 
             # Now do full extraction with calculated threshold
             original_threshold = self.ocr_config.base_threshold
             self.ocr_config.base_threshold = threshold
 
             try:
-                result = self._extract_from_pdf(file_path, progress_callback=progress_callback)
+                result = self._extract_from_pdf(
+                    file_path,
+                    progress_callback=progress_callback,
+                    skip_ocr_for_sparse_text_layer_pages=skip_sparse_ocr,
+                )
             finally:
                 self.ocr_config.base_threshold = original_threshold
 
@@ -277,6 +289,16 @@ class DocumentProcessor:
                    min(int(base), self.ocr_config.max_threshold))
 
     @staticmethod
+    def _has_substantial_text_layer(sample_densities: List[int]) -> bool:
+        """Return True when the initial PDF sample shows a strong native text layer."""
+        if not sample_densities:
+            return False
+        pages_with_substantial_text = sum(1 for count in sample_densities if count >= 200)
+        sample_ratio = pages_with_substantial_text / len(sample_densities)
+        avg_density = sum(sample_densities) / len(sample_densities)
+        return sample_ratio >= 0.8 and avg_density >= 500
+
+    @staticmethod
     def _is_word_index_text(text: str) -> bool:
         """Detect deposition word index pages by structure.
 
@@ -294,6 +316,7 @@ class DocumentProcessor:
 
     def _extract_from_pdf(self, file_path: str, ocr_enabled: bool = True,
                           skip_word_index_pages: bool = True,
+                          skip_ocr_for_sparse_text_layer_pages: bool = False,
                           progress_callback: Callable[[int, int], None] | None = None) -> ExtractResult:
         """Extract text from a PDF file with optional OCR fallback.
 
@@ -368,10 +391,20 @@ class DocumentProcessor:
                     fitz_recovered += 1
                     continue
 
+                best_text = fitz_text if len(fitz_text.strip()) > len(page_text.strip()) else page_text
+
+                if skip_ocr_for_sparse_text_layer_pages:
+                    self._log(
+                        f"Page {i+1} has sparse extracted text ({len(best_text.strip())} chars) "
+                        "in an existing-text-layer PDF. Using extracted text without OCR."
+                    )
+                    text_parts.append(best_text)
+                    continue
+
                 if not ocr_enabled:
                     # OCR suppressed — accept the native (possibly empty) text and move on.
                     # Callers that need exhibit content must opt in via ocr_enabled=True.
-                    text_parts.append(page_text)
+                    text_parts.append(best_text)
                     continue
 
                 self._log(f"Page {i+1} has insufficient text ({len(page_text.strip())} chars). Attempting OCR...", "warning")

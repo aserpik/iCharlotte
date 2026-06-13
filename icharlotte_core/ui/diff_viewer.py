@@ -109,7 +109,7 @@ class DiffViewer(QDialog):
 
         # Statistics
         self.stats_label = QLabel()
-        self.stats_label.setStyleSheet("color: gray; font-size: 11px;")
+        self.stats_label.setStyleSheet("color: #909090; font-size: 11px;")
         mode_layout.addWidget(self.stats_label)
 
         layout.addLayout(mode_layout)
@@ -225,7 +225,7 @@ class DiffViewer(QDialog):
         self.stats_label.setText(
             f"<span style='color: green;'>+{additions}</span> | "
             f"<span style='color: red;'>-{deletions}</span> | "
-            f"<span style='color: gray;'>{unchanged} unchanged</span>"
+            f"<span style='color: #909090;'>{unchanged} unchanged</span>"
         )
 
         # Side-by-side view

@@ -524,7 +524,7 @@ class CodeBlockWidget(QFrame):
         header_layout.setContentsMargins(8, 4, 8, 4)
 
         lang_label = QLabel(self.language or "Code")
-        lang_label.setStyleSheet("font-size: 11px; color: #888;")
+        lang_label.setStyleSheet("font-size: 11px; color: #909090;")
         header_layout.addWidget(lang_label)
 
         header_layout.addStretch()
@@ -641,7 +641,7 @@ class MessageWidget(QFrame):
                 dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
                 time_str = dt.strftime('%I:%M %p')
                 time_label = QLabel(time_str)
-                time_label.setStyleSheet("color: #888; font-size: 11px;")
+                time_label.setStyleSheet("color: #909090; font-size: 11px;")
                 header.addWidget(time_label)
             except Exception:
                 pass
@@ -730,7 +730,7 @@ class MessageWidget(QFrame):
         # Edit indicator
         if self.message.get('edited'):
             edit_label = QLabel("(edited)")
-            edit_label.setStyleSheet("color: #888; font-size: 10px; font-style: italic;")
+            edit_label.setStyleSheet("color: #909090; font-size: 10px; font-style: italic;")
             layout.addWidget(edit_label)
 
     def set_content(self, content: str):

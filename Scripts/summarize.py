@@ -457,7 +457,10 @@ def process_document(
     try:
         with memory_monitor.track_operation("Text Extraction"):
             processor = DocumentProcessor(
-                ocr_config=OCRConfig(adaptive=True),
+                ocr_config=OCRConfig(
+                    adaptive=True,
+                    skip_sparse_ocr_in_text_layer_pdf=True,
+                ),
                 logger=logger
             )
             logger.progress(10, "Running text extraction (OCR if needed)...")

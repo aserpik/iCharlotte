@@ -23,6 +23,18 @@ def test_settings_emits_analyze_with_sensitivity(qtbot):
     assert blocker.args[0] == 1
 
 
+def test_settings_can_replace_pdf_path(qtbot, tmp_path):
+    replacement = tmp_path / "replacement.pdf"
+    replacement.write_bytes(b"%PDF-1.4\n")
+    page = SeparateSettingsPage(pdf_path="C:/x.pdf")
+    qtbot.addWidget(page)
+
+    page.set_pdf_path(str(replacement))
+
+    assert page.pdf_path == str(replacement)
+    assert "replacement.pdf" in page.file_label.text()
+
+
 def test_tab_starts_on_settings(qtbot):
     spec = get_task("separate")
     tab = SeparateTaskTab(spec, case_path="C:/case", file_number="1234.001",

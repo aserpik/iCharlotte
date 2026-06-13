@@ -59,6 +59,7 @@ from icharlotte_core.ui.wizard.pages._motion_research_support import (
     select_research_client as _select_research_client,
 )
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
+from icharlotte_core.ui.wizard.file_drop import enable_file_drop
 from icharlotte_core.ui.wizard.task_debug_helpers import (
     emit_debug,
     finish_debug_run,
@@ -191,6 +192,12 @@ class GenerateMotionSettingsPage(QStackedWidget):
 
         self.files_list = QListWidget()
         self.files_list.setMaximumHeight(110)
+        enable_file_drop(
+            self.files_list,
+            self.add_target_files,
+            path_filter=is_supported_context_file,
+        )
+        enable_file_drop(page, self.add_target_files, path_filter=is_supported_context_file)
         layout.addWidget(self.files_list)
 
         layout.addWidget(QLabel("Relief requested"))
@@ -291,8 +298,11 @@ class GenerateMotionSettingsPage(QStackedWidget):
             start_dir=self.case_root or "",
             file_filter="Documents (*.pdf *.docx *.txt *.msg);;All files (*.*)",
         )
+        self.add_target_files(picked or [])
+
+    def add_target_files(self, paths: list[str]) -> None:
         existing = set(self.current_target_files())
-        for path in picked or []:
+        for path in paths:
             if is_supported_context_file(path) and path not in existing:
                 self.files_list.addItem(path)
                 existing.add(path)

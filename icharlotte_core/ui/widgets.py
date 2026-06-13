@@ -108,7 +108,7 @@ class PassProgressWidget(QWidget):
 
             indicator = QLabel(f"○")
             indicator.setToolTip(name)
-            indicator.setStyleSheet("color: gray; font-size: 12px;")
+            indicator.setStyleSheet("color: #909090; font-size: 12px;")
             indicator.setFixedWidth(20)
             indicator.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.indicators_layout.addWidget(indicator)
@@ -125,7 +125,7 @@ class PassProgressWidget(QWidget):
 
             indicator = QLabel("○")
             indicator.setToolTip(name)
-            indicator.setStyleSheet("color: gray; font-size: 12px;")
+            indicator.setStyleSheet("color: #909090; font-size: 12px;")
             indicator.setFixedWidth(20)
             indicator.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
@@ -180,7 +180,7 @@ class PassProgressWidget(QWidget):
 
         if status == "pending":
             indicator.setText("○")
-            indicator.setStyleSheet("color: gray; font-size: 12px;")
+            indicator.setStyleSheet("color: #909090; font-size: 12px;")
         elif status == "in_progress":
             indicator.setText("◉")
             indicator.setStyleSheet(f"color: {theme.PRIMARY}; font-size: 12px;")  # Blue
@@ -234,7 +234,7 @@ class StatusWidget(QFrame):
         header_layout = QHBoxLayout()
         self.name_label = QLabel(f"<b>{agent_name}</b>")
         self.details_label = QLabel(details)
-        self.details_label.setStyleSheet("color: gray;")
+        self.details_label.setStyleSheet("color: #909090;")
 
         header_layout.addWidget(self.name_label)
         header_layout.addWidget(self.details_label)

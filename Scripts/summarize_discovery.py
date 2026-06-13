@@ -167,6 +167,162 @@ def add_markdown_to_doc(doc, content):
         i += 1
 
 
+_DISCOVERY_HEADING_RE = re.compile(
+    r"""(?im)^[ \t]*
+    (?P<prefix>(?:(?:further|supplemental|amended|verified)[ \t]+)*
+        (?:response|answer)s?[ \t]+(?:to[ \t]+)?)?
+    (?P<kind>
+        form[ \t]+interrogator(?:y|ies)|
+        special[ \t]+interrogator(?:y|ies)|
+        interrogator(?:y|ies)|
+        request(?:s)?[ \t]+for[ \t]+production(?:[ \t]+of[ \t]+documents?)?|
+        request(?:s)?[ \t]+for[ \t]+admission(?:s)?|
+        rfa|rfp|srog|frog|response
+    )
+    [ \t]*(?:no\.?|number|\#)[ \t]*
+    (?P<number>\d+(?:\.\d+)?(?:\([a-z0-9]+\))?)
+    [ \t]*[:.\-]?[ \t]*(?P<trailing>[^\r\n]*)$
+    """,
+    re.VERBOSE,
+)
+
+_SECTION_A_RE = re.compile(
+    r"(?im)^[ \t]*SECTION[ \t]+A[ \t]*:[ \t]*(?:CONSOLIDATED[ \t]+)?EXTRACTED RESPONSES[ \t]*$"
+)
+_SECTION_B_RE = re.compile(
+    r"(?im)^[ \t]*SECTION[ \t]+B[ \t]*:[ \t]*(?:CONSOLIDATED[ \t]+)?NARRATIVE SUMMARY[ \t]*$"
+)
+
+
+def _heading_is_response(match: re.Match) -> bool:
+    prefix = (match.group("prefix") or "").lower()
+    kind = (match.group("kind") or "").lower()
+    return "response" in prefix or "answer" in prefix or kind == "response"
+
+
+def _request_label(kind: str, number: str, fallback_discovery_type: str = None) -> str:
+    raw = (kind or "").lower()
+    fallback = (fallback_discovery_type or "").lower()
+
+    if "form" in raw or raw == "frog" or "form" in fallback:
+        request_type = "FROG"
+    elif "special" in raw or raw == "srog" or "special" in fallback:
+        request_type = "SROG"
+    elif "admission" in raw or raw == "rfa" or "admission" in fallback:
+        request_type = "RFA"
+    elif "production" in raw or raw == "rfp" or "production" in fallback:
+        request_type = "RFP"
+    elif "interrogator" in raw or "interrogator" in fallback:
+        request_type = "Interrogatory"
+    else:
+        request_type = "Request"
+
+    return f"{request_type} No. {number}"
+
+
+def _normalize_verbatim_response_body(body: str) -> str:
+    body = body.replace("\xa0", " ")
+    body = re.sub(r"(?im)^[ \t]*(?:response|answer)[ \t]*:[ \t]*", "", body)
+    body = re.sub(r"[ \t]*\r?\n[ \t]*", " ", body)
+    body = re.sub(r"[ \t]{2,}", " ", body)
+    return body.strip(" \t\r\n-")
+
+
+def build_verbatim_extracted_responses(
+    source_text: str,
+    fallback_discovery_type: str = None,
+) -> str:
+    """Build Section A from source response blocks instead of an LLM summary.
+
+    The LLM extraction pass is useful for metadata and cross-checking, but the
+    output's extracted-responses section needs the complete response text from
+    the source document. This parser handles the common discovery format where
+    request headings and response headings alternate, and it only starts entries
+    at response/answer headings.
+    """
+    matches = list(_DISCOVERY_HEADING_RE.finditer(source_text or ""))
+    entries = []
+    seen = set()
+
+    for index, match in enumerate(matches):
+        if not _heading_is_response(match):
+            continue
+
+        next_start = matches[index + 1].start() if index + 1 < len(matches) else len(source_text)
+        body = "\n".join(
+            part for part in (match.group("trailing"), source_text[match.end():next_start])
+            if part
+        )
+        body = _normalize_verbatim_response_body(body)
+        if not body:
+            continue
+
+        label = _request_label(
+            match.group("kind"),
+            match.group("number"),
+            fallback_discovery_type=fallback_discovery_type,
+        )
+        entry = f"{label}: {body}"
+        normalized = re.sub(r"\s+", " ", entry).casefold()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        entries.append(entry)
+
+    return "\n".join(entries)
+
+
+def _clean_extracted_section_block(block: str) -> str:
+    cleaned_lines = []
+    for line in block.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if re.fullmatch(r"[-_=* ]{4,}", stripped):
+            continue
+        cleaned_lines.append(stripped)
+    return "\n".join(cleaned_lines).strip()
+
+
+def collect_consolidated_extracted_responses(doc_text: str) -> str:
+    """Collect all existing Section A blocks so consolidation cannot shorten them."""
+    doc_text = doc_text or ""
+    blocks = []
+    seen = set()
+    for section_a in _SECTION_A_RE.finditer(doc_text):
+        section_b = _SECTION_B_RE.search(doc_text, section_a.end())
+        if not section_b:
+            continue
+        block = _clean_extracted_section_block(doc_text[section_a.end():section_b.start()])
+        if not block:
+            continue
+        normalized = re.sub(r"\s+", " ", block).casefold()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        blocks.append(block)
+    return "\n\n".join(blocks)
+
+
+def replace_consolidated_extracted_responses(consolidated_text: str, verbatim_section: str) -> str:
+    """Replace the LLM's consolidated Section A with source-preserved text."""
+    if not verbatim_section:
+        return consolidated_text
+
+    consolidated_text = consolidated_text or ""
+    section_a = _SECTION_A_RE.search(consolidated_text)
+    if not section_a:
+        return consolidated_text
+
+    section_b = _SECTION_B_RE.search(consolidated_text, section_a.end())
+    if not section_b:
+        return consolidated_text
+
+    before = consolidated_text[:section_a.end()].rstrip()
+    after = consolidated_text[section_b.start():].lstrip("\r\n")
+    return f"{before}\n\n{verbatim_section.strip()}\n\n{after}"
+
+
 def save_to_docx(extraction_content: str, summary_content: str, output_path: str,
                  title_text: str, discovery_type: str, logger: AgentLogger) -> bool:
     """Saves both extraction and summary content to a DOCX file with process-safe locking."""
@@ -358,6 +514,13 @@ def consolidate_file(file_path: str, logger: AgentLogger, show_diff: bool = Fals
         logger.error("Failed to extract text for consolidation.")
         return False
 
+    verbatim_section_a = collect_consolidated_extracted_responses(result.text)
+    if verbatim_section_a:
+        logger.info(
+            "Captured source-preserved Section A for consolidation: "
+            f"{len(verbatim_section_a)} chars"
+        )
+
     # Load consolidation prompt
     try:
         with open(CONSOLIDATE_PROMPT_FILE, "r", encoding="utf-8") as f:
@@ -387,6 +550,17 @@ def consolidate_file(file_path: str, logger: AgentLogger, show_diff: bool = Fals
     if not consolidated:
         logger.error("LLM failed to generate consolidated summary.")
         return False
+
+    if verbatim_section_a:
+        protected_consolidated = replace_consolidated_extracted_responses(
+            consolidated,
+            verbatim_section_a,
+        )
+        if protected_consolidated != consolidated:
+            consolidated = protected_consolidated
+            logger.info("Restored source-preserved Section A after consolidation.")
+        else:
+            logger.warning("Could not locate consolidated Section A to restore verbatim text.")
 
     # Show diff if requested
     if show_diff:
@@ -612,6 +786,21 @@ def process_document(
     logger.progress(70, "LLM extraction and summary passes completed")
     logger.pass_complete("LLM Extraction + Summary", success=True)
 
+    verbatim_extraction_result = build_verbatim_extracted_responses(
+        text,
+        fallback_discovery_type=discovery_type,
+    )
+    if verbatim_extraction_result:
+        logger.info(
+            "Built source-preserved extracted responses from original document: "
+            f"{len(verbatim_extraction_result)} chars"
+        )
+    else:
+        logger.warning(
+            "Could not identify response headings for source-preserved extraction; "
+            "using LLM extraction output for Section A."
+        )
+
     # ==========================================================================
     # Pass 2: Cross-Check (with retry on failure) (70% - 88%)
     # ==========================================================================
@@ -628,7 +817,7 @@ def process_document(
                 cross_prompt = f"""{prompts["cross_check"]}
 
 === PASS 1 (EXTRACTED RESPONSES) ===
-{extraction_result}
+{verbatim_extraction_result or extraction_result}
 
 === PASS 2 (NARRATIVE SUMMARY) ===
 {summary_result}
@@ -700,7 +889,8 @@ def process_document(
 
     for i in sorted(lines_to_remove, reverse=True):
         extraction_lines.pop(i)
-    extraction_content = "\n".join(extraction_lines).strip()
+    llm_extraction_content = "\n".join(extraction_lines).strip()
+    extraction_content = verbatim_extraction_result or llm_extraction_content
 
     # Fallback: Extract party from document content
     if responding_party == "Unknown_Party":

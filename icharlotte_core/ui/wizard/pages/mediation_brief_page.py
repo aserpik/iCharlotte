@@ -34,6 +34,7 @@ from icharlotte_core.mediation_brief import (
 from icharlotte_core.ui.context_files_dialog import ContextFilesDialog
 from icharlotte_core.ui.wizard import theme
 from icharlotte_core.ui.wizard.docx_io import load_docx_as_html
+from icharlotte_core.ui.wizard.file_drop import enable_file_drop
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
 from icharlotte_core.ui.wizard.task_debug_helpers import (
     emit_debug,
@@ -331,6 +332,8 @@ class MediationBriefSettingsPage(QWidget):
         self.files_list.setSelectionMode(
             QAbstractItemView.SelectionMode.ExtendedSelection
         )
+        enable_file_drop(self.files_list, self.add_files)
+        enable_file_drop(self, self.add_files)
         layout.addWidget(self.files_list, 1)
 
         layout.addWidget(theme.section_header("Caption template"))
@@ -338,6 +341,11 @@ class MediationBriefSettingsPage(QWidget):
         self.caption_edit = QLineEdit()
         self.caption_edit.setPlaceholderText("Path to the case caption .docx…")
         self.caption_edit.textChanged.connect(self._update_caption_hint)
+        enable_file_drop(
+            self.caption_edit,
+            self.add_caption_files,
+            path_filter=self._is_caption_file,
+        )
         caption_row.addWidget(self.caption_edit, 1)
         self.browse_caption_btn = theme.secondary_button("Browse…")
         self.browse_caption_btn.clicked.connect(self._on_browse_caption)
@@ -388,8 +396,11 @@ class MediationBriefSettingsPage(QWidget):
             start_dir=self.case_path or "",
             file_filter="Documents (*.pdf *.docx *.doc *.txt *.msg);;All files (*.*)",
         )
+        self.add_files(picked or [])
+
+    def add_files(self, paths: list[str]) -> None:
         existing = set(self.current_files())
-        for path in picked or []:
+        for path in paths:
             if path not in existing:
                 self.files_list.addItem(path)
                 existing.add(path)
@@ -404,7 +415,22 @@ class MediationBriefSettingsPage(QWidget):
             "Word Documents (*.docx)",
         )
         if path:
-            self.caption_edit.setText(path)
+            self.set_caption_path(path)
+
+    @staticmethod
+    def _is_caption_file(path: str) -> bool:
+        return os.path.splitext(path)[1].lower() == ".docx"
+
+    def set_caption_path(self, path: str) -> bool:
+        if not path or not self._is_caption_file(path) or not os.path.isfile(path):
+            return False
+        self.caption_edit.setText(path)
+        return True
+
+    def add_caption_files(self, paths: list[str]) -> None:
+        for path in paths:
+            if self.set_caption_path(path):
+                return
 
     def to_dict(self) -> dict:
         return {

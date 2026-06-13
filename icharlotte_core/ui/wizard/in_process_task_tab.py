@@ -77,8 +77,9 @@ class InProcessTaskTab(WizardTaskContainer):
         worker_factory: WorkerFactory,
         auto_run: bool = False,
         parent: QWidget | None = None,
+        show_header: bool = True,
     ):
-        super().__init__(spec, parent=parent)
+        super().__init__(spec, parent=parent, show_header=show_header)
         self._case_path = case_path
         self._file_number = file_number
         self._worker_factory = worker_factory
@@ -568,6 +569,7 @@ def build_med_extractor_tab(
         worker_factory=factory,
         auto_run=False,
         parent=parent,
+        show_header=False,
     )
 
 

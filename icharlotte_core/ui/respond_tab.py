@@ -261,7 +261,7 @@ class RespondTab(QWidget):
         # Empty-state label (shown when no documents generated)
         self.empty_label = QLabel("Drop discovery PDFs and click Generate")
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.empty_label.setStyleSheet("color: #888; font-size: 14px;")
+        self.empty_label.setStyleSheet("color: #909090; font-size: 14px;")
         parent_layout.addWidget(self.empty_label)
 
         # Start with empty state visible, tabs hidden

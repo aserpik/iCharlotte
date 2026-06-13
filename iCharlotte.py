@@ -479,9 +479,11 @@ class MainWindow(QMainWindow):
         self.mode_controller.mode_changed.connect(self._apply_mode_visibility)
         self._apply_mode_visibility(self.mode_controller.mode)
 
-        # Restore tab if specified
+        # Restore tab: explicit --tab arg wins, else last session's active tab.
         if initial_tab is not None and 0 <= initial_tab < self.tabs.count():
             self.tabs.setCurrentIndex(initial_tab)
+        else:
+            self._restore_last_tab()
 
         # Only populate tree and check docket if a case is loaded
         if self.case_path:
@@ -623,33 +625,30 @@ class MainWindow(QMainWindow):
         self.tabs.tabBar().setExpanding(True)
         self.tabs.setUsesScrollButtons(False)
 
-        # Style the tab bar for larger, more visible tabs
+        # Larger variant of the global underline tab treatment (theme.py).
+        # Scoped to this widget so nested tab widgets keep the compact default.
         self.tabs.setStyleSheet(f"""
             QTabWidget::pane {{
-                border: 1px solid {theme.BORDER};
-                border-top: none;
+                border: none;
+                border-top: 1px solid {theme.BORDER};
             }}
             QTabBar::tab {{
-                background-color: #e0e0e0;
-                color: {theme.TEXT_BODY};
+                background: transparent;
+                color: {theme.TEXT_MUTED};
                 font-size: 13px;
                 font-weight: 500;
                 padding: 10px 6px;
-                margin-right: 1px;
-                border: 1px solid {theme.BORDER};
-                border-bottom: none;
-                border-top-left-radius: 6px;
-                border-top-right-radius: 6px;
+                border: none;
+                border-bottom: 3px solid transparent;
             }}
             QTabBar::tab:selected {{
-                background-color: {theme.BG};
                 color: {theme.PRIMARY};
-                font-weight: bold;
-                border-bottom: 2px solid {theme.PRIMARY};
+                font-weight: 600;
+                border-bottom: 3px solid {theme.PRIMARY};
             }}
             QTabBar::tab:hover:!selected {{
-                background-color: #f0f0f0;
-                color: {theme.PRIMARY};
+                color: {theme.TEXT};
+                background-color: {theme.BG_SUBTLE};
             }}
         """)
 
@@ -675,25 +674,25 @@ class MainWindow(QMainWindow):
         # Top Toolbar
         toolbar_layout = QHBoxLayout()
 
-        btn_view_docket = QPushButton("ViewDocket")
+        btn_view_docket = theme.secondary_button("ViewDocket")
         btn_view_docket.clicked.connect(self.view_docket)
         toolbar_layout.addWidget(btn_view_docket)
 
-        btn_notes = QPushButton("Notes")
+        btn_notes = theme.secondary_button("Notes")
         btn_notes.clicked.connect(self.open_notes)
         toolbar_layout.addWidget(btn_notes)
 
-        btn_vars = QPushButton("Variables")
+        btn_vars = theme.secondary_button("Variables")
         btn_vars.clicked.connect(self.manage_variables)
         toolbar_layout.addWidget(btn_vars)
 
         # Output Browser Button
-        btn_outputs = QPushButton("Output Browser")
+        btn_outputs = theme.secondary_button("Output Browser")
         btn_outputs.clicked.connect(self.open_output_browser)
         toolbar_layout.addWidget(btn_outputs)
 
         # Processing Log Button
-        btn_proc_log = QPushButton("Processing Log")
+        btn_proc_log = theme.secondary_button("Processing Log")
         btn_proc_log.clicked.connect(self.open_processing_log)
         toolbar_layout.addWidget(btn_proc_log)
 
@@ -725,11 +724,15 @@ class MainWindow(QMainWindow):
         left_panel.setFixedWidth(180)
         left_layout = QVBoxLayout(left_panel)
         left_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        left_layout.setContentsMargins(4, 5, 4, 5)
-        left_layout.setSpacing(4)
+        left_layout.setContentsMargins(
+            theme.SPACE_SM, theme.SPACE_SM, theme.SPACE_SM, theme.SPACE_SM
+        )
+        left_layout.setSpacing(theme.SPACE_XS + 2)
 
         title_label = QLabel("Case Agents")
-        title_label.setStyleSheet("font-weight: bold; font-size: 14px; margin-bottom: 5px;")
+        title_label.setStyleSheet(
+            f"font-weight: 600; font-size: {theme.FONT_H3}px; color: {theme.TEXT}; margin-bottom: 5px;"
+        )
         left_layout.addWidget(title_label)
 
         # Enhanced Agent Buttons with running indicator, status, and settings
@@ -750,7 +753,9 @@ class MainWindow(QMainWindow):
         # Document Agents
         left_layout.addSpacing(8)
         new_label = QLabel("Document Agents")
-        new_label.setStyleSheet("font-weight: bold; font-size: 12px; color: #666;")
+        new_label.setStyleSheet(
+            f"font-weight: 600; font-size: {theme.FONT_BODY}px; color: {theme.TEXT_MUTED};"
+        )
         left_layout.addWidget(new_label)
 
         left_layout.addStretch()
@@ -875,7 +880,7 @@ class MainWindow(QMainWindow):
         scroll.setWidget(self.status_container)
         status_layout.addWidget(scroll)
         
-        clear_btn = QPushButton("Clear Completed")
+        clear_btn = theme.secondary_button("Clear Completed")
         clear_btn.clicked.connect(self.clear_completed_status)
         status_layout.addWidget(clear_btn)
 
@@ -3019,7 +3024,7 @@ class MainWindow(QMainWindow):
         return settings.value("preview_pane_width", type=int)
 
     def _restore_window_state(self):
-        """Restore window geometry and splitter layout from the previous session."""
+        """Restore window geometry, splitter layout, and tree columns from the previous session."""
         settings = QSettings("iCharlotte", "iCharlotte")
         geometry = settings.value("main_window_geometry")
         if geometry is not None:
@@ -3030,13 +3035,42 @@ class MainWindow(QMainWindow):
                 self.main_splitter.setSizes([int(s) for s in sizes])
             except (TypeError, ValueError):
                 pass
+        widths = settings.value("case_view_tree_column_widths")
+        if isinstance(widths, (list, tuple)) and hasattr(self, "tree"):
+            try:
+                for col, w in enumerate(widths[: self.tree.columnCount()]):
+                    if int(w) > 0:
+                        self.tree.setColumnWidth(col, int(w))
+            except (TypeError, ValueError):
+                pass
+
+    def _restore_last_tab(self):
+        """Reopen the tab that was active when the app last closed.
+
+        Tabs are matched by name, not index — indices shift between Wizard and
+        Advanced mode. Skipped when the saved tab is hidden in the current mode.
+        """
+        settings = QSettings("iCharlotte", "iCharlotte")
+        tab_name = settings.value("last_main_tab", type=str)
+        if not tab_name:
+            return
+        idx = self._index_of_tab(tab_name)
+        if idx >= 0 and self.tabs.isTabVisible(idx):
+            self.tabs.setCurrentIndex(idx)
 
     def _save_window_state(self):
-        """Persist window geometry and splitter layout for the next session."""
+        """Persist window geometry, splitter layout, tree columns, and active tab."""
         settings = QSettings("iCharlotte", "iCharlotte")
         settings.setValue("main_window_geometry", self.saveGeometry())
         if hasattr(self, "main_splitter"):
             settings.setValue("main_splitter_sizes", self.main_splitter.sizes())
+        if hasattr(self, "tree"):
+            settings.setValue(
+                "case_view_tree_column_widths",
+                [self.tree.columnWidth(c) for c in range(self.tree.columnCount())],
+            )
+        if hasattr(self, "tabs") and self.tabs.currentIndex() >= 0:
+            settings.setValue("last_main_tab", self.tabs.tabText(self.tabs.currentIndex()))
 
     def apply_advanced_filters(self, filters):
         """Apply advanced filters to the file tree."""

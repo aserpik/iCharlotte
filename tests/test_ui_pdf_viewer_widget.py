@@ -46,6 +46,22 @@ class _FakeSpinBox:
         self.value = value
 
 
+class _FakeButton:
+    def __init__(self) -> None:
+        self.text = ""
+        self.checked = False
+        self.signal_blocks: list[bool] = []
+
+    def setText(self, text: str) -> None:
+        self.text = text
+
+    def blockSignals(self, blocked: bool) -> None:
+        self.signal_blocks.append(blocked)
+
+    def setChecked(self, checked: bool) -> None:
+        self.checked = checked
+
+
 def _viewer_double() -> PdfViewerWidget:
     viewer = PdfViewerWidget.__new__(PdfViewerWidget)
     viewer.current_page = 1
@@ -58,6 +74,8 @@ def _viewer_double() -> PdfViewerWidget:
     viewer.web_view = _FakeWebView()
     viewer.page_label = _FakeLabel()
     viewer.page_spin = _FakeSpinBox()
+    viewer.highlight_btn = _FakeButton()
+    viewer._highlight_mode = False
     return viewer
 
 
@@ -103,3 +121,37 @@ def test_load_pdf_starts_page_count_polling_without_fixed_half_second_delay(
     ]
     assert delays == [(mod.PDF_LOAD_POLL_INTERVAL_MS, viewer._poll_total_pages)]
     assert mod.PDF_LOAD_POLL_INTERVAL_MS <= 150
+
+
+def test_highlight_mode_toggle_updates_button_and_pdf_js() -> None:
+    viewer = _viewer_double()
+
+    viewer.set_highlight_mode(True)
+
+    assert viewer._highlight_mode is True
+    assert viewer.highlight_btn.checked is True
+    assert viewer.highlight_btn.text == "Highlight On"
+    assert viewer.web_view.fake_page.javascript_calls == [
+        "window.pdfViewer && window.pdfViewer.setHighlightMode(true)"
+    ]
+
+
+def test_clear_highlights_calls_pdf_js() -> None:
+    viewer = _viewer_double()
+
+    viewer.clear_highlights()
+
+    assert viewer.web_view.fake_page.javascript_calls == [
+        "window.pdfViewer && window.pdfViewer.clearSessionHighlights()"
+    ]
+
+
+def test_viewer_html_includes_session_highlight_support() -> None:
+    viewer = PdfViewerWidget.__new__(PdfViewerWidget)
+
+    html = viewer._get_viewer_html()
+
+    assert "session-highlight" in html
+    assert "function setHighlightMode(enabled)" in html
+    assert "function highlightSelection()" in html
+    assert "clearSessionHighlights" in html

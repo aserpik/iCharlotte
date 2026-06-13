@@ -174,6 +174,28 @@ def _parse_page_no(cell_text: str) -> Tuple[str, int, int]:
     return (filename, page_start, page_end)
 
 
+_SOURCE_FILE_EXTENSIONS = {
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".tif",
+    ".tiff",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".zip",
+}
+
+
+def _file_lookup_key(filename: str) -> str:
+    """Normalize a source filename or chronology label for lookup."""
+    name = os.path.basename(str(filename or "")).strip()
+    stem, ext = os.path.splitext(name)
+    if ext.lower() in _SOURCE_FILE_EXTENSIONS:
+        name = stem
+    return name.lower().strip()
+
+
 def _build_file_index(case_path: str) -> dict:
     """Walk likely source-record folders to build filename-to-path lookup."""
     file_index = {}
@@ -187,7 +209,7 @@ def _build_file_index(case_path: str) -> dict:
             continue
         for root, _dirs, files in os.walk(folder):
             for fname in files:
-                key = os.path.splitext(fname)[0].lower().strip()
+                key = _file_lookup_key(fname)
                 if key and key not in file_index:
                     file_index[key] = os.path.join(root, fname)
     return file_index
@@ -195,7 +217,7 @@ def _build_file_index(case_path: str) -> dict:
 
 def _lookup_file(file_index: dict, filename: str) -> Optional[str]:
     """Look up a filename in the index with fuzzy fallback (>0.85 ratio)."""
-    lookup_key = os.path.splitext(filename)[0].lower().strip()
+    lookup_key = _file_lookup_key(filename)
     found = file_index.get(lookup_key)
     if found:
         return found

@@ -333,7 +333,7 @@ class EnhancedAgentButton(QFrame):
 
         # Status label (e.g., "Last run: 2 days ago")
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: gray; font-size: 9px; padding-left: 2px;")
+        self.status_label.setStyleSheet("color: #909090; font-size: 9px; padding-left: 2px;")
         content_layout.addWidget(self.status_label)
 
         layout.addLayout(content_layout)
@@ -347,7 +347,7 @@ class EnhancedAgentButton(QFrame):
                 border: none;
                 background: transparent;
                 font-size: 12px;
-                color: #888;
+                color: #909090;
             }
             QToolButton:hover {
                 color: #333;
@@ -801,7 +801,7 @@ class FilePreviewWidget(QFrame):
 
         # File info
         self.info_label = QLabel()
-        self.info_label.setStyleSheet("color: gray; font-size: 10px;")
+        self.info_label.setStyleSheet("color: #909090; font-size: 10px;")
         layout.addWidget(self.info_label)
 
         # Page navigation bar (for PDFs)
@@ -857,7 +857,7 @@ class FilePreviewWidget(QFrame):
         # No preview placeholder
         self.no_preview_label = QLabel("No preview available.\nDouble-click to open file.")
         self.no_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.no_preview_label.setStyleSheet("color: gray;")
+        self.no_preview_label.setStyleSheet("color: #909090;")
         self.preview_stack.addWidget(self.no_preview_label)
 
         # HTML preview for Word documents (using QWebEngineView)

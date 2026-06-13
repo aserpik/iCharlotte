@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
     QSizePolicy, QStackedWidget, QVBoxLayout, QWidget,
 )
 
+from ..file_drop import enable_file_drop
 from ..registry import TaskSpec
 from .depo_prep_topic_editor import TopicEditor
 from .settings_page import SettingsPage
@@ -187,6 +188,7 @@ class DepoPrepSettingsPage(SettingsPage):
         self.deponent_files_list = QListWidget()
         self.deponent_files_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.deponent_files_list.setMaximumHeight(80)
+        enable_file_drop(self.deponent_files_list, self.add_deponent_files)
         s_layout.addWidget(self.deponent_files_list)
 
         s_layout.addWidget(QLabel("Case context:"))
@@ -203,6 +205,7 @@ class DepoPrepSettingsPage(SettingsPage):
         self.context_files_list = QListWidget()
         self.context_files_list.setSelectionMode(QListWidget.SelectionMode.ExtendedSelection)
         self.context_files_list.setMaximumHeight(80)
+        enable_file_drop(self.context_files_list, self.add_context_files)
         s_layout.addWidget(self.context_files_list)
 
         v.addWidget(sources_box)

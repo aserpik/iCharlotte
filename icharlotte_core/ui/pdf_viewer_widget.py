@@ -27,6 +27,7 @@ class PdfViewerWidget(QWidget):
         self._pending_pdf = None
         self._pending_page_number = None
         self._nav_cooldown_until = 0  # Timestamp until which polling is suppressed
+        self._highlight_mode = False
         self._setup_ui()
         self._start_page_polling()
 
@@ -50,6 +51,18 @@ class PdfViewerWidget(QWidget):
         info_layout.addWidget(self.page_spin)
 
         info_layout.addStretch()
+
+        # Review highlights are temporary in-viewer marks; source PDFs are not modified.
+        self.highlight_btn = QPushButton("Highlight")
+        self.highlight_btn.setCheckable(True)
+        self.highlight_btn.setToolTip("Toggle highlight mode for selected PDF text")
+        self.highlight_btn.toggled.connect(self.set_highlight_mode)
+        info_layout.addWidget(self.highlight_btn)
+
+        self.clear_highlights_btn = QPushButton("Clear")
+        self.clear_highlights_btn.setToolTip("Clear temporary highlights from this PDF view")
+        self.clear_highlights_btn.clicked.connect(self.clear_highlights)
+        info_layout.addWidget(self.clear_highlights_btn)
 
         # Zoom controls
         self.zoom_out_btn = QPushButton("-")
@@ -101,6 +114,8 @@ class PdfViewerWidget(QWidget):
             if self._pending_pdf:
                 self._do_load_pdf(self._pending_pdf)
                 self._pending_pdf = None
+            if self._highlight_mode:
+                self.set_highlight_mode(True)
 
     def _get_viewer_html(self):
         """Return inline pdf.js viewer HTML with lazy page rendering."""
@@ -127,7 +142,7 @@ class PdfViewerWidget(QWidget):
         .page-num-label {
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            color: #999; font: 14px Arial; pointer-events: none;
+            color: #909090; font: 14px Arial; pointer-events: none;
         }
         .page.rendered .page-num-label { display: none; }
         canvas { display: block; }
@@ -147,6 +162,12 @@ class PdfViewerWidget(QWidget):
         }
         .annot-overlay:hover { border-color: rgba(0,0,0,0.3); }
         .annot-overlay.selected { border-color: #e00; border-style: dashed; }
+        body.highlight-mode .textLayer > span { cursor: crosshair; }
+        .session-highlight {
+            position: absolute; z-index: 4; pointer-events: none;
+            background: rgba(255, 235, 59, 0.45);
+            border-radius: 2px; mix-blend-mode: multiply;
+        }
         #loading {
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%,-50%);
@@ -177,6 +198,9 @@ class PdfViewerWidget(QWidget):
         // Annotation selection state
         let selectedAnnotExId = null;
         let pendingDeleteExId = null;  // Set by Delete key, polled by Python
+        let highlightMode = false;
+        let sessionHighlights = [];
+        let nextSessionHighlightId = 1;
 
         async function loadPdf(url) {
             if (isLoading) return { success: false, error: 'Already loading' };
@@ -194,6 +218,7 @@ class PdfViewerWidget(QWidget):
                 renderedPages.clear();
                 renderingPages.clear();
                 pageHeights = [];
+                clearSessionHighlights();
 
                 pdfDoc = await pdfjsLib.getDocument(url).promise;
                 totalPages = pdfDoc.numPages;
@@ -386,6 +411,7 @@ class PdfViewerWidget(QWidget):
                     textContentSource: tc, container: tDiv,
                     viewport: viewport, textDivs: []
                 });
+                renderSessionHighlights(pageDiv, pageNum);
 
                 renderedPages.add(pageNum);
             } finally {
@@ -435,6 +461,87 @@ class PdfViewerWidget(QWidget):
             pendingDeleteExId = null;
             return id;
         }
+
+        function setHighlightMode(enabled) {
+            highlightMode = !!enabled;
+            document.body.classList.toggle('highlight-mode', highlightMode);
+            return highlightMode;
+        }
+
+        function highlightSelection() {
+            const selection = window.getSelection();
+            if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return 0;
+
+            const range = selection.getRangeAt(0);
+            const rects = Array.from(range.getClientRects()).filter(r => r.width > 2 && r.height > 2);
+            const pages = Array.from(document.querySelectorAll('.page'));
+            let added = 0;
+
+            for (const rect of rects) {
+                for (const pageDiv of pages) {
+                    const pageRect = pageDiv.getBoundingClientRect();
+                    if (
+                        rect.right <= pageRect.left || rect.left >= pageRect.right ||
+                        rect.bottom <= pageRect.top || rect.top >= pageRect.bottom
+                    ) {
+                        continue;
+                    }
+
+                    const pageNumber = parseInt(pageDiv.dataset.pageNumber || '0', 10);
+                    if (!pageNumber) continue;
+
+                    const left = Math.max(rect.left, pageRect.left) - pageRect.left;
+                    const top = Math.max(rect.top, pageRect.top) - pageRect.top;
+                    const right = Math.min(rect.right, pageRect.right) - pageRect.left;
+                    const bottom = Math.min(rect.bottom, pageRect.bottom) - pageRect.top;
+                    const highlight = {
+                        id: nextSessionHighlightId++,
+                        page: pageNumber,
+                        left: left / pageRect.width,
+                        top: top / pageRect.height,
+                        width: (right - left) / pageRect.width,
+                        height: (bottom - top) / pageRect.height
+                    };
+                    sessionHighlights.push(highlight);
+                    createSessionHighlight(pageDiv, highlight);
+                    added++;
+                }
+            }
+
+            selection.removeAllRanges();
+            return added;
+        }
+
+        function createSessionHighlight(pageDiv, highlight) {
+            const div = document.createElement('div');
+            div.className = 'session-highlight';
+            div.dataset.highlightId = String(highlight.id);
+            div.style.left = (highlight.left * pageDiv.clientWidth) + 'px';
+            div.style.top = (highlight.top * pageDiv.clientHeight) + 'px';
+            div.style.width = (highlight.width * pageDiv.clientWidth) + 'px';
+            div.style.height = (highlight.height * pageDiv.clientHeight) + 'px';
+            pageDiv.appendChild(div);
+        }
+
+        function renderSessionHighlights(pageDiv, pageNumber) {
+            for (const highlight of sessionHighlights.filter(h => h.page === pageNumber)) {
+                createSessionHighlight(pageDiv, highlight);
+            }
+        }
+
+        function clearSessionHighlights() {
+            sessionHighlights = [];
+            document.querySelectorAll('.session-highlight').forEach(el => el.remove());
+            return true;
+        }
+
+        function getSessionHighlightCount() { return sessionHighlights.length; }
+
+        document.getElementById('viewerContainer').addEventListener('mouseup', function() {
+            if (highlightMode) {
+                setTimeout(highlightSelection, 0);
+            }
+        });
 
         function goToPage(pageNum) {
             if (pageNum < 1 || pageNum > totalPages) return false;
@@ -489,7 +596,8 @@ class PdfViewerWidget(QWidget):
 
         window.pdfViewer = {
             loadPdf, goToPage, getCurrentPage, getTotalPages, getScale, setScale, isReady,
-            getSelectedAnnotation, getPendingDelete
+            getSelectedAnnotation, getPendingDelete,
+            setHighlightMode, highlightSelection, clearSessionHighlights, getSessionHighlightCount
         };
     </script>
 </body>
@@ -558,6 +666,27 @@ class PdfViewerWidget(QWidget):
         self.page_spin.setValue(1)
         if self._viewer_ready:
             self.web_view.page().runJavaScript("window.pdfViewer && window.pdfViewer.close && window.pdfViewer.close()")
+
+    def set_highlight_mode(self, enabled):
+        """Toggle temporary in-viewer highlight mode."""
+        enabled = bool(enabled)
+        self._highlight_mode = enabled
+        self.highlight_btn.blockSignals(True)
+        self.highlight_btn.setChecked(enabled)
+        self.highlight_btn.setText("Highlight On" if enabled else "Highlight")
+        self.highlight_btn.blockSignals(False)
+        if self._viewer_ready:
+            js_enabled = "true" if enabled else "false"
+            self.web_view.page().runJavaScript(
+                f"window.pdfViewer && window.pdfViewer.setHighlightMode({js_enabled})"
+            )
+
+    def clear_highlights(self):
+        """Clear temporary in-viewer highlights."""
+        if self._viewer_ready:
+            self.web_view.page().runJavaScript(
+                "window.pdfViewer && window.pdfViewer.clearSessionHighlights()"
+            )
 
     def load_pdf(self, path):
         """Load a PDF file."""

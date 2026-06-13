@@ -59,6 +59,7 @@ from icharlotte_core.ui.wizard.pages._motion_research_support import (
 
 
 from icharlotte_core.ui.wizard.pages.status_page import StatusPage
+from icharlotte_core.ui.wizard.file_drop import enable_file_drop
 from icharlotte_core.ui.wizard.task_debug_helpers import (
     emit_debug,
     finish_debug_run,
@@ -149,12 +150,22 @@ class OpposeMotionSettingsPage(QStackedWidget):
         layout.setSpacing(10)
 
         self.motion_label = QLabel()
+        enable_file_drop(
+            self.motion_label,
+            self.add_motion_files,
+            path_filter=is_supported_motion_file,
+        )
         layout.addWidget(self.motion_label)
         self._refresh_motion_label()
 
         motion_row = QHBoxLayout()
         self.select_motion_btn = QPushButton("Select Motion")
         self.select_motion_btn.clicked.connect(self._on_select_motion_file)
+        enable_file_drop(
+            self.select_motion_btn,
+            self.add_motion_files,
+            path_filter=is_supported_motion_file,
+        )
         motion_row.addWidget(self.select_motion_btn)
         self.analyze_motion_btn = QPushButton("Analyze Motion")
         self.analyze_motion_btn.clicked.connect(self._emit_analysis_requested)
@@ -163,12 +174,22 @@ class OpposeMotionSettingsPage(QStackedWidget):
         layout.addLayout(motion_row)
 
         self.context_label = QLabel()
+        enable_file_drop(
+            self.context_label,
+            self.add_context_files,
+            path_filter=is_supported_context_file,
+        )
         layout.addWidget(self.context_label)
         self._refresh_context_label()
 
         context_row = QHBoxLayout()
         self.add_context_btn = QPushButton("Add Context")
         self.add_context_btn.clicked.connect(self._on_add_context_files)
+        enable_file_drop(
+            self.add_context_btn,
+            self.add_context_files,
+            path_filter=is_supported_context_file,
+        )
         context_row.addWidget(self.add_context_btn)
         context_row.addStretch()
         layout.addLayout(context_row)
@@ -191,6 +212,7 @@ class OpposeMotionSettingsPage(QStackedWidget):
         self.continue_btn.clicked.connect(self._on_continue_to_outline)
         row.addWidget(self.continue_btn)
         layout.addLayout(row)
+        enable_file_drop(page, self.add_context_files, path_filter=is_supported_context_file)
         self.addWidget(page)
 
     def _build_outline_page(self) -> None:
@@ -302,12 +324,23 @@ class OpposeMotionSettingsPage(QStackedWidget):
                 "Select a PDF or DOCX motion.",
             )
             return
+        self.set_motion_file(motion_file)
+
+    def set_motion_file(self, motion_file: str) -> bool:
+        if not is_supported_motion_file(motion_file):
+            return False
         if motion_file != self.motion_file:
             self.motion_file = motion_file
             self.set_metadata(MotionMetadata())
             self.set_outline([])
             self.setCurrentIndex(SETTINGS_PAGE_CONFIRM)
         self._refresh_motion_label()
+        return True
+
+    def add_motion_files(self, paths: list[str]) -> None:
+        for path in paths:
+            if self.set_motion_file(path):
+                return
 
     def _on_add_context_files(self) -> None:
         start_dir = os.path.dirname(self.motion_file) or self.case_root
@@ -319,6 +352,9 @@ class OpposeMotionSettingsPage(QStackedWidget):
         )
         if context_files is None:
             return
+        self.add_context_files(context_files)
+
+    def add_context_files(self, context_files: list[str]) -> None:
         existing = set(self.context_files)
         for path in context_files:
             if path in existing or not is_supported_context_file(path):

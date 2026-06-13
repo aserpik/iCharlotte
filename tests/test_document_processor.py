@@ -238,6 +238,44 @@ class TestDocumentProcessor:
         # High density should have higher threshold (trigger OCR more readily)
         assert threshold_high >= threshold_low
 
+    @patch('icharlotte_core.document_processor.PdfReader')
+    def test_text_layer_pdf_can_skip_ocr_for_sparse_pages(self, mock_reader):
+        """Sparse image pages in an already-text-layered PDF should not force OCR."""
+        class FakePage:
+            def __init__(self, text):
+                self._text = text
+
+            def extract_text(self):
+                return self._text
+
+        pages = [
+            FakePage("Dense native text. " * 80),
+            FakePage("More dense native text. " * 80),
+            FakePage("Additional dense native text. " * 80),
+            FakePage("Still dense native text. " * 80),
+            FakePage("Final dense native text sample. " * 80),
+            FakePage(""),
+        ]
+        mock_reader.return_value.pages = pages
+
+        config = OCRConfig(adaptive=True, skip_sparse_ocr_in_text_layer_pdf=True)
+        processor = DocumentProcessor(ocr_config=config)
+
+        ocr_calls = []
+
+        def fake_ocr_page(file_path, page_index):
+            ocr_calls.append(page_index)
+            return "OCR should not be needed"
+
+        processor._ocr_page = fake_ocr_page
+
+        result = processor.extract_with_dynamic_ocr("text-layered.pdf")
+
+        assert result.success
+        assert ocr_calls == []
+        assert result.ocr_pages == []
+        assert result.extraction_method.value == "native"
+
 
 class TestOCRConfig:
     """Tests for OCR configuration."""

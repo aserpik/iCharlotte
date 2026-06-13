@@ -65,6 +65,7 @@ from icharlotte_core.discovery._io import (
     read_first_page_text,
 )
 from icharlotte_core.ui.context_files_dialog import ContextFilesDialog
+from icharlotte_core.ui.wizard.file_drop import enable_file_drop
 from icharlotte_core.ui.form_interrogatory_dialog import (
     FormInterrogatorySelectionDialog,
 )
@@ -187,6 +188,8 @@ CANT_ADMIT_DENY_RESPONSE = (
     "to enable Responding Party to admit the matter."
 )
 
+CONTEXT_FILE_EXTENSIONS = {".pdf", ".docx", ".txt"}
+
 
 class RespondDiscoverySettingsPage(QWidget):
     """Rules, context selection, and review UI for the discovery response task."""
@@ -284,6 +287,11 @@ class RespondDiscoverySettingsPage(QWidget):
         btn_row.addStretch()
         self.next_btn = QPushButton("Next: Context Files")
         self.next_btn.clicked.connect(self._on_select_context_files)
+        enable_file_drop(
+            self.next_btn,
+            self.add_context_files,
+            path_filter=self._is_context_file,
+        )
         btn_row.addWidget(self.next_btn)
         rules_outer.addLayout(btn_row)
 
@@ -294,6 +302,7 @@ class RespondDiscoverySettingsPage(QWidget):
         self.review_widget = self._build_review_widget()
         self.review_widget.hide()
         outer.addWidget(self.review_widget, 1)
+        enable_file_drop(self, self.add_context_files, path_filter=self._is_context_file)
         self._rebuild_rules()
 
     def set_fi_mode(self, mode: str) -> None:
@@ -462,12 +471,8 @@ class RespondDiscoverySettingsPage(QWidget):
     # ------------------------------------------------------------------
 
     def _on_select_context_files(self) -> None:
-        # For Form Interrogatories, confirm which interrogatories were
-        # propounded before anything else — auto-detection of flattened-PDF
-        # checkboxes is best-effort, so the attorney is the source of truth.
-        if self.detected_type == "FI" and not self._fi_selection_confirmed:
-            if not self._confirm_fi_selection():
-                return  # cancelled — stay on the rules screen
+        if not self._confirm_context_file_selection():
+            return  # cancelled — stay on the rules screen
 
         paths = ContextFilesDialog.get_files(
             self,
@@ -477,7 +482,42 @@ class RespondDiscoverySettingsPage(QWidget):
         )
         if paths is None:
             return  # user cancelled — stay on the rules screen, do not generate
-        self.context_files = list(paths)
+        self.add_context_files(paths, replace=True, confirm_fi=False)
+
+    def _confirm_context_file_selection(self) -> bool:
+        # For Form Interrogatories, confirm which interrogatories were
+        # propounded before anything else — auto-detection of flattened-PDF
+        # checkboxes is best-effort, so the attorney is the source of truth.
+        if self.detected_type == "FI" and not self._fi_selection_confirmed:
+            return self._confirm_fi_selection()
+        return True
+
+    @staticmethod
+    def _is_context_file(path: str) -> bool:
+        return os.path.splitext(path)[1].lower() in CONTEXT_FILE_EXTENSIONS
+
+    def add_context_files(
+        self,
+        paths: list[str],
+        *,
+        replace: bool = False,
+        confirm_fi: bool = True,
+    ) -> None:
+        if confirm_fi and not self._confirm_context_file_selection():
+            return
+        existing = set() if replace else set(self.context_files)
+        context_files = [] if replace else list(self.context_files)
+        for path in paths:
+            if (
+                not path
+                or path in existing
+                or not self._is_context_file(path)
+                or not os.path.isfile(path)
+            ):
+                continue
+            context_files.append(path)
+            existing.add(path)
+        self.context_files = context_files
         self._generate_proposals()
 
     def _confirm_fi_selection(self) -> bool:

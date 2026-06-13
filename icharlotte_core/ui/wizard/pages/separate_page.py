@@ -30,6 +30,7 @@ from icharlotte_core.ui.wizard.task_debug_helpers import (
 )
 from icharlotte_core.ui.wizard.task_scaffold import WizardTaskContainer
 from icharlotte_core.ui.separator_workbench import SeparatorWorkbench
+from icharlotte_core.ui.wizard.file_drop import enable_file_drop
 from icharlotte_core.ui.wizard.file_picker import resolve_default_folder
 
 
@@ -111,7 +112,9 @@ class SeparateSettingsPage(QWidget):
             "iCharlotte will scan the PDF, identify the distinct documents inside it, "
             "and let you review, rename, split, and merge them. An index is also saved "
             "to NOTES/AI OUTPUT/INDEXES."))
-        layout.addWidget(QLabel(f"File: {os.path.basename(pdf_path)}"))
+        self.file_label = QLabel()
+        layout.addWidget(self.file_label)
+        self._refresh_file_label()
 
         sens_row = QHBoxLayout()
         sens_row.addWidget(QLabel("Separation sensitivity:"))
@@ -139,6 +142,7 @@ class SeparateSettingsPage(QWidget):
             lambda: self.analyze_requested.emit(self.sensitivity_slider.value()))
         btn_row.addWidget(self.analyze_btn)
         layout.addLayout(btn_row)
+        enable_file_drop(self, self.add_pdf_files, path_filter=self._is_pdf_file)
 
     def to_dict(self) -> dict:
         return {"sensitivity": self.sensitivity_slider.value()}
@@ -146,6 +150,26 @@ class SeparateSettingsPage(QWidget):
     def from_dict(self, data: dict) -> None:
         if "sensitivity" in data:
             self.sensitivity_slider.setValue(int(data["sensitivity"]))
+
+    @staticmethod
+    def _is_pdf_file(path: str) -> bool:
+        return os.path.splitext(path)[1].lower() == ".pdf"
+
+    def _refresh_file_label(self) -> None:
+        self.file_label.setText(f"File: {os.path.basename(self.pdf_path)}")
+        self.file_label.setToolTip(self.pdf_path)
+
+    def set_pdf_path(self, pdf_path: str) -> bool:
+        if not pdf_path or not self._is_pdf_file(pdf_path):
+            return False
+        self.pdf_path = pdf_path
+        self._refresh_file_label()
+        return True
+
+    def add_pdf_files(self, paths: list[str]) -> None:
+        for path in paths:
+            if self.set_pdf_path(path):
+                return
 
 
 class SeparateWorkbenchPage(QWidget):
@@ -231,6 +255,7 @@ class SeparateTaskTab(WizardTaskContainer):
     def _start_analysis(self, sensitivity: int):
         if self._worker is not None and self._worker.isRunning():
             return
+        self._pdf_path = self.settings_page.pdf_path
         # Keep the settings-page slider in sync with whatever value triggered
         # this run (settings Analyze OR workbench Re-analyze) so the recorded
         # task settings reflect the sensitivity actually used.
