@@ -144,8 +144,9 @@ def _register_chat_routes(app, templates):
         conv = chat.get_conversation(file_number, conv_id)
         if conv is None:
             return HTMLResponse("Conversation not found", status_code=404)
+        from . import chat_models
         return _render("chat_conversation.html", request, case=case, conv=conv,
-                       turn_id=turn)
+                       turn_id=turn, models=chat_models.available_models())
 
     @app.post("/case/{file_number}/chat/{conv_id}/send")
     async def chat_send(request: Request, file_number: str, conv_id: str):
@@ -163,6 +164,7 @@ def _register_chat_routes(app, templates):
         model = form.get("model") or conv.model
         rel_files = [f for f in form.getlist("attach") if f]
         research_on = form.get("research") == "on"
+        chat._persist_model_choice(file_number, conv_id, provider, model)
         try:
             turn_id = _CHAT_MANAGER.start_turn(
                 file_number, conv_id, user_text=message, provider=provider,

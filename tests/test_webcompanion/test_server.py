@@ -350,6 +350,7 @@ def test_chat_send_starts_turn_and_redirects(client, monkeypatch):
         id = "c1"; name = "T"; provider = "Gemini"; model = "gemini-3.5-flash"
         messages = []
     monkeypatch.setattr(chat_mod, "get_conversation", lambda fn, cid: _Conv())
+    monkeypatch.setattr(chat_mod, "_persist_model_choice", lambda *a, **k: None)
     started = {}
     def fake_start(self, fn, cid, **kw):
         started.update(kw); started["cid"] = cid; return "turn1"

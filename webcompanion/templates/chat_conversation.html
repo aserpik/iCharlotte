@@ -27,6 +27,14 @@ const timer = setInterval(async () => {
 </script>
 {% endif %}
 <form method="post" action="/case/{{ case.file_number }}/chat/{{ conv.id }}/send" class="card">
+ <label>Model
+  <select name="model" {% if turn_id %}disabled{% endif %}>
+  {% for m in models %}
+   <option value="{{ m.model }}" data-provider="{{ m.provider }}"
+     {% if m.model == conv.model %}selected{% endif %}>{{ m.label }}</option>
+  {% endfor %}
+  </select></label>
+ <input type="hidden" name="provider" value="{{ conv.provider }}">
  <textarea name="message" rows="4" placeholder="Ask about this case..." {% if turn_id %}disabled{% endif %}></textarea>
  <button class="btn" type="submit" {% if turn_id %}disabled{% endif %}>Send</button>
 </form>

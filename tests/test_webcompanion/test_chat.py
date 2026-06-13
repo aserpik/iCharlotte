@@ -148,3 +148,11 @@ def test_conversation_frees_after_successful_turn(data_dir, monkeypatch):
     _wait_turn(mgr, t2, "done")
     conv = chat.get_conversation("9999", conv_id)
     assert [m.role for m in conv.messages] == ["user", "assistant", "user", "assistant"]
+
+
+def test_persist_model_choice_updates_conversation(data_dir):
+    conv_id = chat.create_conversation("9999")  # defaults Gemini/flash
+    chat._persist_model_choice("9999", conv_id, "Claude",
+                               "claude-sonnet-4-20250514")
+    conv = chat.get_conversation("9999", conv_id)
+    assert conv.provider == "Claude" and conv.model == "claude-sonnet-4-20250514"

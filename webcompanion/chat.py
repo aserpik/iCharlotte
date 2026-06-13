@@ -43,6 +43,12 @@ def append_message(file_number: str, conv_id: str, *, role: str, content: str,
     ChatPersistence(file_number).add_message(conv_id, msg)
 
 
+def _persist_model_choice(file_number: str, conv_id: str, provider: str,
+                          model: str) -> None:
+    ChatPersistence(file_number).update_conversation(
+        conv_id, provider=provider, model=model)
+
+
 def _case_root(file_number: str) -> str:
     """Case folder path from the master DB (for resolving attachments)."""
     from .cases import get_case
