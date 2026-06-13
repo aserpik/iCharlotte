@@ -110,7 +110,48 @@ def create_app(manager: JobManager) -> FastAPI:
 
 # Filled in by Tasks 9-11. Keep these stubs so Task 8 imports cleanly.
 def _register_job_routes(app, manager, templates):
-    pass
+    import os
+
+    def _render(name, request, **ctx):
+        return templates.TemplateResponse(name, {"request": request, **ctx})
+
+    @app.get("/job/{job_id}", response_class=HTMLResponse)
+    def job_page(request: Request, job_id: str):
+        job = manager.store.get(job_id)
+        if job is None:
+            return HTMLResponse("Job not found", status_code=404)
+        task = T.TASKS.get(job.task_id)
+        return _render("job.html", request, job=job, task=task)
+
+    @app.get("/api/job/{job_id}")
+    def job_state(job_id: str):
+        job = manager.store.get(job_id)
+        if job is None:
+            return JSONResponse({"error": "not found"}, status_code=404)
+        return JSONResponse({
+            "state": job.state,
+            "progress": job.progress,
+            "log": job.log[-50:],
+            "has_output": bool(job.output_path),
+            "error": job.error,
+        })
+
+    @app.post("/job/{job_id}/cancel")
+    def cancel_job(job_id: str):
+        manager.cancel(job_id)
+        return RedirectResponse(f"/job/{job_id}", status_code=303)
+
+    @app.get("/job/{job_id}/output")
+    def job_output(job_id: str):
+        job = manager.store.get(job_id)
+        if job is None or not job.output_path \
+                or not os.path.isfile(job.output_path):
+            return HTMLResponse("Output not found", status_code=404)
+        return FileResponse(
+            job.output_path,
+            media_type=_DOCX_MEDIA_TYPE,
+            filename=os.path.basename(job.output_path),
+        )
 
 
 def _register_depo_prep_routes(app, manager, templates):

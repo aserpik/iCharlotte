@@ -80,3 +80,54 @@ def test_start_submits_job_and_redirects(client, monkeypatch):
     assert job.task_id == "summarize_documents"
     assert job.files[0].endswith("doc.pdf")
     assert r.headers["location"] == f"/job/{job.id}"
+
+
+def _make_job(client, state=J.RUNNING, **kw):
+    from webcompanion.jobs import new_job
+    job = new_job("summarize_documents", "E:/case", "9999", ["E:/case/d.pdf"])
+    job.state = state
+    for k, v in kw.items():
+        setattr(job, k, v)
+    client.manager.store.add(job)
+    return job
+
+
+def test_job_page_renders(client):
+    job = _make_job(client, progress=40)
+    r = client.get(f"/job/{job.id}")
+    assert r.status_code == 200 and "Summarize Documents" in r.text
+
+
+def test_job_page_404(client):
+    assert client.get("/job/nope").status_code == 404
+
+
+def test_job_state_api(client):
+    job = _make_job(client, progress=55)
+    job.add_log("hello")
+    r = client.get(f"/api/job/{job.id}")
+    body = r.json()
+    assert body["state"] == "running" and body["progress"] == 55
+    assert body["log"][-1] == "hello" and body["has_output"] is False
+
+
+def test_cancel_route(client):
+    job = _make_job(client, state=J.QUEUED)
+    r = client.post(f"/job/{job.id}/cancel", follow_redirects=False)
+    assert r.status_code == 303
+    assert client.manager.store.get(job.id).state == J.CANCELLED
+
+
+def test_output_download(client, tmp_path):
+    docx = tmp_path / "result.docx"
+    docx.write_bytes(b"PK fake docx")
+    job = _make_job(client, state=J.DONE, output_path=str(docx))
+    r = client.get(f"/job/{job.id}/output")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith(
+        "application/vnd.openxmlformats")
+
+
+def test_output_missing_file_404(client):
+    job = _make_job(client, state=J.DONE, output_path="E:/nope/gone.docx")
+    assert client.get(f"/job/{job.id}/output").status_code == 404
