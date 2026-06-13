@@ -156,3 +156,36 @@ def test_persist_model_choice_updates_conversation(data_dir):
                                "claude-sonnet-4-20250514")
     conv = chat.get_conversation("9999", conv_id)
     assert conv.provider == "Claude" and conv.model == "claude-sonnet-4-20250514"
+
+
+def test_extract_context_concatenates_and_caps(data_dir, monkeypatch, tmp_path):
+    f1 = tmp_path / "a.txt"; f1.write_text("AAA", encoding="utf-8")
+    f2 = tmp_path / "b.txt"; f2.write_text("BBB", encoding="utf-8")
+
+    class _Res:
+        def __init__(self, text): self.text = text; self.error = ""
+    monkeypatch.setattr(chatmod.DocumentProcessor, "extract_text",
+                        lambda self, p, ocr_enabled=True: _Res(open(p, encoding="utf-8").read()))
+    mgr = chatmod.ChatTurnManager()
+    text = mgr._extract_context("t", str(tmp_path), ["a.txt", "b.txt"])
+    assert "AAA" in text and "BBB" in text
+    assert len(text) <= chatmod._CONTEXT_CHAR_CAP
+
+
+def test_extract_context_skips_failed_file(data_dir, monkeypatch, tmp_path):
+    (tmp_path / "ok.txt").write_text("OK", encoding="utf-8")
+    class _Res:
+        def __init__(self, text, error=""): self.text = text; self.error = error
+    def fake_extract(self, p, ocr_enabled=True):
+        if p.endswith("bad.txt"):
+            return _Res("", "boom")
+        return _Res("OK")
+    monkeypatch.setattr(chatmod.DocumentProcessor, "extract_text", fake_extract)
+    mgr = chatmod.ChatTurnManager()
+    text = mgr._extract_context("t", str(tmp_path), ["ok.txt", "bad.txt"])
+    assert "OK" in text  # bad file skipped, no raise
+
+
+def test_extract_context_empty_when_none(data_dir):
+    mgr = chatmod.ChatTurnManager()
+    assert mgr._extract_context("t", "/case", []) == ""

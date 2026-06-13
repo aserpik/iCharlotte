@@ -12,6 +12,8 @@ from typing import Dict, List, Optional
 from icharlotte_core.chat.persistence import ChatPersistence
 from icharlotte_core.chat.models import Conversation, Message
 from icharlotte_core.llm import LLMHandler
+from icharlotte_core.document_processor import DocumentProcessor
+from .cases import safe_resolve
 
 DEFAULT_SYSTEM_PROMPT = (
     "You are a helpful legal assistant. Do not provide any disclaimers about "
@@ -167,9 +169,29 @@ class ChatTurnManager:
             with self._lock:
                 self._busy_convs.discard(conv_id)
 
-    # Stubs — implemented in Tasks 5 (extract) and 6 (research).
     def _extract_context(self, turn_id, case_root, attach_rel_files) -> str:
-        return ""
+        if not attach_rel_files:
+            return ""
+        processor = DocumentProcessor()
+        parts: list = []
+        total = 0
+        for rel in attach_rel_files:
+            try:
+                abs_path = str(safe_resolve(case_root, rel))
+            except ValueError:
+                self._log(turn_id, f"Skipped (invalid path): {rel}")
+                continue
+            result = processor.extract_text(abs_path, ocr_enabled=False)
+            if getattr(result, "error", "") or not result.text:
+                self._log(turn_id, f"Skipped (no text): {rel}")
+                continue
+            chunk = f"--- {rel} ---\n{result.text}"
+            parts.append(chunk)
+            total += len(chunk)
+            self._log(turn_id, f"Attached: {rel}")
+            if total >= _CONTEXT_CHAR_CAP:
+                break
+        return "\n\n".join(parts)[:_CONTEXT_CHAR_CAP]
 
     def _augmented_system_prompt(self, turn_id, provider, model, user_text,
                                  context_text, research_on) -> str:

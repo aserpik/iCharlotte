@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Attach files</h1>
+<div class="crumb"><a href="/case/{{ case.file_number }}/chat/{{ conv_id }}/attach?path=">root</a></div>
+{% for d in dirs %}
+<div class="card"><a href="/case/{{ case.file_number }}/chat/{{ conv_id }}/attach?path={{ ((path ~ '/' ~ d) if path else d) | urlencode }}">&#128193; {{ d }}</a></div>
+{% endfor %}
+<form method="post" action="/case/{{ case.file_number }}/chat/{{ conv_id }}/send">
+{% for f in files %}
+<div class="card"><label class="row">
+ <input type="checkbox" name="attach" value="{{ (path ~ '/' ~ f) if path else f }}"> {{ f }}
+</label></div>
+{% endfor %}
+<label>Message <textarea name="message" rows="3" placeholder="Ask about these files..."></textarea></label>
+<button class="btn" type="submit">Send with attachments</button>
+</form>
+{% endblock %}

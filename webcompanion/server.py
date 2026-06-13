@@ -175,6 +175,21 @@ def _register_chat_routes(app, templates):
             f"/case/{file_number}/chat/{conv_id}?turn={turn_id}",
             status_code=303)
 
+    @app.get("/case/{file_number}/chat/{conv_id}/attach", response_class=HTMLResponse)
+    def chat_attach(request: Request, file_number: str, conv_id: str,
+                    path: str = None):
+        case = cases.get_case(file_number)
+        if case is None:
+            return HTMLResponse("Case not found", status_code=404)
+        rel = path or ""
+        try:
+            dirs, files = cases.browse(case["case_path"], rel,
+                                       (".pdf", ".docx", ".doc", ".txt"))
+        except ValueError:
+            return HTMLResponse("Invalid path", status_code=400)
+        return _render("chat_attach.html", request, case=case, conv_id=conv_id,
+                       path=rel, dirs=dirs, files=files)
+
     @app.get("/api/chat/{conv_id}/turn/{turn_id}")
     def chat_turn_status(conv_id: str, turn_id: str):
         t = _CHAT_MANAGER.get_turn(turn_id)
