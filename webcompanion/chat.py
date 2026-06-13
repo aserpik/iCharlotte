@@ -13,6 +13,8 @@ from icharlotte_core.chat.persistence import ChatPersistence
 from icharlotte_core.chat.models import Conversation, Message
 from icharlotte_core.llm import LLMHandler
 from icharlotte_core.document_processor import DocumentProcessor
+from icharlotte_core.chat.legal_research import (
+    ChatLegalResearchService, ChatResearchSettings)
 from .cases import safe_resolve
 
 DEFAULT_SYSTEM_PROMPT = (
@@ -195,4 +197,24 @@ class ChatTurnManager:
 
     def _augmented_system_prompt(self, turn_id, provider, model, user_text,
                                  context_text, research_on) -> str:
-        return DEFAULT_SYSTEM_PROMPT
+        if not research_on:
+            return DEFAULT_SYSTEM_PROMPT
+
+        def llm_callback(system_prompt, user_prompt):
+            return LLMHandler.generate(
+                provider=provider, model=model, system_prompt=system_prompt,
+                user_prompt=user_prompt, file_contents="",
+                settings={"stream": False, "temperature": 0.2})
+
+        try:
+            service = ChatLegalResearchService.from_environment(
+                llm_callback=llm_callback)
+            packet = service.research(
+                user_text=user_text,
+                context_text=context_text[:_CONTEXT_CHAR_CAP] if context_text else "",
+                settings=ChatResearchSettings.default(),
+                status_callback=lambda msg: self._log(turn_id, str(msg)))
+            return packet.build_augmented_system_prompt(DEFAULT_SYSTEM_PROMPT)
+        except Exception as exc:  # noqa: BLE001 — research is best-effort
+            self._log(turn_id, f"Legal research failed ({exc}); answering without it.")
+            return DEFAULT_SYSTEM_PROMPT

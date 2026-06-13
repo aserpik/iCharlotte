@@ -36,6 +36,7 @@ const timer = setInterval(async () => {
   </select></label>
  <input type="hidden" name="provider" value="{{ conv.provider }}">
  <textarea name="message" rows="4" placeholder="Ask about this case..." {% if turn_id %}disabled{% endif %}></textarea>
+ <label class="row"><input type="checkbox" name="research" {% if turn_id %}disabled{% endif %}> Run legal research</label>
  <button class="btn" type="submit" {% if turn_id %}disabled{% endif %}>Send</button>
  <a href="/case/{{ case.file_number }}/chat/{{ conv.id }}/attach">&#128206; Attach files instead</a>
 </form>

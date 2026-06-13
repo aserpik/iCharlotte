@@ -189,3 +189,41 @@ def test_extract_context_skips_failed_file(data_dir, monkeypatch, tmp_path):
 def test_extract_context_empty_when_none(data_dir):
     mgr = chatmod.ChatTurnManager()
     assert mgr._extract_context("t", "/case", []) == ""
+
+
+def test_research_off_returns_base_prompt(data_dir):
+    mgr = chatmod.ChatTurnManager()
+    out = mgr._augmented_system_prompt("t", "Gemini", "m", "q", "", False)
+    assert out == chatmod.DEFAULT_SYSTEM_PROMPT
+
+
+def test_research_on_augments_prompt(data_dir, monkeypatch):
+    class _Packet:
+        def build_augmented_system_prompt(self, base):
+            return base + "\n\n[AUTHORITY]"
+    class _Service:
+        @classmethod
+        def from_environment(cls, *, llm_callback, courtlistener_token=None):
+            return cls()
+        def research(self, *, user_text, context_text, settings,
+                     status_callback=None, debug_callback=None):
+            if status_callback:
+                status_callback("searching authority")
+            return _Packet()
+    monkeypatch.setattr(chatmod, "ChatLegalResearchService", _Service)
+    mgr = chatmod.ChatTurnManager()
+    out = mgr._augmented_system_prompt("t", "Gemini", "m", "q", "ctx", True)
+    assert out.endswith("[AUTHORITY]")
+
+
+def test_research_failure_falls_back_to_base(data_dir, monkeypatch):
+    class _Service:
+        @classmethod
+        def from_environment(cls, *, llm_callback, courtlistener_token=None):
+            return cls()
+        def research(self, **kw):
+            raise RuntimeError("research broke")
+    monkeypatch.setattr(chatmod, "ChatLegalResearchService", _Service)
+    mgr = chatmod.ChatTurnManager()
+    out = mgr._augmented_system_prompt("t", "Gemini", "m", "q", "ctx", True)
+    assert out == chatmod.DEFAULT_SYSTEM_PROMPT
