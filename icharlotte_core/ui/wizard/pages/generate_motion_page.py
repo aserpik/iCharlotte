@@ -85,6 +85,7 @@ from icharlotte_core.motion_generation.drafter import (
     identify_key_legal_issues,
     insert_researched_citations,
 )
+from icharlotte_core.motion_drafting import style_samples as motion_db_style_samples
 from icharlotte_core.firm_briefs.motion_taxonomy import normalize_motion_type
 from icharlotte_core.firm_briefs.provenance import attach_firm_provenance
 
@@ -739,17 +740,32 @@ class GenerateMotionWorker(QThread):
             exemplars = load_exemplars(self.settings.get("motion_type_id") or "")
             if exemplars:
                 self.progress.emit(f"Using {len(exemplars)} style sample(s) for this motion type.")
-            firm_style = _firm_style_exemplars(firm_motion_type, "moving", metadata)
+            motion_database_style = motion_db_style_samples.load_motion_database_style_samples(
+                self.settings.get("motion_type_source_path") or ""
+            )
+            if motion_database_style:
+                self.progress.emit(
+                    f"Using {len(motion_database_style)} Motion Database style sample(s)."
+                )
+            style_side = "reply" if self.settings.get("draft_kind") == "reply" else "moving"
+            firm_style_side = style_side
+            firm_style = _firm_style_exemplars(firm_motion_type, style_side, metadata)
+            if not firm_style and style_side == "reply":
+                firm_style_side = "moving"
+                firm_style = _firm_style_exemplars(firm_motion_type, "moving", metadata)
             if firm_style:
                 self.progress.emit(f"Using {len(firm_style)} firm-library style sample(s).")
+            selected_exemplars = (motion_database_style + firm_style + exemplars)[:3]
             diagnostics["style"].update(
                 {
                     "configured_samples": len(exemplars),
                     "firm_samples": len(firm_style),
-                    "used_samples": min(3, len(exemplars) + len(firm_style)),
+                    "firm_style_side": firm_style_side,
+                    "motion_database_samples": len(motion_database_style),
+                    "used_samples": len(selected_exemplars),
                 }
             )
-            exemplars = (firm_style + exemplars)[:3]
+            exemplars = selected_exemplars
             finish_phase("style")
 
             self.progress.emit("Drafting motion memorandum...")

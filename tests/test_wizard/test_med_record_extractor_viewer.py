@@ -330,6 +330,102 @@ def test_selection_page_uses_brief_synopsis_and_chronology_row_tabs(qtbot):
         assert page.table_panel.count() == 2
 
 
+def test_ctrl_f_opens_find_box_and_searches_synopsis_entries(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    source = _build_chronology_docx(tmp_path / "chronology.docx")
+    page = MedChronologySelectionPage(str(tmp_path), "5800.013", str(source))
+    qtbot.addWidget(page)
+    page.show()
+    qtbot.waitExposed(page)
+
+    assert not page.find_bar.isVisible()
+
+    qtbot.keyClick(page, Qt.Key.Key_F, modifier=Qt.KeyboardModifier.ControlModifier)
+
+    assert page.find_bar.isVisible()
+    qtbot.waitUntil(page.find_input.hasFocus, timeout=500)
+
+    page.find_input.setText("x-ray")
+
+    assert page.synopsis_panel.currentRow() == 1
+    assert page.find_status_label.text() == "1 of 1"
+
+
+def test_find_highlights_matching_synopsis_text_and_clears_on_close(qtbot, tmp_path):
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+        search_highlight_html,
+    )
+
+    source = _build_chronology_docx(tmp_path / "chronology.docx")
+    page = MedChronologySelectionPage(str(tmp_path), "5800.013", str(source))
+    qtbot.addWidget(page)
+    page.show()
+    qtbot.waitExposed(page)
+
+    qtbot.keyClick(page, Qt.Key.Key_F, modifier=Qt.KeyboardModifier.ControlModifier)
+    page.find_input.setText("x-ray")
+
+    assert page.synopsis_panel.find_highlight_query == "x-ray"
+    assert page.synopsis_panel.find_highlight_rows == {1}
+    assert page.synopsis_panel.active_find_highlight_row == 1
+    assert page.table_panel.find_highlight_query == ""
+    assert "background-color" in search_highlight_html(
+        page.synopsis_panel.item(1).text(),
+        "x-ray",
+        active=True,
+    )
+
+    qtbot.keyPress(page.find_input, Qt.Key.Key_Escape)
+
+    assert page.synopsis_panel.find_highlight_query == ""
+    assert page.synopsis_panel.find_highlight_rows == set()
+    assert page.synopsis_panel.active_find_highlight_row == -1
+
+
+def test_find_searches_active_chronology_row_text_and_cycles_matches(
+    qtbot,
+    tmp_path,
+):
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    source = _build_chronology_docx(tmp_path / "chronology.docx")
+    page = MedChronologySelectionPage(str(tmp_path), "5800.013", str(source))
+    qtbot.addWidget(page)
+    page.show()
+    qtbot.waitExposed(page)
+    page.tab_widget.setCurrentIndex(1)
+
+    qtbot.keyClick(page, Qt.Key.Key_F, modifier=Qt.KeyboardModifier.ControlModifier)
+    page.find_input.setText("Kaiser Permanente")
+
+    assert page.table_panel.currentRow() == 0
+    assert page.find_status_label.text() == "1 of 2"
+    assert page.table_panel.find_highlight_query == "kaiser permanente"
+    assert page.table_panel.find_highlight_rows == {0, 1}
+    assert page.table_panel.active_find_highlight_row == 0
+    assert page.selected_count_label.text() == "0 rows selected"
+    assert all(not page.is_row_checked(row.id) for row in page.document.rows)
+
+    qtbot.keyPress(page.find_input, Qt.Key.Key_Return)
+
+    assert page.table_panel.currentRow() == 1
+    assert page.find_status_label.text() == "2 of 2"
+    assert page.table_panel.active_find_highlight_row == 1
+    assert page.selected_count_label.text() == "0 rows selected"
+    assert all(not page.is_row_checked(row.id) for row in page.document.rows)
+
+    page.find_input.setText("Kaiser Permanente James")
+
+    assert page.table_panel.currentRow() == 1
+    assert page.find_status_label.text() == "1 of 1"
+
+
 def test_clicking_synopsis_text_toggles_entry_selection(qtbot):
     from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
         MedChronologySelectionPage,
@@ -963,7 +1059,7 @@ def test_failed_synopsis_match_updates_visible_status(qtbot):
         assert page.match_status_label.isHidden() is False
 
 
-def test_build_med_extractor_tab_uses_docx_picker_and_summary_folder(qtbot, tmp_path):
+def test_build_med_extractor_tab_opens_blank_page_without_picker(qtbot, tmp_path):
     from icharlotte_core.ui.wizard.in_process_task_tab import build_med_extractor_tab
     from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
         MedChronologySelectionPage,
@@ -972,11 +1068,10 @@ def test_build_med_extractor_tab_uses_docx_picker_and_summary_folder(qtbot, tmp_
 
     summary_dir = tmp_path / "RECORDS" / "Medical Summary - DO NOT PRODUCE"
     summary_dir.mkdir(parents=True)
-    source = _build_chronology_docx(summary_dir / "chronology.docx")
 
     with patch(
         "icharlotte_core.ui.wizard.in_process_task_tab.QFileDialog.getOpenFileName",
-        return_value=(str(source), "Word Documents (*.docx)"),
+        side_effect=AssertionError("launch should not open the chronology picker"),
     ) as picker:
         tab = build_med_extractor_tab(
             get_task("med_record_extractor"),
@@ -987,40 +1082,65 @@ def test_build_med_extractor_tab_uses_docx_picker_and_summary_folder(qtbot, tmp_
 
     qtbot.addWidget(tab)
     assert isinstance(tab.settings_page, MedChronologySelectionPage)
+    assert picker.call_count == 0
+    assert tab.settings_page.chronology_path == ""
+    assert tab.settings_page.select_chronology_btn.text() == "Please select medical chronology"
+    assert not tab.settings_page.empty_state.isHidden()
+    assert tab.settings_page.preview_splitter.isHidden()
+
+
+def test_blank_selection_page_button_loads_chronology_from_summary_folder(
+    qtbot,
+    tmp_path,
+):
+    from icharlotte_core.ui.wizard.pages.med_record_extractor_page import (
+        MedChronologySelectionPage,
+    )
+
+    summary_dir = tmp_path / "RECORDS" / "Medical Summary - DO NOT PRODUCE"
+    summary_dir.mkdir(parents=True)
+    source = _build_chronology_docx(summary_dir / "chronology.docx")
+    page = MedChronologySelectionPage(str(tmp_path), "5800.013", "")
+    qtbot.addWidget(page)
+
+    with patch(
+        "icharlotte_core.ui.wizard.pages.med_record_extractor_page.QFileDialog.getOpenFileName",
+        return_value=(str(source), "Word Documents (*.docx)"),
+    ) as picker:
+        page.select_chronology_btn.click()
+
     assert picker.call_args.args[2] == str(summary_dir)
+    assert page.chronology_path == str(source)
+    assert page.to_dict()["chronology_path"] == str(source)
+    assert page.synopsis_panel.count() == 2
+    assert page.table_panel.count() == 2
+    assert page.empty_state.isHidden()
+    assert not page.preview_splitter.isHidden()
 
 
 def test_build_med_extractor_tab_hides_redundant_task_header(qtbot, tmp_path):
     from icharlotte_core.ui.wizard.in_process_task_tab import build_med_extractor_tab
     from icharlotte_core.ui.wizard.registry import get_task
 
-    summary_dir = tmp_path / "RECORDS" / "Medical Summary - DO NOT PRODUCE"
-    summary_dir.mkdir(parents=True)
-    source = _build_chronology_docx(summary_dir / "chronology.docx")
-
-    with patch(
-        "icharlotte_core.ui.wizard.in_process_task_tab.QFileDialog.getOpenFileName",
-        return_value=(str(source), "Word Documents (*.docx)"),
-    ):
-        tab = build_med_extractor_tab(
-            get_task("med_record_extractor"),
-            case_path=str(tmp_path),
-            file_number="5800.013",
-            parent=None,
-        )
+    tab = build_med_extractor_tab(
+        get_task("med_record_extractor"),
+        case_path=str(tmp_path),
+        file_number="5800.013",
+        parent=None,
+    )
 
     qtbot.addWidget(tab)
 
     assert tab.header.isHidden()
 
 
-def test_build_med_extractor_tab_cancel_returns_none(tmp_path):
+def test_build_med_extractor_tab_without_chronology_stays_blank(tmp_path):
     from icharlotte_core.ui.wizard.in_process_task_tab import build_med_extractor_tab
     from icharlotte_core.ui.wizard.registry import get_task
 
     with patch(
         "icharlotte_core.ui.wizard.in_process_task_tab.QFileDialog.getOpenFileName",
-        return_value=("", ""),
+        side_effect=AssertionError("launch should not open the chronology picker"),
     ):
         tab = build_med_extractor_tab(
             get_task("med_record_extractor"),
@@ -1029,7 +1149,8 @@ def test_build_med_extractor_tab_cancel_returns_none(tmp_path):
             parent=None,
         )
 
-    assert tab is None
+    assert tab is not None
+    assert tab.settings_page.chronology_path == ""
 
 
 def test_selection_page_to_dict_and_from_dict_restore_selection(qtbot, tmp_path):

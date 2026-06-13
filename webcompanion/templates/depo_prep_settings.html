@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ task.glyph }} Depo Prep &mdash; Settings</h1>
+<form method="post" action="/case/{{ case.file_number }}/task/depo_prep/submit" class="card">
+{% for rf in rel_files %}
+ <input type="hidden" name="files" value="{{ rf }}">
+{% endfor %}
+<p><b>Sources:</b> {{ rel_files | join(', ') }}</p>
+<label>Deponent name
+ <input type="text" name="deponent_name" required></label>
+<label>Deponent role
+ <input type="text" name="deponent_role" placeholder="e.g. Treating physician"></label>
+<label>Style
+ <select name="style">
+ {% for key, label in styles %}
+  <option value="{{ key }}">{{ label }}</option>
+ {% endfor %}
+ </select></label>
+<label>Strategy notes
+ <textarea name="free_text_notes" rows="4"
+  placeholder="Case theory, topics to emphasize, key admissions to extract..."></textarea></label>
+<label class="row"><input type="checkbox" name="flag_strategic" checked> Strategic notes per topic</label>
+<label class="row"><input type="checkbox" name="flag_source_facts" checked> Source facts per topic</label>
+<label class="row"><input type="checkbox" name="flag_impeachment"> Impeachment hooks</label>
+<label class="row"><input type="checkbox" name="flag_objection"> Objection alternatives</label>
+<button class="btn" type="submit">Analyze sources</button>
+</form>
+{% endblock %}

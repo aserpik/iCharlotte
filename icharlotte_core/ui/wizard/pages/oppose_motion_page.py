@@ -44,6 +44,7 @@ from icharlotte_core.opposition.verifier import (
     enrich_with_pool_signals,
     pool_membership_check,
 )
+from icharlotte_core.motion_drafting import style_samples as motion_db_style_samples
 from icharlotte_core.firm_briefs.motion_taxonomy import normalize_motion_type
 from icharlotte_core.firm_briefs.provenance import attach_firm_provenance
 from icharlotte_core.ui.wizard.pages._motion_research_support import (
@@ -723,11 +724,18 @@ class OpposeMotionWorker(QThread):
                 self.progress.emit(f"  Using {len(exemplar_texts)} style exemplar(s).")
             else:
                 self.progress.emit("  No matching style exemplars; using default voice.")
+            motion_database_style = motion_db_style_samples.load_motion_database_style_samples(
+                self.settings.get("motion_type_source_path") or ""
+            )
+            if motion_database_style:
+                self.progress.emit(
+                    f"  + {len(motion_database_style)} Motion Database style sample(s)."
+                )
             firm_motion_type = normalize_motion_type(metadata.motion_type)
             firm_style = _firm_style_exemplars(firm_motion_type, "opposition", metadata)
             if firm_style:
                 self.progress.emit(f"  + {len(firm_style)} firm-library style sample(s).")
-            exemplar_texts = (firm_style + exemplar_texts)[:3]
+            exemplar_texts = (motion_database_style + firm_style + exemplar_texts)[:3]
 
             # Retrieval-first grounding: research real California authority for
             # each principal argument before drafting, so the drafter cites only

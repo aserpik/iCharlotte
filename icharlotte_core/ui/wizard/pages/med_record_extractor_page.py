@@ -1,22 +1,45 @@
 """Structured chronology viewer for Med Record Extractor."""
 from __future__ import annotations
 
+import html
+from dataclasses import dataclass
 import os
+import re
 
-from PySide6.QtCore import QRect, QSettings, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QBrush, QColor
+from PySide6.QtCore import (
+    QEvent,
+    QItemSelectionModel,
+    QRect,
+    QSettings,
+    QSize,
+    Qt,
+    QTimer,
+    Signal,
+)
+from PySide6.QtGui import (
+    QAbstractTextDocumentLayout,
+    QBrush,
+    QColor,
+    QShortcut,
+    QTextDocument,
+)
 from PySide6.QtWidgets import (
     QAbstractItemView,
+    QApplication,
     QFrame,
+    QFileDialog,
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
     QListView,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
     QPushButton,
     QSplitter,
+    QStyle,
+    QStyleOptionViewItem,
     QTableWidget,
     QTableWidgetItem,
     QStyledItemDelegate,
@@ -37,13 +60,145 @@ from icharlotte_core.med_record_chronology import (
 )
 from icharlotte_core.med_record_extractor import _build_file_index, _lookup_file
 from icharlotte_core.ui.wizard import theme
+from icharlotte_core.ui.wizard.file_picker import (
+    find_medical_summary_folder,
+    resolve_default_folder,
+)
 
 
 TABLE_COLUMN_WIDTHS_KEY = "wizard/med_record_extractor/chronology_table_column_widths"
 DEFAULT_TABLE_COLUMN_WIDTHS = [56, 96, 240, 260, 520, 180]
 SELECTION_HIGHLIGHT_COLOR = "#fff3a3"
 SELECTION_HIGHLIGHT_BORDER_COLOR = "#d1a500"
+SEARCH_HIGHLIGHT_COLOR = "#ffeb3b"
+ACTIVE_SEARCH_HIGHLIGHT_COLOR = "#ffb74d"
 _SELECTION_HIGHLIGHT_BRUSH = QBrush(QColor(SELECTION_HIGHLIGHT_COLOR))
+
+
+@dataclass(frozen=True)
+class _SearchMatch:
+    tab_index: int
+    row: int
+    column: int = 0
+
+
+def _normalize_search_text(text: str) -> str:
+    return " ".join(str(text or "").casefold().split())
+
+
+def _html_preserve_text(text: str) -> str:
+    return html.escape(text).replace("\n", "<br/>")
+
+
+def _search_ranges(
+    text: str,
+    query: str,
+    *,
+    highlight_terms: bool,
+) -> list[tuple[int, int]]:
+    text = str(text or "")
+    query = _normalize_search_text(query)
+    terms = query.split()
+    if not text or not terms:
+        return []
+
+    phrase_pattern = r"\s+".join(re.escape(term) for term in terms)
+    ranges = [
+        (match.start(), match.end())
+        for match in re.finditer(phrase_pattern, text, flags=re.IGNORECASE)
+    ]
+    if ranges or not highlight_terms:
+        return ranges
+
+    term_ranges: list[tuple[int, int]] = []
+    for term in terms:
+        term_ranges.extend(
+            (match.start(), match.end())
+            for match in re.finditer(re.escape(term), text, flags=re.IGNORECASE)
+        )
+    return _merge_ranges(term_ranges)
+
+
+def _merge_ranges(ranges: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    merged: list[tuple[int, int]] = []
+    for start, end in sorted(ranges):
+        if start >= end:
+            continue
+        if merged and start <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return merged
+
+
+def search_highlight_html(
+    text: str,
+    query: str,
+    *,
+    active: bool = False,
+    highlight_terms: bool = False,
+) -> str:
+    """Return escaped HTML with visible find-result spans around query matches."""
+
+    text = str(text or "")
+    ranges = _search_ranges(text, query, highlight_terms=highlight_terms)
+    if not ranges:
+        return _html_preserve_text(text)
+
+    background = ACTIVE_SEARCH_HIGHLIGHT_COLOR if active else SEARCH_HIGHLIGHT_COLOR
+    parts: list[str] = []
+    cursor = 0
+    for start, end in ranges:
+        parts.append(_html_preserve_text(text[cursor:start]))
+        parts.append(
+            f'<span style="background-color: {background}; color: #111111;">'
+            f"{_html_preserve_text(text[start:end])}</span>"
+        )
+        cursor = end
+    parts.append(_html_preserve_text(text[cursor:]))
+    return "".join(parts)
+
+
+def _paint_highlighted_item(
+    delegate: QStyledItemDelegate,
+    painter,
+    option,
+    index,
+    highlighted_html: str,
+) -> None:
+    view_option = QStyleOptionViewItem(option)
+    delegate.initStyleOption(view_option, index)
+    view_option.text = ""
+
+    widget = view_option.widget
+    style = widget.style() if widget is not None else QApplication.style()
+    style.drawControl(
+        QStyle.ControlElement.CE_ItemViewItem,
+        view_option,
+        painter,
+        widget,
+    )
+
+    text_rect = style.subElementRect(
+        QStyle.SubElement.SE_ItemViewItemText,
+        view_option,
+        widget,
+    )
+    if not text_rect.isValid():
+        return
+
+    document = QTextDocument()
+    document.setDefaultFont(view_option.font)
+    document.setDocumentMargin(0)
+    document.setTextWidth(text_rect.width())
+    document.setHtml(highlighted_html)
+
+    painter.save()
+    painter.translate(text_rect.topLeft())
+    context = QAbstractTextDocumentLayout.PaintContext()
+    context.palette = view_option.palette
+    document.documentLayout().draw(painter, context)
+    painter.restore()
 
 
 def _brief_synopsis_stylesheet() -> str:
@@ -97,6 +252,53 @@ class _BriefSynopsisDelegate(QStyledItemDelegate):
             painter.save()
             painter.fillRect(option.rect, QColor(SELECTION_HIGHLIGHT_COLOR))
             painter.restore()
+        panel = self.parent()
+        if (
+            isinstance(panel, BriefSynopsisPanel)
+            and index.row() in panel.find_highlight_rows
+            and panel.find_highlight_query
+        ):
+            _paint_highlighted_item(
+                self,
+                painter,
+                option,
+                index,
+                search_highlight_html(
+                    str(index.data(Qt.ItemDataRole.DisplayRole) or ""),
+                    panel.find_highlight_query,
+                    active=index.row() == panel.active_find_highlight_row,
+                ),
+            )
+            return
+        super().paint(painter, option, index)
+
+
+class _ChronologyTableDelegate(QStyledItemDelegate):
+    """Paint visible find-result marks inside chronology table cells."""
+
+    def paint(self, painter, option, index) -> None:
+        table = self.parent()
+        if (
+            isinstance(table, ChronologyTablePanel)
+            and index.column() > 0
+            and index.row() in table.find_highlight_rows
+            and table.find_highlight_query
+        ):
+            highlighted_html = search_highlight_html(
+                str(index.data(Qt.ItemDataRole.DisplayRole) or ""),
+                table.find_highlight_query,
+                active=index.row() == table.active_find_highlight_row,
+                highlight_terms=True,
+            )
+            if "background-color:" in highlighted_html:
+                _paint_highlighted_item(
+                    self,
+                    painter,
+                    option,
+                    index,
+                    highlighted_html,
+                )
+                return
         super().paint(painter, option, index)
 
 
@@ -109,6 +311,9 @@ class BriefSynopsisPanel(QListWidget):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._items_by_id: dict[str, QListWidgetItem] = {}
+        self.find_highlight_query = ""
+        self.find_highlight_rows: set[int] = set()
+        self.active_find_highlight_row = -1
         self.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         self.setWordWrap(True)
         self.setTextElideMode(Qt.TextElideMode.ElideNone)
@@ -123,6 +328,7 @@ class BriefSynopsisPanel(QListWidget):
         self.blockSignals(True)
         self.clear()
         self._items_by_id.clear()
+        self.set_find_highlight("", set(), -1)
         for paragraph in paragraphs:
             item = QListWidgetItem(paragraph.text)
             item.setData(Qt.ItemDataRole.UserRole, paragraph.id)
@@ -138,6 +344,17 @@ class BriefSynopsisPanel(QListWidget):
             self._items_by_id[paragraph.id] = item
         self.blockSignals(False)
         self._refresh_item_sizes()
+
+    def set_find_highlight(
+        self,
+        query: str,
+        rows: set[int],
+        active_row: int,
+    ) -> None:
+        self.find_highlight_query = query
+        self.find_highlight_rows = set(rows)
+        self.active_find_highlight_row = active_row
+        self.viewport().update()
 
     def set_paragraph_checked(self, paragraph_id: str, checked: bool) -> None:
         item = self._items_by_id[paragraph_id]
@@ -221,6 +438,9 @@ class ChronologyTablePanel(QTableWidget):
         self._rows_by_id: dict[str, int] = {}
         self._ids_by_row: dict[int, str] = {}
         self._extractable_by_id: dict[str, bool] = {}
+        self.find_highlight_query = ""
+        self.find_highlight_rows: set[int] = set()
+        self.active_find_highlight_row = -1
         self.setColumnCount(6)
         self.setHorizontalHeaderLabels([
             "Select",
@@ -234,6 +454,7 @@ class ChronologyTablePanel(QTableWidget):
         self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.setAlternatingRowColors(True)
+        self.setItemDelegate(_ChronologyTableDelegate(self))
         self.verticalHeader().setVisible(False)
         self.horizontalHeader().setStretchLastSection(False)
         for column in range(self.columnCount()):
@@ -282,6 +503,7 @@ class ChronologyTablePanel(QTableWidget):
         self._rows_by_id.clear()
         self._ids_by_row.clear()
         self._extractable_by_id.clear()
+        self.set_find_highlight("", set(), -1)
         for index, row in enumerate(rows):
             self._rows_by_id[row.id] = index
             self._ids_by_row[index] = row.id
@@ -300,6 +522,17 @@ class ChronologyTablePanel(QTableWidget):
             self._apply_row_highlight(index, False)
         self.resizeRowsToContents()
         self.blockSignals(False)
+
+    def set_find_highlight(
+        self,
+        query: str,
+        rows: set[int],
+        active_row: int,
+    ) -> None:
+        self.find_highlight_query = query
+        self.find_highlight_rows = set(rows)
+        self.active_find_highlight_row = active_row
+        self.viewport().update()
 
     def set_row_checked(self, row_id: str, checked: bool, *, emit: bool = True) -> None:
         row_index = self._rows_by_id[row_id]
@@ -395,8 +628,8 @@ class MedChronologySelectionPage(QWidget):
         super().__init__(parent)
         self.case_path = case_path
         self.file_number = file_number
-        self.chronology_path = chronology_path
-        self.document = self._load_document(chronology_path)
+        self.chronology_path = os.path.normpath(chronology_path) if chronology_path else ""
+        self.document = self._load_document(self.chronology_path)
         self.selection = SelectionState()
         self._paragraphs = {paragraph.id: paragraph for paragraph in self.document.synopsis_paragraphs}
         self._rows = {row.id: row for row in self.document.rows}
@@ -407,9 +640,12 @@ class MedChronologySelectionPage(QWidget):
         self._pdf_preview_width = 420
         self._pdf_preview_target_page = 1
         self._pdf_preview_navigation_attempts = 0
+        self._find_matches: list[_SearchMatch] = []
+        self._find_index = -1
 
         self._setup_ui()
         self._refresh_extract_state()
+        self._sync_chronology_visibility()
 
     def set_paragraph_checked(self, paragraph_id: str, checked: bool) -> None:
         self.synopsis_panel.set_paragraph_checked(paragraph_id, checked)
@@ -429,6 +665,14 @@ class MedChronologySelectionPage(QWidget):
         }
 
     def from_dict(self, data: dict) -> None:
+        chronology_path = str(data.get("chronology_path") or "")
+        if chronology_path and self.case_path and not os.path.isabs(chronology_path):
+            chronology_path = os.path.join(self.case_path, chronology_path)
+        if chronology_path and os.path.normpath(chronology_path) != self.chronology_path:
+            self.load_chronology(chronology_path)
+        if not self.chronology_path:
+            return
+
         self._clear_selection()
 
         for paragraph_id in data.get("selected_paragraph_ids", []):
@@ -453,6 +697,35 @@ class MedChronologySelectionPage(QWidget):
         self._refresh_match_status()
         self._refresh_extract_state()
 
+    def load_chronology(self, chronology_path: str) -> None:
+        chronology_path = os.path.normpath(chronology_path)
+        self.chronology_path = chronology_path
+        self.document = self._load_document(chronology_path)
+        self.selection = SelectionState()
+        self._paragraphs = {
+            paragraph.id: paragraph for paragraph in self.document.synopsis_paragraphs
+        }
+        self._rows = {row.id: row for row in self.document.rows}
+        self._paragraph_match_status.clear()
+        self._file_index = None
+        self._find_matches = []
+        self._find_index = -1
+        if self.pdf_preview_viewer is not None and hasattr(self.pdf_preview_viewer, "clear"):
+            self.pdf_preview_viewer.clear()
+        self.table_panel.load_rows(self.document.rows)
+        self.synopsis_panel.load_paragraphs(self.document.synopsis_paragraphs)
+        self.tab_widget.setCurrentIndex(0)
+        self.find_bar.setVisible(False)
+        self.message_label.setText(_status_message(self.document))
+        self.message_label.setVisible(bool(self.message_label.text()))
+        self._set_match_status("")
+        self.pdf_preview_status_label.setText(
+            "Double-click a chronology entry to preview its source PDF."
+        )
+        self.pdf_preview_placeholder.setVisible(True)
+        self._refresh_extract_state()
+        self._sync_chronology_visibility()
+
     def _clear_selection(self) -> None:
         self.selection.clear()
         self._paragraph_match_status.clear()
@@ -464,6 +737,8 @@ class MedChronologySelectionPage(QWidget):
             self.table_panel.set_row_checked(row_id, False, emit=False)
 
     def _load_document(self, chronology_path: str) -> ChronologyDocument:
+        if not chronology_path:
+            return ChronologyDocument(source_path="")
         try:
             return parse_chronology_document(chronology_path)
         except Exception as exc:
@@ -497,14 +772,22 @@ class MedChronologySelectionPage(QWidget):
         self.preview_splitter = QSplitter(Qt.Orientation.Horizontal)
         layout.addWidget(self.preview_splitter, 1)
 
+        self.empty_state = self._build_empty_state()
+        layout.addWidget(self.empty_state, 1)
+
         left_pane = QWidget()
         left_layout = QVBoxLayout(left_pane)
         left_layout.setContentsMargins(0, 0, theme.SPACE_SM, 0)
         left_layout.setSpacing(theme.SPACE_SM)
 
         self.tab_widget = QTabWidget()
+        self.find_bar = self._build_find_bar()
+        self.find_bar.setVisible(False)
+        left_layout.addWidget(self.find_bar)
+
         self.tab_widget.addTab(self._build_synopsis_pane(), "Brief Synopsis")
         self.tab_widget.addTab(self._build_table_pane(), "Chronology Rows")
+        self.tab_widget.currentChanged.connect(self._on_find_scope_changed)
         left_layout.addWidget(self.tab_widget, 1)
 
         controls = QHBoxLayout()
@@ -532,6 +815,100 @@ class MedChronologySelectionPage(QWidget):
         self.preview_splitter.addWidget(self.pdf_preview_panel)
         self.preview_splitter.setSizes([900, self._pdf_preview_width])
         self.preview_splitter.setCollapsible(1, True)
+        self.find_shortcut = QShortcut("Ctrl+F", self)
+        self.find_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        self.find_shortcut.activated.connect(self._show_find_bar)
+
+    def _build_empty_state(self) -> QWidget:
+        panel = QFrame()
+        panel.setFrameShape(QFrame.Shape.NoFrame)
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addStretch(1)
+
+        self.select_chronology_btn = theme.primary_button(
+            "Please select medical chronology"
+        )
+        self.select_chronology_btn.clicked.connect(self._select_chronology_file)
+        layout.addWidget(
+            self.select_chronology_btn,
+            alignment=Qt.AlignmentFlag.AlignCenter,
+        )
+
+        layout.addStretch(1)
+        return panel
+
+    def _select_chronology_file(self) -> None:
+        start_dir = find_medical_summary_folder(self.case_path) or resolve_default_folder(
+            self.case_path,
+            ["RECORDS"],
+        )
+        chronology_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select medical chronology summary",
+            start_dir,
+            "Word Documents (*.docx)",
+        )
+        if chronology_path:
+            self.load_chronology(chronology_path)
+
+    def _sync_chronology_visibility(self) -> None:
+        has_chronology = bool(self.chronology_path)
+        self.empty_state.setVisible(not has_chronology)
+        self.preview_splitter.setVisible(has_chronology)
+        self.message_label.setVisible(
+            has_chronology and bool(self.message_label.text())
+        )
+
+    def _build_find_bar(self) -> QWidget:
+        bar = QFrame()
+        bar.setObjectName("medRecordFindBar")
+        bar.setFrameShape(QFrame.Shape.NoFrame)
+        bar.setStyleSheet(
+            f"QFrame#medRecordFindBar {{ background: #FFFFFF; border: 1px solid {theme.BORDER_LIGHT};"
+            f" border-radius: {theme.RADIUS_SM}px; }}"
+        )
+
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(8, 6, 8, 6)
+        layout.setSpacing(6)
+
+        self.find_input = QLineEdit()
+        self.find_input.setPlaceholderText("Find...")
+        self.find_input.setClearButtonEnabled(True)
+        self.find_input.textChanged.connect(self._on_find_text_changed)
+        self.find_input.installEventFilter(self)
+        layout.addWidget(self.find_input, 1)
+
+        self.find_status_label = theme.caption("")
+        self.find_status_label.setMinimumWidth(54)
+        layout.addWidget(self.find_status_label)
+
+        self.find_previous_btn = QToolButton()
+        self.find_previous_btn.setText("<")
+        self.find_previous_btn.setToolTip("Previous match")
+        self.find_previous_btn.setFixedSize(28, 24)
+        self.find_previous_btn.clicked.connect(
+            lambda: self._activate_next_find_match(backward=True)
+        )
+        layout.addWidget(self.find_previous_btn)
+
+        self.find_next_btn = QToolButton()
+        self.find_next_btn.setText(">")
+        self.find_next_btn.setToolTip("Next match")
+        self.find_next_btn.setFixedSize(28, 24)
+        self.find_next_btn.clicked.connect(self._activate_next_find_match)
+        layout.addWidget(self.find_next_btn)
+
+        self.find_close_btn = QToolButton()
+        self.find_close_btn.setText("x")
+        self.find_close_btn.setToolTip("Close find")
+        self.find_close_btn.setFixedSize(24, 24)
+        self.find_close_btn.clicked.connect(self._hide_find_bar)
+        layout.addWidget(self.find_close_btn)
+
+        self._set_find_navigation_enabled(False)
+        return bar
 
     def _build_pdf_preview_panel(self) -> QWidget:
         panel = QFrame()
@@ -606,6 +983,177 @@ class MedChronologySelectionPage(QWidget):
         self.table_panel.row_open_requested.connect(self._open_pdf_for_row_id)
         layout.addWidget(self.table_panel, 1)
         return pane
+
+    def eventFilter(self, obj, event) -> bool:
+        if (
+            obj is getattr(self, "find_input", None)
+            and event.type() == QEvent.Type.KeyPress
+        ):
+            if event.key() == Qt.Key.Key_Escape:
+                self._hide_find_bar()
+                return True
+            if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                is_shift = bool(
+                    event.modifiers() & Qt.KeyboardModifier.ShiftModifier
+                )
+                self._activate_next_find_match(backward=is_shift)
+                return True
+        return super().eventFilter(obj, event)
+
+    def keyPressEvent(self, event) -> None:
+        if (
+            event.key() == Qt.Key.Key_F
+            and event.modifiers() & Qt.KeyboardModifier.ControlModifier
+        ):
+            self._show_find_bar()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def _show_find_bar(self) -> None:
+        self.find_bar.setVisible(True)
+        self.window().activateWindow()
+        self.find_input.setFocus(Qt.FocusReason.ShortcutFocusReason)
+        self.find_input.selectAll()
+        self._refresh_find_matches(reset=True)
+
+    def _hide_find_bar(self) -> None:
+        self.find_bar.setVisible(False)
+        self._clear_find_highlights()
+        self.tab_widget.setFocus()
+
+    def _on_find_text_changed(self, _query: str) -> None:
+        self._refresh_find_matches(reset=True)
+
+    def _on_find_scope_changed(self, _index: int) -> None:
+        if self.find_bar.isVisible():
+            self._refresh_find_matches(reset=True)
+
+    def _refresh_find_matches(self, *, reset: bool) -> None:
+        query = _normalize_search_text(self.find_input.text())
+        self._find_matches = self._collect_find_matches(query)
+        if not query:
+            self._find_index = -1
+            self.find_status_label.setText("")
+            self._set_find_navigation_enabled(False)
+            self._clear_find_highlights()
+            return
+        if not self._find_matches:
+            self._find_index = -1
+            self.find_status_label.setText("No matches")
+            self._set_find_navigation_enabled(False)
+            self._clear_find_highlights()
+            return
+        if (
+            reset
+            or self._find_index < 0
+            or self._find_index >= len(self._find_matches)
+        ):
+            self._find_index = 0
+        self._activate_find_match(self._find_matches[self._find_index])
+        self._update_find_status()
+
+    def _collect_find_matches(self, query: str) -> list[_SearchMatch]:
+        if not query:
+            return []
+        if self.tab_widget.currentIndex() == 0:
+            matches: list[_SearchMatch] = []
+            for index in range(self.synopsis_panel.count()):
+                item_text = self.synopsis_panel.item(index).text()
+                if query in _normalize_search_text(item_text):
+                    matches.append(_SearchMatch(tab_index=0, row=index))
+            return matches
+
+        matches: list[_SearchMatch] = []
+        for row in range(self.table_panel.rowCount()):
+            matching_column = -1
+            row_parts: list[str] = []
+            for column in range(1, self.table_panel.columnCount()):
+                item = self.table_panel.item(row, column)
+                text = item.text() if item is not None else ""
+                row_parts.append(text)
+                if matching_column < 0 and query in _normalize_search_text(text):
+                    matching_column = column
+            if query in _normalize_search_text("\n".join(row_parts)):
+                matches.append(
+                    _SearchMatch(
+                        tab_index=1,
+                        row=row,
+                        column=matching_column if matching_column >= 0 else 1,
+                    )
+                )
+        return matches
+
+    def _activate_next_find_match(self, *, backward: bool = False) -> None:
+        if not self.find_bar.isVisible():
+            self._show_find_bar()
+            return
+        if not self._find_matches:
+            self._refresh_find_matches(reset=True)
+            return
+        step = -1 if backward else 1
+        self._find_index = (self._find_index + step) % len(self._find_matches)
+        self._activate_find_match(self._find_matches[self._find_index])
+        self._update_find_status()
+
+    def _activate_find_match(self, match: _SearchMatch) -> None:
+        self._apply_find_highlights(match)
+        selection_flags = QItemSelectionModel.SelectionFlag.NoUpdate
+        if match.tab_index == 0:
+            model_index = self.synopsis_panel.model().index(match.row, 0)
+            self.synopsis_panel.selectionModel().setCurrentIndex(
+                model_index,
+                selection_flags,
+            )
+            self.synopsis_panel.scrollTo(
+                model_index,
+                QAbstractItemView.ScrollHint.PositionAtCenter,
+            )
+            return
+
+        model_index = self.table_panel.model().index(match.row, match.column)
+        self.table_panel.selectionModel().setCurrentIndex(
+            model_index,
+            selection_flags,
+        )
+        self.table_panel.scrollTo(
+            model_index,
+            QAbstractItemView.ScrollHint.PositionAtCenter,
+        )
+
+    def _apply_find_highlights(self, active_match: _SearchMatch) -> None:
+        query = _normalize_search_text(self.find_input.text())
+        if not query:
+            self._clear_find_highlights()
+            return
+        if active_match.tab_index == 0:
+            self.synopsis_panel.set_find_highlight(
+                query,
+                {match.row for match in self._find_matches if match.tab_index == 0},
+                active_match.row,
+            )
+            self.table_panel.set_find_highlight("", set(), -1)
+            return
+        self.synopsis_panel.set_find_highlight("", set(), -1)
+        self.table_panel.set_find_highlight(
+            query,
+            {match.row for match in self._find_matches if match.tab_index == 1},
+            active_match.row,
+        )
+
+    def _clear_find_highlights(self) -> None:
+        self.synopsis_panel.set_find_highlight("", set(), -1)
+        self.table_panel.set_find_highlight("", set(), -1)
+
+    def _update_find_status(self) -> None:
+        self.find_status_label.setText(
+            f"{self._find_index + 1} of {len(self._find_matches)}"
+        )
+        self._set_find_navigation_enabled(len(self._find_matches) > 1)
+
+    def _set_find_navigation_enabled(self, enabled: bool) -> None:
+        self.find_previous_btn.setEnabled(enabled)
+        self.find_next_btn.setEnabled(enabled)
 
     def _on_paragraph_toggled(self, paragraph_id: str, checked: bool) -> None:
         if checked:

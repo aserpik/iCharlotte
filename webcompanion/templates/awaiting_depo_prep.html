@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Review topics</h1>
+<form method="post" action="/job/{{ job.id }}/resume" class="card">
+{% for t in topics %}
+<div class="card">
+ <label class="row"><input type="checkbox" name="keep_{{ loop.index0 }}"
+  {% if t.get('default_checked', True) %}checked{% endif %}> Include</label>
+ <input type="text" name="title_{{ loop.index0 }}" value="{{ t.get('title', '') }}">
+ <input type="text" name="note_{{ loop.index0 }}" value="{{ t.get('strategic_note', '') }}" placeholder="Strategic note">
+</div>
+{% endfor %}
+<h2>Add topics</h2>
+{% for i in (1, 2, 3) %}
+<input type="text" name="new_title_{{ i }}" placeholder="New topic title">
+<input type="text" name="new_note_{{ i }}" placeholder="Strategic note (optional)">
+{% endfor %}
+<button class="btn" type="submit">Generate outline</button>
+</form>
+{% endblock %}

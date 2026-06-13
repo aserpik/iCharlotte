@@ -44,3 +44,8 @@ adeu>=0.1.0  # Agentic DOCX Redlining Engine
 # Testing
 pytest>=9.0.0
 pytest-qt>=4.5.0
+
+# Web companion (mobile wizard access)
+fastapi>=0.115.0
+uvicorn>=0.30.0
+python-multipart>=0.0.9

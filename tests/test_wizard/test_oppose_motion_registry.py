@@ -10,11 +10,12 @@ from icharlotte_core.ui.wizard.task_routing import (
 class OpposeMotionRegistryTests(unittest.TestCase):
     def test_task_registered(self):
         ids = {task.task_id for task in list_tasks()}
-        self.assertIn("oppose_motion", ids)
+        self.assertNotIn("oppose_motion", ids)
         spec = get_task("oppose_motion")
         self.assertEqual(spec.title, "Oppose a Motion")
         self.assertEqual(spec.default_folders, ["MOTIONS", "PLEADINGS", "DISCOVERY"])
         self.assertEqual(spec.script_name, "")
+        self.assertTrue(spec.hidden)
 
     def test_task_uses_in_process_builder_without_generic_picker(self):
         self.assertEqual(

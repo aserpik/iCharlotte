@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="crumb"><a href="/case/{{ case.file_number }}/chat">&#8592; Conversations</a></div>
+<h1>{{ conv.name }}</h1>
+{% for m in conv.messages %}
+<div class="card">
+ <b>{{ 'You' if m.role == 'user' else 'AI' }}:</b>
+ <div style="white-space:pre-wrap">{{ m.content }}</div>
+ {% for a in m.attachments %}<small>&#128206; {{ a.name }}</small>{% endfor %}
+</div>
+{% endfor %}
+{% if turn_id %}
+<div class="card" id="pending">
+ <b>AI:</b> <span id="turnstatus">thinking&hellip;</span>
+ <pre id="turnlog"></pre>
+</div>
+<script>
+const timer = setInterval(async () => {
+  let r;
+  try { r = await fetch('/api/chat/{{ conv.id }}/turn/{{ turn_id }}'); } catch(e){ return; }
+  if(!r.ok) return;
+  const s = await r.json();
+  document.getElementById('turnstatus').textContent = s.status;
+  document.getElementById('turnlog').textContent = (s.log || []).join('\n');
+  if(s.done){ clearInterval(timer); location.href = '/case/{{ case.file_number }}/chat/{{ conv.id }}'; }
+}, 2500);
+</script>
+{% endif %}
+<form method="post" action="/case/{{ case.file_number }}/chat/{{ conv.id }}/send" class="card">
+ <label>Model
+  <select name="model" id="modelselect" {% if turn_id %}disabled{% endif %}>
+  {% for m in models %}
+   <option value="{{ m.model }}" data-provider="{{ m.provider }}"
+     {% if m.model == conv.model %}selected{% endif %}>{{ m.label }}</option>
+  {% endfor %}
+  </select></label>
+ <input type="hidden" name="provider" id="providerfield" value="{{ conv.provider }}">
+ <textarea name="message" rows="4" placeholder="Ask about this case..." {% if turn_id %}disabled{% endif %}></textarea>
+ <label class="row"><input type="checkbox" name="research" {% if turn_id %}disabled{% endif %}> Run legal research</label>
+ <button class="btn" type="submit" {% if turn_id %}disabled{% endif %}>Send</button>
+ <a href="/case/{{ case.file_number }}/chat/{{ conv.id }}/attach">&#128206; Attach files instead</a>
+</form>
+<script>
+// Keep the submitted provider in sync with the chosen model's provider so a
+// cross-provider model selection doesn't send a mismatched provider/model pair.
+(function(){
+  const sel = document.getElementById('modelselect');
+  const prov = document.getElementById('providerfield');
+  if(!sel || !prov) return;
+  function sync(){
+    const opt = sel.options[sel.selectedIndex];
+    if(opt && opt.dataset.provider){ prov.value = opt.dataset.provider; }
+  }
+  sel.addEventListener('change', sync);
+  sync();
+})();
+</script>
+{% endblock %}

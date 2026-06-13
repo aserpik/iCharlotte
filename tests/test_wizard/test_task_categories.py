@@ -46,6 +46,7 @@ def test_expected_category_assignments():
     assert TASK_REGISTRY["med_record_extractor"].category == "Medical"
     assert TASK_REGISTRY["subpoena_tracker"].category == "Medical"
     # Motions
+    assert TASK_REGISTRY["motion_drafting"].category == "Motions"
     assert TASK_REGISTRY["oppose_motion"].category == "Motions"
     assert TASK_REGISTRY["generate_motion"].category == "Motions"
     assert TASK_REGISTRY["mediation_brief"].category == "Motions"
@@ -62,7 +63,7 @@ def test_empty_query_returns_all_tasks_grouped_in_category_order():
     assert len(grouped["Summarize"]) == 3
     assert len(grouped["Discovery"]) == 2
     assert len(grouped["Medical"]) == 4
-    assert len(grouped["Motions"]) == 3
+    assert len(grouped["Motions"]) == 2
 
 
 def test_whitespace_query_is_treated_as_empty():

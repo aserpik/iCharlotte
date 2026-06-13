@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ case.file_number }} &mdash; {{ case.plaintiff_last_name }}</h1>
+{% for task in tasks %}
+<div class="card"><a href="/case/{{ case.file_number }}/task/{{ task.task_id }}">
+ {{ task.glyph }} <b>{{ task.title }}</b><br>
+ <small>{{ task.description }}</small>
+</a></div>
+{% endfor %}
+<div class="card"><a href="/case/{{ case.file_number }}/chat">
+ &#128172; <b>Chat</b><br>
+ <small>Ask an AI about this case; attach files or run legal research.</small>
+</a></div>
+{% endblock %}

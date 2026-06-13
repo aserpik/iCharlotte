@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Pick topics &mdash; {{ session.get('deponent_name', 'Deponent') }}</h1>
+<p>{{ session.get('deponent_type', '') }} {{ session.get('deposition_date', '') }}</p>
+<form method="post" action="/job/{{ job.id }}/resume" class="card">
+<h2>Topics</h2>
+{% for t in session.get('topics', []) %}
+<label class="row"><input type="checkbox" name="topic" value="{{ t.get('title', '') }}" checked> {{ t.get('title', '') }}</label>
+{% endfor %}
+<label>Add topics (one per line)
+ <textarea name="added_topics" rows="3"></textarea></label>
+<label>Bullets per topic
+ <input type="number" name="bullets" value="5" min="1" max="15"></label>
+<label>Deponent label
+ <input type="text" name="deponent_label" value="{{ session.get('deponent_name', 'Deponent') }}"></label>
+<label>Audience
+ <select name="audience">
+ {% for key, label in audiences %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+ </select></label>
+<label>Custom audience (if Custom)
+ <input type="text" name="audience_custom"></label>
+<label>Tone
+ <select name="tone">
+ {% for key, label in tones %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+ </select></label>
+<label>Custom tone (if Custom)
+ <input type="text" name="tone_custom"></label>
+<label>Custom rules
+ <textarea name="custom_rules" rows="2"></textarea></label>
+<label class="row"><input type="checkbox" name="cross_check"> Cross-check citations</label>
+<button class="btn" type="submit">Generate summary</button>
+</form>
+{% endblock %}

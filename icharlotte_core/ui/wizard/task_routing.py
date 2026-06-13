@@ -5,6 +5,7 @@ _IN_PROCESS_TASK_BUILDERS = {
     "subpoena_tracker": "build_subpoena_tab",
     "med_record_extractor": "build_med_extractor_tab",
     "respond_to_discovery": "build_respond_to_discovery_tab",
+    "motion_drafting": "build_motion_drafting_tab",
     "oppose_motion": "build_oppose_motion_tab",
     "separate": "build_separate_tab",
     "generate_motion": "build_generate_motion_tab",
@@ -20,6 +21,7 @@ _IN_PROCESS_TASK_BUILDERS = {
 _SETTINGS_MANAGED_SOURCE_TASKS = frozenset({
     "depo_prep",
     "medical_records",
+    "motion_drafting",
     "oppose_motion",
     "summarize_documents",
     "summarize_discovery",

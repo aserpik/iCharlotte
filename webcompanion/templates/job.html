@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>{{ task.title }} &mdash; {{ job.file_number }}</h1>
+<div class="card">
+ <div>Status: <span class="state" id="state">{{ job.state }}</span></div>
+ <progress id="bar" max="100" value="{{ job.progress }}"></progress>
+ <div id="actions">
+  {% if job.state == 'awaiting_input' %}
+   <a class="btn" href="/job/{{ job.id }}/awaiting">Provide input</a>
+  {% elif job.state == 'done' and job.output_path %}
+   <a class="btn" href="/job/{{ job.id }}/output">View result</a>
+  {% endif %}
+ </div>
+ <pre id="log">{{ job.log[-50:] | join('\n') }}</pre>
+ {% if job.state in ('queued', 'running', 'awaiting_input') %}
+ <form method="post" action="/job/{{ job.id }}/cancel">
+  <button class="btn secondary" type="submit">Cancel</button>
+ </form>
+ {% endif %}
+</div>
+<script>
+async function tick(){
+  let r;
+  try { r = await fetch('/api/job/{{ job.id }}'); } catch(e) { return; }
+  if(!r.ok) return;
+  const s = await r.json();
+  document.getElementById('state').textContent = s.state;
+  document.getElementById('bar').value = s.progress;
+  document.getElementById('log').textContent = s.log.join('\n');
+  const a = document.getElementById('actions');
+  if(s.state === 'awaiting_input'){
+    a.innerHTML = '<a class="btn" href="/job/{{ job.id }}/awaiting">Provide input</a>';
+  } else if(s.state === 'done' && s.has_output){
+    a.innerHTML = '<a class="btn" href="/job/{{ job.id }}/output">View result</a>';
+  }
+  if(['done','failed','cancelled','interrupted'].includes(s.state)){
+    clearInterval(timer);
+  }
+}
+const timer = setInterval(tick, 3000);
+tick();
+</script>
+{% endblock %}
