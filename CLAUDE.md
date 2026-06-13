@@ -269,4 +269,11 @@ powershell -ExecutionPolicy Bypass -File "C:\geminiterminal2\screenshot_util.ps1
 - `--lan` flag binds 0.0.0.0 for local development; default binds Tailscale IP
 - Spec: `docs/superpowers/specs/2026-06-12-wizard-web-companion-design.md`
 
+### Web Companion Chat (2026-06-13)
+- Per-case AI chat from the phone: conversation management (shared with the
+  desktop chat file), background replies with polling, model picker, file
+  attachments as context, and a legal-research toggle
+- In-process LLM call (not a job); `webcompanion/chat.py` + `_register_chat_routes`
+- Spec: `docs/superpowers/specs/2026-06-13-webcompanion-chat-design.md`
+
 See `DEVELOPMENT_LOG.md` for detailed changelog of features added during development.
