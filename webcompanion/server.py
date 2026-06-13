@@ -4,6 +4,8 @@ Entry point: ``python -m webcompanion.server`` (binds the Tailscale IP by
 default; ``--lan`` binds 0.0.0.0 for same-network development).
 """
 import argparse
+import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -311,9 +313,20 @@ def _register_awaiting_routes(app, manager, templates):
 
 # ---- entry point ----
 
+def _tailscale_exe() -> str:
+    """Return a runnable tailscale path: bare command if on PATH, else the
+    standard Windows install location (the MSI does not add it to PATH)."""
+    found = shutil.which("tailscale")
+    if found:
+        return found
+    program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+    fallback = os.path.join(program_files, "Tailscale", "tailscale.exe")
+    return fallback if os.path.isfile(fallback) else "tailscale"
+
+
 def detect_tailscale_ip() -> str | None:
     try:
-        out = subprocess.run(["tailscale", "ip", "-4"],
+        out = subprocess.run([_tailscale_exe(), "ip", "-4"],
                              capture_output=True, text=True, timeout=10)
         if out.returncode == 0:
             lines = [ln.strip() for ln in out.stdout.splitlines() if ln.strip()]

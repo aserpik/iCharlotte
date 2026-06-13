@@ -277,3 +277,25 @@ def test_awaiting_depo_prep_form_and_resume(client, tmp_path, monkeypatch):
 def test_awaiting_on_non_awaiting_job_404(client):
     job = _make_job(client, state=J.RUNNING)
     assert client.get(f"/job/{job.id}/awaiting").status_code == 404
+
+
+def test_tailscale_exe_prefers_path(monkeypatch):
+    from webcompanion import server
+    monkeypatch.setattr(server.shutil, "which", lambda name: r"C:\path\tailscale.exe")
+    assert server._tailscale_exe() == r"C:\path\tailscale.exe"
+
+
+def test_tailscale_exe_falls_back_to_program_files(monkeypatch):
+    from webcompanion import server
+    monkeypatch.setattr(server.shutil, "which", lambda name: None)
+    monkeypatch.setenv("ProgramFiles", r"C:\Program Files")
+    monkeypatch.setattr(server.os.path, "isfile",
+                        lambda p: p == r"C:\Program Files\Tailscale\tailscale.exe")
+    assert server._tailscale_exe() == r"C:\Program Files\Tailscale\tailscale.exe"
+
+
+def test_tailscale_exe_defaults_to_bare_command(monkeypatch):
+    from webcompanion import server
+    monkeypatch.setattr(server.shutil, "which", lambda name: None)
+    monkeypatch.setattr(server.os.path, "isfile", lambda p: False)
+    assert server._tailscale_exe() == "tailscale"
