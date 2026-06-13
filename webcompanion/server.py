@@ -191,7 +191,123 @@ def _register_depo_prep_routes(app, manager, templates):
 
 
 def _register_awaiting_routes(app, manager, templates):
-    pass
+    def _render(name, request, **ctx):
+        return templates.TemplateResponse(name, {"request": request, **ctx})
+
+    def _get_awaiting(job_id):
+        job = manager.store.get(job_id)
+        if job is None or job.state != J.AWAITING_INPUT \
+                or not job.session_path:
+            return None
+        return job
+
+    @app.get("/job/{job_id}/awaiting", response_class=HTMLResponse)
+    def awaiting_form(request: Request, job_id: str):
+        job = _get_awaiting(job_id)
+        if job is None:
+            return HTMLResponse("Not awaiting input", status_code=404)
+        kind = T.TASKS[job.task_id].awaiting_kind
+        if kind == "deposition":
+            session = T.read_session_json(job.session_path)
+            return _render("awaiting_deposition.html", request, job=job,
+                           session=session, audiences=T.DEPO_AUDIENCES,
+                           tones=T.DEPO_TONES)
+        if kind == "med_chron":
+            session = T.read_session_json(job.session_path)
+            return _render("awaiting_med_chron.html", request, job=job,
+                           session=session)
+        if kind == "depo_prep":
+            topics = T.read_depo_prep_topics(job.session_path)
+            return _render("awaiting_depo_prep.html", request, job=job,
+                           topics=topics)
+        return HTMLResponse("Unknown task kind", status_code=400)
+
+    @app.post("/job/{job_id}/resume")
+    async def resume_job(request: Request, job_id: str):
+        job = _get_awaiting(job_id)
+        if job is None:
+            return HTMLResponse("Not awaiting input", status_code=404)
+        form = await request.form()
+        kind = T.TASKS[job.task_id].awaiting_kind
+
+        if kind == "deposition":
+            cfg = {
+                "selected_topics": [t for t in form.getlist("topic")
+                                    if t.strip()],
+                "added_topics": [
+                    ln.strip()
+                    for ln in (form.get("added_topics") or "").splitlines()
+                    if ln.strip()],
+                "bullets_per_topic": int(form.get("bullets") or 5),
+                "deponent_label": (form.get("deponent_label") or "").strip()
+                                  or "Deponent",
+                "custom_rules": (form.get("custom_rules") or "").strip(),
+                "cross_check_enabled": form.get("cross_check") == "on",
+                "context_doc_paths": [],
+                "audience": form.get("audience") or "neutral",
+                "audience_custom": (
+                    (form.get("audience_custom") or "").strip()
+                    if form.get("audience") == "custom" else ""),
+                "tone": form.get("tone") or "recitation",
+                "tone_custom": (
+                    (form.get("tone_custom") or "").strip()
+                    if form.get("tone") == "custom" else ""),
+            }
+            if not cfg["selected_topics"] and not cfg["added_topics"]:
+                return HTMLResponse("Select or add at least one topic.",
+                                    status_code=400)
+            T.apply_deposition_user_config(job.session_path, cfg)
+
+        elif kind == "med_chron":
+            selected = [a for a in form.getlist("analysis") if a]
+            custom = []
+            for i in (1, 2, 3):
+                lbl = (form.get(f"custom_label_{i}") or "").strip()
+                instr = (form.get(f"custom_instruction_{i}") or "").strip()
+                if lbl and instr:
+                    custom.append({"label": lbl, "instruction": instr,
+                                   "context_files": []})
+            if not selected and not custom:
+                return HTMLResponse(
+                    "Select or add at least one analysis.", status_code=400)
+            T.apply_med_chron_user_config(job.session_path, {
+                "selected_catalog_ids": selected,
+                "custom_analyses": custom,
+            })
+
+        elif kind == "depo_prep":
+            existing = T.read_depo_prep_topics(job.session_path)
+            topics = []
+            for i, t in enumerate(existing):
+                topics.append({
+                    "id": t.get("id") or f"t{i + 1:02d}",
+                    "title": (form.get(f"title_{i}")
+                              or t.get("title", "")).strip(),
+                    "strategic_note": (form.get(f"note_{i}") or "").strip(),
+                    "relevant_digest_refs": t.get("relevant_digest_refs", []),
+                    "default_checked": form.get(f"keep_{i}") == "on",
+                    "lawyer_added": bool(t.get("lawyer_added", False)),
+                })
+            for i in (1, 2, 3):
+                title = (form.get(f"new_title_{i}") or "").strip()
+                if title:
+                    topics.append({
+                        "id": f"t{len(topics) + 1:02d}", "title": title,
+                        "strategic_note": (form.get(f"new_note_{i}")
+                                           or "").strip(),
+                        "relevant_digest_refs": [],
+                        "default_checked": True, "lawyer_added": True,
+                    })
+            if not any(t["default_checked"] for t in topics):
+                return HTMLResponse("Keep or add at least one topic.",
+                                    status_code=400)
+            T.write_depo_prep_topics(job.session_path, topics)
+
+        else:
+            return HTMLResponse("Unknown task kind", status_code=400)
+
+        manager.resume(job_id)
+        return RedirectResponse(f"/job/{job_id}", status_code=303)
 
 
 # ---- entry point ----

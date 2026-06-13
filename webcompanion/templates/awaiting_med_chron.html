@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Analyses &mdash; {{ session.get('provider_name', '') }}</h1>
+<form method="post" action="/job/{{ job.id }}/resume" class="card">
+<h2>Catalog</h2>
+{% for entry in session.get('catalog', []) %}
+<label class="row"><input type="checkbox" name="analysis" value="{{ entry.id }}"> {{ entry.label }}</label>
+{% endfor %}
+<h2>Custom analyses</h2>
+{% for i in (1, 2, 3) %}
+<label>Label <input type="text" name="custom_label_{{ i }}"></label>
+<label>Instruction <input type="text" name="custom_instruction_{{ i }}"></label>
+{% endfor %}
+<button class="btn" type="submit">Run analyses</button>
+</form>
+{% endblock %}

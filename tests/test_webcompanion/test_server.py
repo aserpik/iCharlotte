@@ -164,3 +164,116 @@ def test_depo_prep_submit_builds_config(client, monkeypatch):
     assert cfg["per_topic_flags"]["source_facts"] is False
     assert cfg["deponent_sources"][0].endswith("doc.pdf")
     assert cfg["context_sources"] == []
+
+
+import json as _json
+
+
+def _awaiting_job(client, tmp_path, task_id, session_data, topics=None):
+    from webcompanion.jobs import new_job
+    session = tmp_path / "session.json"
+    session.write_text(_json.dumps(session_data), encoding="utf-8")
+    if topics is not None:
+        (tmp_path / "topics.json").write_text(
+            _json.dumps({"topics": topics}), encoding="utf-8")
+    job = new_job(task_id, "E:/case", "9999", ["E:/case/d.pdf"])
+    job.state = J.AWAITING_INPUT
+    job.session_path = str(session)
+    client.manager.store.add(job)
+    return job
+
+
+def test_awaiting_deposition_form(client, tmp_path):
+    job = _awaiting_job(client, tmp_path, "summarize_depositions", {
+        "deponent_name": "Dr. Jones", "deponent_type": "expert",
+        "deposition_date": "2026-01-15",
+        "topics": [{"title": "Background"}, {"title": "Treatment"}],
+    })
+    r = client.get(f"/job/{job.id}/awaiting")
+    assert r.status_code == 200
+    assert "Dr. Jones" in r.text and "Background" in r.text
+
+
+def test_awaiting_deposition_resume(client, tmp_path, monkeypatch):
+    job = _awaiting_job(client, tmp_path, "summarize_depositions", {
+        "topics": [{"title": "Background"}],
+    })
+    applied, resumed = {}, []
+    monkeypatch.setattr(
+        "webcompanion.server.T.apply_deposition_user_config",
+        lambda sp, cfg: applied.update(cfg))
+    monkeypatch.setattr(client.manager, "resume",
+                        lambda jid: resumed.append(jid))
+    r = client.post(f"/job/{job.id}/resume", data={
+        "topic": ["Background"], "added_topics": "Damages\nPrognosis",
+        "bullets": "7", "deponent_label": "Dr. Jones",
+        "audience": "pro_defense", "tone": "recitation",
+        "cross_check": "on",
+    }, follow_redirects=False)
+    assert r.status_code == 303 and resumed == [job.id]
+    assert applied["selected_topics"] == ["Background"]
+    assert applied["added_topics"] == ["Damages", "Prognosis"]
+    assert applied["bullets_per_topic"] == 7
+    assert applied["cross_check_enabled"] is True
+    assert applied["audience"] == "pro_defense"
+
+
+def test_awaiting_deposition_requires_topic(client, tmp_path):
+    job = _awaiting_job(client, tmp_path, "summarize_depositions",
+                        {"topics": []})
+    r = client.post(f"/job/{job.id}/resume", data={"added_topics": ""})
+    assert r.status_code == 400
+
+
+def test_awaiting_med_chron_form_and_resume(client, tmp_path, monkeypatch):
+    job = _awaiting_job(client, tmp_path, "med_chron_analysis", {
+        "provider_name": "Kaiser",
+        "catalog": [{"id": "gaps", "label": "Treatment gaps"},
+                    {"id": "billing", "label": "Billing analysis"}],
+    })
+    r = client.get(f"/job/{job.id}/awaiting")
+    assert "Kaiser" in r.text and "Treatment gaps" in r.text
+
+    applied, resumed = {}, []
+    monkeypatch.setattr(
+        "webcompanion.server.T.apply_med_chron_user_config",
+        lambda sp, cfg: applied.update(cfg))
+    monkeypatch.setattr(client.manager, "resume",
+                        lambda jid: resumed.append(jid))
+    r = client.post(f"/job/{job.id}/resume", data={
+        "analysis": ["gaps"],
+        "custom_label_1": "IME prep", "custom_instruction_1": "Flag inconsistencies",
+    }, follow_redirects=False)
+    assert r.status_code == 303 and resumed == [job.id]
+    assert applied["selected_catalog_ids"] == ["gaps"]
+    assert applied["custom_analyses"] == [
+        {"label": "IME prep", "instruction": "Flag inconsistencies",
+         "context_files": []}]
+
+
+def test_awaiting_depo_prep_form_and_resume(client, tmp_path, monkeypatch):
+    topics = [{"id": "t01", "title": "Background", "strategic_note": "note",
+               "relevant_digest_refs": ["d1"], "default_checked": True,
+               "lawyer_added": False}]
+    job = _awaiting_job(client, tmp_path, "depo_prep", {}, topics=topics)
+    r = client.get(f"/job/{job.id}/awaiting")
+    assert "Background" in r.text
+
+    resumed = []
+    monkeypatch.setattr(client.manager, "resume",
+                        lambda jid: resumed.append(jid))
+    r = client.post(f"/job/{job.id}/resume", data={
+        "keep_0": "on", "title_0": "Background (edited)", "note_0": "note",
+        "new_title_1": "Damages", "new_note_1": "",
+    }, follow_redirects=False)
+    assert r.status_code == 303 and resumed == [job.id]
+    written = _json.loads(
+        (tmp_path / "topics.json").read_text(encoding="utf-8"))["topics"]
+    assert written[0]["title"] == "Background (edited)"
+    assert written[0]["relevant_digest_refs"] == ["d1"]
+    assert written[1]["title"] == "Damages" and written[1]["lawyer_added"] is True
+
+
+def test_awaiting_on_non_awaiting_job_404(client):
+    job = _make_job(client, state=J.RUNNING)
+    assert client.get(f"/job/{job.id}/awaiting").status_code == 404
