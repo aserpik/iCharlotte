@@ -85,14 +85,18 @@ class JobManager:
 
     def _schedule(self) -> None:
         # store.all() is newest-first; iterate oldest-first for FIFO.
+        running_count = self._running_count()
+        running_paths = self._running_case_paths()
         for job in reversed(self.store.all()):
             if job.state != J.QUEUED:
                 continue
-            if self._running_count() >= self._max:
+            if running_count >= self._max:
                 return
-            if job.case_path in self._running_case_paths():
+            if job.case_path in running_paths:
                 continue
             self._start_current_file(job)
+            running_count += 1
+            running_paths.add(job.case_path)
 
     def _start_current_file(self, job: Job) -> None:
         task = TASKS[job.task_id]
@@ -137,7 +141,7 @@ class JobManager:
                 self._awaiting[job_id] = ev.path
             elif ev.kind == "output":
                 self._explicit_output[job_id] = ev.path
-            elif ev.message.strip():
+            elif (ev.message or "").strip():
                 job.add_log(ev.message)
             self.store.save()
 
@@ -149,9 +153,11 @@ class JobManager:
                 return
             if job_id in self._cancel_requested:
                 self._cancel_requested.discard(job_id)
+                self._file_idx.pop(job_id, None)
                 job.state = J.CANCELLED
                 job.add_log("Cancelled.")
             elif returncode != 0:
+                self._file_idx.pop(job_id, None)
                 job.state = J.FAILED
                 job.error = f"Script exited with code {returncode}."
                 job.add_log(job.error)
@@ -171,6 +177,7 @@ class JobManager:
                     self.store.save()
                     self._start_current_file(job)
                     return
+                self._file_idx.pop(job_id, None)
                 job.state = J.DONE
                 job.progress = 100
                 job.add_log(

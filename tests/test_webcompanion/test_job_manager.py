@@ -123,7 +123,85 @@ def test_cancel_queued_job(tmp_path, fake_task):
     a = _submit(manager, tmp_path, "await", "a.txt")   # occupies the slot
     _wait(lambda: manager.store.get(a.id).state == J.AWAITING_INPUT)
     b = _submit(manager, tmp_path, "ok", "b.txt")
+    # With a occupying the single slot (awaiting, not running) the per-case
+    # guard only blocks on RUNNING, so b is allowed to start since a is not
+    # RUNNING — b may be QUEUED, RUNNING, or already DONE.
+    assert manager.store.get(b.id).state in (J.QUEUED, J.RUNNING, J.DONE)
     # a is awaiting (not RUNNING) so b may start; cancel a instead
     manager.cancel(a.id)
     assert manager.store.get(a.id).state == J.CANCELLED
     _wait(lambda: manager.store.get(b.id).state == J.DONE)
+
+
+@pytest.fixture
+def fake_single_task(tmp_path, monkeypatch):
+    """Register single-phase task 'fakes' that accepts multiple files.
+
+    Emits PROGRESS:50:half then OUTPUT:<result> and exits 0 for each file.
+    """
+    script = tmp_path / "fake_single.py"
+    script.write_text(textwrap.dedent("""
+        import sys
+        from pathlib import Path
+        arg = sys.argv[-1]
+        print("PROGRESS:50:half")
+        print("OUTPUT:" + str(Path(arg).with_name("result.docx")))
+        sys.exit(0)
+    """), encoding="utf-8")
+
+    spec = TaskDef(task_id="fakes", title="FakeSingle", glyph="S",
+                   script_name="UNUSED", description="single-phase test",
+                   two_phase=False)
+    monkeypatch.setitem(T.TASKS, "fakes", spec)
+    import webcompanion.job_manager as jm
+    monkeypatch.setattr(
+        jm, "build_phase1_argv",
+        lambda task, p: [str(script), *task.phase1_args, p])
+    monkeypatch.setattr(
+        jm, "build_phase2_argv",
+        lambda task, s: [str(script), s])
+    return script
+
+
+def test_multi_file_progress_scaling(tmp_path, fake_single_task):
+    manager = JobManager(JobStore(tmp_path / "jobs.json"))
+    f1 = tmp_path / "a.txt"; f1.write_text("ok", encoding="utf-8")
+    f2 = tmp_path / "b.txt"; f2.write_text("ok", encoding="utf-8")
+    job = new_job("fakes", str(tmp_path), "9999", [str(f1), str(f2)])
+    manager.submit(job)
+    _wait(lambda: manager.store.get(job.id).state == J.DONE)
+    assert manager.store.get(job.id).progress == 100
+
+
+@pytest.fixture
+def fake_mtime_task(tmp_path, monkeypatch):
+    script = tmp_path / "fake_mtime.py"
+    script.write_text(textwrap.dedent('''
+        import os, sys, time
+        from pathlib import Path
+        arg = sys.argv[-1]
+        case_path = Path(arg).read_text(encoding="utf-8").strip()
+        out_dir = Path(case_path) / "NOTES" / "AI Output"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        time.sleep(0.05)
+        (out_dir / "made.docx").write_bytes(b"PK")
+        print("PROGRESS:80:writing")
+        sys.exit(0)
+    '''), encoding="utf-8")
+    spec = TaskDef(task_id="fakem", title="FakeM", glyph="M",
+                   script_name="UNUSED", description="mtime test")
+    monkeypatch.setitem(T.TASKS, "fakem", spec)
+    import webcompanion.job_manager as jm
+    monkeypatch.setattr(jm, "build_phase1_argv",
+                        lambda task, p: [str(script), *task.phase1_args, p])
+    return script
+
+
+def test_output_detected_via_mtime_diff(tmp_path, fake_mtime_task):
+    manager = JobManager(JobStore(tmp_path / "jobs.json"))
+    mode = tmp_path / "case.txt"
+    mode.write_text(str(tmp_path), encoding="utf-8")
+    job = new_job("fakem", str(tmp_path), "9999", [str(mode)])
+    manager.submit(job)
+    _wait(lambda: manager.store.get(job.id).state == J.DONE)
+    assert manager.store.get(job.id).output_path.endswith("made.docx")
